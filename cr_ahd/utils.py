@@ -2,8 +2,8 @@ import pandas as pd
 import numpy as np
 from collections import namedtuple
 
-opts = {'verbose': 0,
-        'speed_kmh': 1500,
+opts = {'verbose': 2,
+        'speed_kmh': 60**2,
         'start_time': 0}
 
 Coords = namedtuple('Coords', ['x', 'y'])
@@ -33,3 +33,16 @@ def make_dist_matrix(vertices: list):
 
 def travel_time(dist):
     return (dist / opts['speed_kmh']) * 60**2  # compute time in seconds
+
+
+class InsertionError(Exception):
+    """Exception raised for errors in the insertion of a request into a tour.
+
+    Attributes:
+        expression -- input expression in which the error occurred
+        message -- explanation of the error
+    """
+
+    def __init__(self, expression, message):
+        self.expression = expression
+        self.message = message

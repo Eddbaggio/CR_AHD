@@ -1,5 +1,5 @@
 import vertex as vx
-from utils import travel_time, opts
+from utils import travel_time, opts, InsertionError
 from copy import deepcopy
 from typing import List
 
@@ -41,7 +41,7 @@ class Tour(object):
         tour.cost = self.cost
         return tour
 
-    def insert_and_reset_schedules(self, index: int, vertex: vx.Vertex, dist_matrix):
+    def insert_and_reset_schedules(self, index: int, vertex: vx.Vertex):
         """ inserts a vertex before the specified index and resets all schedules to None. """
         self.sequence.insert(index, vertex)
         self.arrival_schedule = [None] * len(self)  # reset arrival times
@@ -52,48 +52,52 @@ class Tour(object):
     def _insert_and_update_schedules(self):
         pass
 
-    def compute_cost_and_schedules(self, dist_matrix, start_time=opts['start_time'], ignore_tw=True):
+    def compute_cost_and_schedules(self, dist_matrix, start_time=opts['start_time'], ignore_tw=True, verbose=opts['verbose']):
         self.cost = 0
         self.arrival_schedule[0] = start_time
         self.service_schedule[0] = start_time
-        for i in range(1, len(self)):
-            j: vx.Vertex = self.sequence[i - 1]
-            k: vx.Vertex = self.sequence[i]
-            dist = dist_matrix.loc[j.id_, k.id_]
+        for rho in range(1, len(self)):
+            i: vx.Vertex = self.sequence[rho - 1]
+            j: vx.Vertex = self.sequence[rho]
+            dist = dist_matrix.loc[i.id_, j.id_]
             self.cost += dist
-            planned_arrival = self.service_schedule[i - 1] + j.service_duration + travel_time(dist)
-            if opts['verbose'] > 2:
-                print(f'Planned arrival at {k}: {planned_arrival}')
+            planned_arrival = self.service_schedule[rho - 1] + i.service_duration + travel_time(dist)
+            if verbose > 2:
+                print(f'Planned arrival at {j}: {planned_arrival}')
             if not ignore_tw:
-                assert planned_arrival <= k.tw.l
-            self.arrival_schedule[i] = planned_arrival
-            if planned_arrival >= k.tw.e:
-                self.service_schedule[i] = planned_arrival
+                assert planned_arrival <= j.tw.l
+            self.arrival_schedule[rho] = planned_arrival
+            if planned_arrival >= j.tw.e:
+                self.service_schedule[rho] = planned_arrival
             else:
-                self.service_schedule[i] = k.tw.e
+                self.service_schedule[rho] = j.tw.e
         pass
 
     def is_feasible(self, dist_matrix, start_time=opts['start_time'], verbose=opts['verbose']) -> bool:
         if verbose > 1:
-            print(f'== Fesibility Check')
+            print(f'== Feasibility Check')
             print(self)
         service_schedule = self.service_schedule.copy()
         service_schedule[0] = start_time
-        for i in range(1, len(self)):
-            j: vx.Vertex = self.sequence[i - 1]
-            k: vx.Vertex = self.sequence[i]
-            dist = dist_matrix.loc[j.id_, k.id_]
+        for rho in range(1, len(self)):
+            i: vx.Vertex = self.sequence[rho - 1]
+            j: vx.Vertex = self.sequence[rho]
+            dist = dist_matrix.loc[i.id_, j.id_]
             if verbose > 2:
-                print(f'iteration {i}; service_schedule: {service_schedule}')
-            earliest_arrival = service_schedule[i - 1] + j.service_duration + travel_time(dist)
-            if earliest_arrival > k.tw.l:
+                print(f'iteration {rho}; service_schedule: {service_schedule}')
+            earliest_arrival = service_schedule[rho - 1] + i.service_duration + travel_time(dist)
+            if earliest_arrival > j.tw.l:
                 if verbose > 0:
-                    print(f'Infeasible! {round(earliest_arrival, 2)} > {k.id_}.tw.l: {k.tw.l}')
+                    print(f'From {i} to {j}')
+                    print(f'Predecessor start of service : {service_schedule[rho - 1]}')
+                    print(f'Predecessor service time : {i.service_duration}')
+                    print(f'Distance : {dist}')
+                    print(f'Travel time: {travel_time(dist)}')
+                    print(f'Infeasible! {round(earliest_arrival, 2)} > {j.id_}.tw.l: {j.tw.l}')
+                    print()
                 return False
-            elif earliest_arrival >= k.tw.e:
-                service_schedule[i] = earliest_arrival
             else:
-                service_schedule[i] = k.tw.e
+                service_schedule[rho] = max(j.tw.e, earliest_arrival)
         return True
 
     def cheapest_feasible_insertion(self, u: vx.Vertex, dist_matrix, verbose=opts['verbose']):
@@ -103,15 +107,19 @@ class Tour(object):
             print(f'\n= Cheapest insertion of {u.id_} into {self.id_}')
             print(self)
         min_insertion_cost = float('inf')
-        i_star = None
-        j_star = None
+        i_best = None
+        j_best = None
 
         # test all insertion positions
         for rho in range(1, len(self)):
 
-            # compute insertion cost
             i: vx.Vertex = self.sequence[rho - 1]
             j: vx.Vertex = self.sequence[rho]
+
+            # trivial feasibility check
+            # if i.tw.e < u.tw.l and u.tw.e < j.tw.l:
+
+            # compute insertion cost
             dist_i_u = dist_matrix.loc[i.id_, u.id_]
             dist_u_j = dist_matrix.loc[u.id_, j.id_]
             insertion_cost = dist_i_u + dist_u_j
@@ -123,20 +131,21 @@ class Tour(object):
 
                 # check feasibility
                 temp_tour = deepcopy(self)
-                temp_tour.insert_and_reset_schedules(index=rho, vertex=u, dist_matrix=dist_matrix)
+                temp_tour.insert_and_reset_schedules(index=rho, vertex=u)
                 if temp_tour.is_feasible(dist_matrix=dist_matrix):
-                    # TODO: there is a lot of potential to skip feasibility checks if the tw.l is smaller than the current arrival of its potential successor!
                     # update best known insertion position
                     min_insertion_cost = insertion_cost
-                    i_star = i
-                    j_star = j
+                    i_best = i
+                    j_best = j
                     insertion_position = rho
+            # else:
+            #     print('skip')
 
         # return the best found position and cost or raise an error if no feasible position was found
-        if i_star:
+        if i_best:
             if verbose > 0:
-                print(f'== Best: between {i_star.id_} and {j_star.id_}: {min_insertion_cost}')
+                print(f'== Best: between {i_best.id_} and {j_best.id_}: {min_insertion_cost}')
             return insertion_position, min_insertion_cost
         else:
-            raise IndexError('No feasible insertion position found')
+            raise InsertionError('', 'No feasible insertion position found')
         pass

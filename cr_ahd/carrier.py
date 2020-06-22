@@ -1,7 +1,7 @@
 import vertex as vx
 from tour import Tour
 from collections import OrderedDict
-from utils import opts
+from utils import opts, InsertionError
 
 
 class Carrier(object):
@@ -31,20 +31,37 @@ class Carrier(object):
             route_cost += v.tour.cost
         return route_cost
 
-    def _cheapest_insertion_construction(self, dist_matrix):
-        """private method, call via l1_construction of carrier's instance instead"""
+    def find_seed_request(self, earliest_due_date: bool = True) -> vx.Vertex:
+        # find request with earliest deadline and initialize pendulum tour
+        if earliest_due_date:
+            seed = list(self.requests.values())[0]
+            for key, request in self.requests.items():
+                if request.tw.l < seed.tw.l:
+                    seed = self.requests[key]
+        return seed
+
+    def _cheapest_insertion_construction(self, dist_matrix, verbose=opts['verbose']):
+        """private method, call via construction method of carrier's instance instead"""
         unrouted: OrderedDict = self.requests.copy()
         tours = [v.tour for v in self.vehicles]
 
-        seed = list(unrouted.values())[0]
-        for key, request in unrouted.items():
-            if request.tw.l < seed.tw.l:
-                seed = unrouted[key]
+        # find request with earliest deadline and initialize pendulum tour
+        seed = self.find_seed_request()
         tour: Tour = tours[0]
-        tour.insert_and_reset_schedules(index=1, vertex=seed, dist_matrix=dist_matrix)
-        tour.compute_cost_and_schedules(dist_matrix=dist_matrix)
-        unrouted.pop(seed.id_)
 
+        print(f'Seed:\n{seed}')
+        print(f'Tour:\n{tour}')
+        print(f'Distance seed - depot: {dist_matrix.loc[seed.id_, self.depot.id_]}')
+        print()
+
+        tour.insert_and_reset_schedules(index=1, vertex=seed)
+        if tour.is_feasible(dist_matrix=dist_matrix):
+            tour.compute_cost_and_schedules(dist_matrix=dist_matrix)
+            unrouted.pop(seed.id_)
+        else:
+            raise InsertionError('', 'Seed request cannot be inserted feasibly')
+
+        # add unrouted customers one by one
         while len(unrouted) > 0:
             _, u = unrouted.popitem(last=False)  # remove LIFO from unrouted
             inserted = False
@@ -52,16 +69,16 @@ class Carrier(object):
             while inserted is False:
                 tour = tours[tour_index]
                 try:
-                    pos, cost = tour.cheapest_feasible_insertion(u=u, dist_matrix=dist_matrix)
-                    tour.insert_and_reset_schedules(pos, u, dist_matrix)  # add the unrouted element in its cheapest insertion position
-                    tour.compute_cost_and_schedules(dist_matrix)
+                    pos, cost = tour.cheapest_feasible_insertion(u=u, dist_matrix=dist_matrix)  # will raise error when none is found
+                    tour.insert_and_reset_schedules(index=pos, vertex=u)  # add the unrouted element in its cheapest insertion position
+                    tour.compute_cost_and_schedules(dist_matrix=dist_matrix)
                     inserted = True
-                except IndexError:
-                    if opts['verbose'] > 0:
-                        print(f'== Infeasible')
+                except InsertionError:
+                    if verbose > 0:
+                        print(f'== {u.id_} cannot be feasibly inserted into {tour.id_}')
                     tour_index += 1
                     pass
-        if opts['verbose'] > 0:
+        if verbose > 0:
             for v in self.vehicles:
                 print()
                 print(v.tour)
