@@ -117,29 +117,29 @@ class Tour(object):
             j: vx.Vertex = self.sequence[rho]
 
             # trivial feasibility check
-            # if i.tw.e < u.tw.l and u.tw.e < j.tw.l:
+            if i.tw.e < u.tw.l and u.tw.e < j.tw.l:
 
-            # compute insertion cost
-            dist_i_u = dist_matrix.loc[i.id_, u.id_]
-            dist_u_j = dist_matrix.loc[u.id_, j.id_]
-            insertion_cost = dist_i_u + dist_u_j
+                # compute insertion cost
+                dist_i_u = dist_matrix.loc[i.id_, u.id_]
+                dist_u_j = dist_matrix.loc[u.id_, j.id_]
+                insertion_cost = dist_i_u + dist_u_j
 
-            if verbose > 1:
-                print(f'Between {i.id_} and {j.id_}: {insertion_cost}')
+                if verbose > 1:
+                    print(f'Between {i.id_} and {j.id_}: {insertion_cost}')
 
-            if insertion_cost < min_insertion_cost:
+                if insertion_cost < min_insertion_cost:
 
-                # check feasibility
-                temp_tour = deepcopy(self)
-                temp_tour.insert_and_reset_schedules(index=rho, vertex=u)
-                if temp_tour.is_feasible(dist_matrix=dist_matrix):
-                    # update best known insertion position
-                    min_insertion_cost = insertion_cost
-                    i_best = i
-                    j_best = j
-                    insertion_position = rho
-            # else:
-            #     print('skip')
+                    # check feasibility
+                    temp_tour = deepcopy(self)
+                    temp_tour.insert_and_reset_schedules(index=rho, vertex=u)
+                    if temp_tour.is_feasible(dist_matrix=dist_matrix):
+                        # update best known insertion position
+                        min_insertion_cost = insertion_cost
+                        i_best = i
+                        j_best = j
+                        insertion_position = rho
+            else:
+                print('skip')
 
         # return the best found position and cost or raise an error if no feasible position was found
         if i_best:
