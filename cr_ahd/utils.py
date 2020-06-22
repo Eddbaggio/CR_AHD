@@ -3,7 +3,7 @@ import numpy as np
 from collections import namedtuple
 
 opts = {'verbose': 0,
-        'speed_kmh': 2000,
+        'speed_kmh': 1500,
         'start_time': 0}
 
 Coords = namedtuple('Coords', ['x', 'y'])

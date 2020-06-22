@@ -10,8 +10,6 @@ import pandas as pd
 
 class Instance(object):
     """Class to store CR_AHD instances
-
-
     """
 
     def __init__(self, id_, requests, carriers):
@@ -27,8 +25,10 @@ class Instance(object):
     def cheapest_insertion_construction(self):
         for c in self.carriers:
             c._cheapest_insertion_construction(self.dist_matrix)
-            print('\n')
-            print('\n')
+            if opts['verbose'] > 0:
+                print('\n')
+                print(f'Route cost of carrier {c.id_}: {c.route_cost()}')
+                print('\n')
         pass
 
     def total_cost(self):
