@@ -22,10 +22,19 @@ class Instance(object):
     def __str__(self):
         return f'Instance with {len(self.requests)} customers and {len(self.carriers)} carriers'
 
-    def cheapest_insertion_construction(self):
+    def cheapest_insertion_construction(self, verbose=opts['verbose']):
         for c in self.carriers:
             c._cheapest_insertion_construction(self.dist_matrix)
-            if opts['verbose'] > 0:
+            if verbose > 0:
+                print('\n')
+                print(f'Route cost of carrier {c.id_}: {c.route_cost()}')
+                print('\n')
+        pass
+
+    def I1_construction(self, verbose=opts['verbose']):
+        for c in self.carriers:
+            c._I1_construction(dist_matrix=self.dist_matrix)
+            if verbose > 0:
                 print('\n')
                 print(f'Route cost of carrier {c.id_}: {c.route_cost()}')
                 print('\n')

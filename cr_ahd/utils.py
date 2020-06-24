@@ -4,7 +4,11 @@ from collections import namedtuple
 
 opts = {'verbose': 0,
         'speed_kmh': 60**2,
-        'start_time': 0}
+        'start_time': 0,
+        'alpha_1': 1,
+        'mu': 0,
+        'lambda': 0,
+        }
 
 Coords = namedtuple('Coords', ['x', 'y'])
 TimeWindow = namedtuple('TimeWindow', ['e', 'l'])

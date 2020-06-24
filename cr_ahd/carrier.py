@@ -2,6 +2,7 @@ import vertex as vx
 from tour import Tour
 from collections import OrderedDict
 from utils import opts, InsertionError
+from copy import deepcopy
 
 
 class Carrier(object):
@@ -12,6 +13,8 @@ class Carrier(object):
         self.depot = depot
         self.vehicles = vehicles
         self.requests = OrderedDict()
+        self.unrouted = OrderedDict()
+        # TODO: maybe have attributes 'unrouted' and 'routed'?! saves me from copying the self.requests e.g. in _cheapest_insertion_construction
 
         for v in vehicles:
             v.tour = Tour(id_=v.id_, sequence=[self.depot, self.depot])
@@ -22,6 +25,7 @@ class Carrier(object):
 
     def assign_request(self, request: vx.Vertex):
         self.requests[request.id_] = request
+        self.unrouted[request.id_] = request
         # TODO: add dist matrix attribute and extend it with each request assignment? -> inefficient, too much updating? instead have an extra function to extend the matrix whenever necessary?
         pass
 
@@ -34,36 +38,29 @@ class Carrier(object):
     def find_seed_request(self, earliest_due_date: bool = True) -> vx.Vertex:
         # find request with earliest deadline and initialize pendulum tour
         if earliest_due_date:
-            seed = list(self.requests.values())[0]
-            for key, request in self.requests.items():
+            seed = list(self.unrouted.values())[0]
+            for key, request in self.unrouted.items():
                 if request.tw.l < seed.tw.l:
-                    seed = self.requests[key]
+                    seed = self.unrouted[key]
         return seed
 
     def _cheapest_insertion_construction(self, dist_matrix, verbose=opts['verbose']):
         """private method, call via construction method of carrier's instance instead"""
-        unrouted: OrderedDict = self.requests.copy()
         tours = [v.tour for v in self.vehicles]
 
-        # find request with earliest deadline and initialize pendulum tour
-        seed = self.find_seed_request()
-        tour: Tour = tours[0]
-
-        print(f'Seed:\n{seed}')
-        print(f'Tour:\n{tour}')
-        print(f'Distance seed - depot: {dist_matrix.loc[seed.id_, self.depot.id_]}')
-        print()
-
-        tour.insert_and_reset_schedules(index=1, vertex=seed)
-        if tour.is_feasible(dist_matrix=dist_matrix):
-            tour.compute_cost_and_schedules(dist_matrix=dist_matrix)
-            unrouted.pop(seed.id_)
-        else:
-            raise InsertionError('', 'Seed request cannot be inserted feasibly')
+        # find request with earliest deadline and initialize pendulum tours
+        # for tour in tours:
+        #     seed = self.find_seed_request(earliest_due_date=True)
+        #     tour.insert_and_reset_schedules(index=1, vertex=seed)
+        #     if tour.is_feasible(dist_matrix=dist_matrix):
+        #         tour.compute_cost_and_schedules(dist_matrix=dist_matrix)
+        #         self.unrouted.pop(seed.id_)
+        #     else:
+        #         raise InsertionError('', 'Seed request cannot be inserted feasibly')
 
         # add unrouted customers one by one
-        while len(unrouted) > 0:
-            _, u = unrouted.popitem(last=False)  # remove LIFO from unrouted
+        while len(self.unrouted) > 0:
+            _, u = self.unrouted.popitem(last=False)  # remove LIFO from unrouted
             inserted = False
             tour_index = 0
             while inserted is False:
@@ -85,19 +82,63 @@ class Carrier(object):
 
         pass
 
-        # def I1_construction(self):
-        # initialize tour with a seed, a) farthest un-routed request
-        # or b) un-routed request with earliest deadline
+    def _I1_construction(self, dist_matrix, verbose=opts['verbose']):
+        """Solomon's I1 insertion heuristic from 1987. Following the description of
+         'Bräysy, Olli; Gendreau, Michel (2005): Vehicle Routing Problem with Time Windows,
+        Part I: Route Construction and Local Search Algorithms.'
+        """
+        tours = [v.tour for v in self.vehicles]
 
-        # here, b) is implemented
+        # find request with earliest deadline and initialize pendulum tours
+        for tour in tours:
+            seed = self.find_seed_request(earliest_due_date=True)
+            tour.insert_and_reset_schedules(index=1, vertex=seed)
+            if tour.is_feasible(dist_matrix=dist_matrix):
+                tour.compute_cost_and_schedules(dist_matrix=dist_matrix)
+                self.unrouted.pop(seed.id_)
+            else:
+                raise InsertionError('', 'Seed request cannot be inserted feasibly')
 
-        # def c1(u: vx.Vertex, alpha_1: float, mu):
-        #     alpha_2 = 1 - alpha_1
-        #     for roh in range(1, len(tour)):
-        #         i: vx.Vertex = tour.sequence[roh - 1]
-        #         j: vx.Vertex = tour.sequence[roh]
+        # handle unrouted customers one by one
+        while len(self.unrouted) > 0:  # TODO: This should be a for loop
+            _, u = self.unrouted.popitem(last=False)  # remove LIFO from unrouted
+            max_c2 = float('inf')
 
-        #         c11 = dist_matrix.loc[i.id_, u.id_] + dist_matrix.loc[u.id_, j.id_] - mu * dist_matrix[i.id_, j.id_]
-        # c12 =
+            for tour in tours:
+                # test all insertion positions in the current tour to find the best
+                for rho in range(1, len(tour)):
+                    i: vx.Vertex = tour.sequence[rho - 1]
+                    j: vx.Vertex = tour.sequence[rho]
 
-        # c1 = alpha_1 * c11 + alpha_2 * c12
+                    # trivial feasibility check
+                    if i.tw.e < u.tw.l and u.tw.e < j.tw.l:
+
+                        # proper feasibility check
+                        # TODO: check Solomon (1987) for an efficient feasibility check
+                        temp_tour = deepcopy(tour)
+                        temp_tour.insert_and_reset_schedules(index=rho, vertex=u)
+                        if temp_tour.is_feasible(dist_matrix=dist_matrix):
+
+                            # compute c1 and c2 and update their best values
+                            c1 = tour.c1(i_index=rho - 1, u=u, j_index=rho, alpha_1=opts['alpha_1'], mu=opts['mu'], dist_matrix=dist_matrix)
+                            if verbose > 1:
+                                print(f'c1({u.id_}->{tour.id_}): {c1}')
+
+                            c2 = tour.c2(i_index=rho - 1, u=u, j_index=rho, lambda_=opts['lambda'], c1=c1, dist_matrix=dist_matrix)  # TODO: do I give c1 or min_c1 as input here?!
+                            if verbose > 1:
+                                print(f'c2({u.id_}->{tour.id_}): {c2}')
+                            if c2 < max_c2:
+                                if verbose > 1:
+                                    print(f'^ is the new best c2')
+                                max_c2 = c2
+                                rho_best = rho
+                                u_best = u
+                                tour_best = tour
+
+            if max_c2 < float('inf'):
+                if verbose > 1:
+                    print(f'Inserting {u_best.id_} into {tour_best.id_}\n')
+                tour_best.insert_and_reset_schedules(index=rho_best, vertex=u_best)
+                tour_best.compute_cost_and_schedules(dist_matrix=dist_matrix, ignore_tw=True)
+            else:
+                raise InsertionError('', 'No best insertion candidate found')
