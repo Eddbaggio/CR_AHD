@@ -233,7 +233,10 @@ class Tour(object):
             ax.annotate('',
                         xy=(end.coords.x, end.coords.y),
                         xytext=(start.coords.x, start.coords.y),
-                        arrowprops=dict(arrowstyle="->", alpha=alpha),
+                        arrowprops=dict(arrowstyle="->",
+                                        alpha=alpha,
+                                        # color='red',
+                                        ),
                         )
             if annotate:
                 ax.annotate(f'{end.id_}',

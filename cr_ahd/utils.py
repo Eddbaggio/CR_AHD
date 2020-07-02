@@ -3,6 +3,7 @@ import numpy as np
 from collections import namedtuple
 
 opts = {'verbose': 1,
+        'plot_level': 1,
         'speed_kmh': 60**2,
         'start_time': 0,
         'alpha_1': 1,

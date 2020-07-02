@@ -29,7 +29,7 @@ class Instance(object):
         for c in self.carriers:
             c._cheapest_insertion_construction(self.dist_matrix)
             if verbose > 0:
-                print(f'Route cost of carrier {c.id_}: {c.route_cost()}')
+                print(f'Total Route cost of carrier {c.id_}: {c.route_cost()}\n')
         pass
 
     def I1_construction(self, verbose=opts['verbose']):
@@ -38,7 +38,7 @@ class Instance(object):
         for c in self.carriers:
             c._I1_construction(dist_matrix=self.dist_matrix)
             if verbose > 0:
-                print(f'Route cost of carrier {c.id_}: {c.route_cost()}')
+                print(f'Total Route cost of carrier {c.id_}: {c.route_cost()}\n')
         pass
 
     def total_cost(self):

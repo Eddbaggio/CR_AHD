@@ -12,10 +12,11 @@ def main() -> it.Instance:
     # Read solomon file and create the instance
     C103: it.Instance = it.read_solomon('C103', num_carriers=3)
     fig, ax = plt.subplots()
-    C103.plot(ax)
-    ax.set_xlim(0, 100)
-    ax.set_ylim(0, 100)
-    plt.show()
+    if opts['plot_level'] > 1:
+        C103.plot(ax)
+        ax.set_xlim(0, 100)
+        ax.set_ylim(0, 100)
+        fig.show()
 
     if opts['verbose'] > 1:
         print(C103.dist_matrix)
@@ -53,12 +54,16 @@ if __name__ == '__main__':
                max_time=round(max(times), 4),
                ))
 
-    for c in inst.carriers:
-        for v in c.vehicles:
-            ax: plt.Axes
-            fig, ax = plt.subplots()
-            if len(v.tour) > 2:
-                p = v.tour.plot(ax=ax)
-                ax.set_xlim(0, 100)
-                ax.set_ylim(0, 100)
-                plt.show()
+    if opts['plot_level'] > 0:
+        for c in inst.carriers:
+            for v in c.vehicles:
+                if len(v.tour) > 2:
+                    fig: plt.Figure
+                    ax: plt.Axes
+                    fig, ax = plt.subplots()
+                    p = v.tour.plot(ax=ax)
+                    ax.set_xlim(0, 100)
+                    ax.set_ylim(0, 100)
+                    ax.set_title(f'tour {c.id_}.{v.id_} with cost of {c.route_cost(2)}')
+                    fig.show()
+                    plt.close(fig)
