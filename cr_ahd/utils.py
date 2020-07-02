@@ -2,11 +2,11 @@ import pandas as pd
 import numpy as np
 from collections import namedtuple
 
-opts = {'verbose': 0,
+opts = {'verbose': 1,
         'speed_kmh': 60**2,
         'start_time': 0,
         'alpha_1': 1,
-        'mu': 0,
+        'mu': 1,
         'lambda': 0,
         }
 
@@ -15,7 +15,8 @@ TimeWindow = namedtuple('TimeWindow', ['e', 'l'])
 
 
 def split_iterable(iterable, num_chunks):
-    """ splits an iterable, e.g. a list into num_chunks parts of roughly the same length. If no exact split is possible the first chunk(s) will be longer."""
+    """ splits an iterable, e.g. a list into num_chunks parts of roughly the same length. If no exact split is
+    possible the first chunk(s) will be longer. """
     k, m = divmod(len(iterable), num_chunks)
     return (iterable[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(num_chunks))
 

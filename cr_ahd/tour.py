@@ -1,13 +1,17 @@
-import vertex as vx
-from utils import travel_time, opts, InsertionError
 from copy import deepcopy
 from typing import List
+
+import matplotlib.pyplot as plt
+
+import vertex as vx
+from utils import travel_time, opts, InsertionError
 
 
 class Tour(object):
     def __init__(self, id_: str, sequence: List[vx.Vertex]):
         self.id_ = id_
-        self.sequence = sequence    # sequence of vertices
+        self.sequence = sequence  # sequence of vertices
+        self.depot = sequence[0]
         # TODO: should this really be a sequence? What about the successor/adjacency-list?
         self.arrival_schedule = [None] * len(sequence)  # arrival times
         self.service_schedule = [None] * len(sequence)  # start of service times
@@ -67,7 +71,8 @@ class Tour(object):
     #     else:
     #         return False
 
-    def compute_cost_and_schedules(self, dist_matrix, start_time=opts['start_time'], ignore_tw=True, verbose=opts['verbose']):
+    def compute_cost_and_schedules(self, dist_matrix, start_time=opts['start_time'], ignore_tw=True,
+                                   verbose=opts['verbose']):
         self.cost = 0
         self.arrival_schedule[0] = start_time
         self.service_schedule[0] = start_time
@@ -102,7 +107,7 @@ class Tour(object):
                 print(f'iteration {rho}; service_schedule: {service_schedule}')
             earliest_arrival = service_schedule[rho - 1] + i.service_duration + travel_time(dist)
             if earliest_arrival > j.tw.l:
-                if verbose > 0:
+                if verbose > 1:
                     # print(f'From {i} to {j}')
                     # print(f'Predecessor start of service : {service_schedule[rho - 1]}')
                     # print(f'Predecessor service time : {i.service_duration}')
@@ -118,7 +123,7 @@ class Tour(object):
     def cheapest_feasible_insertion(self, u: vx.Vertex, dist_matrix, verbose=opts['verbose']):
         """calculating the cheapest insertion postition for an unrouted customer,
         returning cost and position"""
-        if verbose > 0:
+        if verbose > 1:
             print(f'\n= Cheapest insertion of {u.id_} into {self.id_}')
             print(self)
         min_insertion_cost = float('inf')
@@ -156,7 +161,7 @@ class Tour(object):
 
         # return the best found position and cost or raise an error if no feasible position was found
         if i_best:
-            if verbose > 0:
+            if verbose > 1:
                 print(f'== Best: between {i_best.id_} and {j_best.id_}: {min_insertion_cost}')
             return insertion_position, min_insertion_cost
         else:
@@ -210,3 +215,29 @@ class Tour(object):
         """
         depot_id = self.sequence[0].id_
         return lambda_ * dist_matrix.loc[depot_id, u.id_] - c1
+
+    def plot(self, ax: plt.Axes = plt.gca(), annotate: bool = True, alpha: float = 1):
+
+        # plot depot
+        ax.scatter(*self.depot.coords, marker='s', alpha=alpha)
+
+        # plot requests locations
+        x = [r.coords.x for r in self.sequence[1:-1]]
+        y = [r.coords.y for r in self.sequence[1:-1]]
+        ax.scatter(x, y, alpha=alpha)
+
+        # plot arrows and annotations
+        for i in range(1, len(self)):
+            start = self.sequence[i - 1]
+            end = self.sequence[i]
+            ax.annotate('',
+                        xy=(end.coords.x, end.coords.y),
+                        xytext=(start.coords.x, start.coords.y),
+                        arrowprops=dict(arrowstyle="->", alpha=alpha),
+                        )
+            if annotate:
+                ax.annotate(f'{end.id_}',
+                            xy=(end.coords.x, end.coords.y),
+                            alpha=alpha
+                            )
+        return ax
