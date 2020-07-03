@@ -8,38 +8,38 @@ from utils import opts
 
 
 def main() -> it.Instance:
-    np.random.seed(3)
+    # np.random.seed(3)
     # Read solomon file and create the instance
-    C103: it.Instance = it.read_solomon('C103', num_carriers=3)
-    fig, ax = plt.subplots()
+    C101: it.Instance = it.read_solomon('C101', num_carriers=3)
     if opts['plot_level'] > 1:
-        C103.plot(ax)
+        fig, ax = plt.subplots()
+        C101.plot(ax)
         ax.set_xlim(0, 100)
         ax.set_ylim(0, 100)
         fig.show()
 
     if opts['verbose'] > 1:
-        print(C103.dist_matrix)
+        print(C101.dist_matrix)
 
     # MAIN LOOP
     # randomly assign customers to carriers
-    for r in C103.requests:
-        c = C103.carriers[np.random.choice(range(3))]
+    for r in C101.requests:
+        c = C101.carriers[np.random.choice(range(3))]
         c.assign_request(r)
 
     if opts['verbose'] > 0:
-        print(*C103.carriers, sep='\n')
+        print(*C101.carriers, sep='\n')
         print('\n')
-    C103.cheapest_insertion_construction()
+    C101.cheapest_insertion_construction()
     if opts['verbose'] > 0:
-        print(f'Total cost: {C103.total_cost()}')
-    return C103
+        print(f'Total cost: {C101.total_cost()}')
+    return C101
 
 
 if __name__ == '__main__':
     times = []
     cost = []
-    for i in range(1):
+    for i in range(20):
         t0 = time.perf_counter()
         inst = main()
         t1 = time.perf_counter() - t0

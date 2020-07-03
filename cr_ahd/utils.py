@@ -2,8 +2,8 @@ import pandas as pd
 import numpy as np
 from collections import namedtuple
 
-opts = {'verbose': 1,
-        'plot_level': 1,
+opts = {'verbose': 0,
+        'plot_level': 0,
         'speed_kmh': 60**2,
         'start_time': 0,
         'alpha_1': 1,
