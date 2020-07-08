@@ -57,23 +57,16 @@ class Carrier(object):
                 self.unrouted.pop(seed.id_)
 
                 if opts['plot_level'] > 1:
-                    fig: plt.Figure
-                    ax: plt.Axes
-                    fig, ax = plt.subplots()
-                    ax.set_xlim(0, 100)
-                    ax.set_ylim(0, 100)
-                    tour.plot(ax)
-                    fig.show()
+                    plot_incomplete_tour(tour)
 
             else:
                 raise InsertionError('', 'Seed request cannot be inserted feasibly')
         return tour
 
-    def _cheapest_insertion_construction(self, dist_matrix, verbose=opts['verbose']):
+    def static_cheapest_insertion_construction(self, dist_matrix, verbose=opts['verbose']):
         """private method, call via construction method of carrier's instance instead"""
-        tours = [v.tour for v in self.vehicles]
-        for tour in tours:
-            self.initialize_tour(tour, dist_matrix=dist_matrix, earliest_due_date=True)
+        for v in self.vehicles:
+            self.initialize_tour(v.tour, dist_matrix=dist_matrix, earliest_due_date=True)
             tour_is_full = False
 
             # add unrouted customers one by one until tour is full
@@ -81,41 +74,34 @@ class Carrier(object):
                 k, u = self.unrouted.popitem(last=False)
                 try:
                     # find cheapest feasible insertion position and execute insertion
-                    pos, cost = tour.cheapest_feasible_insertion(u=u, dist_matrix=dist_matrix)
+                    pos, cost = v.tour.cheapest_feasible_insertion(u=u, dist_matrix=dist_matrix)
                     if verbose > 0:
-                        print(f'\tInserting {u.id_} into {tour.id_}')
-                    tour.insert_and_reset_schedules(index=pos, vertex=u)
-                    tour.compute_cost_and_schedules(dist_matrix=dist_matrix)
+                        print(f'\tInserting {u.id_} into {v.tour.id_}')
+                    v.tour.insert_and_reset_schedules(index=pos, vertex=u)
+                    v.tour.compute_cost_and_schedules(dist_matrix=dist_matrix)
 
                     if opts['plot_level'] > 1:
-                        fig: plt.Figure
-                        ax: plt.Axes
-                        fig, ax = plt.subplots()
-                        ax.set_xlim(0, 100)
-                        ax.set_ylim(0, 100)
-                        tour.plot(ax)
-                        fig.show()
+                        plot_incomplete_tour(v.tour)
 
                 except InsertionError:
                     # re-insert the popped request
                     self.unrouted[k] = u
                     tour_is_full = True
                     if verbose > 0:
-                        print(f'x\t{u.id_} cannot be feasibly inserted into {tour.id_}')
-
-        # if opts['plot_level'] > 1:
-        #     plt.close('all')
+                        print(f'x\t{u.id_} cannot be feasibly inserted into {v.tour.id_}')
         return
 
-    def _I1_construction(self, dist_matrix, verbose=opts['verbose']):
+    # def dynamic_cheapest_insertion(self, dist_matrix, verbose=opts['verbose']):
+    #     assert len(self.unrouted) == 1, 'More than 1 unrouted customers -> invalid for dynamic insertion'
+
+    def static_I1_construction(self, dist_matrix, verbose=opts['verbose']):
         """Solomon's I1 insertion heuristic from 1987. Following the description of
          'Bräysy, Olli; Gendreau, Michel (2005): Vehicle Routing Problem with Time Windows,
         Part I: Route Construction and Local Search Algorithms.'
         """
-        tours = [v.tour for v in self.vehicles]
-        for tour in tours:
+        for v in self.vehicles:
             # initialize a tour with the first customer with earliest due date
-            self.initialize_tour(tour, dist_matrix=dist_matrix, earliest_due_date=True)
+            self.initialize_tour(v.tour, dist_matrix=dist_matrix, earliest_due_date=True)
             tour_is_full = False
 
             # handle unrouted customers one by one
@@ -126,29 +112,30 @@ class Carrier(object):
 
                 # find the best request and its best insertion position
                 for _, u in self.unrouted.items():
-                    for rho in range(1, len(tour)):
-                        i: vx.Vertex = tour.sequence[rho - 1]
-                        j: vx.Vertex = tour.sequence[rho]
+                    for rho in range(1, len(v.tour)):
+                        i: vx.Vertex = v.tour.sequence[rho - 1]
+                        j: vx.Vertex = v.tour.sequence[rho]
 
                         # trivial feasibility check
                         if i.tw.e < u.tw.l and u.tw.e < j.tw.l:
 
                             # proper feasibility check
                             # TODO: check Solomon (1987) for an efficient and sufficient feasibility check
-                            temp_tour = deepcopy(tour)
+                            temp_tour = deepcopy(v.tour)
                             temp_tour.insert_and_reset_schedules(index=rho, vertex=u)
                             if temp_tour.is_feasible(dist_matrix=dist_matrix):
 
                                 # compute c1 and c2 and update their best values
-                                c1 = tour.c1(i_index=rho - 1, u=u, j_index=rho, alpha_1=opts['alpha_1'], mu=opts['mu'],
-                                             dist_matrix=dist_matrix)
+                                c1 = v.tour.c1(i_index=rho - 1, u=u, j_index=rho, alpha_1=opts['alpha_1'],
+                                               mu=opts['mu'],
+                                               dist_matrix=dist_matrix)
                                 if verbose > 1:
-                                    print(f'c1({u.id_}->{tour.id_}): {c1}')
+                                    print(f'c1({u.id_}->{v.tour.id_}): {c1}')
 
-                                c2 = tour.c2(i_index=rho - 1, u=u, j_index=rho, lambda_=opts['lambda'], c1=c1,
-                                             dist_matrix=dist_matrix)
+                                c2 = v.tour.c2(i_index=rho - 1, u=u, j_index=rho, lambda_=opts['lambda'], c1=c1,
+                                               dist_matrix=dist_matrix)
                                 if verbose > 1:
-                                    print(f'c2({u.id_}->{tour.id_}): {c2}')
+                                    print(f'c2({u.id_}->{v.tour.id_}): {c2}')
                                 if c2 > max_c2:
                                     if verbose > 1:
                                         print(f'^ is the new best c2')
@@ -158,21 +145,39 @@ class Carrier(object):
 
                 if max_c2 > float('-inf'):
                     if verbose > 0:
-                        print(f'\tInserting {u_best.id_} into {tour.id_}')
-                    tour.insert_and_reset_schedules(index=rho_best, vertex=u_best)
-                    tour.compute_cost_and_schedules(dist_matrix=dist_matrix, ignore_tw=True)
+                        print(f'\tInserting {u_best.id_} into {v.tour.id_}')
+                    v.tour.insert_and_reset_schedules(index=rho_best, vertex=u_best)
+                    v.tour.compute_cost_and_schedules(dist_matrix=dist_matrix, ignore_tw=True)
                     self.unrouted.pop(u_best.id_)  # remove u from list of unrouted
 
                     if opts['plot_level'] > 1:
-                        fig: plt.Figure
-                        ax: plt.Axes
-                        fig, ax = plt.subplots()
-                        ax.set_xlim(0, 100)
-                        ax.set_ylim(0, 100)
-                        tour.plot(ax)
-                        fig.show()
+                        plot_incomplete_tour(v.tour)
 
                 else:
                     tour_is_full = True
                     # raise InsertionError('', 'No best insertion candidate found')
-        pass
+        if opts['plot_level'] > 1:
+            plt.show()
+        return
+
+    def plot(self, ax: plt.Axes = plt.gca(), annotate: bool = True, alpha: float = 1):
+
+        # plot depot
+        depot = ax.scatter(*self.depot.coords, marker='s', alpha=alpha, label=self.depot.id_)
+
+        # plot all routes on the same axes
+        for v in self.vehicles:
+            if len(v.tour) > 2:
+                v.tour.plot(ax=ax, plot_depot=False, annotate=annotate, alpha=alpha)
+                ax.legend()
+        return ax
+
+
+def plot_incomplete_tour(tour: Tour):
+    fig: plt.Figure
+    ax: plt.Axes
+    fig, ax = plt.subplots()
+    ax.set_xlim(0, 100)
+    ax.set_ylim(0, 100)
+    tour.plot(ax)
+    # fig.show()

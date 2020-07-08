@@ -23,11 +23,10 @@ def main() -> it.Instance:
         print(C101.dist_matrix)
 
     # assign requests to carriers randomly
-    # C101.assign_all_requests()
+    C101.assign_all_requests()
 
     # construct initial solution
-    for u in C101.requests:
-        C101.dynamic_cheapest_insertion(u)
+    C101.static_construction(method='cheapest_insertion')
     if opts['verbose'] > 0:
         print(*C101.carriers, sep='\n')
         print('\n')
@@ -63,5 +62,4 @@ if __name__ == '__main__':
             ax.set_xlim(0, 100)
             ax.set_ylim(0, 100)
             ax.set_title(f'tour {c.id_} with cost of {c.route_cost(2)}')
-            fig.show()
-            # plt.close(fig)
+        plt.show()

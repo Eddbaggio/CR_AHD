@@ -2,9 +2,10 @@ import pandas as pd
 import numpy as np
 from collections import namedtuple
 
-opts = {'verbose': 0,
-        'plot_level': 0,
-        'speed_kmh': 60**2,
+opts = {'num_trials': 1,
+        'verbose': 1,
+        'plot_level': 2,
+        'speed_kmh': 60 ** 2,
         'start_time': 0,
         'alpha_1': 1,
         'mu': 1,
@@ -23,7 +24,7 @@ def split_iterable(iterable, num_chunks):
 
 
 def euclidean_distance(a: Coords, b: Coords):
-    return np.sqrt((a[0] - b[0])**2 + (a[1] - b[1])**2)
+    return np.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 
 
 def make_dist_matrix(vertices: list):
@@ -38,7 +39,7 @@ def make_dist_matrix(vertices: list):
 
 
 def travel_time(dist):
-    return (dist / opts['speed_kmh']) * 60**2  # compute time in seconds
+    return (dist / opts['speed_kmh']) * 60 ** 2  # compute time in seconds
 
 
 class InsertionError(Exception):

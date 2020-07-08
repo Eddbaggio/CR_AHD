@@ -73,6 +73,8 @@ class Tour(object):
 
     def compute_cost_and_schedules(self, dist_matrix, start_time=opts['start_time'], ignore_tw=True,
                                    verbose=opts['verbose']):
+        """
+        """
         self.cost = 0
         self.arrival_schedule[0] = start_time
         self.service_schedule[0] = start_time
@@ -121,8 +123,10 @@ class Tour(object):
         return True
 
     def cheapest_feasible_insertion(self, u: vx.Vertex, dist_matrix, verbose=opts['verbose']):
-        """calculating the cheapest insertion postition for an unrouted customer,
-        returning cost and position"""
+        """
+        calculating the cheapest insertion position for an unrouted customer,
+        returning cost and position
+       """
         if verbose > 1:
             print(f'\n= Cheapest insertion of {u.id_} into {self.id_}')
             print(self)
@@ -216,31 +220,32 @@ class Tour(object):
         depot_id = self.sequence[0].id_
         return lambda_ * dist_matrix.loc[depot_id, u.id_] - c1
 
-    def plot(self, ax: plt.Axes = plt.gca(), annotate: bool = True, alpha: float = 1):
+    def plot(self, ax: plt.Axes = plt.gca(), plot_depot: bool = True, annotate: bool = True, alpha: float = 1):
 
         # plot depot
-        ax.scatter(*self.depot.coords, marker='s', alpha=alpha)
+        if plot_depot:
+            depot = ax.scatter(*self.depot.coords, marker='s', alpha=alpha, label=self.depot.id_)
 
         # plot requests locations
         x = [r.coords.x for r in self.sequence[1:-1]]
         y = [r.coords.y for r in self.sequence[1:-1]]
-        ax.scatter(x, y, alpha=alpha)
+        requests = ax.scatter(x, y, alpha=alpha, label=self.id_)
 
         # plot arrows and annotations
         for i in range(1, len(self)):
             start = self.sequence[i - 1]
             end = self.sequence[i]
-            ax.annotate('',
-                        xy=(end.coords.x, end.coords.y),
-                        xytext=(start.coords.x, start.coords.y),
-                        arrowprops=dict(arrowstyle="->",
-                                        alpha=alpha,
-                                        # color='red',
-                                        ),
-                        )
+            arrows = ax.annotate('',
+                                 xy=(end.coords.x, end.coords.y),
+                                 xytext=(start.coords.x, start.coords.y),
+                                 arrowprops=dict(arrowstyle="->",
+                                                 alpha=alpha,
+                                                 color=requests.get_facecolors()[0],
+                                                 ),
+                                 )
             if annotate:
-                ax.annotate(f'{end.id_}',
-                            xy=(end.coords.x, end.coords.y),
-                            alpha=alpha
-                            )
+                annotations = ax.annotate(f'{end.id_}',
+                                          xy=(end.coords.x, end.coords.y),
+                                          alpha=alpha
+                                          )
         return ax
