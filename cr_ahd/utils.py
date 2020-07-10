@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 from collections import namedtuple
+from matplotlib.pyplot import cycler, get_cmap
+
 
 opts = {'num_trials': 1,
         'verbose': 1,
@@ -10,6 +12,7 @@ opts = {'num_trials': 1,
         'alpha_1': 1,
         'mu': 1,
         'lambda': 0,
+        'ccycler': cycler(color=get_cmap('Set1').colors)()
         }
 
 Coords = namedtuple('Coords', ['x', 'y'])

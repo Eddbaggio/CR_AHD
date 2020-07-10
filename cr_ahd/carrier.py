@@ -2,6 +2,7 @@ from collections import OrderedDict
 from copy import deepcopy
 
 import vertex as vx
+import vehicle as vh
 from tour import Tour
 from utils import opts, InsertionError
 
@@ -57,14 +58,23 @@ class Carrier(object):
                 self.unrouted.pop(seed.id_)
 
                 if opts['plot_level'] > 1:
-                    plot_incomplete_tour(tour)
+                    tour.plot()
 
             else:
                 raise InsertionError('', 'Seed request cannot be inserted feasibly')
         return tour
 
-    def static_cheapest_insertion_construction(self, dist_matrix, verbose=opts['verbose']):
+    def static_cheapest_insertion_construction(self, dist_matrix, verbose=opts['verbose'],
+                                               plot_level=opts['plot_level']):
         """private method, call via construction method of carrier's instance instead"""
+        if plot_level > 1:
+            fig: plt.Figure
+            ax: plt.Axes
+            fig, ax = plt.subplots()
+            ax.set_xlim(0, 100)
+            ax.set_ylim(0, 100)
+
+        v: vh.Vehicle
         for v in self.vehicles:
             self.initialize_tour(v.tour, dist_matrix=dist_matrix, earliest_due_date=True)
             tour_is_full = False
@@ -80,8 +90,8 @@ class Carrier(object):
                     v.tour.insert_and_reset_schedules(index=pos, vertex=u)
                     v.tour.compute_cost_and_schedules(dist_matrix=dist_matrix)
 
-                    if opts['plot_level'] > 1:
-                        plot_incomplete_tour(v.tour)
+                    if plot_level > 1:
+                        v.tour.plot(ax=ax, color=v.color)
 
                 except InsertionError:
                     # re-insert the popped request
@@ -89,12 +99,15 @@ class Carrier(object):
                     tour_is_full = True
                     if verbose > 0:
                         print(f'x\t{u.id_} cannot be feasibly inserted into {v.tour.id_}')
+                    if plot_level > 1:
+                        fig.show()
+
         return
 
     # def dynamic_cheapest_insertion(self, dist_matrix, verbose=opts['verbose']):
     #     assert len(self.unrouted) == 1, 'More than 1 unrouted customers -> invalid for dynamic insertion'
 
-    def static_I1_construction(self, dist_matrix, verbose=opts['verbose']):
+    def static_I1_construction(self, dist_matrix, verbose=opts['verbose'], plot_level=opts['plot_level']):
         """Solomon's I1 insertion heuristic from 1987. Following the description of
          'Bräysy, Olli; Gendreau, Michel (2005): Vehicle Routing Problem with Time Windows,
         Part I: Route Construction and Local Search Algorithms.'
@@ -150,34 +163,29 @@ class Carrier(object):
                     v.tour.compute_cost_and_schedules(dist_matrix=dist_matrix, ignore_tw=True)
                     self.unrouted.pop(u_best.id_)  # remove u from list of unrouted
 
-                    if opts['plot_level'] > 1:
-                        plot_incomplete_tour(v.tour)
+                    if plot_level > 1:
+                        v.tour.plot(ax=ax, color=v.color)
 
                 else:
                     tour_is_full = True
                     # raise InsertionError('', 'No best insertion candidate found')
-        if opts['plot_level'] > 1:
+        if plot_level > 1:
             plt.show()
         return
 
-    def plot(self, ax: plt.Axes = plt.gca(), annotate: bool = True, alpha: float = 1):
+    def plot(self, annotate: bool = True, alpha: float = 1):
+
+        fig, ax = plt.subplots()
+        ax.set_xlim(0, 100)
+        ax.set_ylim(0, 100)
+        ax.set_title(f'tour {self.id_} with cost of {self.route_cost(2)}')
 
         # plot depot
-        depot = ax.scatter(*self.depot.coords, marker='s', alpha=alpha, label=self.depot.id_)
+        ax.plot(*self.depot.coords, marker='s', alpha=alpha, label=self.depot.id_)
 
         # plot all routes on the same axes
         for v in self.vehicles:
             if len(v.tour) > 2:
-                v.tour.plot(ax=ax, plot_depot=False, annotate=annotate, alpha=alpha)
+                v.tour.plot(ax=ax, plot_depot=False, annotate=annotate, color=v.color, alpha=alpha)
                 ax.legend()
-        return ax
-
-
-def plot_incomplete_tour(tour: Tour):
-    fig: plt.Figure
-    ax: plt.Axes
-    fig, ax = plt.subplots()
-    ax.set_xlim(0, 100)
-    ax.set_ylim(0, 100)
-    tour.plot(ax)
-    # fig.show()
+        return

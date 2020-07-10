@@ -13,11 +13,10 @@ def main() -> it.Instance:
     # Read solomon file and create the instance
     C101: it.Instance = it.read_solomon('C101', num_carriers=3)
     if opts['plot_level'] > 1:
-        fig, ax = plt.subplots()
-        C101.plot(ax)
-        ax.set_xlim(0, 100)
-        ax.set_ylim(0, 100)
-        fig.show()
+        C101.plot()
+        plt.xlim(0, 100)
+        plt.ylim(0, 100)
+        plt.show()
 
     if opts['verbose'] > 1:
         print(C101.dist_matrix)
@@ -27,6 +26,8 @@ def main() -> it.Instance:
 
     # construct initial solution
     C101.static_construction(method='cheapest_insertion')
+    if opts['plot_level'] > 1:
+        plt.show()
     if opts['verbose'] > 0:
         print(*C101.carriers, sep='\n')
         print('\n')
@@ -55,11 +56,5 @@ if __name__ == '__main__':
     if opts['plot_level'] > 0:
         c: Carrier
         for c in inst.carriers:
-            fig: plt.Figure
-            ax: plt.Axes
-            fig, ax = plt.subplots()
-            p = c.plot(ax=ax)
-            ax.set_xlim(0, 100)
-            ax.set_ylim(0, 100)
-            ax.set_title(f'tour {c.id_} with cost of {c.route_cost(2)}')
+            p = c.plot()
         plt.show()

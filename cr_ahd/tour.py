@@ -220,16 +220,20 @@ class Tour(object):
         depot_id = self.sequence[0].id_
         return lambda_ * dist_matrix.loc[depot_id, u.id_] - c1
 
-    def plot(self, ax: plt.Axes = plt.gca(), plot_depot: bool = True, annotate: bool = True, alpha: float = 1):
+    def plot(self, ax: plt.Axes = plt.gca(),
+             plot_depot: bool = True,
+             annotate: bool = True,
+             alpha: float = 1,
+             color: str = 'black'):
 
         # plot depot
         if plot_depot:
-            depot = ax.scatter(*self.depot.coords, marker='s', alpha=alpha, label=self.depot.id_)
+            depot = ax.scatter(*self.depot.coords, marker='s', c=color, alpha=alpha, label=self.depot.id_)
 
         # plot requests locations
         x = [r.coords.x for r in self.sequence[1:-1]]
         y = [r.coords.y for r in self.sequence[1:-1]]
-        requests = ax.scatter(x, y, alpha=alpha, label=self.id_)
+        requests = ax.scatter(x, y, c=color, alpha=alpha, label=self.id_)
 
         # plot arrows and annotations
         for i in range(1, len(self)):
@@ -238,7 +242,8 @@ class Tour(object):
             arrows = ax.annotate('',
                                  xy=(end.coords.x, end.coords.y),
                                  xytext=(start.coords.x, start.coords.y),
-                                 arrowprops=dict(arrowstyle="->",
+                                 c=color,
+                                 arrowprops=dict(arrowstyle="-|>",
                                                  alpha=alpha,
                                                  color=requests.get_facecolors()[0],
                                                  ),
@@ -248,4 +253,5 @@ class Tour(object):
                                           xy=(end.coords.x, end.coords.y),
                                           alpha=alpha
                                           )
+        plt.pause(0.05)
         return ax

@@ -75,21 +75,21 @@ class Instance(object):
                 total_cost += v.tour.cost
         return total_cost
 
-    def plot(self, ax: plt.Axes = plt.gca(), annotate: bool = True, alpha: float = 1):
+    def plot(self, annotate: bool = True, alpha: float = 1):
         # plot depots
         depots = [c.depot for c in self.carriers]
         for d in depots:
-            ax.scatter(d.coords.x, d.coords.y, marker='s', alpha=alpha)
+            plt.scatter(d.coords.x, d.coords.y, marker='s', alpha=alpha)
             if annotate:
-                ax.annotate(f'{d.id_}', xy=d.coords)
+                plt.annotate(f'{d.id_}', xy=d.coords)
 
         # plot requests locations
         for r in self.requests:
-            ax.scatter(r.coords.x, r.coords.y, alpha=alpha, color='grey')
+            plt.scatter(r.coords.x, r.coords.y, alpha=alpha, color='grey')
             if annotate:
-                ax.annotate(f'{r.id_}', xy=r.coords)
+                plt.annotate(f'{r.id_}', xy=r.coords)
 
-        return ax
+        return
 
 
 def read_solomon(name: str, num_carriers: int = 3) -> Instance:
