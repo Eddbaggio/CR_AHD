@@ -220,38 +220,49 @@ class Tour(object):
         depot_id = self.sequence[0].id_
         return lambda_ * dist_matrix.loc[depot_id, u.id_] - c1
 
-    def plot(self, ax: plt.Axes = plt.gca(),
+    def plot(self,
+             # ax: plt.Axes = plt.gca(),
              plot_depot: bool = True,
              annotate: bool = True,
              alpha: float = 1,
-             color: str = 'black'):
+             color: str = 'black') -> List:
+
+        """
+        :return: List of artists to be drawn. Use for animated plotting
+        """
+
+        artists = []  # list of artists to be plotted
 
         # plot depot
         if plot_depot:
-            depot = ax.scatter(*self.depot.coords, marker='s', c=color, alpha=alpha, label=self.depot.id_)
+            depot = plt.scatter(*self.depot.coords, marker='s', c=color, alpha=alpha, label=self.depot.id_)
+            artists.append(depot)
 
         # plot requests locations
         x = [r.coords.x for r in self.sequence[1:-1]]
         y = [r.coords.y for r in self.sequence[1:-1]]
-        requests = ax.scatter(x, y, c=color, alpha=alpha, label=self.id_)
+        requests = plt.scatter(x, y, c=color, alpha=alpha, label=self.id_)
+        artists.append(requests)
 
         # plot arrows and annotations
         for i in range(1, len(self)):
             start = self.sequence[i - 1]
             end = self.sequence[i]
-            arrows = ax.annotate('',
-                                 xy=(end.coords.x, end.coords.y),
-                                 xytext=(start.coords.x, start.coords.y),
-                                 c=color,
-                                 arrowprops=dict(arrowstyle="-|>",
-                                                 alpha=alpha,
-                                                 color=requests.get_facecolors()[0],
-                                                 ),
-                                 )
+            arrows = plt.annotate('',
+                                  xy=(end.coords.x, end.coords.y),
+                                  xytext=(start.coords.x, start.coords.y),
+                                  c=color,
+                                  arrowprops=dict(arrowstyle="-|>",
+                                                  alpha=alpha,
+                                                  color=requests.get_facecolors()[0],
+                                                  ),
+                                  )
+            artists.append(arrows)
+
             if annotate:
-                annotations = ax.annotate(f'{end.id_}',
-                                          xy=(end.coords.x, end.coords.y),
-                                          alpha=alpha
-                                          )
-        plt.pause(0.05)
-        return ax
+                annotations = plt.annotate(f'{end.id_}',
+                                           xy=(end.coords.x, end.coords.y),
+                                           alpha=alpha
+                                           )
+                artists.append(annotations)
+        return artists

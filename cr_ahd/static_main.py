@@ -25,9 +25,8 @@ def main() -> it.Instance:
     C101.assign_all_requests()
 
     # construct initial solution
-    C101.static_construction(method='cheapest_insertion')
-    if opts['plot_level'] > 1:
-        plt.show()
+    C101.static_construction(method='I1')
+
     if opts['verbose'] > 0:
         print(*C101.carriers, sep='\n')
         print('\n')

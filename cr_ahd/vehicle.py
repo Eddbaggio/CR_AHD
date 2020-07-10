@@ -1,4 +1,5 @@
 from utils import opts
+from tour import Tour
 
 
 class Vehicle(object):
@@ -7,7 +8,7 @@ class Vehicle(object):
     def __init__(self, id_, capacity):
         self.id_ = id_
         self.capacity = capacity
-        self.tour = None
+        self.tour: Tour = None
         self.color = [next(opts['ccycler'])['color'], ]
 
     def __str__(self):

@@ -7,12 +7,14 @@ from tour import Tour
 from utils import opts, InsertionError
 
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from typing import List
 
 
 class Carrier(object):
     """docstring for Carrier"""
 
-    def __init__(self, id_: int, depot: vx.Vertex, vehicles: list):
+    def __init__(self, id_: int, depot: vx.Vertex, vehicles: List[vh.Vehicle]):
         self.id_ = id_
         self.depot = depot
         self.vehicles = vehicles
@@ -48,36 +50,36 @@ class Carrier(object):
                     seed = self.unrouted[key]
         return seed
 
-    def initialize_tour(self, tour: Tour, dist_matrix, earliest_due_date: bool = True):
+    def initialize_tour(self, vehicle: vh.Vehicle, dist_matrix, earliest_due_date: bool = True):
+        assert len(vehicle.tour) == 2, 'Vehicle already has a tour'
         if len(self.unrouted) > 0:
             # find request with earliest deadline and initialize pendulum tour
             seed = self.find_seed_request(earliest_due_date=True)
-            tour.insert_and_reset_schedules(index=1, vertex=seed)
-            if tour.is_feasible(dist_matrix=dist_matrix):
-                tour.compute_cost_and_schedules(dist_matrix=dist_matrix)
+            vehicle.tour.insert_and_reset_schedules(index=1, vertex=seed)
+            if vehicle.tour.is_feasible(dist_matrix=dist_matrix):
+                vehicle.tour.compute_cost_and_schedules(dist_matrix=dist_matrix)
                 self.unrouted.pop(seed.id_)
-
-                if opts['plot_level'] > 1:
-                    tour.plot()
-
             else:
                 raise InsertionError('', 'Seed request cannot be inserted feasibly')
-        return tour
+        return
 
     def static_cheapest_insertion_construction(self, dist_matrix, verbose=opts['verbose'],
                                                plot_level=opts['plot_level']):
-        """private method, call via construction method of carrier's instance instead"""
         if plot_level > 1:
-            fig: plt.Figure
-            ax: plt.Axes
-            fig, ax = plt.subplots()
-            ax.set_xlim(0, 100)
-            ax.set_ylim(0, 100)
+            fig: plt.Figure = plt.figure()
+            # ims is a list of lists. each row will contain the list of artists to be drawn at a frame
+            ims = []
+            full_tour_artists = []
 
         v: vh.Vehicle
         for v in self.vehicles:
-            self.initialize_tour(v.tour, dist_matrix=dist_matrix, earliest_due_date=True)
+            self.initialize_tour(vehicle=v, dist_matrix=dist_matrix, earliest_due_date=True)
             tour_is_full = False
+
+            if plot_level > 1 and len(self.unrouted) > 0:  # do not plot empty vehicles
+                artists = v.tour.plot(color=v.color)
+                frame = [*full_tour_artists, *artists]
+                ims.append(frame)
 
             # add unrouted customers one by one until tour is full
             while len(self.unrouted) > 0 and tour_is_full is False:
@@ -91,7 +93,9 @@ class Carrier(object):
                     v.tour.compute_cost_and_schedules(dist_matrix=dist_matrix)
 
                     if plot_level > 1:
-                        v.tour.plot(ax=ax, color=v.color)
+                        artists = v.tour.plot(color=v.color)
+                        frame = [*full_tour_artists, *artists]
+                        ims.append(frame)
 
                 except InsertionError:
                     # re-insert the popped request
@@ -99,8 +103,14 @@ class Carrier(object):
                     tour_is_full = True
                     if verbose > 0:
                         print(f'x\t{u.id_} cannot be feasibly inserted into {v.tour.id_}')
-                    if plot_level > 1:
-                        fig.show()
+
+            if plot_level > 1 and tour_is_full:
+                full_tour_artists.extend(artists)
+
+        if plot_level >1:
+            ani = animation.ArtistAnimation(fig, artists=ims, interval=50, blit=True, repeat=False, repeat_delay=1000)
+            plt.title(f'Static Cheapest Insertion Construction of {self.id_}')
+            plt.show()
 
         return
 
@@ -112,10 +122,22 @@ class Carrier(object):
          'Bräysy, Olli; Gendreau, Michel (2005): Vehicle Routing Problem with Time Windows,
         Part I: Route Construction and Local Search Algorithms.'
         """
+        if plot_level > 1:
+            fig: plt.Figure = plt.figure()
+            # ims is a list of lists. each row will contain the list of artists to be drawn at a frame
+            ims = []
+            full_tour_artists = []
+
+        v: vh.Vehicle
         for v in self.vehicles:
             # initialize a tour with the first customer with earliest due date
-            self.initialize_tour(v.tour, dist_matrix=dist_matrix, earliest_due_date=True)
+            self.initialize_tour(vehicle=v, dist_matrix=dist_matrix, earliest_due_date=True)
             tour_is_full = False
+
+            if plot_level > 1 and len(self.unrouted) > 0:  # do not plot empty vehicles
+                artists = v.tour.plot(color=v.color)
+                frame = [*full_tour_artists, *artists]
+                ims.append(frame)
 
             # handle unrouted customers one by one
             while len(self.unrouted) > 0 and tour_is_full is False:
@@ -159,18 +181,27 @@ class Carrier(object):
                 if max_c2 > float('-inf'):
                     if verbose > 0:
                         print(f'\tInserting {u_best.id_} into {v.tour.id_}')
+
                     v.tour.insert_and_reset_schedules(index=rho_best, vertex=u_best)
                     v.tour.compute_cost_and_schedules(dist_matrix=dist_matrix, ignore_tw=True)
                     self.unrouted.pop(u_best.id_)  # remove u from list of unrouted
 
                     if plot_level > 1:
-                        v.tour.plot(ax=ax, color=v.color)
+                        artists = v.tour.plot(color=v.color)
+                        frame = [*full_tour_artists, *artists]
+                        ims.append(frame)
 
                 else:
                     tour_is_full = True
                     # raise InsertionError('', 'No best insertion candidate found')
-        if plot_level > 1:
+            if plot_level > 1 and tour_is_full:
+                full_tour_artists.extend(artists)
+
+        if plot_level >1:
+            ani = animation.ArtistAnimation(fig, artists=ims, interval=50, blit=True, repeat=False, repeat_delay=1000)
+            plt.title(f'Solomon I1 Construction of {self.id_}')
             plt.show()
+
         return
 
     def plot(self, annotate: bool = True, alpha: float = 1):
@@ -186,6 +217,6 @@ class Carrier(object):
         # plot all routes on the same axes
         for v in self.vehicles:
             if len(v.tour) > 2:
-                v.tour.plot(ax=ax, plot_depot=False, annotate=annotate, color=v.color, alpha=alpha)
+                v.tour.plot(plot_depot=False, annotate=annotate, color=v.color, alpha=alpha)
                 ax.legend()
         return

@@ -3,6 +3,7 @@ import vehicle as vh
 import carrier as cr
 from tour import Tour
 from utils import split_iterable, make_dist_matrix, opts
+from typing import List
 
 from copy import copy
 
@@ -15,7 +16,7 @@ class Instance(object):
     """Class to store CR_AHD instances
     """
 
-    def __init__(self, id_, requests, carriers):
+    def __init__(self, id_: str, requests: List[vx.Vertex], carriers: List[cr.Carrier]):
         self.id_ = id_
         self.requests = requests
         self.carriers = carriers
@@ -30,7 +31,7 @@ class Instance(object):
             c = self.carriers[np.random.choice(range(3))]
             c.assign_request(r)
 
-    def static_construction(self, method: str, verbose=opts['verbose']):
+    def static_construction(self, method: str, verbose: int = opts['verbose']):
         assert method in ['cheapest_insertion', 'I1']
 
         if verbose > 0:
@@ -60,8 +61,6 @@ class Instance(object):
         vehicle_best.tour.insert_and_reset_schedules(position_best, request)
         vehicle_best.tour.compute_cost_and_schedules(self.dist_matrix)
         c.unrouted.pop(request.id_)  # remove inserted request from unrouted
-
-
 
         # TODO: continue here! request are assigned one by one and then the cheapest feasible insertion cost are
         #  determined. Take into account the demand value of a request for the cheapest insertion. This will allow to
