@@ -107,8 +107,8 @@ class Carrier(object):
             if plot_level > 1 and tour_is_full:
                 full_tour_artists.extend(artists)
 
-        if plot_level >1:
-            ani = animation.ArtistAnimation(fig, artists=ims, interval=50, blit=True, repeat=False, repeat_delay=1000)
+        if plot_level > 1:
+            ani = animation.ArtistAnimation(fig, artists=ims, interval=100, blit=True, repeat=True, repeat_delay=500)
             plt.title(f'Static Cheapest Insertion Construction of {self.id_}')
             plt.show()
 
@@ -118,9 +118,9 @@ class Carrier(object):
     #     assert len(self.unrouted) == 1, 'More than 1 unrouted customers -> invalid for dynamic insertion'
 
     def static_I1_construction(self, dist_matrix, verbose=opts['verbose'], plot_level=opts['plot_level']):
-        """Solomon's I1 insertion heuristic from 1987. Following the description of
-         'Bräysy, Olli; Gendreau, Michel (2005): Vehicle Routing Problem with Time Windows,
-        Part I: Route Construction and Local Search Algorithms.'
+        """Solomon's I1 insertion heuristic from 1987. Following the description of 'Bräysy, Olli; Gendreau,
+        Michel (2005): Vehicle Routing Problem with Time Windows, Part I: Route Construction and Local Search
+        Algorithms.'
         """
         if plot_level > 1:
             fig: plt.Figure = plt.figure()
@@ -139,7 +139,7 @@ class Carrier(object):
                 frame = [*full_tour_artists, *artists]
                 ims.append(frame)
 
-            # handle unrouted customers one by one
+            # fill the tours
             while len(self.unrouted) > 0 and tour_is_full is False:
                 rho_best = None
                 u_best = None
@@ -193,12 +193,12 @@ class Carrier(object):
 
                 else:
                     tour_is_full = True
-                    # raise InsertionError('', 'No best insertion candidate found')
+
             if plot_level > 1 and tour_is_full:
                 full_tour_artists.extend(artists)
 
-        if plot_level >1:
-            ani = animation.ArtistAnimation(fig, artists=ims, interval=50, blit=True, repeat=False, repeat_delay=1000)
+        if plot_level > 1:
+            ani = animation.ArtistAnimation(fig, artists=ims, interval=100, blit=True, repeat=True, repeat_delay=500)
             plt.title(f'Solomon I1 Construction of {self.id_}')
             plt.show()
 
@@ -214,7 +214,7 @@ class Carrier(object):
         # plot depot
         ax.plot(*self.depot.coords, marker='s', alpha=alpha, label=self.depot.id_)
 
-        # plot all routes on the same axes
+        # plot all routes
         for v in self.vehicles:
             if len(v.tour) > 2:
                 v.tour.plot(plot_depot=False, annotate=annotate, color=v.color, alpha=alpha)

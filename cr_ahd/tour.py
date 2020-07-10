@@ -181,9 +181,10 @@ class Tour(object):
            dist_matrix,
            verbose=opts['verbose']) -> float:
         """
-        c1 criterion of Solomon's I1 insertion heuristic
-        Does NOT include a feasibility check
-        Following the description by (Bräysy, Olli; Gendreau, Michel (2005): Vehicle Routing Problem with Time Windows, Part I: Route Construction and Local Search Algorithms. In Transportation Science 39 (1), pp. 104–118. DOI: 10.1287/trsc.1030.0056.)
+        c1 criterion of Solomon's I1 insertion heuristic Does NOT include a feasibility check Following the
+        description by (Bräysy, Olli; Gendreau, Michel (2005): Vehicle Routing Problem with Time Windows,
+        Part I: Route Construction and Local Search Algorithms. In Transportation Science 39 (1), pp. 104–118. DOI:
+        10.1287/trsc.1030.0056.)
         """
         alpha_2 = 1 - alpha_1
 
@@ -221,7 +222,6 @@ class Tour(object):
         return lambda_ * dist_matrix.loc[depot_id, u.id_] - c1
 
     def plot(self,
-             # ax: plt.Axes = plt.gca(),
              plot_depot: bool = True,
              annotate: bool = True,
              alpha: float = 1,
@@ -235,13 +235,13 @@ class Tour(object):
 
         # plot depot
         if plot_depot:
-            depot = plt.scatter(*self.depot.coords, marker='s', c=color, alpha=alpha, label=self.depot.id_)
+            depot, = plt.plot(*self.depot.coords, marker='s', c=color, alpha=alpha, label=self.depot.id_, linestyle='')
             artists.append(depot)
 
         # plot requests locations
         x = [r.coords.x for r in self.sequence[1:-1]]
         y = [r.coords.y for r in self.sequence[1:-1]]
-        requests = plt.scatter(x, y, c=color, alpha=alpha, label=self.id_)
+        requests, = plt.plot(x, y, marker='o', c=color, alpha=alpha, label=self.id_, linestyle='')
         artists.append(requests)
 
         # plot arrows and annotations
@@ -254,7 +254,7 @@ class Tour(object):
                                   c=color,
                                   arrowprops=dict(arrowstyle="-|>",
                                                   alpha=alpha,
-                                                  color=requests.get_facecolors()[0],
+                                                  color=requests.get_color(),
                                                   ),
                                   )
             artists.append(arrows)

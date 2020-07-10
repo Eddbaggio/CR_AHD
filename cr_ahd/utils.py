@@ -1,8 +1,8 @@
-import pandas as pd
-import numpy as np
 from collections import namedtuple
-from matplotlib.pyplot import cycler, get_cmap
 
+import numpy as np
+import pandas as pd
+from matplotlib.pyplot import cycler, get_cmap
 
 opts = {'num_trials': 1,
         'verbose': 1,
