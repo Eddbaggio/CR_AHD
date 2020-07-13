@@ -13,3 +13,9 @@ class Vehicle(object):
 
     def __str__(self):
         return f'Vehicle (ID={self.id_}, capacity={self.capacity})'
+
+    def to_dict(self):
+        return {
+            'id_': self.id_,
+            'capacity': self.capacity
+        }

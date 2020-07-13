@@ -22,6 +22,17 @@ class Vertex(object):
     def __str__(self):
         return f'Vertex (ID={self.id_}, {self.coords}, {self.tw}, Demand={self.demand})'
 
+    def to_dict(self):
+        return {
+            'id_': self.id_,
+            'x_coord': self.coords.x,
+            'y_coord': self.coords.y,
+            'demand': self.demand,
+            'tw_open': self.tw.e,
+            'tw_close': self.tw.l,
+            'service_duration': self.service_duration
+        }
+
 
 if __name__ == '__main__':
     req1 = Vertex()

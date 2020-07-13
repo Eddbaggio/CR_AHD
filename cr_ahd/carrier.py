@@ -8,25 +8,40 @@ from utils import opts, InsertionError
 
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-from typing import List
+from typing import List, Union, OrderedDict as OrderedDictType
 
 
 class Carrier(object):
     """docstring for Carrier"""
 
-    def __init__(self, id_: int, depot: vx.Vertex, vehicles: List[vh.Vehicle]):
+    def __init__(self, id_: int, depot: vx.Vertex, vehicles: List[vh.Vehicle],
+                 requests: dict = None,
+                 unrouted: dict = None):
         self.id_ = id_
         self.depot = depot
         self.vehicles = vehicles
-        self.requests = OrderedDict()
-        self.unrouted = OrderedDict()
-
+        if requests is not None:
+            self.requests = OrderedDict(requests)
+        else:
+            self.requests = OrderedDict()
+        if unrouted is not None:
+            self.unrouted = OrderedDict(unrouted)
+        else:
+            self.unrouted: OrderedDictType[vx.Vertex] = OrderedDict()
         for v in vehicles:
             v.tour = Tour(id_=v.id_, sequence=[self.depot, self.depot])
         pass
 
     def __str__(self):
         return f'Carrier (ID:{self.id_}, Depot:{self.depot}, Vehicles:{len(self.vehicles)}, Requests:{len(self.requests)})'
+
+    def to_dict(self):
+        return {
+            'id_': self.id_,
+            'depot': self.depot.to_dict(),
+            'vehicles': [v.to_dict() for v in self.vehicles],
+            'requests': [r.to_dict() for r in self.requests.values()]
+        }
 
     def assign_request(self, request: vx.Vertex):
         self.requests[request.id_] = request

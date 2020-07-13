@@ -3,9 +3,10 @@ from collections import namedtuple
 import numpy as np
 import pandas as pd
 from matplotlib.pyplot import cycler, get_cmap
+from typing import List
 
-opts = {'num_trials': 1,
-        'verbose': 1,
+opts = {'num_trials': 10,
+        'verbose': 0,
         'plot_level': 1,
         'speed_kmh': 60 ** 2,
         'start_time': 0,
@@ -30,10 +31,14 @@ def euclidean_distance(a: Coords, b: Coords):
     return np.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 
 
-def make_dist_matrix(vertices: list):
+def make_dist_matrix(vertices: List):
+    """
+    :param vertices: List of vertices each of class Vertex
+    :return: pd.DataFrame distance matrix
+    """
     # assuming that vertices are of type rq.Request
     index = [i.id_ for i in vertices]
-    dist_matrix = pd.DataFrame(index=index, columns=index)
+    dist_matrix:pd.DataFrame = pd.DataFrame(index=index, columns=index, dtype='float64')
 
     for i in vertices:
         for j in vertices:

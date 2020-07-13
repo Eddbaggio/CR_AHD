@@ -1,7 +1,6 @@
 import time
 
 import matplotlib.pyplot as plt
-import numpy as np
 
 import instance as it
 from carrier import Carrier
@@ -9,29 +8,26 @@ from utils import opts
 
 
 def main() -> it.Instance:
-    np.random.seed(0)
-    # Read solomon file and create the instance
-    C101: it.Instance = it.read_solomon('C101', num_carriers=3)
+    # Read file and create the instance
+    C101_3_10_assigned: it.Instance = it.read_custom_json('C101_3_10_assigned')
     if opts['plot_level'] > 1:
-        C101.plot()
+        C101_3_10_assigned.plot()
         plt.xlim(0, 100)
         plt.ylim(0, 100)
         plt.show()
 
     if opts['verbose'] > 1:
-        print(C101.dist_matrix)
-
-    # assign requests to carriers randomly
-    C101.assign_all_requests()
+        print(C101_3_10_assigned.dist_matrix)
 
     # construct initial solution
-    C101.static_construction(method='cheapest_insertion')
+    C101_3_10_assigned.static_construction(method='cheapest_insertion')
+    # C101_3_10_assigned.static_construction(method='I1')
 
     if opts['verbose'] > 0:
-        print(*C101.carriers, sep='\n')
+        print(*C101_3_10_assigned.carriers, sep='\n')
         print('\n')
-        print(f'Total cost of {C101.id_}: {C101.total_cost()}')
-    return C101
+        print(f'Total cost of {C101_3_10_assigned.id_}: {C101_3_10_assigned.total_cost()}')
+    return C101_3_10_assigned
 
 
 if __name__ == '__main__':
