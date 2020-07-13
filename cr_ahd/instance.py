@@ -1,15 +1,14 @@
-import vertex as vx
-import vehicle as vh
-import carrier as cr
-from tour import Tour
-from utils import split_iterable, make_dist_matrix, opts
+from copy import copy
 from typing import List
 
-from copy import copy
-
-import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+
+import carrier as cr
+import vehicle as vh
+import vertex as vx
+from utils import split_iterable, make_dist_matrix, opts
 
 
 class Instance(object):
@@ -44,28 +43,48 @@ class Instance(object):
             if verbose > 0:
                 print(f'Total Route cost of carrier {c.id_}: {c.route_cost()}\n')
 
-    def dynamic_cheapest_insertion(self, request: vx.Vertex):
-        c: cr.Carrier = self.carriers[np.random.choice(range(3))]
-        c.assign_request(request)
+    def cheapest_insertion_auction(self, request: vx.Vertex, initial_carrier: cr.Carrier, verbose=opts['verbose'],
+                                   plot_level=opts['plot_level']):
+        """
+        If insertion of the request is profitable (demand > insertion cost) for the initial carrier, returns the
+        <carrier, vehicle, position, cost> triple for the cheapest insertion. If insertion is not profitable for the
+        initially selected carrier, returns the associated triple for the collaborator with the cheapest insertion
+        cost for the given request
 
-        vehicle_best: vh.Vehicle = None
-        cost_best = float('inf')
-        position_best = None
-        for v in c.vehicles:
-            v: vh.Vehicle
-            position, cost = v.tour.cheapest_feasible_insertion(u=request, dist_matrix=self.dist_matrix)
-            if cost < cost_best:
-                vehicle_best = v
-                cost_best = cost
-                position_best = position
-        vehicle_best.tour.insert_and_reset_schedules(position_best, request)
-        vehicle_best.tour.compute_cost_and_schedules(self.dist_matrix)
-        c.unrouted.pop(request.id_)  # remove inserted request from unrouted
+        :return: The carrier, vehicle, insertion index, and insertion cost of the correct/best insertion
+        """
+        if verbose > 0:
+            print(f'{request.id_} is originally assigned to {initial_carrier.id_}')
+            print(f'Checking profitability of {request.id_} for {initial_carrier.id_}')
+        vehicle_best, position_best, cost_best = initial_carrier.find_cheapest_feasible_insertion(request,
+                                                                                                  self.dist_matrix)
+        carrier_best = initial_carrier
+        # auction: determine and return the collaborator with the cheapest insertion cost
+        if cost_best > request.demand:
+            if verbose > 0:
+                print(f'{request.id_} is not profitable for {carrier_best.id_}')
+            for carrier in self.carriers:
+                if carrier is carrier_best:
+                    continue
+                else:
+                    if verbose > 0:
+                        print(f'Checking profitability of {request.id_} for {carrier.id_}')
+                    vehicle, position, cost = carrier.find_cheapest_feasible_insertion(request, self.dist_matrix)
+                    if cost < cost_best:
+                        carrier_best = carrier
+                        vehicle_best = vehicle
+                        position_best = position
+                        cost_best = cost
+        if verbose > 0:
+            if cost_best > request.demand:
+                print(f'No carrier can insert request {request.id_} profitably! It will be assigned to {carrier_best.id_}')
+            else:
+                print(f'{request.id_} is finally assigned to {carrier_best.id_}')
+        return carrier_best, vehicle_best, position_best, cost_best
 
         # TODO: continue here! request are assigned one by one and then the cheapest feasible insertion cost are
         #  determined. Take into account the demand value of a request for the cheapest insertion. This will allow to
         #  determine whether a request is profitable or not. If it is not profitable, submit is to the auction
-        pass
 
     def total_cost(self):
         total_cost = 0

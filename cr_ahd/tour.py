@@ -96,7 +96,7 @@ class Tour(object):
         pass
 
     def is_feasible(self, dist_matrix, start_time=opts['start_time'], verbose=opts['verbose']) -> bool:
-        if verbose > 1:
+        if verbose > 2:
             print(f'== Feasibility Check')
             print(self)
         service_schedule = self.service_schedule.copy()
@@ -105,11 +105,11 @@ class Tour(object):
             i: vx.Vertex = self.sequence[rho - 1]
             j: vx.Vertex = self.sequence[rho]
             dist = dist_matrix.loc[i.id_, j.id_]
-            if verbose > 2:
+            if verbose > 3:
                 print(f'iteration {rho}; service_schedule: {service_schedule}')
             earliest_arrival = service_schedule[rho - 1] + i.service_duration + travel_time(dist)
             if earliest_arrival > j.tw.l:
-                if verbose > 1:
+                if verbose > 2:
                     # print(f'From {i} to {j}')
                     # print(f'Predecessor start of service : {service_schedule[rho - 1]}')
                     # print(f'Predecessor service time : {i.service_duration}')
@@ -124,10 +124,9 @@ class Tour(object):
 
     def cheapest_feasible_insertion(self, u: vx.Vertex, dist_matrix, verbose=opts['verbose']):
         """
-        calculating the cheapest insertion position for an unrouted customer,
-        returning cost and position
-       """
-        if verbose > 1:
+        :return: Tuple (position, cost) of the best insertion position index and the associated (lowest) cost
+        """
+        if verbose > 2:
             print(f'\n= Cheapest insertion of {u.id_} into {self.id_}')
             print(self)
         min_insertion_cost = float('inf')
@@ -148,7 +147,7 @@ class Tour(object):
                 dist_u_j = dist_matrix.loc[u.id_, j.id_]
                 insertion_cost = dist_i_u + dist_u_j
 
-                if verbose > 1:
+                if verbose > 2:
                     print(f'Between {i.id_} and {j.id_}: {insertion_cost}')
 
                 if insertion_cost < min_insertion_cost:
@@ -165,12 +164,11 @@ class Tour(object):
 
         # return the best found position and cost or raise an error if no feasible position was found
         if i_best:
-            if verbose > 1:
+            if verbose > 2:
                 print(f'== Best: between {i_best.id_} and {j_best.id_}: {min_insertion_cost}')
             return insertion_position, min_insertion_cost
         else:
             raise InsertionError('', 'No feasible insertion position found')
-            pass
 
     def c1(self,
            i_index: int,

@@ -6,7 +6,7 @@ from matplotlib.pyplot import cycler, get_cmap
 
 opts = {'num_trials': 1,
         'verbose': 1,
-        'plot_level': 2,
+        'plot_level': 1,
         'speed_kmh': 60 ** 2,
         'start_time': 0,
         'alpha_1': 1,

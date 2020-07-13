@@ -5,7 +5,7 @@ import numpy as np
 
 import instance as it
 from carrier import Carrier
-from utils import opts
+from utils import opts, InsertionError
 
 
 def main() -> it.Instance:
@@ -22,12 +22,24 @@ def main() -> it.Instance:
     if opts['verbose'] > 1:
         print(C101.dist_matrix)
 
-    # assign requests to carriers randomly
-    # C101.assign_all_requests()
-
-    # construct initial solution
     for u in C101.requests:
-        C101.dynamic_cheapest_insertion(u)
+        if opts['verbose'] > 0:
+            print('\n')
+        initial_carrier = C101.carriers[np.random.choice(range(3))]
+        # initial_carrier.assign_request(u)
+        carrier, vehicle, position, cost = C101.cheapest_insertion_auction(u, initial_carrier)
+        carrier.assign_request(u)
+
+        # attempt insertion
+        try:
+            if opts['verbose'] > 0:
+                print(f'\tInserting {u.id_} into {carrier.id_}.{vehicle.id_} with cost of {round(cost, 2)}')
+            vehicle.tour.insert_and_reset_schedules(position, u)
+            vehicle.tour.compute_cost_and_schedules(C101.dist_matrix)
+            carrier.unrouted.pop(u.id_)  # remove inserted request from unrouted
+        except TypeError:
+            raise InsertionError('', f"Cannot insert {u} feasibly into {carrier.id_}.{vehicle.id_}")
+
     if opts['verbose'] > 0:
         print(*C101.carriers, sep='\n')
         print('\n')
@@ -37,17 +49,17 @@ def main() -> it.Instance:
 
 if __name__ == '__main__':
     times = []
-    cost = []
+    costs = []
     for i in range(opts['num_trials']):
         t0 = time.perf_counter()
         inst = main()
         t1 = time.perf_counter() - t0
         times.append(t1)
-        cost.append(inst.total_cost())
+        costs.append(inst.total_cost())
     print(dict(iterations=i + 1,
-               avg_cost=round(sum(cost) / len(cost), 4),
-               min_cost=round(min(cost), 4),
-               max_cost=round(max(cost), 4),
+               avg_cost=round(sum(costs) / len(costs), 4),
+               min_cost=round(min(costs), 4),
+               max_cost=round(max(costs), 4),
                avg_time=round(sum(times) / len(times), 4),
                min_time=round(min(times), 4),
                max_time=round(max(times), 4),
@@ -56,12 +68,8 @@ if __name__ == '__main__':
     if opts['plot_level'] > 0:
         c: Carrier
         for c in inst.carriers:
-            fig: plt.Figure
-            ax: plt.Axes
-            fig, ax = plt.subplots()
-            p = c.plot(ax=ax)
-            ax.set_xlim(0, 100)
-            ax.set_ylim(0, 100)
-            ax.set_title(f'tour {c.id_} with cost of {c.route_cost(2)}')
-            fig.show()
-            # plt.close(fig)
+            p = c.plot()
+            plt.xlim(0, 100)
+            plt.ylim(0, 100)
+            plt.title(f'tour {c.id_} with cost of {c.route_cost(2)}')
+        plt.show()

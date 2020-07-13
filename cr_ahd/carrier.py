@@ -20,7 +20,6 @@ class Carrier(object):
         self.vehicles = vehicles
         self.requests = OrderedDict()
         self.unrouted = OrderedDict()
-        # TODO: maybe have attributes 'unrouted' and 'routed'?! saves me from copying the self.requests e.g. in _cheapest_insertion_construction
 
         for v in vehicles:
             v.tour = Tour(id_=v.id_, sequence=[self.depot, self.depot])
@@ -114,9 +113,6 @@ class Carrier(object):
 
         return
 
-    # def dynamic_cheapest_insertion(self, dist_matrix, verbose=opts['verbose']):
-    #     assert len(self.unrouted) == 1, 'More than 1 unrouted customers -> invalid for dynamic insertion'
-
     def static_I1_construction(self, dist_matrix, verbose=opts['verbose'], plot_level=opts['plot_level']):
         """Solomon's I1 insertion heuristic from 1987. Following the description of 'Bräysy, Olli; Gendreau,
         Michel (2005): Vehicle Routing Problem with Time Windows, Part I: Route Construction and Local Search
@@ -203,6 +199,30 @@ class Carrier(object):
             plt.show()
 
         return
+
+    def find_cheapest_feasible_insertion(self, u: vx.Vertex, dist_matrix, verbose=opts['verbose'],
+                                         plot_level=opts['plot_level']):
+        """
+        Check every vehicle/tour for a feasible insertion and return the cheapest one
+
+        :return: triple (vehicle_best, position_best, cost_best) defining the cheapest vehicle/tour, index and associated cost to insert the given vertex u
+        """
+        vehicle_best: vh.Vehicle = None
+        cost_best = float('inf')
+        position_best = None
+        for v in self.vehicles:
+            try:
+                position, cost = v.tour.cheapest_feasible_insertion(u=u, dist_matrix=dist_matrix)
+                if verbose > 1:
+                    print(f'\t\tInsertion cost {u.id_} -> {v.id_}: {cost}')
+                if cost < cost_best:
+                    vehicle_best = v
+                    cost_best = cost
+                    position_best = position
+            except InsertionError:
+                if verbose > 0:
+                    print(f'x\t{u.id_} cannot be feasibly inserted into {v.id_}')
+        return vehicle_best, position_best, cost_best
 
     def plot(self, annotate: bool = True, alpha: float = 1):
 

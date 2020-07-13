@@ -20,7 +20,7 @@ class Vertex(object):
         self.service_duration = service_duration
 
     def __str__(self):
-        return f'Vertex (ID={self.id_}, {self.coords}, {self.tw})'
+        return f'Vertex (ID={self.id_}, {self.coords}, {self.tw}, Demand={self.demand})'
 
 
 if __name__ == '__main__':
