@@ -6,9 +6,10 @@ import instance as it
 from utils import opts
 import pandas as pd
 from copy import deepcopy
+from tqdm import tqdm
 
 
-def main() -> Tuple[Any, Any, Any, Any]:
+def main() -> Tuple[Any, Any, Any, Any, Any]:
     # create and write a new instance with random assignment based on a solomon instance
     num_carriers = 3
     num_vehicles = 10
@@ -24,10 +25,8 @@ def main() -> Tuple[Any, Any, Any, Any]:
 
     # Read file and create the instance
     # custom = read_custom_json(f'{solomon}_{num_carriers}_{num_vehicles}')
-    if opts['plot_level'] > 1:
+    if opts['plot_level'] > 0:
         custom.plot()
-        plt.xlim(0, 100)
-        plt.ylim(0, 100)
         plt.show()
 
     # ===== DYNAMIC + AUCTION =====
@@ -35,16 +34,18 @@ def main() -> Tuple[Any, Any, Any, Any]:
 
     # ===== STATIC CHEAPEST INSERTION =====
     sta_runtime, sta_cost = deepcopy(custom).static_construction(method='cheapest_insertion')
-    return dyn_runtime, dyn_cost, sta_runtime, sta_cost
+    return custom, dyn_runtime, dyn_cost, sta_runtime, sta_cost
 
 
 if __name__ == '__main__':
+    instances = []
     dyn_runtimes = []
     dyn_costs = []
     sta_runtimes = []
     sta_costs = []
-    for i in range(opts['num_trials']):
-        dyn_runtime, dyn_cost, sta_runtime, sta_cost = main()
+    for i in tqdm(range(opts['num_trials']), ascii=True):
+        inst, dyn_runtime, dyn_cost, sta_runtime, sta_cost = main()
+        instances.append(inst)
         dyn_runtimes.append(dyn_runtime)
         dyn_costs.append(dyn_cost)
         sta_runtimes.append(sta_runtime)
@@ -52,8 +53,10 @@ if __name__ == '__main__':
     performance = pd.DataFrame({'dyn_runtimes': dyn_runtimes,
                                 'dyn_costs': dyn_costs,
                                 'sta_runtimes': sta_runtimes,
-                                'sta_costs': sta_costs})
+                                'sta_costs': sta_costs},
+                               index=[inst.id_ for inst in instances])
     print(performance)
-    # print(performance.eval())
-    # performance.plot()
-    # plt.show()
+    print(performance.describe())
+    performance.filter(regex='runtimes').plot()
+    performance.filter(regex='costs').plot()
+    plt.show()

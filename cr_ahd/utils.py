@@ -5,7 +5,7 @@ import pandas as pd
 from matplotlib.pyplot import cycler, get_cmap
 from typing import List
 
-opts = {'num_trials': 10,
+opts = {'num_trials': 5,
         'verbose': 0,
         'plot_level': 1,
         'speed_kmh': 60 ** 2,

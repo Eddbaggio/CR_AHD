@@ -5,6 +5,7 @@ from itertools import islice
 from typing import List
 
 import matplotlib.pyplot as plt
+from adjustText import adjust_text
 import numpy as np
 import pandas as pd
 
@@ -62,8 +63,6 @@ class Instance(object):
 
         runtime = time.perf_counter() - t0
         return runtime, self.total_cost()
-
-
 
     def cheapest_insertion_auction(self, request: vx.Vertex, initial_carrier: cr.Carrier, verbose=opts['verbose'],
                                    plot_level=opts['plot_level']):
@@ -149,18 +148,33 @@ class Instance(object):
         return total_cost
 
     def plot(self, annotate: bool = True, alpha: float = 1):
+        for c in self.carriers:
+            plt.plot(*c.depot.coords, marker='s', alpha=alpha, linestyle='', c='black')
+            r_x_coords = [r.coords.x for r in c.requests.values()]
+            r_y_coords = [r.coords.y for r in c.requests.values()]
+            plt.scatter(x=r_x_coords, y=r_y_coords, alpha=alpha, label=c.id_)
+
+        if annotate:
+            texts = [plt.text(*c.depot.coords, s=c.depot.id_) for c in self.carriers]
+            adjust_text(texts)
+
+        plt.gca().legend()
+        plt.xlim(0,100)
+        plt.ylim(0,100)
+        plt.title(f'Instance {self.id_}')
+
         # plot depots
-        depots = [c.depot for c in self.carriers]
-        for d in depots:
-            plt.scatter(d.coords.x, d.coords.y, marker='s', alpha=alpha)
-            if annotate:
-                plt.annotate(f'{d.id_}', xy=d.coords)
+        # depots = [c.depot for c in self.carriers]
+        # for d in depots:
+        #     plt.scatter(d.coords.x, d.coords.y, marker='s', alpha=alpha)
+        #     if annotate:
+        #         plt.annotate(f'{d.id_}', xy=d.coords)
 
         # plot requests locations
-        for r in self.requests:
-            plt.scatter(r.coords.x, r.coords.y, alpha=alpha, color='grey')
-            if annotate:
-                plt.annotate(f'{r.id_}', xy=r.coords)
+        # for r in self.requests:
+        #     plt.scatter(r.coords.x, r.coords.y, alpha=alpha, color='grey')
+        #     if annotate:
+        #         plt.annotate(f'{r.id_}', xy=r.coords)
         return
 
     def write_custom_json(self):
@@ -247,7 +261,7 @@ if __name__ == '__main__':
     num_carriers = 3
     num_vehicles = 10
     self = make_custom_from_solomon('R101',
-                                      f'R101_{num_carriers}_{num_vehicles}',
+                                    f'R101_{num_carriers}_{num_vehicles}',
                                     num_carriers,
                                     num_vehicles,
                                     None)
