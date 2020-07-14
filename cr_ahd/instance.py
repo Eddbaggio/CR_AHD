@@ -41,12 +41,12 @@ class Instance(object):
             'dist_matrix': self.dist_matrix.to_dict()
         }
 
-    def assign_all_requests(self):
+    def assign_all_requests_randomly(self):
         for r in self.requests:
             c = self.carriers[np.random.choice(range(3))]
             c.assign_request(r)
 
-    def static_construction(self, method: str, verbose: int = opts['verbose']):
+    def static_construction(self, method: str, verbose: int = opts['verbose'], plot_level: int = opts['plot_level']):
         assert method in ['cheapest_insertion', 'I1']
 
         t0 = time.perf_counter()
@@ -55,9 +55,9 @@ class Instance(object):
             print(f'STATIC {method} Construction:')
         for c in self.carriers:
             if method == 'cheapest_insertion':
-                c.static_cheapest_insertion_construction(self.dist_matrix)
+                c.static_cheapest_insertion_construction(self.dist_matrix, verbose, plot_level)
             elif method == 'I1':
-                c.static_I1_construction(dist_matrix=self.dist_matrix)
+                c.static_I1_construction(self.dist_matrix, verbose, plot_level)
             if verbose > 0:
                 print(f'Total Route cost of carrier {c.id_}: {c.route_cost()}\n')
 
@@ -104,10 +104,6 @@ class Instance(object):
                 print(f'{request.id_} is finally assigned to {carrier_best.id_}')
         return carrier_best, vehicle_best, position_best, cost_best
 
-        # TODO: continue here! request are assigned one by one and then the cheapest feasible insertion cost are
-        #  determined. Take into account the demand value of a request for the cheapest insertion. This will allow to
-        #  determine whether a request is profitable or not. If it is not profitable, submit is to the auction
-
     def dynamic_construction(self):
         t0 = time.perf_counter()
         for i in range(len(self.requests)):
@@ -140,6 +136,17 @@ class Instance(object):
         runtime = time.perf_counter() - t0
         return runtime, self.total_cost()
 
+    def to_centralized(self):
+        central_depot = vx.Vertex('d_central', 50, 50, 0, 0, float('inf'))
+        central_vehicles = []
+        for c in self.carriers:
+            central_vehicles.extend(c.vehicles)
+        central_carrier = cr.Carrier(0, central_depot, central_vehicles)
+        centralized = Instance(self.id_ + 'centralized', self.requests, [central_carrier])
+        for r in centralized.requests:
+            centralized.carriers[0].assign_request(r)
+        return centralized
+
     def total_cost(self):
         total_cost = 0
         for c in self.carriers:
@@ -159,22 +166,10 @@ class Instance(object):
             adjust_text(texts)
 
         plt.gca().legend()
-        plt.xlim(0,100)
-        plt.ylim(0,100)
+        plt.xlim(0, 100)
+        plt.ylim(0, 100)
         plt.title(f'Instance {self.id_}')
 
-        # plot depots
-        # depots = [c.depot for c in self.carriers]
-        # for d in depots:
-        #     plt.scatter(d.coords.x, d.coords.y, marker='s', alpha=alpha)
-        #     if annotate:
-        #         plt.annotate(f'{d.id_}', xy=d.coords)
-
-        # plot requests locations
-        # for r in self.requests:
-        #     plt.scatter(r.coords.x, r.coords.y, alpha=alpha, color='grey')
-        #     if annotate:
-        #         plt.annotate(f'{r.id_}', xy=r.coords)
         return
 
     def write_custom_json(self):
@@ -265,7 +260,7 @@ if __name__ == '__main__':
                                     num_carriers,
                                     num_vehicles,
                                     None)
-    self.assign_all_requests()
+    self.assign_all_requests_randomly()
     self.write_custom_json()
     # custom = read_custom_json(f'R101_{num_carriers}_{num_vehicles}')
     pass

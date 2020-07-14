@@ -228,7 +228,6 @@ class Tour(object):
         """
         :return: List of artists to be drawn. Use for animated plotting
         """
-
         artists = []  # list of artists to be plotted
 
         # plot depot

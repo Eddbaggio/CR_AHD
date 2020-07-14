@@ -122,7 +122,7 @@ class Carrier(object):
                 full_tour_artists.extend(artists)
 
         if plot_level > 1:
-            ani = animation.ArtistAnimation(fig, artists=ims, interval=100, blit=True, repeat=True, repeat_delay=500)
+            ani = animation.ArtistAnimation(fig, artists=ims, interval=5, blit=True, repeat=False, repeat_delay=500)
             plt.title(f'Static Cheapest Insertion Construction of {self.id_}')
             plt.show()
 
@@ -209,7 +209,7 @@ class Carrier(object):
                 full_tour_artists.extend(artists)
 
         if plot_level > 1:
-            ani = animation.ArtistAnimation(fig, artists=ims, interval=100, blit=True, repeat=True, repeat_delay=500)
+            ani = animation.ArtistAnimation(fig, artists=ims, interval=5, blit=True, repeat=False, repeat_delay=500)
             plt.title(f'Solomon I1 Construction of {self.id_}')
             plt.show()
 
