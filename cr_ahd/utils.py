@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 from matplotlib.pyplot import cycler, get_cmap
 from typing import List
+import os
+
 
 opts = {'num_trials': 10,
         'verbose': 0,
@@ -18,6 +20,7 @@ opts = {'num_trials': 10,
 
 Coords = namedtuple('Coords', ['x', 'y'])
 TimeWindow = namedtuple('TimeWindow', ['e', 'l'])
+Solomon_Instances = [file[:-4] for file in os.listdir('../data/Solomon')]
 
 
 def split_iterable(iterable, num_chunks):

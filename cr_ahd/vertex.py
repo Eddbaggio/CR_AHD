@@ -2,7 +2,7 @@ from utils import TimeWindow, Coords
 
 
 class Vertex(object):
-    """docstring for Request"""
+
 
     def __init__(self,
                  id_: str,

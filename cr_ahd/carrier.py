@@ -74,7 +74,7 @@ class Carrier(object):
                 vehicle.tour.compute_cost_and_schedules(dist_matrix=dist_matrix)
                 self.unrouted.pop(seed.id_)
             else:
-                raise InsertionError('', 'Seed request cannot be inserted feasibly')
+                raise InsertionError('', f'Seed request {seed} cannot be inserted feasibly into {vehicle}')
         return
 
     def static_cheapest_insertion_construction(self, dist_matrix, verbose=opts['verbose'],

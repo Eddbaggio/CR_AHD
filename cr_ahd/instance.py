@@ -43,7 +43,7 @@ class Instance(object):
 
     def assign_all_requests_randomly(self):
         for r in self.requests:
-            c = self.carriers[np.random.choice(range(3))]
+            c = self.carriers[np.random.choice(range(len(self.carriers)))]
             c.assign_request(r)
 
     def static_construction(self, method: str, verbose: int = opts['verbose'], plot_level: int = opts['plot_level']):
@@ -104,10 +104,14 @@ class Instance(object):
                 print(f'{request.id_} is finally assigned to {carrier_best.id_}')
         return carrier_best, vehicle_best, position_best, cost_best
 
-    def dynamic_construction(self):
+    def dynamic_construction(self, with_auction: bool = True):
         t0 = time.perf_counter()
+
+        # find the next request u, that has id number i
+        # TODO this can be simplified/made more efficient if the
+        #  assignment of a vertex is stored with its class instance. In that case, it must also be stored
+        #  accordingly in the json file
         for i in range(len(self.requests)):
-            # find the next request u, that has id number i
             for c in self.carriers:
                 try:
                     u_id, u = next(islice(c.unrouted.items(), 1))  # get the first unrouted request of carrier c
@@ -116,12 +120,17 @@ class Instance(object):
                 if int(u_id[1:]) == i:
                     break
 
-            # do the auction
-            carrier, vehicle, position, cost = self.cheapest_insertion_auction(u, c)
-            if c != carrier:
-                c.unrouted.pop(u.id_)  # remove from initial carrier
-                c.requests.pop(u.id_)
-                carrier.assign_request(u)  # assign to auction winner
+            if with_auction:
+                # do the auction
+                carrier, vehicle, position, cost = self.cheapest_insertion_auction(request=u, initial_carrier=c)
+                if c != carrier:
+                    c.unrouted.pop(u.id_)  # remove from initial carrier
+                    c.requests.pop(u.id_)
+                    carrier.assign_request(u)  # assign to auction winner
+            else:
+                # find cheapest insertion
+                carrier = c
+                vehicle, position, cost = c.find_cheapest_feasible_insertion(u, self.dist_matrix)
 
             # attempt insertion
             try:
@@ -159,7 +168,7 @@ class Instance(object):
             plt.plot(*c.depot.coords, marker='s', alpha=alpha, linestyle='', c='black')
             r_x_coords = [r.coords.x for r in c.requests.values()]
             r_y_coords = [r.coords.y for r in c.requests.values()]
-            plt.scatter(x=r_x_coords, y=r_y_coords, alpha=alpha, label=c.id_)
+            plt.plot(r_x_coords, r_y_coords, marker='o', alpha=alpha, label=c.id_, ls='')
 
         if annotate:
             texts = [plt.text(*c.depot.coords, s=c.depot.id_) for c in self.carriers]
