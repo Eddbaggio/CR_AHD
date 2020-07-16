@@ -1,4 +1,5 @@
 import json
+import os
 import time
 from copy import copy
 from itertools import islice
@@ -42,6 +43,7 @@ class Instance(object):
         }
 
     def assign_all_requests_randomly(self):
+        # np.random.seed(0)
         for r in self.requests:
             c = self.carriers[np.random.choice(range(len(self.carriers)))]
             c.assign_request(r)
@@ -62,7 +64,7 @@ class Instance(object):
                 print(f'Total Route cost of carrier {c.id_}: {c.route_cost()}\n')
 
         runtime = time.perf_counter() - t0
-        return runtime, self.total_cost()
+        return runtime, self.total_cost(), self.num_vehicles_in_use()
 
     def cheapest_insertion_auction(self, request: vx.Vertex, initial_carrier: cr.Carrier, verbose=opts['verbose'],
                                    plot_level=opts['plot_level']):
@@ -77,8 +79,8 @@ class Instance(object):
         if verbose > 0:
             print(f'{request.id_} is originally assigned to {initial_carrier.id_}')
             print(f'Checking profitability of {request.id_} for {initial_carrier.id_}')
-        vehicle_best, position_best, cost_best = initial_carrier.find_cheapest_feasible_insertion(request,
-                                                                                                  self.dist_matrix)
+        vehicle_best, position_best, cost_best = initial_carrier.cheapest_feasible_insertion(request,
+                                                                                             self.dist_matrix)
         carrier_best = initial_carrier
         # auction: determine and return the collaborator with the cheapest insertion cost
         if cost_best > request.demand:
@@ -90,7 +92,7 @@ class Instance(object):
                 else:
                     if verbose > 0:
                         print(f'Checking profitability of {request.id_} for {carrier.id_}')
-                    vehicle, position, cost = carrier.find_cheapest_feasible_insertion(request, self.dist_matrix)
+                    vehicle, position, cost = carrier.cheapest_feasible_insertion(request, self.dist_matrix)
                     if cost < cost_best:
                         carrier_best = carrier
                         vehicle_best = vehicle
@@ -130,7 +132,7 @@ class Instance(object):
             else:
                 # find cheapest insertion
                 carrier = c
-                vehicle, position, cost = c.find_cheapest_feasible_insertion(u, self.dist_matrix)
+                vehicle, position, cost = c.cheapest_feasible_insertion(u, self.dist_matrix)
 
             # attempt insertion
             try:
@@ -143,7 +145,7 @@ class Instance(object):
                 raise InsertionError('', f"Cannot insert {u} feasibly into {carrier.id_}.{vehicle.id_}")
 
         runtime = time.perf_counter() - t0
-        return runtime, self.total_cost()
+        return runtime, self.total_cost(), self.num_vehicles_in_use()
 
     def to_centralized(self):
         central_depot = vx.Vertex('d_central', 50, 50, 0, 0, float('inf'))
@@ -162,6 +164,14 @@ class Instance(object):
             for v in c.vehicles:
                 total_cost += v.tour.cost
         return total_cost
+
+    def num_vehicles_in_use(self):
+        num_vehicles_in_use = 0
+        for c in self.carriers:
+            for v in c.vehicles:
+                if len(v.tour) > 2:
+                    num_vehicles_in_use += 1
+        return num_vehicles_in_use
 
     def plot(self, annotate: bool = True, alpha: float = 1):
         for c in self.carriers:
@@ -182,15 +192,27 @@ class Instance(object):
         return
 
     def write_custom_json(self):
+        file_name = f'../data/Custom/{self.id_}'
+
+        # check if any customers are assigned to carriers already and set the file name
         assigned_requests = []
         for c in self.carriers:
             assigned_requests.extend(c.requests)
         if any(assigned_requests):
-            file_name = f'../data/Custom/{self.id_}_assigned.json'
-        else:
-            file_name = f'../data/Custom/{self.id_}.json'
+            file_name += '_ass'
+
+        # check how many instances of this type already have been stored and enumerate file name accordingly
+        listdir = os.listdir(f'../data/Custom')
+        enum = 0
+        for file in listdir:
+            if self.id_ in file:
+                enum += 1
+        file_name += f'_#{enum}'
+
+        file_name += '.json'
         with open(file_name, mode='w') as write_file:
             json.dump(self.to_dict(), write_file, indent=4)
+        return file_name
 
 
 def read_solomon(name: str, num_carriers: int) -> Instance:

@@ -9,7 +9,7 @@ import os
 
 opts = {'num_trials': 10,
         'verbose': 0,
-        'plot_level': 2,
+        'plot_level': 0,
         'speed_kmh': 60 ** 2,
         'start_time': 0,
         'alpha_1': 1,

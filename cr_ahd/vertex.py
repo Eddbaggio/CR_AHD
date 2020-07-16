@@ -1,8 +1,8 @@
 from utils import TimeWindow, Coords
+import carrier
 
 
 class Vertex(object):
-
 
     def __init__(self,
                  id_: str,
@@ -34,5 +34,6 @@ class Vertex(object):
         }
 
 
-if __name__ == '__main__':
-    req1 = Vertex()
+# if __name__ == '__main__':
+    # carrier = carrier.Carrier(-99, Vertex('dummy', 0, 0, 0, 0, 0), [])
+    # print(carrier)

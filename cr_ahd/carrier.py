@@ -12,7 +12,6 @@ from typing import List, Union, OrderedDict as OrderedDictType
 
 
 class Carrier(object):
-    """docstring for Carrier"""
 
     def __init__(self, id_: int, depot: vx.Vertex, vehicles: List[vh.Vehicle],
                  requests: dict = None,
@@ -21,7 +20,7 @@ class Carrier(object):
         self.depot = depot
         self.vehicles = vehicles
         if requests is not None:
-            self.requests = OrderedDict(requests)
+            self.requests = OrderedDict(requests)  # TODO: write comment explaining why these HAVE to be (ordered)dicts instead of lists
         else:
             self.requests = OrderedDict()
         if unrouted is not None:
@@ -33,7 +32,7 @@ class Carrier(object):
         pass
 
     def __str__(self):
-        return f'Carrier (ID:{self.id_}, Depot:{self.depot}, Vehicles:{len(self.vehicles)}, Requests:{len(self.requests)})'
+        return f'Carrier (ID:{self.id_}, Depot:{self.depot}, Vehicles:{len(self.vehicles)}, Requests:{len(self.requests)}, Unrouted:{len(self.unrouted)})'
 
     def to_dict(self):
         return {
@@ -90,7 +89,6 @@ class Carrier(object):
             requests = plt.plot(r_x, r_y, marker='o', ms=9, mfc='white', mec='black', alpha=0.9, ls='')
             ims.append(requests)
 
-        v: vh.Vehicle
         for v in self.vehicles:
             self.initialize_tour(vehicle=v, dist_matrix=dist_matrix, earliest_due_date=True)
             tour_is_full = False
@@ -126,14 +124,13 @@ class Carrier(object):
             if plot_level > 1 and tour_is_full:
                 full_tour_artists.extend(artists)
 
-        assert len(self.unrouted) == 0, 'Unrouted customers left'
-
         if plot_level > 1:
             ims.extend([ims[-1]]*100)
             ani = animation.ArtistAnimation(fig, artists=ims, interval=40, blit=True, repeat=True, repeat_delay=500)
             plt.title(f'Static Cheapest Insertion Construction of {self.id_}')
             plt.show()
 
+        assert len(self.unrouted) == 0, f'{len(self.unrouted)} unrouted customers left for {self}'
         return
 
     def static_I1_construction(self, dist_matrix, verbose=opts['verbose'], plot_level=opts['plot_level']):
@@ -152,7 +149,6 @@ class Carrier(object):
             requests = plt.plot(r_x, r_y, marker='o', ms=9, mfc='white', mec='black', alpha=0.9, ls='')
             ims.append(requests)
 
-        v: vh.Vehicle
         for v in self.vehicles:
             # initialize a tour with the first customer with earliest due date
             self.initialize_tour(vehicle=v, dist_matrix=dist_matrix, earliest_due_date=True)
@@ -231,10 +227,10 @@ class Carrier(object):
 
         return
 
-    def find_cheapest_feasible_insertion(self, u: vx.Vertex, dist_matrix, verbose=opts['verbose'],
-                                         plot_level=opts['plot_level']):
+    def cheapest_feasible_insertion(self, u: vx.Vertex, dist_matrix, verbose=opts['verbose'],
+                                    plot_level=opts['plot_level']):
         """
-        Check every vehicle/tour for a feasible insertion and return the cheapest one
+        Checks EVERY vehicle/tour for a feasible insertion and return the cheapest one
 
         :return: triple (vehicle_best, position_best, cost_best) defining the cheapest vehicle/tour, index and associated cost to insert the given vertex u
         """
