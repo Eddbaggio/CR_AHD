@@ -81,9 +81,14 @@ class Carrier(object):
                                                plot_level=opts['plot_level']):
         if plot_level > 1:
             fig: plt.Figure = plt.figure()
+            plt.grid()
             # ims is a list of lists. each row will contain the list of artists to be drawn at a frame
             ims = []
             full_tour_artists = []
+            r_x = [r.coords.x for _, r in self.requests.items()]
+            r_y = [r.coords.y for _, r in self.requests.items()]
+            requests = plt.plot(r_x, r_y, marker='o', ms=9, mfc='white', mec='black', alpha=0.9, ls='')
+            ims.append(requests)
 
         v: vh.Vehicle
         for v in self.vehicles:
@@ -92,7 +97,7 @@ class Carrier(object):
 
             if plot_level > 1 and len(self.unrouted) > 0:  # do not plot empty vehicles
                 artists = v.tour.plot(color=v.color)
-                frame = [*full_tour_artists, *artists]
+                frame = [*requests, *full_tour_artists, *artists]
                 ims.append(frame)
 
             # add unrouted customers one by one until tour is full
@@ -108,7 +113,7 @@ class Carrier(object):
 
                     if plot_level > 1:
                         artists = v.tour.plot(color=v.color)
-                        frame = [*full_tour_artists, *artists]
+                        frame = [*requests, *full_tour_artists, *artists]
                         ims.append(frame)
 
                 except InsertionError:
@@ -121,8 +126,11 @@ class Carrier(object):
             if plot_level > 1 and tour_is_full:
                 full_tour_artists.extend(artists)
 
+        assert len(self.unrouted) == 0, 'Unrouted customers left'
+
         if plot_level > 1:
-            ani = animation.ArtistAnimation(fig, artists=ims, interval=5, blit=True, repeat=False, repeat_delay=500)
+            ims.extend([ims[-1]]*100)
+            ani = animation.ArtistAnimation(fig, artists=ims, interval=40, blit=True, repeat=True, repeat_delay=500)
             plt.title(f'Static Cheapest Insertion Construction of {self.id_}')
             plt.show()
 
@@ -135,9 +143,14 @@ class Carrier(object):
         """
         if plot_level > 1:
             fig: plt.Figure = plt.figure()
+            plt.grid()
             # ims is a list of lists. each row will contain the list of artists to be drawn at a frame
             ims = []
             full_tour_artists = []
+            r_x = [r.coords.x for _, r in self.requests.items()]
+            r_y = [r.coords.y for _, r in self.requests.items()]
+            requests = plt.plot(r_x, r_y, marker='o', ms=9, mfc='white', mec='black', alpha=0.9, ls='')
+            ims.append(requests)
 
         v: vh.Vehicle
         for v in self.vehicles:
@@ -147,7 +160,7 @@ class Carrier(object):
 
             if plot_level > 1 and len(self.unrouted) > 0:  # do not plot empty vehicles
                 artists = v.tour.plot(color=v.color)
-                frame = [*full_tour_artists, *artists]
+                frame = [*requests, *full_tour_artists, *artists]
                 ims.append(frame)
 
             # fill the tours
@@ -199,7 +212,7 @@ class Carrier(object):
 
                     if plot_level > 1:
                         artists = v.tour.plot(color=v.color)
-                        frame = [*full_tour_artists, *artists]
+                        frame = [*requests, *full_tour_artists, *artists]
                         ims.append(frame)
 
                 else:
@@ -208,8 +221,11 @@ class Carrier(object):
             if plot_level > 1 and tour_is_full:
                 full_tour_artists.extend(artists)
 
+        assert len(self.unrouted) == 0, 'Unrouted customers left'
+
         if plot_level > 1:
-            ani = animation.ArtistAnimation(fig, artists=ims, interval=5, blit=True, repeat=False, repeat_delay=500)
+            ims.extend([ims[-1]]*100)
+            ani = animation.ArtistAnimation(fig, artists=ims, interval=40, blit=True, repeat=True, repeat_delay=500)
             plt.title(f'Solomon I1 Construction of {self.id_}')
             plt.show()
 

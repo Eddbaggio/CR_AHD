@@ -232,7 +232,15 @@ class Tour(object):
 
         # plot depot
         if plot_depot:
-            depot, = plt.plot(*self.depot.coords, marker='s', c=color, alpha=alpha, label=self.depot.id_, linestyle='')
+            depot, = plt.plot(*self.depot.coords,
+                              marker='s',
+                              markersize='9',
+                              mfc=color,
+                              mec='black',
+                              mew=1,
+                              alpha=alpha,
+                              label=self.depot.id_,
+                              linestyle='')
             artists.append(depot)
 
         # plot requests locations

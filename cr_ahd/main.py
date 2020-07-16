@@ -64,7 +64,7 @@ def main(solomon) -> dict:
 if __name__ == '__main__':
     results = []
     # for i in tqdm(range(opts['num_trials']), ascii=True):
-    for solomon in tqdm(Solomon_Instances):
+    for solomon in tqdm([Solomon_Instances[-3]]):
         res = main(solomon)
         results.append(res)
     performance = pd.DataFrame(results)
