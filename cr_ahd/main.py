@@ -44,7 +44,7 @@ def main(solomon) -> dict:
     _, dyn_runtime = dyn_custom.dynamic_construction(with_auction=False)
     dyn_cost = dyn_custom.total_cost
     dyn_solution = dyn_custom.solution
-    print(dyn_solution)
+    # print(dyn_solution)
 
     # ===== DYNAMIC + AUCTION =====
     dyn_auc_custom = deepcopy(custom)

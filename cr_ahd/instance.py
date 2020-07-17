@@ -14,6 +14,7 @@ import carrier as cr
 import vehicle as vh
 import vertex as vx
 from utils import split_iterable, make_dist_matrix, opts, InsertionError, timer
+from plotting import CarrierConstructionAnimation
 
 
 class Instance(object):
@@ -80,13 +81,16 @@ class Instance(object):
             c = self.carriers[np.random.choice(range(len(self.carriers)))]
             c.assign_request(r)
 
-    @ timer
+    @timer
     def static_construction(self, method: str, verbose: int = opts['verbose'], plot_level: int = opts['plot_level']):
         assert method in ['cheapest_insertion', 'I1']
         if verbose > 0:
             print(f'STATIC {method} Construction:')
 
         for c in self.carriers:
+            if plot_level > 1:
+                ani = CarrierConstructionAnimation(c)
+
             if method == 'cheapest_insertion':
                 while len(c.unrouted) > 0:
                     _, u = c.unrouted.popitem(last=False)
@@ -95,6 +99,11 @@ class Instance(object):
                         print(f'\tInserting {u.id_} into {c.id_}.{vehicle.tour.id_}')
                     vehicle.tour.insert_and_reset_schedules(index=position, vertex=u)
                     vehicle.tour.compute_cost_and_schedules(self.dist_matrix)
+                    if plot_level > 1:
+                        ani.add_current_frame()
+        if plot_level > 1:
+            # ani.show()
+            ani.save()
 
             # elif method == 'I1':
             #     c.static_I1_construction(self.dist_matrix, verbose, plot_level)
@@ -143,11 +152,13 @@ class Instance(object):
         return carrier_best, vehicle_best, position_best, cost_best
 
     @timer
-    def dynamic_construction(self, with_auction: bool = True):
+    def dynamic_construction(self, with_auction: bool = True, verbose=opts['verbose'], plot_level=opts['plot_level']):
         # find the next request u, that has id number i
-        # TODO this can be simplified/made more efficient if the
-        #  assignment of a vertex is stored with its class instance. In that case, it must also be stored
-        #  accordingly in the json file
+
+        # TODO this can be simplified/made more efficient if the assignment of a vertex is stored with its class
+        #  instance. In that case, it must also be stored accordingly in the json file. Right now, it is not a big
+        #  problem since requests are assigned in ascending order, so only the first request of each carrier must be
+        #  checked
 
         for i in range(len(self.requests)):
             for c in self.carriers:
