@@ -13,7 +13,7 @@ import pandas as pd
 import carrier as cr
 import vehicle as vh
 import vertex as vx
-from utils import split_iterable, make_dist_matrix, opts, InsertionError
+from utils import split_iterable, make_dist_matrix, opts, InsertionError, timer
 
 
 class Instance(object):
@@ -34,6 +34,23 @@ class Instance(object):
     def __str__(self):
         return f'Instance {self.id_} with {len(self.requests)} customers and {len(self.carriers)} carriers'
 
+    @property
+    def total_cost(self):
+        total_cost = 0
+        for c in self.carriers:
+            for v in c.vehicles:
+                total_cost += v.tour.cost
+        return total_cost
+
+    @property
+    def num_vehicles_in_use(self):
+        num_vehicles_in_use = 0
+        for c in self.carriers:
+            for v in c.vehicles:
+                if len(v.tour) > 2:
+                    num_vehicles_in_use += 1
+        return num_vehicles_in_use
+
     def to_dict(self):
         return {
             'id_': self.id_,
@@ -48,23 +65,27 @@ class Instance(object):
             c = self.carriers[np.random.choice(range(len(self.carriers)))]
             c.assign_request(r)
 
+    @ timer
     def static_construction(self, method: str, verbose: int = opts['verbose'], plot_level: int = opts['plot_level']):
         assert method in ['cheapest_insertion', 'I1']
-
-        t0 = time.perf_counter()
-
         if verbose > 0:
             print(f'STATIC {method} Construction:')
+
         for c in self.carriers:
             if method == 'cheapest_insertion':
-                c.static_cheapest_insertion_construction(self.dist_matrix, verbose, plot_level)
-            elif method == 'I1':
-                c.static_I1_construction(self.dist_matrix, verbose, plot_level)
+                while len(c.unrouted) > 0:
+                    _, u = c.unrouted.popitem(last=False)
+                    vehicle, position, cost = c.cheapest_feasible_insertion(u, self.dist_matrix, verbose, plot_level)
+                    if verbose > 0:
+                        print(f'\tInserting {u.id_} into {c.id_}.{vehicle.tour.id_}')
+                    vehicle.tour.insert_and_reset_schedules(index=position, vertex=u)
+                    vehicle.tour.compute_cost_and_schedules(self.dist_matrix)
+
+            # elif method == 'I1':
+            #     c.static_I1_construction(self.dist_matrix, verbose, plot_level)
             if verbose > 0:
                 print(f'Total Route cost of carrier {c.id_}: {c.route_cost()}\n')
-
-        runtime = time.perf_counter() - t0
-        return runtime, self.total_cost(), self.num_vehicles_in_use()
+        return
 
     def cheapest_insertion_auction(self, request: vx.Vertex, initial_carrier: cr.Carrier, verbose=opts['verbose'],
                                    plot_level=opts['plot_level']):
@@ -106,13 +127,13 @@ class Instance(object):
                 print(f'{request.id_} is finally assigned to {carrier_best.id_}')
         return carrier_best, vehicle_best, position_best, cost_best
 
+    @timer
     def dynamic_construction(self, with_auction: bool = True):
-        t0 = time.perf_counter()
-
         # find the next request u, that has id number i
         # TODO this can be simplified/made more efficient if the
         #  assignment of a vertex is stored with its class instance. In that case, it must also be stored
         #  accordingly in the json file
+
         for i in range(len(self.requests)):
             for c in self.carriers:
                 try:
@@ -144,11 +165,10 @@ class Instance(object):
             except TypeError:
                 raise InsertionError('', f"Cannot insert {u} feasibly into {carrier.id_}.{vehicle.id_}")
 
-        runtime = time.perf_counter() - t0
-        return runtime, self.total_cost(), self.num_vehicles_in_use()
+        return
 
-    def to_centralized(self):
-        central_depot = vx.Vertex('d_central', 50, 50, 0, 0, float('inf'))
+    def to_centralized(self, depot_xy: tuple):
+        central_depot = vx.Vertex('d_central', *depot_xy, 0, 0, float('inf'))
         central_vehicles = []
         for c in self.carriers:
             central_vehicles.extend(c.vehicles)
@@ -157,21 +177,6 @@ class Instance(object):
         for r in centralized.requests:
             centralized.carriers[0].assign_request(r)
         return centralized
-
-    def total_cost(self):
-        total_cost = 0
-        for c in self.carriers:
-            for v in c.vehicles:
-                total_cost += v.tour.cost
-        return total_cost
-
-    def num_vehicles_in_use(self):
-        num_vehicles_in_use = 0
-        for c in self.carriers:
-            for v in c.vehicles:
-                if len(v.tour) > 2:
-                    num_vehicles_in_use += 1
-        return num_vehicles_in_use
 
     def plot(self, annotate: bool = True, alpha: float = 1):
         for c in self.carriers:

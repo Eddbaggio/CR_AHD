@@ -1,11 +1,12 @@
+import functools
+import os
+import time
 from collections import namedtuple
+from typing import List
 
 import numpy as np
 import pandas as pd
-from matplotlib.pyplot import cycler, get_cmap
-from typing import List
-import os
-
+import matplotlib.pyplot as plt
 
 opts = {'num_trials': 10,
         'verbose': 0,
@@ -15,7 +16,7 @@ opts = {'num_trials': 10,
         'alpha_1': 1,
         'mu': 1,
         'lambda': 0,
-        'ccycler': cycler(color=get_cmap('Set1').colors)()
+        'ccycler': plt.cycler(color=plt.get_cmap('Set1').colors)()
         }
 
 Coords = namedtuple('Coords', ['x', 'y'])
@@ -41,7 +42,7 @@ def make_dist_matrix(vertices: List):
     """
     # assuming that vertices are of type rq.Request
     index = [i.id_ for i in vertices]
-    dist_matrix:pd.DataFrame = pd.DataFrame(index=index, columns=index, dtype='float64')
+    dist_matrix: pd.DataFrame = pd.DataFrame(index=index, columns=index, dtype='float64')
 
     for i in vertices:
         for j in vertices:
@@ -64,3 +65,19 @@ class InsertionError(Exception):
     def __init__(self, expression, message):
         self.expression = expression
         self.message = message
+
+
+def timer(func):
+    """Print the runtime of the decorated function"""
+    @functools.wraps(func)
+    def wrapper_timer(*args, **kwargs):
+        start_time = time.perf_counter()  # 1
+        value = func(*args, **kwargs)
+        end_time = time.perf_counter()  # 2
+        run_time = end_time - start_time  # 3
+        if opts['verbose'] > 0:
+            print(f"Finished {func.__name__!r} in {run_time:.4f} secs")
+        return value, run_time
+    return wrapper_timer
+
+

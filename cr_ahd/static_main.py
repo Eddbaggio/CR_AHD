@@ -26,7 +26,7 @@ def main() -> it.Instance:
     if opts['verbose'] > 0:
         print(*C101_3_10_assigned.carriers, sep='\n')
         print('\n')
-        print(f'Total cost of {C101_3_10_assigned.id_}: {C101_3_10_assigned.total_cost()}')
+        print(f'Total cost of {C101_3_10_assigned.id_}: {C101_3_10_assigned.total_cost}')
     return C101_3_10_assigned
 
 
@@ -38,7 +38,7 @@ if __name__ == '__main__':
         inst = main()
         t1 = time.perf_counter() - t0
         times.append(t1)
-        cost.append(inst.total_cost())
+        cost.append(inst.total_cost)
     print(dict(iterations=i + 1,
                avg_cost=round(sum(cost) / len(cost), 4),
                min_cost=round(min(cost), 4),

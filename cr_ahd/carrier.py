@@ -20,7 +20,8 @@ class Carrier(object):
         self.depot = depot
         self.vehicles = vehicles
         if requests is not None:
-            self.requests = OrderedDict(requests)  # TODO: write comment explaining why these HAVE to be (ordered)dicts instead of lists
+            self.requests = OrderedDict(
+                requests)  # TODO: write comment explaining why these HAVE to be (ordered)dicts instead of lists
         else:
             self.requests = OrderedDict()
         if unrouted is not None:
@@ -105,7 +106,7 @@ class Carrier(object):
                     # find cheapest feasible insertion position and execute insertion
                     pos, cost = v.tour.cheapest_feasible_insertion(u=u, dist_matrix=dist_matrix)
                     if verbose > 0:
-                        print(f'\tInserting {u.id_} into {v.tour.id_}')
+                        print(f'\tInserting {u.id_} into {self.id_}.{v.tour.id_}')
                     v.tour.insert_and_reset_schedules(index=pos, vertex=u)
                     v.tour.compute_cost_and_schedules(dist_matrix=dist_matrix)
 
@@ -125,7 +126,7 @@ class Carrier(object):
                 full_tour_artists.extend(artists)
 
         if plot_level > 1:
-            ims.extend([ims[-1]]*100)
+            ims.extend([ims[-1]] * 100)
             ani = animation.ArtistAnimation(fig, artists=ims, interval=40, blit=True, repeat=True, repeat_delay=500)
             plt.title(f'Static Cheapest Insertion Construction of {self.id_}')
             plt.show()
@@ -138,6 +139,13 @@ class Carrier(object):
         Michel (2005): Vehicle Routing Problem with Time Windows, Part I: Route Construction and Local Search
         Algorithms.'
         """
+
+        if True:
+            raise DeprecationWarning
+            # TODO: check functionality: (1) tours are created sequentially, is that intended? (2) related,
+            #  only the current tour is checked for best insertion, not ALL tours as in other approaches
+            return
+
         if plot_level > 1:
             fig: plt.Figure = plt.figure()
             plt.grid()
@@ -200,7 +208,7 @@ class Carrier(object):
 
                 if max_c2 > float('-inf'):
                     if verbose > 0:
-                        print(f'\tInserting {u_best.id_} into {v.tour.id_}')
+                        print(f'\tInserting {u_best.id_} into {self.id_}.{v.tour.id_}')
 
                     v.tour.insert_and_reset_schedules(index=rho_best, vertex=u_best)
                     v.tour.compute_cost_and_schedules(dist_matrix=dist_matrix, ignore_tw=True)
@@ -220,7 +228,7 @@ class Carrier(object):
         assert len(self.unrouted) == 0, 'Unrouted customers left'
 
         if plot_level > 1:
-            ims.extend([ims[-1]]*100)
+            ims.extend([ims[-1]] * 100)
             ani = animation.ArtistAnimation(fig, artists=ims, interval=40, blit=True, repeat=True, repeat_delay=500)
             plt.title(f'Solomon I1 Construction of {self.id_}')
             plt.show()
