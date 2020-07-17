@@ -51,6 +51,21 @@ class Instance(object):
                     num_vehicles_in_use += 1
         return num_vehicles_in_use
 
+    @property
+    def solution(self):
+        instance_solution = {}
+        for c in self.carriers:
+            carrier_solution = {}
+            for v in c.vehicles:
+                vehicle_solution = dict(sequence=[r.id_ for r in v.tour.sequence],
+                                        arrival=v.tour.arrival_schedule,
+                                        service=v.tour.service_schedule, cost=v.tour.cost)
+                carrier_solution[v.id_] = vehicle_solution
+                carrier_solution['cost'] = c.route_cost()
+            instance_solution[c.id_] = carrier_solution
+            instance_solution['cost'] = self.total_cost
+        return instance_solution
+
     def to_dict(self):
         return {
             'id_': self.id_,

@@ -143,7 +143,7 @@ class Carrier(object):
         if True:
             raise DeprecationWarning
             # TODO: check functionality: (1) tours are created sequentially, is that intended? (2) related,
-            #  only the current tour is checked for best insertion, not ALL tours as in other approaches
+            #  only the current tour is checked for best insertion, not ALL tours, as is the case in other approaches
             return
 
         if plot_level > 1:
