@@ -8,16 +8,17 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-opts = {'num_trials': 10,
-        'verbose': 0,
-        'plot_level': 2,
-        'speed_kmh': 60 ** 2,
-        'start_time': 0,
-        'alpha_1': 1,
-        'mu': 1,
-        'lambda': 0,
-        'ccycler': plt.cycler(color=plt.get_cmap('Set1').colors)()
-        }
+opts = {
+    'num_trials': 10,
+    'verbose': 0,
+    'plot_level': 0,
+    'speed_kmh': 60 ** 2,
+    'start_time': 0,
+    'alpha_1': 0.5,
+    'mu': 1,
+    'lambda': 2,
+    'ccycler': plt.cycler(color=plt.get_cmap('Set1').colors)()
+}
 
 Coords = namedtuple('Coords', ['x', 'y'])
 TimeWindow = namedtuple('TimeWindow', ['e', 'l'])
@@ -69,6 +70,7 @@ class InsertionError(Exception):
 
 def timer(func):
     """Print the runtime of the decorated function"""
+
     @functools.wraps(func)
     def wrapper_timer(*args, **kwargs):
         start_time = time.perf_counter()  # 1
@@ -78,6 +80,8 @@ def timer(func):
         if opts['verbose'] > 0:
             print(f"Finished {func.__name__!r} in {run_time:.4f} secs")
         return value, run_time
+
     return wrapper_timer
 
 
+# if __name__ == '__main__':

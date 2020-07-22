@@ -1,20 +1,20 @@
 import json
 import os
-import time
 from copy import copy
 from itertools import islice
-from typing import List
+from typing import List, Optional
 
 import matplotlib.pyplot as plt
-from adjustText import adjust_text
 import numpy as np
 import pandas as pd
+from adjustText import adjust_text
 
 import carrier as cr
 import vehicle as vh
 import vertex as vx
-from utils import split_iterable, make_dist_matrix, opts, InsertionError, timer
 from plotting import CarrierConstructionAnimation
+from profiling import Timer
+from utils import split_iterable, make_dist_matrix, opts, InsertionError
 
 
 class Instance(object):
@@ -30,18 +30,26 @@ class Instance(object):
             self.dist_matrix = dist_matrix
         else:
             self.dist_matrix = make_dist_matrix([*self.requests, *[c.depot for c in self.carriers]])
-        pass
+        self._solved = False
 
     def __str__(self):
-        return f'Instance {self.id_} with {len(self.requests)} customers and {len(self.carriers)} carriers'
+        return f'{"Solved " if self._solved else ""}Instance {self.id_} with {len(self.requests)} customers and {len(self.carriers)} carriers'
 
     @property
-    def total_cost(self):
+    def cost(self):
         total_cost = 0
         for c in self.carriers:
             for v in c.vehicles:
                 total_cost += v.tour.cost
         return total_cost
+
+    @property
+    def revenue(self):
+        return sum([c.revenue for c in self.carriers])
+
+    @property
+    def profit(self):
+        return self.revenue - self.cost
 
     @property
     def num_vehicles_in_use(self):
@@ -60,12 +68,35 @@ class Instance(object):
             for v in c.vehicles:
                 vehicle_solution = dict(sequence=[r.id_ for r in v.tour.sequence],
                                         arrival=v.tour.arrival_schedule,
-                                        service=v.tour.service_schedule, cost=v.tour.cost)
+                                        service=v.tour.service_schedule,
+                                        cost=v.tour.cost)
                 carrier_solution[v.id_] = vehicle_solution
-                carrier_solution['cost'] = c.route_cost()
+                carrier_solution['cost'] = c.cost()
             instance_solution[c.id_] = carrier_solution
-            instance_solution['cost'] = self.total_cost
+            instance_solution['cost'] = self.cost
         return instance_solution
+
+    @property
+    def num_requests_per_carrier(self):
+        num_requests_per_carrier = dict()
+        for c in self.carriers:
+            num_requests_per_carrier[f'{c.id_}_num_veh'] = c.num_vehicles_in_use
+        return num_requests_per_carrier
+
+
+
+    @property
+    def evaluation_metrics(self):
+        assert self._solved, f'{self} has not been solved yet'
+        return dict(id=self.id_,
+                    num_veh=self.num_vehicles_in_use,
+                    cost=self.cost,
+                    revenue=self.revenue,
+                    profit=self.profit,
+                    runtime=self._runtime,
+                    algorithm=self._solution_algorithm,
+                    **self.num_requests_per_carrier,
+                    )
 
     def to_dict(self):
         return {
@@ -76,39 +107,74 @@ class Instance(object):
         }
 
     def assign_all_requests_randomly(self):
+        assert not self._solved, f'Instance {self} has already been solved'
         # np.random.seed(0)
         for r in self.requests:
             c = self.carriers[np.random.choice(range(len(self.carriers)))]
             c.assign_request(r)
 
-    @timer
-    def static_construction(self, method: str, verbose: int = opts['verbose'], plot_level: int = opts['plot_level']):
+    def static_construction(self,
+                            method: str,
+                            initialize: Optional[str] = None,
+                            verbose: int = opts['verbose'],
+                            plot_level: int = opts['plot_level']):
+        """
+        Use a static construction method to build tours for all carriers.
+
+        :param method: use 'cheapest_insertion' or 'I1' insertion method
+        :param initialize: optionally, pendulum tours can be created before insertion. 'earliest_due_date' or 'furthest' methods are available
+        :param verbose:
+        :param plot_level:
+        :return:
+        """
+        assert not self._solved, f'Instance {self} has already been solved'
         assert method in ['cheapest_insertion', 'I1']
         if verbose > 0:
             print(f'STATIC {method} Construction:')
+        timer = Timer()
+        timer.start()
 
         for c in self.carriers:
             if plot_level > 1:
                 ani = CarrierConstructionAnimation(c)
+            # use initialization procedure to construct pendulum tours
+            if initialize is not None:
+                for v in c.vehicles:
+                    c.initialize_tour(v, self.dist_matrix, initialize)
+                if plot_level > 1:
+                    ani.add_current_frame()
+            else:
+                for v in c.vehicles:
+                    v.tour.compute_cost_and_schedules(self.dist_matrix)
 
-            if method == 'cheapest_insertion':
-                while len(c.unrouted) > 0:
-                    _, u = c.unrouted.popitem(last=False)
-                    vehicle, position, cost = c.cheapest_feasible_insertion(u, self.dist_matrix, verbose, plot_level)
-                    if verbose > 0:
-                        print(f'\tInserting {u.id_} into {c.id_}.{vehicle.tour.id_}')
-                    vehicle.tour.insert_and_reset_schedules(index=position, vertex=u)
-                    vehicle.tour.compute_cost_and_schedules(self.dist_matrix)
-                    if plot_level > 1:
-                        ani.add_current_frame()
-        if plot_level > 1:
-            # ani.show()
-            ani.save()
+            # construction loop
+            while len(c.unrouted) > 0:
+                if method == 'cheapest_insertion':
+                    _, u = c.unrouted.popitem(last=False)  # sequential removal from list of unrouted
+                    vehicle, position, cost = c.find_cheapest_feasible_insertion(u, self.dist_matrix)
+                elif method == 'I1':
+                    u, vehicle, position, c2 = c.find_best_feasible_I1_insertion(self.dist_matrix)
+                    c.unrouted.pop(u.id_)  # non-sequential removal from list of unrouted
 
-            # elif method == 'I1':
-            #     c.static_I1_construction(self.dist_matrix, verbose, plot_level)
+                if verbose > 0:
+                    print(f'\tInserting {u.id_} into {c.id_}.{vehicle.tour.id_}')
+                vehicle.tour.insert_and_reset_schedules(index=position, vertex=u)
+                vehicle.tour.compute_cost_and_schedules(self.dist_matrix)
+                if plot_level > 1:
+                    ani.add_current_frame()
+
+            assert len(c.unrouted) == 0
+
+            if plot_level > 1:
+                ani.show()
+                # ani.save()
             if verbose > 0:
-                print(f'Total Route cost of carrier {c.id_}: {c.route_cost()}\n')
+                print(f'Total Route cost of carrier {c.id_}: {c.cost()}\n')
+
+        timer.stop()
+        self._runtime = timer.duration
+        self._solved = True
+        self._solution_algorithm = f'sta_{method}'
         return
 
     def cheapest_insertion_auction(self, request: vx.Vertex, initial_carrier: cr.Carrier, verbose=opts['verbose'],
@@ -124,8 +190,8 @@ class Instance(object):
         if verbose > 0:
             print(f'{request.id_} is originally assigned to {initial_carrier.id_}')
             print(f'Checking profitability of {request.id_} for {initial_carrier.id_}')
-        vehicle_best, position_best, cost_best = initial_carrier.cheapest_feasible_insertion(request,
-                                                                                             self.dist_matrix)
+        vehicle_best, position_best, cost_best = initial_carrier.find_cheapest_feasible_insertion(request,
+                                                                                                  self.dist_matrix)
         carrier_best = initial_carrier
         # auction: determine and return the collaborator with the cheapest insertion cost
         if cost_best > request.demand:
@@ -137,7 +203,7 @@ class Instance(object):
                 else:
                     if verbose > 0:
                         print(f'Checking profitability of {request.id_} for {carrier.id_}')
-                    vehicle, position, cost = carrier.cheapest_feasible_insertion(request, self.dist_matrix)
+                    vehicle, position, cost = carrier.find_cheapest_feasible_insertion(request, self.dist_matrix)
                     if cost < cost_best:
                         carrier_best = carrier
                         vehicle_best = vehicle
@@ -151,15 +217,15 @@ class Instance(object):
                 print(f'{request.id_} is finally assigned to {carrier_best.id_}')
         return carrier_best, vehicle_best, position_best, cost_best
 
-    @timer
     def dynamic_construction(self, with_auction: bool = True, verbose=opts['verbose'], plot_level=opts['plot_level']):
+        assert not self._solved, f'Instance {self} has already been solved'
+        timer = Timer()
+        timer.start()
         # find the next request u, that has id number i
-
         # TODO this can be simplified/made more efficient if the assignment of a vertex is stored with its class
         #  instance. In that case, it must also be stored accordingly in the json file. Right now, it is not a big
         #  problem since requests are assigned in ascending order, so only the first request of each carrier must be
         #  checked
-
         for i in range(len(self.requests)):
             for c in self.carriers:
                 try:
@@ -173,13 +239,12 @@ class Instance(object):
                 # do the auction
                 carrier, vehicle, position, cost = self.cheapest_insertion_auction(request=u, initial_carrier=c)
                 if c != carrier:
-                    c.unrouted.pop(u.id_)  # remove from initial carrier
-                    c.requests.pop(u.id_)
+                    c.retract_request(u.id_)
                     carrier.assign_request(u)  # assign to auction winner
             else:
                 # find cheapest insertion
                 carrier = c
-                vehicle, position, cost = c.cheapest_feasible_insertion(u, self.dist_matrix)
+                vehicle, position, cost = c.find_cheapest_feasible_insertion(u, self.dist_matrix)
 
             # attempt insertion
             try:
@@ -191,6 +256,10 @@ class Instance(object):
             except TypeError:
                 raise InsertionError('', f"Cannot insert {u} feasibly into {carrier.id_}.{vehicle.id_}")
 
+        timer.stop()
+        self._runtime = timer.duration
+        self._solved = True
+        self._solution_algorithm = f'dyn{"_auc" if with_auction else ""}'
         return
 
     def to_centralized(self, depot_xy: tuple):
@@ -198,7 +267,7 @@ class Instance(object):
         central_vehicles = []
         for c in self.carriers:
             central_vehicles.extend(c.vehicles)
-        central_carrier = cr.Carrier(0, central_depot, central_vehicles)
+        central_carrier = cr.Carrier('r0', central_depot, central_vehicles)
         centralized = Instance(self.id_ + 'centralized', self.requests, [central_carrier])
         for r in centralized.requests:
             centralized.carriers[0].assign_request(r)
@@ -223,7 +292,8 @@ class Instance(object):
         return
 
     def write_custom_json(self):
-        file_name = f'../data/Custom/{self.id_}'
+        solomon_name = self.id_.split(sep='_')[0]
+        file_name = f'../data/Custom/{solomon_name}/{self.id_}'
 
         # check if any customers are assigned to carriers already and set the file name
         assigned_requests = []
@@ -233,12 +303,12 @@ class Instance(object):
             file_name += '_ass'
 
         # check how many instances of this type already have been stored and enumerate file name accordingly
-        listdir = os.listdir(f'../data/Custom')
+        listdir = os.listdir(f'../data/Custom/{solomon_name}')
         enum = 0
         for file in listdir:
             if self.id_ in file:
                 enum += 1
-        file_name += f'_#{enum}'
+        file_name += f'_#{enum:03d}'
 
         file_name += '.json'
         with open(file_name, mode='w') as write_file:
@@ -267,7 +337,7 @@ def read_solomon(name: str, num_carriers: int) -> Instance:
                       int(depot.due_date[0]))
     carriers = []
     for i in range(num_carriers):
-        c = cr.Carrier('c' + str(i), copy(depot), next(vehicles))
+        c = cr.Carrier(f'c{i}', copy(depot), next(vehicles))
         c.depot.id_ = 'd' + str(i)
         carriers.append(c)
     inst = Instance(name, requests, carriers)
@@ -287,7 +357,7 @@ def make_custom_from_solomon(solomon_name: str, custom_name: str, num_carriers: 
             v = vh.Vehicle('v' + str(i * num_vehicles_per_carrier + j),
                            vehicle_capacity)
             vehicles.append(v)
-        carrier = cr.Carrier('c' + str(i),
+        carrier = cr.Carrier(f'c{i}',
                              depot=solomon.carriers[i].depot,
                              vehicles=vehicles)
         carriers.append(carrier)
@@ -297,9 +367,9 @@ def make_custom_from_solomon(solomon_name: str, custom_name: str, num_carriers: 
     return inst
 
 
-def read_custom_json(name: str):
-    file_name = f'../data/Custom/{name}.json'
-    with open(file_name, 'r') as reader_file:
+def read_custom_json(path: str):
+    # file_name = f'../data/Custom/{name}.json'
+    with open(path, 'r') as reader_file:
         json_data = json.load(reader_file)
     requests = [vx.Vertex(**r_dict) for r_dict in json_data['requests']]
     carriers = []
@@ -310,19 +380,22 @@ def read_custom_json(name: str):
         c = cr.Carrier(c_dict['id_'], depot, vehicles, requests=assigned_requests, unrouted=assigned_requests)
         carriers.append(c)
     dist_matrix = pd.DataFrame.from_dict(json_data['dist_matrix'])
-    inst = Instance(json_data['id_'], requests, carriers, dist_matrix)
+    _, name = os.path.split(path)
+    inst = Instance(name, requests, carriers, dist_matrix)
     return inst
 
 
 if __name__ == '__main__':
-    num_carriers = 3
-    num_vehicles = 10
-    self = make_custom_from_solomon('R101',
-                                    f'R101_{num_carriers}_{num_vehicles}',
-                                    num_carriers,
-                                    num_vehicles,
-                                    None)
-    self.assign_all_requests_randomly()
-    self.write_custom_json()
+    # num_carriers = 3
+    # num_vehicles = 15
+    # solomon = 'C101'
+    # for i in range(100):
+    #     self = make_custom_from_solomon(solomon,
+    #                                     f'{solomon}_{num_carriers}_{num_vehicles}',
+    #                                     num_carriers,
+    #                                     num_vehicles,
+    #                                     None)
+    #     self.assign_all_requests_randomly()
+    #     self.write_custom_json()
     # custom = read_custom_json(f'R101_{num_carriers}_{num_vehicles}')
     pass

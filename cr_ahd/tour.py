@@ -38,12 +38,20 @@ class Tour(object):
     def __len__(self):
         return len(self.sequence)
 
-    def copy(self):
-        tour = Tour(self.sequence)
-        tour.arrival_schedule = self.arrival_schedule
-        tour.service_schedule = self.service_schedule
-        tour.cost = self.cost
-        return tour
+    @property
+    def revenue(self):
+        return sum([r.demand for r in self.sequence])
+
+    @property
+    def profit(self):
+        return self.revenue - self.cost
+
+    # def copy(self):
+    #     tour = Tour(self.sequence)
+    #     tour.arrival_schedule = self.arrival_schedule
+    #     tour.service_schedule = self.service_schedule
+    #     tour.cost = self.cost
+    #     return tour
 
     def insert_and_reset_schedules(self, index: int, vertex: vx.Vertex):
         """ inserts a vertex before the specified index and resets all schedules to None. """
@@ -73,8 +81,6 @@ class Tour(object):
 
     def compute_cost_and_schedules(self, dist_matrix, start_time=opts['start_time'], ignore_tw=True,
                                    verbose=opts['verbose']):
-        """
-        """
         self.cost = 0
         self.arrival_schedule[0] = start_time
         self.service_schedule[0] = start_time
@@ -122,7 +128,7 @@ class Tour(object):
                 service_schedule[rho] = max(j.tw.e, earliest_arrival)
         return True
 
-    def cheapest_feasible_insertion(self, u: vx.Vertex, dist_matrix, verbose=opts['verbose']):
+    def find_cheapest_feasible_insertion(self, u: vx.Vertex, dist_matrix, verbose=opts['verbose']):
         """
         :return: Tuple (position, cost) of the best insertion position index and the associated (lowest) cost
         """
@@ -176,8 +182,7 @@ class Tour(object):
            j_index: int,
            alpha_1: float,
            mu: float,
-           dist_matrix,
-           verbose=opts['verbose']) -> float:
+           dist_matrix, ) -> float:
         """
         c1 criterion of Solomon's I1 insertion heuristic Does NOT include a feasibility check Following the
         description by (Bräysy, Olli; Gendreau, Michel (2005): Vehicle Routing Problem with Time Windows,
@@ -190,34 +195,76 @@ class Tour(object):
         j = self.sequence[j_index]
 
         # compute c11
-        c11 = dist_matrix.loc[i.id_, u.id_] + dist_matrix.loc[u.id_, j.id_] - mu * dist_matrix.loc[i.id_, j.id_]
+        c11 = self._c11(dist_matrix, i, u, j, mu)
 
         # compute c12
+        c12 = self._c12(dist_matrix, j_index, u)
+
+        # compute and return c1
+        return alpha_1 * c11 + alpha_2 * c12
+
+    @staticmethod
+    def _c11(dist_matrix, i, u, j, mu):
+        c11 = dist_matrix.loc[i.id_, u.id_] + dist_matrix.loc[u.id_, j.id_] - mu * dist_matrix.loc[i.id_, j.id_]
+        return c11
+
+    def _c12(self, dist_matrix, j_index, u):
         service_start_j = self.service_schedule[j_index]
         temp_tour = deepcopy(self)
         temp_tour.insert_and_reset_schedules(index=j_index, vertex=u)
         temp_tour.compute_cost_and_schedules(dist_matrix=dist_matrix, ignore_tw=True)
         service_start_j_new = temp_tour.service_schedule[j_index + 1]
         c12 = service_start_j_new - service_start_j
-
-        # compute and return c1
-        return alpha_1 * c11 + alpha_2 * c12
+        return c12
 
     def c2(self,
-           i_index: int,
            u: vx.Vertex,
-           j_index: int,
            c1: float,
            dist_matrix,
            lambda_: float = opts['lambda'],
-           verbose=opts['verbose']):
+           ):
         """
-        c2 criterion of Solomon's I1 insertion heuristic
-        Does NOT include a feasibility check
-        Following the description by (Bräysy, Olli; Gendreau, Michel (2005): Vehicle Routing Problem with Time Windows, Part I: Route Construction and Local Search Algorithms. In Transportation Science 39 (1), pp. 104–118. DOI: 10.1287/trsc.1030.0056.)
+        c2 criterion of Solomon's I1 insertion heuristic Does NOT include a feasibility check Following the
+        description by (Bräysy, Olli; Gendreau, Michel (2005): Vehicle Routing Problem with Time Windows,
+        Part I: Route Construction and Local Search Algorithms. In Transportation Science 39 (1), pp. 104–118. DOI:
+        10.1287/trsc.1030.0056.)
         """
         depot_id = self.sequence[0].id_
         return lambda_ * dist_matrix.loc[depot_id, u.id_] - c1
+
+    def find_best_feasible_I1_insertion(self, u: vx.Vertex, dist_matrix, verbose=opts['verbose']):
+        rho_best = None
+        max_c2 = float('-inf')
+        for rho in range(1, len(self)):
+            i = self.sequence[rho - 1]
+            j = self.sequence[rho]
+
+            # trivial feasibility check
+            if i.tw.e < u.tw.l and u.tw.e < j.tw.l:
+
+                # proper feasibility check
+                # TODO: check Solomon (1987) for an efficient and sufficient feasibility check
+                temp_tour = deepcopy(self)
+                temp_tour.insert_and_reset_schedules(index=rho, vertex=u)
+                if temp_tour.is_feasible(dist_matrix=dist_matrix):
+
+                    # compute c1 and c2 and update their best values
+                    c1 = self.c1(i_index=rho - 1,
+                                 u=u,
+                                 j_index=rho,
+                                 alpha_1=opts['alpha_1'],
+                                 mu=opts['mu'],
+                                 dist_matrix=dist_matrix)
+                    if verbose > 1:
+                        print(f'c1({u.id_}->{self.id_}): {c1}')
+                    c2 = self.c2(u=u, lambda_=opts['lambda'], c1=c1, dist_matrix=dist_matrix)
+                    if verbose > 1:
+                        print(f'c2({u.id_}->{self.id_}): {c2}')
+                    if c2 > max_c2:
+                        max_c2 = c2
+                        rho_best = rho
+
+        return rho_best, max_c2
 
     def plot(self,
              plot_depot: bool = True,

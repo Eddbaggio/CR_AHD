@@ -1,4 +1,5 @@
 import datetime
+import os
 from copy import deepcopy
 
 import matplotlib.pyplot as plt
@@ -9,80 +10,65 @@ import instance as it
 from utils import opts, Solomon_Instances, InsertionError
 
 
-def main(solomon) -> dict:
-    # create and write a new instance with random assignment based on a solomon instance
-    num_carriers = 3
-    num_vehicles = 20
-    custom = it.make_custom_from_solomon(solomon,
-                                         f'{solomon}_{num_carriers}_{num_vehicles}',
-                                         num_carriers,
-                                         num_vehicles,
-                                         None)
-    custom.assign_all_requests_randomly()
-    # file_name = custom.write_custom_json()
-    # custom = read_custom_json(file_name)
+def main(path, centralized_flag):
+
+    # read
+    custom = it.read_custom_json(path)
     if opts['plot_level'] > 0:
         custom.plot()
         plt.show()
 
-    # ===== STATIC CHEAPEST INSERTION =====
-    # Since this uses a SEQUENTIAL insertion strategy (inserting unrouted customers in the order that they were
-    #  assigned), the result is the same as the dynamic insertion!
-
-    # sta_custom = deepcopy(custom)
-    # _, sta_runtime = sta_custom.static_construction(method='cheapest_insertion')
-    # sta_cost = sta_custom.total_cost
-    # sta_solution = sta_custom.solution
-    # print(sta_solution)
-
     # ===== STATIC I1 INSERTION =====
     # Having the benefit of knowing all requests in advance, each carrier can use I1 insertion to always identify the
     # best unrouted customer for the next insertion
+    sta_custom = deepcopy(custom)
+    sta_custom.static_construction(method='I1')
 
-    # ===== DYNAMIC (NO AUCTION) =====
+    # ===== DYNAMIC SEQUENTIAL INSERTION (NO AUCTION) =====
     dyn_custom = deepcopy(custom)
-    _, dyn_runtime = dyn_custom.dynamic_construction(with_auction=False)
-    dyn_cost = dyn_custom.total_cost
-    dyn_solution = dyn_custom.solution
-    # print(dyn_solution)
+    dyn_custom.dynamic_construction(with_auction=False)
 
     # ===== DYNAMIC + AUCTION =====
     dyn_auc_custom = deepcopy(custom)
-    _, dyn_auc_runtime = dyn_auc_custom.dynamic_construction(with_auction=True)
-    dyn_auc_cost = dyn_auc_custom.total_cost
+    dyn_auc_custom.dynamic_construction(with_auction=True)
 
-    # ===== CENTRALIZED STATIC/DYNAMIC CHEAPEST INSERTION =====
-    # TODO There is no difference in static and dynamic if i use SEQUENTIAL cheapest insertion!
-    try:
-        centralized = custom.to_centralized(custom.carriers[0].depot.coords)
-        _, cen_sta_runtime = centralized.static_construction(method='cheapest_insertion')
-        cen_sta_cost = centralized.total_cost
-    except InsertionError:
-        cen_sta_runtime = None
-        cen_sta_cost = None
+    # ===== CENTRALIZED  =====
+    # if path == '../data/Custom/C101\\C101_3_15_ass_#000.json':
+    if centralized_flag:
+        # ===== I1  =====
+        cen_sta_I1_custom = custom.to_centralized(custom.carriers[0].depot.coords)
+        cen_sta_I1_custom.static_construction(method='I1', )
 
-    # result collection
-    return dict(
-        instance=custom.id_,
-        # sta_cost=sta_cost,
-        dyn_cost=dyn_cost,
-        dyn_auc_cost=dyn_auc_cost,
-        cen_sta_cost=cen_sta_cost,
-        # sta_runtime=sta_runtime,
-        dyn_runtime=dyn_runtime,
-        dyn_auc_runtime=dyn_auc_runtime,
-        cen_sta_runtime=cen_sta_runtime,
-    )
+        # ===== CHEAPEST INSERTION  =====
+        cen_sta_cheapest_insertion_custom = custom.to_centralized(custom.carriers[0].depot.coords)
+        cen_sta_cheapest_insertion_custom.static_construction(method='cheapest_insertion', )
+
+        # result collection
+        return (sta_custom.evaluation_metrics,
+                dyn_custom.evaluation_metrics,
+                dyn_auc_custom.evaluation_metrics,
+                cen_sta_I1_custom.evaluation_metrics,
+                cen_sta_cheapest_insertion_custom.evaluation_metrics)
+    else:
+        return (sta_custom.evaluation_metrics,
+                dyn_custom.evaluation_metrics,
+                dyn_auc_custom.evaluation_metrics)
+    # TODO extend metric collection: E.g. how many requests are finally assigned to each carrier?
 
 
 if __name__ == '__main__':
+    centralized_flag = False
+
     results = []
-    # for i in tqdm(range(opts['num_trials']), ascii=True):
-    for solomon in tqdm([Solomon_Instances[0]]):
-        res = main(solomon)
-        results.append(res)
+    directory = f'../data/Custom/C101'
+    inst_names = os.listdir(directory)[:1]
+    for instance_name in tqdm(inst_names):
+        path = os.path.join(directory, instance_name)
+        res = main(path, centralized_flag)
+        centralized_flag = False
+        results.extend(res)
     performance = pd.DataFrame(results)
-    performance = performance.set_index('instance')
+    performance = performance.set_index(['id', 'algorithm'])
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
     performance.to_csv(f'../data/Output/Performance{timestamp}.csv')
     print(performance)
@@ -94,12 +80,15 @@ if __name__ == '__main__':
     # TODO how do carriers 'buy' requests from others? Is there some kind of money exchange happening?
 
     # TODO storing the vehicle assignment with each vertex (also in the file) may greatly simplify a few things.
-    #  Alternatively, store the assignment in the instance?
+    #  Alternatively, store the assignment in the instance? Or have some kind of AssignmentManager class?!
 
-    # TODO distribute different benchmarks/versions over multiple cores
+    # TODO distribute different benchmarks/versions or different instances over multiple cores
 
-    # TODO update/fix/re-integrate the I1 insertion. Originally does not check every vehicle for insertion. Do I want to
-    #  stick to the original version?
+    # TODO how to handle initialization? initializing pendulum tours for all vehicles of a carrier is stupid as it
+    #  opens up potentially unnecessary vehicles/tours. Is there a clever way to initialize a new tour only when
+    #  necessary?
 
-    # TODO re-integrate animated plots for (1) static/dynamic sequential cheapest insertion construction (2) dynamic
-    #  construction (3) I1 insertion construction
+    # TODO re-integrate animated plots for
+    #  (1) static/dynamic sequential cheapest insertion construction => DONE
+    #  (2) dynamic construction
+    #  (3) I1 insertion construction => DONE

@@ -22,12 +22,12 @@ class CarrierConstructionAnimation(object):
 
     def add_current_frame(self, vehicle: Union['all', Vehicle] = 'all'):
         if vehicle != 'all':
-            artists = vehicle.tour.plot(color=vehicle.color)
+            artists = vehicle.tour.plot(color=vehicle.color, plot_depot=False)
         else:
             artists = []
             for v in self.carrier.vehicles:
                 if len(v.tour) > 2:
-                    a = v.tour.plot(color=v.color, )
+                    a = v.tour.plot(color=v.color, plot_depot=False)
                     artists.extend(a)
                 else:
                     continue  # skip empty vehicles

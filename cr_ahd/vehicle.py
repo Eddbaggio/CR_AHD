@@ -5,7 +5,7 @@ from utils import opts
 class Vehicle(object):
     """docstring for Vehicle"""
 
-    def __init__(self, id_, capacity):
+    def __init__(self, id_: str, capacity):
         self.id_ = id_
         self.capacity = capacity
         self.tour: Tour = None
