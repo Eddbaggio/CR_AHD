@@ -12,7 +12,10 @@ from utils import opts, InsertionError
 
 class Carrier(object):
 
-    def __init__(self, id_: str, depot: vx.Vertex, vehicles: List[vh.Vehicle],
+    def __init__(self,
+                 id_: str,
+                 depot: vx.Vertex,
+                 vehicles: List[vh.Vehicle],
                  requests: dict = None,
                  unrouted: dict = None):
         self.id_ = id_
@@ -29,10 +32,13 @@ class Carrier(object):
             self.unrouted: OrderedDictType[str, vx.Vertex] = OrderedDict()
         for v in vehicles:
             v.tour = Tour(id_=v.id_, sequence=[self.depot, self.depot])
-        pass
 
     def __str__(self):
         return f'Carrier (ID:{self.id_}, Depot:{self.depot}, Vehicles:{len(self.vehicles)}, Requests:{len(self.requests)}, Unrouted:{len(self.unrouted)})'
+
+    @property
+    def num_vehicles(self):
+        return len(self.vehicles)
 
     @property
     def cost(self, ndigits: int = 15):
@@ -50,7 +56,7 @@ class Carrier(object):
         return self.revenue - self.cost
 
     @property
-    def num_vehicles_in_use(self) -> int:
+    def num_act_veh(self) -> int:
         return sum([1 for v in self.vehicles if len(v.tour) > 2])
 
     def to_dict(self):

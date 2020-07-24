@@ -7,12 +7,13 @@ from vehicle import Vehicle
 
 
 class CarrierConstructionAnimation(object):
-    def __init__(self, carrier: Carrier):
+    def __init__(self, carrier: Carrier, title=None):
         self.carrier = carrier
         self.fig, self.ax = plt.subplots()
         self.fig: plt.Figure
         self.ax: plt.Axes
         self.ax.grid()
+        self.ax.set_title(title)
         x = [r.coords.x for _, r in carrier.requests.items()]
         y = [r.coords.y for _, r in carrier.requests.items()]
         self.requests = self.ax.plot(x, y, marker='o', markersize=9, mfc='white', c='black', ls='')

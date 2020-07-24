@@ -11,7 +11,6 @@ from utils import opts, Solomon_Instances, InsertionError
 
 
 def main(path, centralized_flag):
-
     # read
     custom = it.read_custom_json(path)
     if opts['plot_level'] > 0:
@@ -36,12 +35,12 @@ def main(path, centralized_flag):
     # if path == '../data/Custom/C101\\C101_3_15_ass_#000.json':
     if centralized_flag:
         # ===== I1  =====
-        cen_sta_I1_custom = custom.to_centralized(custom.carriers[0].depot.coords)
-        cen_sta_I1_custom.static_construction(method='I1', )
+        cen_sta_I1_custom = deepcopy(custom).to_centralized(custom.carriers[0].depot.coords)
+        cen_sta_I1_custom.static_construction(method='I1')
 
         # ===== CHEAPEST INSERTION  =====
-        cen_sta_cheapest_insertion_custom = custom.to_centralized(custom.carriers[0].depot.coords)
-        cen_sta_cheapest_insertion_custom.static_construction(method='cheapest_insertion', )
+        cen_sta_cheapest_insertion_custom = deepcopy(custom).to_centralized(custom.carriers[0].depot.coords)
+        cen_sta_cheapest_insertion_custom.static_construction(method='cheapest_insertion')
 
         # result collection
         return (sta_custom.evaluation_metrics,
@@ -53,29 +52,35 @@ def main(path, centralized_flag):
         return (sta_custom.evaluation_metrics,
                 dyn_custom.evaluation_metrics,
                 dyn_auc_custom.evaluation_metrics)
-    # TODO extend metric collection: E.g. how many requests are finally assigned to each carrier?
+    # TODO extend metric collection:
+    #  - bidding price per request to identify/learn which requests are valuable for which coll. partner?
+    #  - ... ?
 
 
 if __name__ == '__main__':
-    centralized_flag = False
+    for solomon in ['C201', 'R101', 'R201', 'RC101', 'RC201']:
+        directory = f'../data/Custom/{solomon}'
+        inst_names = os.listdir(directory)  # [:10]
+        results = []
+        centralized_flag = True
+        for instance_name in tqdm(inst_names, ascii=True):
+            path = os.path.join(directory, instance_name)
+            res = main(path, centralized_flag)
+            centralized_flag = False
+            results.extend(res)
+        performance = pd.DataFrame(results)
+        performance = performance.set_index(['id', 'num_carriers', 'num_vehicles', 'algorithm'])
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
+        performance.to_csv(f'../data/Output/Prototype/{solomon}_Performance{timestamp}.csv')
+        print(performance)
+        print(performance.describe())
+        performance.groupby(['algorithm'])
+        # performance.filter(regex='runtime').plot(marker='o', )
+        # performance.filter(regex='cost').plot(marker='o')
+        # plt.show()
 
-    results = []
-    directory = f'../data/Custom/C101'
-    inst_names = os.listdir(directory)[:1]
-    for instance_name in tqdm(inst_names):
-        path = os.path.join(directory, instance_name)
-        res = main(path, centralized_flag)
-        centralized_flag = False
-        results.extend(res)
-    performance = pd.DataFrame(results)
-    performance = performance.set_index(['id', 'algorithm'])
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
-    performance.to_csv(f'../data/Output/Performance{timestamp}.csv')
-    print(performance)
-    print(performance.describe())
-    performance.filter(regex='runtime').plot(marker='o', )
-    performance.filter(regex='cost').plot(marker='o')
-    plt.show()
+    # TODO fix I1: open & initialize a new tour whenever the previous one is full. And check all opened tours for
+    #  insertion but not the vehicles that do not yet have a route
 
     # TODO how do carriers 'buy' requests from others? Is there some kind of money exchange happening?
 

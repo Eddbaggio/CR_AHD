@@ -8,13 +8,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from adjustText import adjust_text
+from tqdm import tqdm
 
 import carrier as cr
 import vehicle as vh
 import vertex as vx
 from plotting import CarrierConstructionAnimation
 from profiling import Timer
-from utils import split_iterable, make_dist_matrix, opts, InsertionError
+from utils import split_iterable, make_dist_matrix, opts, InsertionError, Solomon_Instances
 
 
 class Instance(object):
@@ -36,6 +37,18 @@ class Instance(object):
         return f'{"Solved " if self._solved else ""}Instance {self.id_} with {len(self.requests)} customers and {len(self.carriers)} carriers'
 
     @property
+    def num_carriers(self):
+        return len(self.carriers)
+
+    @property
+    def num_vehicles(self):
+        return sum([c.num_vehicles for c in self.carriers])
+
+    @property
+    def num_requests(self):
+        return len(self.requests)
+
+    @property
     def cost(self):
         total_cost = 0
         for c in self.carriers:
@@ -52,7 +65,7 @@ class Instance(object):
         return self.revenue - self.cost
 
     @property
-    def num_vehicles_in_use(self):
+    def num_act_veh(self):
         num_vehicles_in_use = 0
         for c in self.carriers:
             for v in c.vehicles:
@@ -77,24 +90,33 @@ class Instance(object):
         return instance_solution
 
     @property
+    def num_act_veh_per_carrier(self):
+        num_act_veh_per_carrier = dict()
+        for c in self.carriers:
+            num_act_veh_per_carrier[f'{c.id_}_num_act_veh'] = c.num_act_veh
+        return num_act_veh_per_carrier
+
+    @property
     def num_requests_per_carrier(self):
         num_requests_per_carrier = dict()
         for c in self.carriers:
-            num_requests_per_carrier[f'{c.id_}_num_veh'] = c.num_vehicles_in_use
+            num_requests_per_carrier[f'{c.id_}_num_requests'] = len(c.requests)
         return num_requests_per_carrier
-
-
 
     @property
     def evaluation_metrics(self):
         assert self._solved, f'{self} has not been solved yet'
         return dict(id=self.id_,
-                    num_veh=self.num_vehicles_in_use,
+                    num_carriers=self.num_carriers,
+                    num_requests=self.num_requests,
+                    num_vehicles=self.num_vehicles,
+                    num_act_veh=self.num_act_veh,
                     cost=self.cost,
                     revenue=self.revenue,
                     profit=self.profit,
                     runtime=self._runtime,
                     algorithm=self._solution_algorithm,
+                    **self.num_act_veh_per_carrier,
                     **self.num_requests_per_carrier,
                     )
 
@@ -136,7 +158,7 @@ class Instance(object):
 
         for c in self.carriers:
             if plot_level > 1:
-                ani = CarrierConstructionAnimation(c)
+                ani = CarrierConstructionAnimation(c, )
             # use initialization procedure to construct pendulum tours
             if initialize is not None:
                 for v in c.vehicles:
@@ -155,11 +177,14 @@ class Instance(object):
                 elif method == 'I1':
                     u, vehicle, position, c2 = c.find_best_feasible_I1_insertion(self.dist_matrix)
                     c.unrouted.pop(u.id_)  # non-sequential removal from list of unrouted
+                else:
+                    raise InsertionError()
 
                 if verbose > 0:
                     print(f'\tInserting {u.id_} into {c.id_}.{vehicle.tour.id_}')
                 vehicle.tour.insert_and_reset_schedules(index=position, vertex=u)
                 vehicle.tour.compute_cost_and_schedules(self.dist_matrix)
+                # print(f'New cost of {vehicle.tour.id_}: {vehicle.tour.cost}')
                 if plot_level > 1:
                     ani.add_current_frame()
 
@@ -174,7 +199,7 @@ class Instance(object):
         timer.stop()
         self._runtime = timer.duration
         self._solved = True
-        self._solution_algorithm = f'sta_{method}'
+        self._solution_algorithm = f'{"cen_" if self.num_carriers == 1 else ""}sta_{method}'
         return
 
     def cheapest_insertion_auction(self, request: vx.Vertex, initial_carrier: cr.Carrier, verbose=opts['verbose'],
@@ -267,8 +292,8 @@ class Instance(object):
         central_vehicles = []
         for c in self.carriers:
             central_vehicles.extend(c.vehicles)
-        central_carrier = cr.Carrier('r0', central_depot, central_vehicles)
-        centralized = Instance(self.id_ + 'centralized', self.requests, [central_carrier])
+        central_carrier = cr.Carrier('c0', central_depot, central_vehicles)
+        centralized = Instance(self.id_, self.requests, [central_carrier])
         for r in centralized.requests:
             centralized.carriers[0].assign_request(r)
         return centralized
@@ -291,7 +316,7 @@ class Instance(object):
 
         return
 
-    def write_custom_json(self):
+    def write_to_json(self):
         solomon_name = self.id_.split(sep='_')[0]
         file_name = f'../data/Custom/{solomon_name}/{self.id_}'
 
@@ -381,21 +406,22 @@ def read_custom_json(path: str):
         carriers.append(c)
     dist_matrix = pd.DataFrame.from_dict(json_data['dist_matrix'])
     _, name = os.path.split(path)
+    name = name.split(sep='.')[0]
     inst = Instance(name, requests, carriers, dist_matrix)
     return inst
 
 
 if __name__ == '__main__':
-    # num_carriers = 3
-    # num_vehicles = 15
-    # solomon = 'C101'
-    # for i in range(100):
-    #     self = make_custom_from_solomon(solomon,
-    #                                     f'{solomon}_{num_carriers}_{num_vehicles}',
-    #                                     num_carriers,
-    #                                     num_vehicles,
-    #                                     None)
-    #     self.assign_all_requests_randomly()
-    #     self.write_custom_json()
-    # custom = read_custom_json(f'R101_{num_carriers}_{num_vehicles}')
+    num_carriers = 3
+    num_vehicles = 15
+    for solomon in tqdm(Solomon_Instances):
+        for i in range(100):
+            # TODO read solomon only once
+            self = make_custom_from_solomon(solomon,
+                                            f'{solomon}_{num_carriers}_{num_vehicles}',
+                                            num_carriers,
+                                            num_vehicles,
+                                            None)
+            self.assign_all_requests_randomly()
+            self.write_to_json()
     pass
