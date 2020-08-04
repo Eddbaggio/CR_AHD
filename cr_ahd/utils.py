@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 opts = {
     'num_trials': 10,
     'verbose': 0,
-    'plot_level': 0,
+    'plot_level': 2,
     'speed_kmh': 60 ** 2,
     'start_time': 0,
     'alpha_1': 0.5,

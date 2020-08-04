@@ -128,57 +128,48 @@ class Instance(object):
             'dist_matrix': self.dist_matrix.to_dict()
         }
 
-    def assign_all_requests_randomly(self):
+    def _assign_all_requests_randomly(self):
+        """
+        Only call this method for creating new instances. If the instance has been read from disk, the assignment is
+        stored in there already and should be retained to ensure comparability between methods, even dynamic methods.
+                """
+        raise UserWarning('Only call this method for constructing new instances & writing them to disk.')
         assert not self._solved, f'Instance {self} has already been solved'
         # np.random.seed(0)
         for r in self.requests:
             c = self.carriers[np.random.choice(range(len(self.carriers)))]
             c.assign_request(r)
 
-    def static_construction(self,
-                            method: str,
-                            initialize: Optional[str] = None,
-                            verbose: int = opts['verbose'],
-                            plot_level: int = opts['plot_level']):
+    def static_CI_construction(self,
+                               verbose: int = opts['verbose'],
+                               plot_level: int = opts['plot_level']):
         """
-        Use a static construction method to build tours for all carriers.
+        Use a static construction method to build tours for all carriers via sequential cheapest insertion.
+        (Can also be used for dynamic route construction if the request-to-carrier assignment is known.)
 
-        :param method: use 'cheapest_insertion' or 'I1' insertion method
-        :param initialize: optionally, pendulum tours can be created before insertion. 'earliest_due_date' or 'furthest' methods are available
         :param verbose:
         :param plot_level:
         :return:
         """
         assert not self._solved, f'Instance {self} has already been solved'
-        assert method in ['cheapest_insertion', 'I1']
         if verbose > 0:
-            print(f'STATIC {method} Construction:')
+            print(f'STATIC Cheapest Insertion Construction:')
         timer = Timer()
         timer.start()
 
         for c in self.carriers:
             if plot_level > 1:
-                ani = CarrierConstructionAnimation(c, )
-            # use initialization procedure to construct pendulum tours
-            if initialize is not None:
-                for v in c.vehicles:
-                    c.initialize_tour(v, self.dist_matrix, initialize)
-                if plot_level > 1:
-                    ani.add_current_frame()
-            else:
-                for v in c.vehicles:
-                    v.tour.compute_cost_and_schedules(self.dist_matrix)
+                ani = CarrierConstructionAnimation(c, f'{self.id_}{" centralized" if self.num_carriers == 0 else ""}: '
+                                                      f'Cheapest Insertion construction: {c.id_}')
+
+            # TODO why is this necessary here? why aren't these things computed already before?
+            c.compute_all_vehicle_cost_and_schedules(self.dist_matrix)
+
+            # TODO no initialization of vehicle tours. I1 has initialization
 
             # construction loop
-            while len(c.unrouted) > 0:
-                if method == 'cheapest_insertion':
-                    _, u = c.unrouted.popitem(last=False)  # sequential removal from list of unrouted
-                    vehicle, position, cost = c.find_cheapest_feasible_insertion(u, self.dist_matrix)
-                elif method == 'I1':
-                    u, vehicle, position, c2 = c.find_best_feasible_I1_insertion(self.dist_matrix)
-                    c.unrouted.pop(u.id_)  # non-sequential removal from list of unrouted
-                else:
-                    raise InsertionError()
+            for _, u in c.unrouted.items():  # sequential removal from list of unrouted
+                vehicle, position, _ = c.find_cheapest_feasible_insertion(u, self.dist_matrix)
 
                 if verbose > 0:
                     print(f'\tInserting {u.id_} into {c.id_}.{vehicle.tour.id_}')
@@ -199,7 +190,68 @@ class Instance(object):
         timer.stop()
         self._runtime = timer.duration
         self._solved = True
-        self._solution_algorithm = f'{"cen_" if self.num_carriers == 1 else ""}sta_{method}'
+        self._solution_algorithm = f'{"cen_" if self.num_carriers == 1 else ""}sta_CI'
+        return
+
+    def static_I1_construction(self,
+                               init_method: str,
+                               verbose: int = opts['verbose'],
+                               plot_level: int = opts['plot_level']):
+        """
+        Use the I1 construction method (Solomon 1987) to build tours for all carriers.
+
+        :param init_method: pendulum tours are created if necessary. 'earliest_due_date' or 'furthest_distance' methods are available
+        :param verbose:
+        :param plot_level:
+        :return:
+        """
+        assert not self._solved, f'Instance {self} has already been solved'
+        if verbose > 0:
+            print(f'STATIC I1 Construction:')
+        timer = Timer()
+        timer.start()
+
+        for c in self.carriers:
+            if plot_level > 1:
+                ani = CarrierConstructionAnimation(c, f"{self.id_}{' centralized' if self.num_carriers == 0 else ''}: Solomon's I1 construction: {c.id_}")
+
+            # TODO why is this necessary here? why aren't these things computed already before?
+            c.compute_all_vehicle_cost_and_schedules(self.dist_matrix)
+
+            # initialize one tour to begin with
+            c.initialize_tour(c.inactive_vehicles[0], self.dist_matrix, init_method)
+
+            # construction loop
+            while any(c.unrouted):
+                u, vehicle, position, _ = c.find_best_feasible_I1_insertion(self.dist_matrix)
+                if position is not None:  # insert
+                    c.unrouted.pop(u.id_)
+                    vehicle.tour.insert_and_reset_schedules(index=position, vertex=u)
+                    vehicle.tour.compute_cost_and_schedules(self.dist_matrix)
+                    if verbose > 0:
+                        print(f'\tInserting {u.id_} into {c.id_}.{vehicle.tour.id_}')
+                    if plot_level > 1:
+                        ani.add_current_frame()
+                else:
+                    if any(c.inactive_vehicles):
+                        c.initialize_tour(c.inactive_vehicles[0], self.dist_matrix, init_method)
+                        if plot_level > 1:
+                            ani.add_current_frame()
+                    else:
+                        InsertionError('', 'No more vehicles available')
+
+            assert len(c.unrouted) == 0  # just to be on the safe side
+
+            if plot_level > 1:
+                ani.show()
+                # ani.save()
+            if verbose > 0:
+                print(f'Total Route cost of carrier {c.id_}: {c.cost()}\n')
+
+        timer.stop()
+        self._runtime = timer.duration
+        self._solved = True
+        self._solution_algorithm = f'{"cen_" if self.num_carriers == 1 else ""}sta_I1'
         return
 
     def cheapest_insertion_auction(self, request: vx.Vertex, initial_carrier: cr.Carrier, verbose=opts['verbose'],
@@ -251,6 +303,9 @@ class Instance(object):
         #  instance. In that case, it must also be stored accordingly in the json file. Right now, it is not a big
         #  problem since requests are assigned in ascending order, so only the first request of each carrier must be
         #  checked
+
+        # TODO this function assumes that requests have been assigned to carriers already which is not really logical
+        #  since this is a dynamic construction
         for i in range(len(self.requests)):
             for c in self.carriers:
                 try:
@@ -310,6 +365,7 @@ class Instance(object):
             adjust_text(texts)
 
         plt.gca().legend()
+        plt.grid()
         plt.xlim(0, 100)
         plt.ylim(0, 100)
         plt.title(f'Instance {self.id_}')
@@ -414,14 +470,14 @@ def read_custom_json(path: str):
 if __name__ == '__main__':
     num_carriers = 3
     num_vehicles = 15
-    for solomon in tqdm(Solomon_Instances):
-        for i in range(100):
-            # TODO read solomon only once
-            self = make_custom_from_solomon(solomon,
-                                            f'{solomon}_{num_carriers}_{num_vehicles}',
-                                            num_carriers,
-                                            num_vehicles,
-                                            None)
-            self.assign_all_requests_randomly()
-            self.write_to_json()
+    # for solomon in tqdm(Solomon_Instances):
+    #     for i in range(100):
+    #         # TODO read solomon only once
+    #         self = make_custom_from_solomon(solomon,
+    #                                         f'{solomon}_{num_carriers}_{num_vehicles}',
+    #                                         num_carriers,
+    #                                         num_vehicles,
+    #                                         None)
+    #         self._assign_all_requests_randomly()
+    #         self.write_to_json()
     pass

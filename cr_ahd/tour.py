@@ -55,6 +55,7 @@ class Tour(object):
 
     def insert_and_reset_schedules(self, index: int, vertex: vx.Vertex):
         """ inserts a vertex before the specified index and resets all schedules to None. """
+        assert type(vertex) == vx.Vertex
         self.sequence.insert(index, vertex)
         self.arrival_schedule = [None] * len(self)  # reset arrival times
         self.service_schedule = [None] * len(self)  # reset start of service times
@@ -233,6 +234,13 @@ class Tour(object):
         return lambda_ * dist_matrix.loc[depot_id, u.id_] - c1
 
     def find_best_feasible_I1_insertion(self, u: vx.Vertex, dist_matrix, verbose=opts['verbose']):
+        """
+        returns float('-inf') if no feasible insertion position was found
+        :param u:
+        :param dist_matrix:
+        :param verbose:
+        :return:
+        """
         rho_best = None
         max_c2 = float('-inf')
         for rho in range(1, len(self)):
@@ -247,7 +255,6 @@ class Tour(object):
                 temp_tour = deepcopy(self)
                 temp_tour.insert_and_reset_schedules(index=rho, vertex=u)
                 if temp_tour.is_feasible(dist_matrix=dist_matrix):
-
                     # compute c1 and c2 and update their best values
                     c1 = self.c1(i_index=rho - 1,
                                  u=u,
@@ -263,7 +270,6 @@ class Tour(object):
                     if c2 > max_c2:
                         max_c2 = c2
                         rho_best = rho
-
         return rho_best, max_c2
 
     def plot(self,
@@ -313,7 +319,7 @@ class Tour(object):
 
             if annotate:
                 annotations = plt.annotate(f'{end.id_}',
-                                           xy=(end.coords.x, end.coords.y),
+                                           xy=(end.coords.x, end.coords.y+1),
                                            alpha=alpha
                                            )
                 artists.append(annotations)

@@ -21,7 +21,7 @@ def main(path, centralized_flag):
     # Having the benefit of knowing all requests in advance, each carrier can use I1 insertion to always identify the
     # best unrouted customer for the next insertion
     sta_custom = deepcopy(custom)
-    sta_custom.static_construction(method='I1')
+    sta_custom.static_I1_construction(init_method='earliest_due_date')
 
     # ===== DYNAMIC SEQUENTIAL INSERTION (NO AUCTION) =====
     dyn_custom = deepcopy(custom)
@@ -32,15 +32,14 @@ def main(path, centralized_flag):
     dyn_auc_custom.dynamic_construction(with_auction=True)
 
     # ===== CENTRALIZED  =====
-    # if path == '../data/Custom/C101\\C101_3_15_ass_#000.json':
     if centralized_flag:
         # ===== I1  =====
         cen_sta_I1_custom = deepcopy(custom).to_centralized(custom.carriers[0].depot.coords)
-        cen_sta_I1_custom.static_construction(method='I1')
+        cen_sta_I1_custom.static_I1_construction(init_method='earliest_due_date')
 
         # ===== CHEAPEST INSERTION  =====
         cen_sta_cheapest_insertion_custom = deepcopy(custom).to_centralized(custom.carriers[0].depot.coords)
-        cen_sta_cheapest_insertion_custom.static_construction(method='cheapest_insertion')
+        cen_sta_cheapest_insertion_custom.static_CI_construction()
 
         # result collection
         return (sta_custom.evaluation_metrics,
@@ -58,12 +57,12 @@ def main(path, centralized_flag):
 
 
 if __name__ == '__main__':
-    for solomon in ['C201', 'R101', 'R201', 'RC101', 'RC201']:
+    for solomon in ['C101', 'C201', 'R101', 'R201', 'RC101', 'RC201']:
         directory = f'../data/Custom/{solomon}'
         inst_names = os.listdir(directory)  # [:10]
         results = []
-        centralized_flag = True
-        for instance_name in tqdm(inst_names, ascii=True):
+        centralized_flag = False
+        for instance_name in tqdm(inst_names[:2], ascii=True):
             path = os.path.join(directory, instance_name)
             res = main(path, centralized_flag)
             centralized_flag = False
@@ -79,9 +78,6 @@ if __name__ == '__main__':
         # performance.filter(regex='cost').plot(marker='o')
         # plt.show()
 
-    # TODO fix I1: open & initialize a new tour whenever the previous one is full. And check all opened tours for
-    #  insertion but not the vehicles that do not yet have a route
-
     # TODO how do carriers 'buy' requests from others? Is there some kind of money exchange happening?
 
     # TODO storing the vehicle assignment with each vertex (also in the file) may greatly simplify a few things.
@@ -92,6 +88,10 @@ if __name__ == '__main__':
     # TODO how to handle initialization? initializing pendulum tours for all vehicles of a carrier is stupid as it
     #  opens up potentially unnecessary vehicles/tours. Is there a clever way to initialize a new tour only when
     #  necessary?
+
+    # TODO which of the @properties should be converted to proper class attributes, i.e. without delaying their
+    #  computation? the @property may slow down the code, BUT in many cases it's probably a more idiot-proof way
+    #  because otherwise I'd have to update the attribute which can easily be forgotten
 
     # TODO re-integrate animated plots for
     #  (1) static/dynamic sequential cheapest insertion construction => DONE

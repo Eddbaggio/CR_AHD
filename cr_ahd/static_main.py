@@ -20,7 +20,7 @@ def main() -> it.Instance:
         print(C101_3_10_assigned.dist_matrix)
 
     # construct initial solution
-    C101_3_10_assigned.static_construction(method='cheapest_insertion')
+    C101_3_10_assigned.static_CI_construction(method='cheapest_insertion')
     # C101_3_10_assigned.static_construction(method='I1')
 
     if opts['verbose'] > 0:

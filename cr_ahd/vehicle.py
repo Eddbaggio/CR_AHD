@@ -14,6 +14,10 @@ class Vehicle(object):
     def __str__(self):
         return f'Vehicle (ID={self.id_}, capacity={self.capacity})'
 
+    @property
+    def is_active(self):
+        return True if len(self.tour) > 2 else False
+
     def to_dict(self):
         return {
             'id_': self.id_,
