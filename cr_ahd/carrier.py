@@ -48,7 +48,7 @@ class Carrier(object):
 
     @property
     def profit(self):
-        return self.revenue - self.cost
+        return self.revenue - self.cost()
 
     @property
     def num_act_veh(self) -> int:

@@ -9,9 +9,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 opts = {
-    'num_trials': 10,
+    # 'num_trials': 10,
     'verbose': 0,
-    'plot_level': 2,
+    'plot_level': 0,
     'speed_kmh': 60 ** 2,
     'start_time': 0,
     'alpha_1': 0.5,
@@ -22,7 +22,7 @@ opts = {
 
 Coords = namedtuple('Coords', ['x', 'y'])
 TimeWindow = namedtuple('TimeWindow', ['e', 'l'])
-Solomon_Instances = [file[:-4] for file in os.listdir('../data/Solomon')]
+Solomon_Instances = [file[:-4] for file in os.listdir('../data/Input/Solomon')]
 
 
 def split_iterable(iterable, num_chunks):

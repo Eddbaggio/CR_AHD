@@ -1,21 +1,21 @@
 import json
 import os
+import warnings
 from copy import copy
 from itertools import islice
-from typing import List, Optional
+from typing import List
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from adjustText import adjust_text
-from tqdm import tqdm
 
 import carrier as cr
 import vehicle as vh
 import vertex as vx
 from plotting import CarrierConstructionAnimation
 from profiling import Timer
-from utils import split_iterable, make_dist_matrix, opts, InsertionError, Solomon_Instances
+from utils import split_iterable, make_dist_matrix, opts, InsertionError
 
 
 class Instance(object):
@@ -35,6 +35,10 @@ class Instance(object):
 
     def __str__(self):
         return f'{"Solved " if self._solved else ""}Instance {self.id_} with {len(self.requests)} customers and {len(self.carriers)} carriers'
+
+    @property
+    def solomon_base(self):
+        return self.id_.split('_')[0]
 
     @property
     def num_carriers(self):
@@ -104,21 +108,48 @@ class Instance(object):
         return num_requests_per_carrier
 
     @property
+    def cost_per_carrier(self):
+        cost_per_carrier=dict()
+        for c in self.carriers:
+            cost_per_carrier[f'{c.id_}_cost'] = c.cost()
+        return cost_per_carrier
+
+    @property
+    def revenue_per_carrier(self):
+        revenue_per_carrier=dict()
+        for c in self.carriers:
+            revenue_per_carrier[f'{c.id_}_revenue'] = c.revenue
+        return revenue_per_carrier
+
+    @property
+    def profit_per_carrier(self):
+        profit_per_carrier=dict()
+        for c in self.carriers:
+            profit_per_carrier[f'{c.id_}_profit'] = c.profit
+        return profit_per_carrier
+
+    @property
     def evaluation_metrics(self):
         assert self._solved, f'{self} has not been solved yet'
-        return dict(id=self.id_,
-                    num_carriers=self.num_carriers,
-                    num_requests=self.num_requests,
-                    num_vehicles=self.num_vehicles,
-                    num_act_veh=self.num_act_veh,
-                    cost=self.cost,
-                    revenue=self.revenue,
-                    profit=self.profit,
-                    runtime=self._runtime,
-                    algorithm=self._solution_algorithm,
-                    **self.num_act_veh_per_carrier,
-                    **self.num_requests_per_carrier,
-                    )
+        return dict(
+            id=self.id_,
+            rand_copy=self.id_.split('#')[-1],
+            solomon_base=self.solomon_base,
+            num_carriers=self.num_carriers,
+            num_requests=self.num_requests,
+            num_vehicles=self.num_vehicles,
+            num_act_veh=self.num_act_veh,
+            cost=self.cost,
+            revenue=self.revenue,
+            profit=self.profit,
+            runtime=self._runtime,
+            algorithm=self._solution_algorithm,
+            **self.num_act_veh_per_carrier,
+            **self.num_requests_per_carrier,
+            **self.cost_per_carrier,
+            **self.revenue_per_carrier,
+            **self.profit_per_carrier,
+        )
 
     def to_dict(self):
         return {
@@ -153,7 +184,7 @@ class Instance(object):
         """
         assert not self._solved, f'Instance {self} has already been solved'
         if verbose > 0:
-            print(f'STATIC Cheapest Insertion Construction:')
+            print(f'STATIC Cheapest Insertion Construction for {self}:')
         timer = Timer()
         timer.start()
 
@@ -168,18 +199,19 @@ class Instance(object):
             # TODO no initialization of vehicle tours. I1 has initialization
 
             # construction loop
-            for _, u in c.unrouted.items():  # sequential removal from list of unrouted
+            for _ in range(len(c.unrouted)):
+                key, u = c.unrouted.popitem(False)  # sequential removal from list of unrouted
                 vehicle, position, _ = c.find_cheapest_feasible_insertion(u, self.dist_matrix)
 
                 if verbose > 0:
                     print(f'\tInserting {u.id_} into {c.id_}.{vehicle.tour.id_}')
                 vehicle.tour.insert_and_reset_schedules(index=position, vertex=u)
                 vehicle.tour.compute_cost_and_schedules(self.dist_matrix)
-                # print(f'New cost of {vehicle.tour.id_}: {vehicle.tour.cost}')
+
                 if plot_level > 1:
                     ani.add_current_frame()
 
-            assert len(c.unrouted) == 0
+            assert len(c.unrouted) == 0  # just to be completely sure
 
             if plot_level > 1:
                 ani.show()
@@ -194,7 +226,7 @@ class Instance(object):
         return
 
     def static_I1_construction(self,
-                               init_method: str,
+                               init_method: str = 'earliest_due_date',
                                verbose: int = opts['verbose'],
                                plot_level: int = opts['plot_level']):
         """
@@ -207,13 +239,14 @@ class Instance(object):
         """
         assert not self._solved, f'Instance {self} has already been solved'
         if verbose > 0:
-            print(f'STATIC I1 Construction:')
+            print(f'STATIC I1 Construction for {self}:')
         timer = Timer()
         timer.start()
 
         for c in self.carriers:
             if plot_level > 1:
-                ani = CarrierConstructionAnimation(c, f"{self.id_}{' centralized' if self.num_carriers == 0 else ''}: Solomon's I1 construction: {c.id_}")
+                ani = CarrierConstructionAnimation(c,
+                                                   f"{self.id_}{' centralized' if self.num_carriers == 0 else ''}: Solomon's I1 construction: {c.id_}")
 
             # TODO why is this necessary here? why aren't these things computed already before?
             c.compute_all_vehicle_cost_and_schedules(self.dist_matrix)
@@ -296,6 +329,11 @@ class Instance(object):
 
     def dynamic_construction(self, with_auction: bool = True, verbose=opts['verbose'], plot_level=opts['plot_level']):
         assert not self._solved, f'Instance {self} has already been solved'
+
+        if verbose > 0:
+            print(
+                f'DYNAMIC Cheapest Insertion Construction {"WITH" if with_auction else "WITHOUT"} auction for {self}:')
+
         timer = Timer()
         timer.start()
         # find the next request u, that has id number i
@@ -372,9 +410,8 @@ class Instance(object):
 
         return
 
-    def write_to_json(self):
-        solomon_name = self.id_.split(sep='_')[0]
-        file_name = f'../data/Custom/{solomon_name}/{self.id_}'
+    def write_instance_to_json(self):
+        file_name = f'../data/Input/Custom/{self.solomon_base}/{self.id_}'
 
         # check if any customers are assigned to carriers already and set the file name
         assigned_requests = []
@@ -384,7 +421,7 @@ class Instance(object):
             file_name += '_ass'
 
         # check how many instances of this type already have been stored and enumerate file name accordingly
-        listdir = os.listdir(f'../data/Custom/{solomon_name}')
+        listdir = os.listdir(f'../data/Input/Custom/{self.solomon_base}')
         enum = 0
         for file in listdir:
             if self.id_ in file:
@@ -395,6 +432,22 @@ class Instance(object):
         with open(file_name, mode='w') as write_file:
             json.dump(self.to_dict(), write_file, indent=4)
         return file_name
+
+    def write_solution_to_json(self):
+        assert self._solved
+        file_name = f'../data/Output/Custom/{self.solomon_base}/{self.id_}_{self._solution_algorithm}_sol.json'
+        if os.path.exists(file_name):
+            warnings.warn('Existing solution file is overwritten')
+        with open(file_name, mode='w') as write_file:
+            json.dump(self.solution, write_file, indent=4)
+        return file_name
+
+    # def write_evaluation_metrics_to_csv(self):
+    #     assert self._solved
+    #     file_name = f'../data/Output/Custom/{self.solomon_base}/{self.id_}_{self._solution_algorithm}_eval.csv'
+    #     df = pd.Series(self.evaluation_metrics)
+    #     df.to_csv(file_name)
+    #     return file_name
 
 
 def read_solomon(name: str, num_carriers: int) -> Instance:
@@ -448,7 +501,7 @@ def make_custom_from_solomon(solomon_name: str, custom_name: str, num_carriers: 
     return inst
 
 
-def read_custom_json(path: str):
+def read_custom_json_instance(path: str):
     # file_name = f'../data/Custom/{name}.json'
     with open(path, 'r') as reader_file:
         json_data = json.load(reader_file)

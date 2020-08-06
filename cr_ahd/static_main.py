@@ -9,7 +9,7 @@ from utils import opts
 
 def main() -> it.Instance:
     # Read file and create the instance
-    C101_3_10_assigned: it.Instance = it.read_custom_json('C101_3_10_assigned')
+    C101_3_10_assigned: it.Instance = it.read_custom_json_instance('C101_3_10_assigned')
     if opts['plot_level'] > 1:
         C101_3_10_assigned.plot()
         plt.xlim(0, 100)
