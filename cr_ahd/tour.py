@@ -53,12 +53,16 @@ class Tour(object):
     #     tour.cost = self.cost
     #     return tour
 
-    def insert_and_reset_schedules(self, index: int, vertex: vx.Vertex):
-        """ inserts a vertex before the specified index and resets all schedules to None. """
-        assert type(vertex) == vx.Vertex
-        self.sequence.insert(index, vertex)
+    def reset_cost_and_schedules(self):
+        self.cost = None
         self.arrival_schedule = [None] * len(self)  # reset arrival times
         self.service_schedule = [None] * len(self)  # reset start of service times
+
+    def insert_and_reset(self, index: int, vertex: vx.Vertex):
+        """ inserts a vertex before the specified index and resets/deletes all cost and schedules. """
+        assert type(vertex) == vx.Vertex
+        self.sequence.insert(index, vertex)
+        self.reset_cost_and_schedules()
         pass
 
     # TODO: custom versions of the list methods, e.g. insert method that automatically updates the schedules?!
@@ -161,7 +165,7 @@ class Tour(object):
 
                     # check feasibility
                     temp_tour = deepcopy(self)
-                    temp_tour.insert_and_reset_schedules(index=rho, vertex=u)
+                    temp_tour.insert_and_reset(index=rho, vertex=u)
                     if temp_tour.is_feasible(dist_matrix=dist_matrix):
                         # update best known insertion position
                         min_insertion_cost = insertion_cost
@@ -212,7 +216,7 @@ class Tour(object):
     def _c12(self, dist_matrix, j_index, u):
         service_start_j = self.service_schedule[j_index]
         temp_tour = deepcopy(self)
-        temp_tour.insert_and_reset_schedules(index=j_index, vertex=u)
+        temp_tour.insert_and_reset(index=j_index, vertex=u)
         temp_tour.compute_cost_and_schedules(dist_matrix=dist_matrix, ignore_tw=True)
         service_start_j_new = temp_tour.service_schedule[j_index + 1]
         c12 = service_start_j_new - service_start_j
@@ -253,7 +257,7 @@ class Tour(object):
                 # proper feasibility check
                 # TODO: check Solomon (1987) for an efficient and sufficient feasibility check
                 temp_tour = deepcopy(self)
-                temp_tour.insert_and_reset_schedules(index=rho, vertex=u)
+                temp_tour.insert_and_reset(index=rho, vertex=u)
                 if temp_tour.is_feasible(dist_matrix=dist_matrix):
                     # compute c1 and c2 and update their best values
                     c1 = self.c1(i_index=rho - 1,
@@ -271,6 +275,25 @@ class Tour(object):
                         max_c2 = c2
                         rho_best = rho
         return rho_best, max_c2
+
+    def two_opt(self, dist_matrix):
+        self.compute_cost_and_schedules(dist_matrix)
+        best = self
+        improved = True
+        while improved:
+            improved = False
+            for i in range(1, len(self) - 2):
+                for j in range(i + 1, len(self)):
+                    if j - i == 1:
+                        continue  # changes nothing, skip then
+                    new_tour = deepcopy(self)
+                    new_tour.reset_cost_and_schedules()
+                    new_tour.sequence[i:j] = self.sequence[j - 1:i - 1:-1]  # this is the 2optSwap
+                    new_tour.compute_cost_and_schedules(dist_matrix)
+                    if new_tour.cost < best.cost and new_tour.is_feasible(dist_matrix):
+                        best = new_tour
+                        improved = True
+        return best
 
     def plot(self,
              plot_depot: bool = True,
@@ -319,7 +342,7 @@ class Tour(object):
 
             if annotate:
                 annotations = plt.annotate(f'{end.id_}',
-                                           xy=(end.coords.x, end.coords.y+1),
+                                           xy=(end.coords.x, end.coords.y + 1),
                                            alpha=alpha
                                            )
                 artists.append(annotations)

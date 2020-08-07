@@ -111,7 +111,7 @@ class Carrier(object):
         if len(self.unrouted) > 0:
             # find request with earliest deadline and initialize pendulum tour
             seed = self.find_seed_request(method=method)
-            vehicle.tour.insert_and_reset_schedules(index=1, vertex=seed)
+            vehicle.tour.insert_and_reset(index=1, vertex=seed)
             if vehicle.tour.is_feasible(dist_matrix=dist_matrix):
                 vehicle.tour.compute_cost_and_schedules(dist_matrix=dist_matrix)
                 self.unrouted.pop(seed.id_)
@@ -167,6 +167,11 @@ class Carrier(object):
                 if verbose > 0:
                     print(f'x\t{u.id_} cannot be feasibly inserted into {v.id_}')
         return vehicle_best, position_best, cost_best
+
+    def two_opt(self, dist_matrix):
+        for v in self.active_vehicles:
+            two_opt_tour = v.tour.two_opt(dist_matrix)
+            v.tour = two_opt_tour
 
     def plot(self, annotate: bool = True, alpha: float = 1):
 

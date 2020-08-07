@@ -205,7 +205,7 @@ class Instance(object):
 
                 if verbose > 0:
                     print(f'\tInserting {u.id_} into {c.id_}.{vehicle.tour.id_}')
-                vehicle.tour.insert_and_reset_schedules(index=position, vertex=u)
+                vehicle.tour.insert_and_reset(index=position, vertex=u)
                 vehicle.tour.compute_cost_and_schedules(self.dist_matrix)
 
                 if plot_level > 1:
@@ -259,7 +259,7 @@ class Instance(object):
                 u, vehicle, position, _ = c.find_best_feasible_I1_insertion(self.dist_matrix)
                 if position is not None:  # insert
                     c.unrouted.pop(u.id_)
-                    vehicle.tour.insert_and_reset_schedules(index=position, vertex=u)
+                    vehicle.tour.insert_and_reset(index=position, vertex=u)
                     vehicle.tour.compute_cost_and_schedules(self.dist_matrix)
                     if verbose > 0:
                         print(f'\tInserting {u.id_} into {c.id_}.{vehicle.tour.id_}')
@@ -343,7 +343,7 @@ class Instance(object):
         #  checked
 
         # TODO this function assumes that requests have been assigned to carriers already which is not really logical
-        #  since this is a dynamic construction
+        #  in a real-life case since they arrive dynamically
         for i in range(len(self.requests)):
             for c in self.carriers:
                 try:
@@ -368,7 +368,7 @@ class Instance(object):
             try:
                 if opts['verbose'] > 0:
                     print(f'\tInserting {u.id_} into {carrier.id_}.{vehicle.id_} with cost of {round(cost, 2)}')
-                vehicle.tour.insert_and_reset_schedules(position, u)
+                vehicle.tour.insert_and_reset(position, u)
                 vehicle.tour.compute_cost_and_schedules(self.dist_matrix)
                 carrier.unrouted.pop(u.id_)  # remove inserted request from unrouted
             except TypeError:
@@ -379,6 +379,13 @@ class Instance(object):
         self._solved = True
         self._solution_algorithm = f'dyn{"_auc" if with_auction else ""}'
         return
+
+    def two_opt(self):
+        # print(f'Before 2-opt: {self.cost_per_carrier}')
+        for c in self.carriers:
+            c.two_opt(self.dist_matrix)
+        # print(f'After 2-opt: {self.cost_per_carrier}')
+        self._solution_algorithm += '_2opt'
 
     def to_centralized(self, depot_xy: tuple):
         central_depot = vx.Vertex('d_central', *depot_xy, 0, 0, float('inf'))
@@ -436,8 +443,8 @@ class Instance(object):
     def write_solution_to_json(self):
         assert self._solved
         file_name = f'../data/Output/Custom/{self.solomon_base}/{self.id_}_{self._solution_algorithm}_sol.json'
-        if os.path.exists(file_name):
-            warnings.warn('Existing solution file is overwritten')
+        # if os.path.exists(file_name):
+        #     warnings.warn('Existing solution file is overwritten')
         with open(file_name, mode='w') as write_file:
             json.dump(self.solution, write_file, indent=4)
         return file_name
