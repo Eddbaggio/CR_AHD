@@ -1,5 +1,5 @@
 import functools
-import os
+from pathlib import Path
 import time
 from collections import namedtuple
 from typing import List
@@ -7,11 +7,13 @@ from typing import List
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
+import itertools
 
 opts = {
     # 'num_trials': 10,
-    'verbose': 0,
-    'plot_level': 0,
+    'verbose': 3,
+    'plot_level': 1,
     'speed_kmh': 60 ** 2,
     'start_time': 0,
     'alpha_1': 0.5,
@@ -22,7 +24,41 @@ opts = {
 
 Coords = namedtuple('Coords', ['x', 'y'])
 TimeWindow = namedtuple('TimeWindow', ['e', 'l'])
-Solomon_Instances = [file[:-4] for file in os.listdir('../data/Input/Solomon')]
+# Solomon_Instances = [file[:-4] for file in os.listdir('..\\data\\Input\\Solomon')]
+path_project = Path.cwd().parent
+path_input = path_project.joinpath('data', 'Input')
+path_input_custom = path_input.joinpath('Custom')
+path_input_solomon = path_input.joinpath('Solomon')
+Solomon_Instances = [file.stem for file in path_input_solomon.iterdir()]
+path_output = path_project.joinpath('data', 'Output')
+path_output_custom = path_output.joinpath('Custom')
+
+# alpha 100%
+univie_colors_100 = [
+    '#0063A6',  # universitätsblau
+    '#666666',  # universtitätsgrau
+    '#A71C49',  # weinrot
+    '#DD4814',  # orangerot
+    '#F6A800',  # goldgelb
+    '#94C154',  # hellgrün
+    '#11897A',  # mintgrün
+]
+# alpha 80%
+univie_colors_60 = [
+    '#6899CA',  # universitätsblau
+    '#B5B4B4',  # universtitätsgrau
+    '#C26F76',  # weinrot
+    '#F49C6A',  # orangerot
+    '#FCCB78',  # goldgelb
+    '#C3DC9F',  # hellgrün
+    '#85B6AE',  # mintgrün
+]
+# paired
+univie_colors_paired = list(itertools.chain(*zip(univie_colors_100, univie_colors_60)))
+
+univie_cmap = LinearSegmentedColormap.from_list('univie', univie_colors_100, N=len(univie_colors_100))
+univie_cmap_paired = LinearSegmentedColormap.from_list('univie_paired', univie_colors_paired,
+                                                       N=len(univie_colors_100) + len(univie_colors_60))
 
 
 def split_iterable(iterable, num_chunks):
@@ -84,4 +120,12 @@ def timer(func):
     return wrapper_timer
 
 
-# if __name__ == '__main__':
+if __name__ == '__main__':
+    th = np.linspace(0, 2 * np.pi, 128)
+    fig, ax = plt.subplots()
+    ax.plot(th, np.cos(th), 'C1', label='C1')
+    ax.plot(th, np.sin(th), 'C2', label='C2')
+    ax.plot(th, np.sin(th + np.pi), 'C3', label='C3')
+    ax.plot(th, np.cos(th + np.pi), 'C4', label='C4')
+    ax.legend()
+    plt.show()

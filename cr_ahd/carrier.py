@@ -10,6 +10,9 @@ from utils import opts, InsertionError
 
 
 class Carrier(object):
+    """
+    Class that represents carriers in the auction-based collaborative transportation network
+    """
 
     def __init__(self,
                  id_: str,
@@ -189,3 +192,14 @@ class Carrier(object):
                 v.tour.plot(plot_depot=False, annotate=annotate, color=v.color, alpha=alpha)
                 ax.legend()
         return
+
+    def determine_auction_set(self):
+        expensive_requests = []
+        for r in self.requests:
+            r.get_profit()
+        # OR
+        for v in self.vehicles:
+            for r_id in v.tour.sequence:
+                r.get_profit()
+    # TODO: determine the value/ profit of each request for the carrier based some criteria (a) demand/distance from
+    #  depot, (b) insertion cost (c) c1 or c2 value of I1 algorithm?! (d) ...

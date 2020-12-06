@@ -1,5 +1,6 @@
 if __name__ == '__main__':
     pass
+    # TODO write pseudo codes for ALL the stuff that's happening
 
     # TODO how do carriers 'buy' requests from others? Is there some kind of money exchange happening?
 
@@ -14,3 +15,5 @@ if __name__ == '__main__':
     #  (1) static/dynamic sequential cheapest insertion construction => DONE
     #  (2) dynamic construction
     #  (3) I1 insertion construction => DONE
+
+    # TODO's with * are from 06/12/20 or later from when I tried to understand my own code

@@ -1,5 +1,6 @@
 import multiprocessing
 import os
+from pathlib import Path
 from copy import deepcopy
 
 import pandas as pd
@@ -7,13 +8,24 @@ from tqdm import tqdm
 
 import instance as it
 import evaluation as ev
+from utils import path_input_custom, path_output_custom
+
+
+# TODO: describe what this file is for and how it works exactly
 
 
 def run_all_algorithms(base_instance: it.Instance, centralized_flag: bool):
+    """
+    :param base_instance: (custom) instance that will we (deep)copied for each algorithm
+    :param centralized_flag: TRUE if also a central (a single central carrier) instance (deep)copy shall be created
+    and solved
+    :return:
+    """
     results = []
 
+    # non-centralized instances
     algorithms_and_parameters = [
-        (it.Instance.static_CI_construction, dict()),
+        (it.Instance.static_I1_construction, dict()),
         (it.Instance.dynamic_construction, dict(with_auction=False)),
         (it.Instance.dynamic_construction, dict(with_auction=True))
     ]
@@ -49,37 +61,49 @@ def run_all_algorithms(base_instance: it.Instance, centralized_flag: bool):
 
 
 def multi_func(solomon, num_of_inst):
-    directory = f'../data/Input/Custom/{solomon}'
-    inst_names = os.listdir(directory)[:num_of_inst]
-    centralized_flag = True
-    solomon_base_results = []
+    """
+    for the first num_of_inst random instances that exists in the solomon type folder, this function runs all available
+    algorithms to solve each of these instances. The results are collected, transformed into a pd.DataFrame and saved as
+    .csv
+    :param solomon: solomon base class to be used. will read custom made classes from this base class
+    :param num_of_inst: number of instances to read and solve
+    """
+    name = multiprocessing.current_process().name
+    pid = os.getpid()
+    print(f'{solomon} in {name} - {pid}')
+
+    directory = path_input_custom.joinpath(solomon)
+    inst_names = list(directory.iterdir())[:num_of_inst]  # find the first num_of_inst custom instances
+    centralized_flag = True  # TRUE if also the centralized versions should be solved
+    solomon_base_results = []  # collecting all the results
     for instance_name in tqdm(iterable=inst_names):
-        path = os.path.join(directory, instance_name)
+        path = directory.joinpath(instance_name)
         base_instance = it.read_custom_json_instance(path)
-        results = run_all_algorithms(base_instance, centralized_flag)
+        results = run_all_algorithms(base_instance,
+                                     centralized_flag)  # TODO: extract the creation of the eval.csv file!!
         solomon_base_results.extend(results)
         centralized_flag = False
 
     performance = pd.DataFrame(solomon_base_results)
     performance = performance.set_index(['solomon_base', 'rand_copy', 'algorithm', 'num_carriers', 'num_vehicles'])
-    file_name = f'{base_instance.id_.split("#")[0]}eval.csv'
-    performance.to_csv(f'../data/Output/Custom/{solomon}/{file_name}')
 
-    name = multiprocessing.current_process().name
-    pid = os.getpid()
-    print(f'{solomon} in {name} - {pid}')
+    # write the results
+    write_dir=path_output_custom.joinpath(solomon)
+    write_dir.mkdir(parents=True, exist_ok=True)  # TODO All the directory creation should happen in the beginning somewhere once
+    file_name = f'{base_instance.id_.split("#")[0]}eval.csv'
+    write_path = write_dir.joinpath(file_name)
+    performance.to_csv(write_path)
 
 
 if __name__ == '__main__':
     # jobs = []
-    solomon_list = ['C101', 'C201', 'R101', 'R201', 'RC101', 'RC201']
+    # solomon_list = ['C101', 'C201', 'R101', 'R201', 'RC101', 'RC201']
     # for solomon in solomon_list:
-    #     process = multiprocessing.Process(target=multi_func, args=(solomon, 10,))
+    #     process = multiprocessing.Process(target=multi_func, args=(solomon, 100,))
     #     jobs.append(process)
     #     process.start()
-    # for j in jobs:
+    # for j in jobs:  # to ensure that program waits until all processes have finished before continuing
     #     j.join()
-    ev.bar_plot_with_errors(solomon_list, 'cost')
 
     # for running just a single instance
-    # multi_func('C101', 2)
+    multi_func('C101', num_of_inst=1)

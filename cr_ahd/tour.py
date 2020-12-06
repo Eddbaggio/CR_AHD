@@ -86,6 +86,20 @@ class Tour(object):
 
     def compute_cost_and_schedules(self, dist_matrix, start_time=opts['start_time'], ignore_tw=True,
                                    verbose=opts['verbose']):
+
+        """
+
+        Computes the total routing cost (distance-based) and the corresponding routing schedule (comprising sequence
+        of vertex visits, arrival times and service start times). Based on an ASAP-principle (vehicle leaves as early as
+        possible, serves as early as possible, No waiting strategies or similar things are applied)
+
+        # TODO write docstring!!
+        :param dist_matrix: The distance matrix to use
+        :param start_time:
+        :param ignore_tw: Should time windows be ignored?
+        :param verbose:
+        :return:
+        """
         self.cost = 0
         self.arrival_schedule[0] = start_time
         self.service_schedule[0] = start_time
@@ -93,17 +107,19 @@ class Tour(object):
             i: vx.Vertex = self.sequence[rho - 1]
             j: vx.Vertex = self.sequence[rho]
             dist = dist_matrix.loc[i.id_, j.id_]
-            self.cost += dist
+            self.cost += dist  # sum up the total routing cost
             planned_arrival = self.service_schedule[rho - 1] + i.service_duration + travel_time(dist)
             if verbose > 2:
                 print(f'Planned arrival at {j}: {planned_arrival}')
             if not ignore_tw:
-                assert planned_arrival <= j.tw.l
-            self.arrival_schedule[rho] = planned_arrival
+                assert planned_arrival <= j.tw.l  # assert that arrival happens before time window closes
+            self.arrival_schedule[rho] = planned_arrival  # set the arrival time
             if planned_arrival >= j.tw.e:
-                self.service_schedule[rho] = planned_arrival
+                self.service_schedule[
+                    rho] = planned_arrival  # if arrival is later than time window opening, choose service time = arrival time
             else:
-                self.service_schedule[rho] = j.tw.e
+                self.service_schedule[
+                    rho] = j.tw.e  # if arrival is later than time window opening, chooseservie time =  tw opening
         pass
 
     def is_feasible(self, dist_matrix, start_time=opts['start_time'], verbose=opts['verbose']) -> bool:

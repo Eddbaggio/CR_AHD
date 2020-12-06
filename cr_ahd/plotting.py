@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 from matplotlib.text import Annotation
 from carrier import Carrier
 from vehicle import Vehicle
+from pathlib import Path
+from utils import path_output
 
 
 class CarrierConstructionAnimation(object):
@@ -56,7 +58,7 @@ class CarrierConstructionAnimation(object):
         self.freeze_frames.append(freeze_frame)
         return freeze_frame
 
-    def _finish(self, repeat_last_frame=80, interval=40, repeat=True, repeat_delay=300):
+    def _finish(self, repeat_last_frame=80, interval=60, repeat=True, repeat_delay=300):
         self.ims.extend([self.ims[-1]] * repeat_last_frame)
         self.animation = ani.ArtistAnimation(self.fig,
                                              artists=self.ims,
@@ -70,8 +72,9 @@ class CarrierConstructionAnimation(object):
         plt.show()
         # self.fig.show()
 
-    def save(self, filename='../data/Output/Animations/animation.gif'):
+    def save(self, filename=path_output.joinpath('Animations', 'animation.gif')):
         self._finish()
         movie_writer = ani.ImageMagickFileWriter(fps=24)
+        # filename.mkdir(parents=True, exist_ok=True)  # TODO use pathlib Paths everywhere!
         self.animation.save(filename, writer=movie_writer)
         return filename
