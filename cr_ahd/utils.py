@@ -120,6 +120,21 @@ def timer(func):
     return wrapper_timer
 
 
+def unique_path(directory, name_pattern):
+    """
+    construct a unique numbered file name based on a template
+    :param directory: directory which shall be the parent dir of the file
+    :param name_pattern: pattern for the file name, with room for a counter
+    :return: file path that is unique in the specified directory
+    """
+    counter = 0
+    while True:
+        counter += 1
+        path = directory / name_pattern.format(counter)
+        if not path.exists():
+            return path
+
+
 if __name__ == '__main__':
     th = np.linspace(0, 2 * np.pi, 128)
     fig, ax = plt.subplots()

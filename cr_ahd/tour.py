@@ -54,12 +54,21 @@ class Tour(object):
     #     return tour
 
     def reset_cost_and_schedules(self):
+        """
+        Resets self.cost, self.arrival_schedule and self.service_schedule to None.
+        """
         self.cost = None
         self.arrival_schedule = [None] * len(self)  # reset arrival times
         self.service_schedule = [None] * len(self)  # reset start of service times
 
     def insert_and_reset(self, index: int, vertex: vx.Vertex):
-        """ inserts a vertex before the specified index and resets/deletes all cost and schedules. """
+        """
+         inserts a vertex before the specified index and resets/deletes all cost and schedules.
+
+        :param index: index before which the given vertex/request is to be inserted
+        :param vertex: vertex to insert into the tour
+        :return:
+        """
         assert type(vertex) == vx.Vertex
         self.sequence.insert(index, vertex)
         self.reset_cost_and_schedules()
@@ -88,12 +97,10 @@ class Tour(object):
                                    verbose=opts['verbose']):
 
         """
-
         Computes the total routing cost (distance-based) and the corresponding routing schedule (comprising sequence
         of vertex visits, arrival times and service start times). Based on an ASAP-principle (vehicle leaves as early as
         possible, serves as early as possible, No waiting strategies or similar things are applied)
 
-        # TODO write docstring!!
         :param dist_matrix: The distance matrix to use
         :param start_time:
         :param ignore_tw: Should time windows be ignored?
@@ -123,6 +130,13 @@ class Tour(object):
         pass
 
     def is_feasible(self, dist_matrix, start_time=opts['start_time'], verbose=opts['verbose']) -> bool:
+        """
+
+        :param dist_matrix:
+        :param start_time:
+        :param verbose:
+        :return:
+        """
         if verbose > 2:
             print(f'== Feasibility Check')
             print(self)

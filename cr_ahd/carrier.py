@@ -10,16 +10,22 @@ from utils import opts, InsertionError
 
 
 class Carrier(object):
-    """
-    Class that represents carriers in the auction-based collaborative transportation network
-    """
-
     def __init__(self,
                  id_: str,
                  depot: vx.Vertex,
                  vehicles: List[vh.Vehicle],
                  requests: dict = None,
                  unrouted: dict = None):
+        """
+        Class that represents carriers in the auction-based collaborative transportation network
+
+        :param id_: unique identifier (usually c0, c1, c2, ...)
+        :param depot: Vertex that is the depot of the carrier
+        :param vehicles: List of vehicles (of class vh.Vehicle) that belong to this carrier
+        :param requests: List of requests that are assigned to this carrier
+        :param unrouted: List of this carrier's requests that are still unrouted (usually all requests upon
+        instantiation of the carrier)
+        """
         self.id_ = id_
         self.depot = depot
         self.vehicles = vehicles
@@ -55,17 +61,21 @@ class Carrier(object):
 
     @property
     def num_act_veh(self) -> int:
+        """Number of active vehicles, i.e. vehicles that serve at least one request Vertex"""
         return sum([1 for v in self.active_vehicles])
 
     @property
     def active_vehicles(self):
+        """List of vehicles that serve at least one request Vertex"""
         return [v for v in self.vehicles if v.is_active]
 
     @property
     def inactive_vehicles(self):
+        """List of vehicles that serve no request Vertex but have depot-depot tour only"""
         return [v for v in self.vehicles if not v.is_active]
 
     def to_dict(self):
+        """Nested dictionary representation of self"""
         return {
             'id_': self.id_,
             'depot': self.depot.to_dict(),
@@ -74,6 +84,12 @@ class Carrier(object):
         }
 
     def assign_request(self, request: vx.Vertex):
+        """
+        Assign a request to the carrier (self). It will be stored in self.requests by its id
+
+        :param request: the request vertex to be assigned
+        :return:
+        """
         self.requests[request.id_] = request
         self.unrouted[request.id_] = request
         # TODO: add dist matrix attribute and extend it with each request assignment? -> inefficient,
@@ -81,15 +97,36 @@ class Carrier(object):
         pass
 
     def retract_request(self, request_id: str):
-        self.unrouted.pop(request_id)  # remove from initial carrier
+        """
+        remove the specified request from self.requests.
+
+        :param request_id: the id of the request to be removed
+        :return:
+        """
+        self.unrouted.pop(request_id)  # auction: remove from initial carrier
         retracted = self.requests.pop(request_id)
         return retracted
 
     def compute_all_vehicle_cost_and_schedules(self, dist_matrix):
+        """
+        Computes for all vehicles of this carrier the routing costs and the corresponding schedules (sequence,
+        arrival time, service start time) See Vehicle.tour.compute_cost_and_schedules
+        :param dist_matrix: The Vertex distance matrix to use
+        :return:
+        """
         for v in self.vehicles:
             v.tour.compute_cost_and_schedules(dist_matrix)
 
     def find_seed_request(self, method: str) -> vx.Vertex:
+        """
+        Searches for the best request to be used for a tour initialization based on the given method (Either of
+        'earliest_due_date' or 'furthest_distance).
+
+        :param method: Method to identify the best seed request. 'earliest_due_date' finds the request with the
+        earliest time window opening time. 'furthest_distance' is not yet implemented
+        :return: The seed vertex to use for the pendulum tour
+        """
+
         # find request with earliest deadline and initialize pendulum tour
         assert method in ['earliest_due_date', 'furthest_distance']
         if method == 'earliest_due_date':
@@ -103,11 +140,12 @@ class Carrier(object):
 
     def initialize_tour(self, vehicle: vh.Vehicle, dist_matrix, method: str):
         """
-        :param vehicle: The vehicle to initialize the tour on
-        :param dist_matrix:
-        :param method: Either of 'earliest_due_date' or 'furthest_distance'
+        Builds a pendulum tour for the specified vehicle by finding a so-called "seed" request. the _method_ parameter
+        specifies how the seed is determined (Either of 'earliest_due_date' or 'furthest_distance').
 
-        :return:
+        :param vehicle: The vehicle to initialize the tour on
+        :param dist_matrix: distance matrix to be used
+        :param method: Either of 'earliest_due_date' or 'furthest_distance'
         """
         assert method in ['earliest_due_date', 'furthest_distance']
         assert len(vehicle.tour) == 2, 'Vehicle already has a tour'
@@ -125,6 +163,8 @@ class Carrier(object):
     def find_best_feasible_I1_insertion(self, dist_matrix, verbose=opts['verbose'],
                                         ) -> Tuple[vx.Vertex, vh.Vehicle, int, float]:
         """
+        Find the next optimal Vertex and its optimal insertion position based on the I1 insertion scheme.
+
         :param dist_matrix:
         :param verbose:
         :return: Tuple(u_best, vehicle_best, rho_best, max_c2)
@@ -135,8 +175,8 @@ class Carrier(object):
         u_best = None
         max_c2 = float('-inf')
 
-        for _, u in self.unrouted.items():
-            for v in self.active_vehicles:
+        for _, u in self.unrouted.items():  # take the unrouted requests
+            for v in self.active_vehicles:  # check first the vehicles that are active (to avoid small tours)
                 rho, c2 = v.tour.find_best_feasible_I1_insertion(u, dist_matrix)
                 if c2 > max_c2:
                     if verbose > 1:
@@ -152,17 +192,21 @@ class Carrier(object):
         """
         Checks EVERY vehicle/tour for a feasible insertion and return the cheapest one
 
-        :return: triple (vehicle_best, position_best, cost_best) defining the cheapest vehicle/tour, index and associated cost to insert the given vertex u
+        :param u: Vertex to be inserted
+        :param dist_matrix: distance matrix to consider for insertion cost computations
+        :param verbose: level of console output
+        :return: triple (vehicle_best, position_best, cost_best) defining the cheapest vehicle/tour, index and
+        associated cost to insert the given vertex u
         """
         vehicle_best: vh.Vehicle = None
         cost_best = float('inf')
         position_best = None
-        for v in self.vehicles:
+        for v in self.vehicles:  # check ALL vehicles (also the inactive ones)
             try:
                 position, cost = v.tour.find_cheapest_feasible_insertion(u=u, dist_matrix=dist_matrix)
                 if verbose > 1:
                     print(f'\t\tInsertion cost {u.id_} -> {v.id_}: {cost}')
-                if cost < cost_best:
+                if cost < cost_best:  # a new cheapest insertion was found -> update the incumbents
                     vehicle_best = v
                     cost_best = cost
                     position_best = position
@@ -172,12 +216,19 @@ class Carrier(object):
         return vehicle_best, position_best, cost_best
 
     def two_opt(self, dist_matrix):
+        """Applies the 2-Opt local search operator to all vehicles/tours"""
         for v in self.active_vehicles:
             two_opt_tour = v.tour.two_opt(dist_matrix)
             v.tour = two_opt_tour
 
     def plot(self, annotate: bool = True, alpha: float = 1):
+        """
+        Create a matplotlib plot of the carrier and its tours.
 
+        :param annotate: whether the vertices are annotated
+        :param alpha: transparency of the nodes
+        :return: # TODO why do i not return the fig or ax?
+        """
         fig, ax = plt.subplots()
         ax.set_xlim(0, 100)
         ax.set_ylim(0, 100)

@@ -10,6 +10,7 @@ def bar_plot_with_errors(solomon_list: list, algorithms: List[str], columns: Lis
     """
     Reads and combines the evaluation csv files of each instance type in solomon_list. Filters for only the given
     algorithms and saves an individual comparison bar plot for each given column.
+
     :param fig_size: Figure size (default is for A4 wide); (7, 4.5) for half slide PPT 16:9; ()
     :param algorithms: filter the algorithms that are compared in each bar plot
     :param solomon_list: the solomon base instances that shall be compared
@@ -91,8 +92,17 @@ def bar_plot_with_errors(solomon_list: list, algorithms: List[str], columns: Lis
 
 
 def combine_eval_files(algorithms, solomon_list, save: bool = True):
+    """
+
+
+    :param algorithms:
+    :param solomon_list:
+    :param save:
+    :return:
+    """
     eval = pd.DataFrame()
     for solomon in solomon_list:
+
         file_name = f'../data/Output/Custom/{solomon}/{solomon}_3_15_ass_eval.csv'  # TODO: fix the file name for != 3 carriers etc
         df = pd.read_csv(file_name)
         eval = eval.append(df)
