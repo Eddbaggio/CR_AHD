@@ -1,7 +1,8 @@
 #include "Vertex.h"
 
 #include <iostream>
-
+#include <string>
+#include <nlohmann/json.hpp>
 #include "utils.h"
 
 // The class declaration goes into the header file.
@@ -25,6 +26,7 @@ vertex::vertex()
 
 // constructor; same name as the class; many constructors can exists with different # parameters (overloading); there is always a (potentially hidden) default constructor
 vertex::vertex(
+	std::string id,
 	float x,
 	float y,
 	float tw_open,
@@ -34,15 +36,20 @@ vertex::vertex(
 )
 
 	// member initializer list
-	: coordinates_(x, y), time_window_(tw_open, tw_close), demand_(demand), service_duration_(service_duration)
+	: id_(id), coordinates_(x, y), time_window_(tw_open, tw_close), demand_(demand), service_duration_(service_duration)
 {
 	
 }
 
-vertex::~vertex()  // Destructor, free up memory whenever an instance is deleted
+vertex::vertex(const nlohmann::json& json)
 {
-	print("Vertex destroyed!");
+	id_ = json.at("id_");
+	coordinates_ = coordinates(json.at("x_coord"), json.at("y_coord"));
+	time_window_= time_window(json.at("tw_open"), json.at("tw_close"));
+	demand_= json.at("demand");
+	service_duration_= json.at("service_duration");
 }
+
 
 coordinates vertex::get_coordinates() const
 {
@@ -66,10 +73,6 @@ void vertex::set_time_window(time_window time_window)
 
 void vertex::print_coordinates()
 {
-	std::cout << coordinates_.m_x_coord << ", " << coordinates_.m_y_coord << std::endl;  // should later be replaced by overloading the << operator for the coordinates struct
+	std::cout << coordinates_.x_coordinate_ << ", " << coordinates_.y_coordinate_ << std::endl;  // should later be replaced by overloading the << operator for the coordinates struct
 }
 
-void vertex::dummy_func()
-{
-	float a = coordinates_.m_y_coord + coordinates_.m_x_coord;
-}

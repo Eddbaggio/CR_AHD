@@ -24,7 +24,7 @@ from utils import split_iterable, make_dist_matrix, opts, InsertionError, Solomo
 
 class Instance(object):
     def __init__(self, id_: str, requests: List[vx.Vertex], carriers: List[cr.Carrier],
-                 dist_matrix: pd.DataFrame = None):
+                 dist_matrix: pd.DataFrame=None):
         """
         Create an instance (requests, carriers (,distance matrix) for the collaborative transportation network for
         attended home delivery
@@ -150,8 +150,7 @@ class Instance(object):
     @property
     def evaluation_metrics(self):
         assert self._solved, f'{self} has not been solved yet'
-        return dict(
-            id=self.id_,
+        return dict(id=self.id_,
             rand_copy=self.id_.split('#')[-1],
             solomon_base=self.solomon_base,
             num_carriers=self.num_carriers,
@@ -167,8 +166,7 @@ class Instance(object):
             **self.num_requests_per_carrier,
             **self.cost_per_carrier,
             **self.revenue_per_carrier,
-            **self.profit_per_carrier,
-        )
+            **self.profit_per_carrier,)
 
     def to_dict(self):
         """Convert the instance to a nested dictionary. Primarily useful for storing in .json format"""
@@ -185,7 +183,8 @@ class Instance(object):
         stored in there already and should be retained to ensure comparability between methods, even dynamic methods.
         """
 
-        raise UserWarning('Only call this method for constructing new instances & writing them to disk.')
+        #raise UserWarning('Only call this method for constructing new
+        #instances & writing them to disk.')
         assert not self._solved, f'Instance {self} has already been solved'
         # np.random.seed(0)
         for r in self.requests:
@@ -193,8 +192,8 @@ class Instance(object):
             c.assign_request(r)
 
     def static_CI_construction(self,
-                               verbose: int = opts['verbose'],
-                               plot_level: int = opts['plot_level']):
+                               verbose: int=opts['verbose'],
+                               plot_level: int=opts['plot_level']):
         """
         Use a static construction method to build tours for all carriers via SEQUENTIAL CHEAPEST INSERTION.
         (Can also be used for dynamic route construction if the request-to-carrier assignment is known.)
@@ -214,10 +213,12 @@ class Instance(object):
                 ani = CarrierConstructionAnimation(c, f'{self.id_}{" centralized" if self.num_carriers == 0 else ""}: '
                                                       f'Cheapest Insertion construction: {c.id_}')
 
-            # TODO why is this necessary here? why aren't these things computed already before?
+            # TODO why is this necessary here?  why aren't these things
+            # computed already before?
             c.compute_all_vehicle_cost_and_schedules(self.dist_matrix)
 
-            # TODO no initialization of vehicle tours is done while I1 has initialization - is it unfair?
+            # TODO no initialization of vehicle tours is done while I1 has
+            # initialization - is it unfair?
 
             # construction loop
             for _ in range(len(c.unrouted)):
@@ -248,9 +249,9 @@ class Instance(object):
         return
 
     def static_I1_construction(self,
-                               init_method: str = 'earliest_due_date',
-                               verbose: int = opts['verbose'],
-                               plot_level: int = opts['plot_level']):
+                               init_method: str='earliest_due_date',
+                               verbose: int=opts['verbose'],
+                               plot_level: int=opts['plot_level']):
         """
         Use the I1 construction method (Solomon 1987) to build tours for all carriers.
 
@@ -270,7 +271,8 @@ class Instance(object):
                 ani = CarrierConstructionAnimation(c,
                                                    f"{self.id_}{' centralized' if self.num_carriers == 0 else ''}: Solomon's I1 construction: {c.id_}")
 
-            # TODO why is this necessary here? why aren't these things computed already before?
+            # TODO why is this necessary here?  why aren't these things
+            # computed already before?
             c.compute_all_vehicle_cost_and_schedules(self.dist_matrix)  # tour empty at this point (depot to depot tour)
 
             # initialize one tour to begin with
@@ -299,8 +301,7 @@ class Instance(object):
 
             if plot_level > 1:
                 ani.show()
-                ani.save(
-                    filename=f'.{path_output}/Animations/{self.id_}_{"cen_" if self.num_carriers == 1 else ""}sta_I1_{c.id_ if self.num_carriers > 1 else ""}.gif')
+                ani.save(filename=f'.{path_output}/Animations/{self.id_}_{"cen_" if self.num_carriers == 1 else ""}sta_I1_{c.id_ if self.num_carriers > 1 else ""}.gif')
             if verbose > 0:
                 print(f'Total Route cost of carrier {c.id_}: {c.cost()}\n')
 
@@ -310,7 +311,7 @@ class Instance(object):
         self._solution_algorithm = f'{"cen_" if self.num_carriers == 1 else ""}sta_I1'
         return
 
-    def cheapest_insertion_auction(self, request: vx.Vertex, initial_carrier: cr.Carrier, verbose=opts['verbose'], ):
+    def cheapest_insertion_auction(self, request: vx.Vertex, initial_carrier: cr.Carrier, verbose=opts['verbose'],):
         """
         If insertion of the request is profitable (demand > insertion cost) for the initial carrier, returns the
         <carrier, vehicle, position, cost> triple for the cheapest insertion. If insertion is not profitable for the
@@ -325,7 +326,8 @@ class Instance(object):
         vehicle_best, position_best, cost_best = initial_carrier.find_cheapest_feasible_insertion(request,
                                                                                                   self.dist_matrix)
         carrier_best = initial_carrier
-        # auction: determine and return the collaborator with the cheapest insertion cost
+        # auction: determine and return the collaborator with the cheapest
+        # insertion cost
         if cost_best > request.demand:
             if verbose > 0:
                 print(f'{request.id_} is not profitable for {carrier_best.id_}')
@@ -343,13 +345,12 @@ class Instance(object):
                         cost_best = cost
         if verbose > 0:
             if cost_best > request.demand:
-                print(
-                    f'No carrier can insert request {request.id_} profitably! It will be assigned to {carrier_best.id_}')
+                print(f'No carrier can insert request {request.id_} profitably! It will be assigned to {carrier_best.id_}')
             else:
                 print(f'{request.id_} is finally assigned to {carrier_best.id_}')
         return carrier_best, vehicle_best, position_best, cost_best
 
-    def dynamic_construction(self, with_auction: bool = True, verbose=opts['verbose'], plot_level=opts['plot_level']):
+    def dynamic_construction(self, with_auction: bool=True, verbose=opts['verbose'], plot_level=opts['plot_level']):
         """
         Iterates over each request, finds the carrier it belongs to (this is necessary because the request-to-carrier
         assignment is pre-determined in the instance files. Optimally, the assignment happens on the fly),
@@ -365,23 +366,28 @@ class Instance(object):
         assert not self._solved, f'Instance {self} has already been solved'
 
         if verbose > 0:
-            print(
-                f'DYNAMIC Cheapest Insertion Construction {"WITH" if with_auction else "WITHOUT"} auction for {self}:')
+            print(f'DYNAMIC Cheapest Insertion Construction {"WITH" if with_auction else "WITHOUT"} auction for {self}:')
 
         timer = Timer()
         timer.start()
         # find the next request u, that has id number i
-        # TODO this can be simplified/made more efficient if the assignment of a vertex is stored with its class
-        #  instance. In that case, it must also be stored accordingly in the json file. Right now, it is not a big
-        #  problem since requests are assigned in ascending order, so only the first request of each carrier must be
+        # TODO this can be simplified/made more efficient if the assignment of
+        # a vertex is stored with its class
+        #  instance.  In that case, it must also be stored accordingly in the
+        #  json file.  Right now, it is not a big
+        #  problem since requests are assigned in ascending order, so only the
+        #  first request of each carrier must be
         #  checked
 
-        # TODO this function assumes that requests have been assigned to carriers already which is not really logical
+        # TODO this function assumes that requests have been assigned to
+        # carriers already which is not really logical
         #  in a real-life case since they arrive dynamically
         for i in range(len(self.requests)):  # iterate over all requests one by one
             for c in self.carriers:
-                # this loop finds the carrier to which the request is assigned(based on the currently PRE -
-                # DETERMINED request-to-carrier assignment). Optimally, the assignment happens on-the-fly
+                # this loop finds the carrier to which the request is
+                # assigned(based on the currently PRE -
+                # DETERMINED request-to-carrier assignment).  Optimally, the
+                # assignment happens on-the-fly
                 try:
                     u_id, u = next(islice(c.unrouted.items(), 1))  # get the first unrouted request of carrier c
                 except StopIteration:  # if the next() function cannot return anything due to an exhausted iterator
@@ -450,7 +456,7 @@ class Instance(object):
             centralized.carriers[0].assign_request(r)
         return centralized
 
-    def plot(self, annotate: bool = True, alpha: float = 1):
+    def plot(self, annotate: bool=True, alpha: float=1):
         """
         Create a matplotlib plot of the instance, showing the carriers's depots and requests
 
@@ -485,17 +491,19 @@ class Instance(object):
         file_name = path_input_custom.joinpath(self.solomon_base, self.id_)
         file_name.parent.mkdir(parents=True, exist_ok=True)
 
-        # check if any customers are assigned to carriers already and set the file name
+        # check if any customers are assigned to carriers already and set the
+        # file name
         assigned_requests = []
         for c in self.carriers:
             assigned_requests.extend(c.requests)
         if any(assigned_requests):
-            file_name.rename(Path(file_name.parent, file_name.stem + '_ass'))
+            file_name = file_name.with_name(file_name.stem + '_ass')
 
-        # check how many instances of this type already have been stored and enumerate file name accordingly
-        file_name = unique_path(file_name.parent, file_name.stem + '_#{:03d}')
+        # check how many instances of this type already have been stored and
+        # enumerate file name accordingly
+        file_name = unique_path(file_name.parent, file_name.stem + '_#{:03d}'+'.json')
 
-        file_name = file_name.with_suffix('.json')
+        file_name = file_name.with_suffix('.json')  # TODO redundant?
         with open(file_name, mode='w') as write_file:
             json.dump(self.to_dict(), write_file, indent=4)
         return file_name
@@ -521,11 +529,11 @@ class Instance(object):
 
     # def write_evaluation_metrics_to_csv(self):
     #     assert self._solved
-    #     file_name = f'../data/Output/Custom/{self.solomon_base}/{self.id_}_{self._solution_algorithm}_eval.csv'
+    #     file_name =
+    #     f'../data/Output/Custom/{self.solomon_base}/{self.id_}_{self._solution_algorithm}_eval.csv'
     #     df = pd.Series(self.evaluation_metrics)
     #     df.to_csv(file_name)
     #     return file_name
-
 
 def read_solomon(name: str, num_carriers: int) -> Instance:
     """
@@ -535,7 +543,8 @@ def read_solomon(name: str, num_carriers: int) -> Instance:
     :param num_carriers: number of carriers to be added to the instance
     :return: realization of the Instance class
     """
-    # TODO: a more efficient way of reading the data, e.g. by reading all vertices at once and split off the depot
+    # TODO: a more efficient way of reading the data, e.g.  by reading all
+    # vertices at once and split off the depot
     #  after; and by not using pd to read vehicles
     file_name = path_input_solomon / f'{name}.txt'
 
@@ -553,7 +562,7 @@ def read_solomon(name: str, num_carriers: int) -> Instance:
 
     # depots
     depot = pd.read_csv(file_name, skiprows=9, nrows=1, delim_whitespace=True,
-                        names=cols)  # TODO: how to handle depots? read in read_solomon?
+                        names=cols)  # TODO: how to handle depots?  read in read_solomon?
     depot = vx.Vertex('d1', int(depot.x_coord[0]), int(depot.y_coord[0]), int(depot.demand[0]),
                       int(depot.ready_time[0]),
                       int(depot.due_date[0]))
@@ -571,7 +580,7 @@ def read_solomon(name: str, num_carriers: int) -> Instance:
 
 
 def make_custom_from_solomon(solomon_name: str, custom_name: str, num_carriers: int, num_vehicles_per_carrier: int,
-                             vehicle_capacity: int, verbose: int = opts['verbose']):
+                             vehicle_capacity: int, verbose: int=opts['verbose']):
     """
     Create a customized instance for the collaborative transportation network from a Solomon instance. First, reads the
     specified solomon instance with the given number of carriers, then adds the defined number of vehicles
@@ -585,7 +594,8 @@ def make_custom_from_solomon(solomon_name: str, custom_name: str, num_carriers: 
     :return: the custom instance as a realization of the Instance class
     """
     solomon = read_solomon(solomon_name, num_carriers)
-    carriers = []  # collect carriers. these will overwrite the ones created by the read_solomon() function
+    carriers = []  # collect carriers.  these will overwrite the ones created by the
+                   # read_solomon() function
     for i in range(num_carriers):
         vehicles = []
         for j in range(num_vehicles_per_carrier):
@@ -692,16 +702,16 @@ def read_custom_json_instance(path: Path):
 
 if __name__ == '__main__':
     # If you need to re-create the custom instances run the following chunk:
-    # num_carriers = 3
-    # num_vehicles = 15
-    # for solomon in tqdm(Solomon_Instances):
-    #     for i in range(100):
-    #         # TODO read solomon only once
-    #         self = make_custom_from_solomon(solomon,
-    #                                         f'{solomon}_{num_carriers}_{num_vehicles}',
-    #                                         num_carriers,
-    #                                         num_vehicles,
-    #                                         None)
-    #         self._assign_all_requests_randomly()
-    #         self.write_instance_to_json()
+    num_carriers = 3
+    num_vehicles = 15
+    for solomon in tqdm(Solomon_Instances):
+        for i in range(100):
+            # TODO read solomon only once
+            custom = make_custom_from_solomon(solomon,
+                                            f'{solomon}_{num_carriers}_{num_vehicles}',
+                                            num_carriers,
+                                            num_vehicles,
+                                            None)
+            custom._assign_all_requests_randomly()
+            custom.write_instance_to_json()
     pass

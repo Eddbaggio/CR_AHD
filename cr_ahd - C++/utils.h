@@ -1,11 +1,12 @@
 #pragma once
 #include <string>
 #include <array>
+#include <iostream>
 
 struct coordinates
 {
-	float m_x_coord; // convention: m_ for member variables
-	float m_y_coord;
+	float x_coordinate_; // convention: m_ for member variables
+	float y_coordinate_;
 
 	coordinates()  // just like classes, structs can have default constructors
 	{
@@ -14,15 +15,22 @@ struct coordinates
 
 	coordinates(float x_coord, float y_coord)  // just like classes, structs can have constructors
 	{
-		m_x_coord = x_coord;
-		m_y_coord = y_coord;
+		x_coordinate_ = x_coord;
+		y_coordinate_ = y_coord;
 	}
+
+	friend std::ostream& operator<<(std::ostream& os, const coordinates& coordinates)
+	{
+		os << "(" << coordinates.x_coordinate_ << ", " << coordinates.y_coordinate_ << ")";
+		return os;
+	}
+
 };
 
 struct time_window
 {
-	float m_e;
-	float m_l;
+	float e_;
+	float l_;
 
 	time_window()
 	{
@@ -31,8 +39,14 @@ struct time_window
 
 	time_window(float open, float close)
 	{
-		m_e = open;
-		m_l = close;
+		e_ = open;
+		l_ = close;
+	}
+
+	friend std::ostream& operator<<(std::ostream& os, const time_window& time_window)
+	{
+		os << "(" << time_window.e_ << ", " << time_window.l_<< ")";
+		return os;
 	}
 };
 

@@ -1,19 +1,19 @@
 #pragma once
 #include <string>
-#include <array>
-#include <map>  // associative array - usually implemented as binary search trees - avg. time complexity: O(log n)
+#include <unordered_map> 
 #include "vertex.h"
 #include "vehicle.h"
+#include "nlohmann/json.hpp"
 
 class carrier
 {
 private:
 	std::string id_;
 	vertex depot_;
-	//std::array<Vehicle, ?? > vehicles;
+	std::vector<vehicle> vehicles_;
 	int num_of_vehicles_;
-	std::map<std::string, vertex> requests_;
-	std::map<std::string, vertex> unrouted_;
+	std::unordered_map<std::string, vertex> requests_;
+	//std::unordered_map<std::string, vertex> unrouted_; //should be pointers to elements of unordered map requests_
 	float cost_;
 	float revenue_;
 	float profit_;
@@ -24,12 +24,14 @@ private:
 public:
 	// Constructors
 	carrier();
-	carrier(
-		const std::string& id,
-		vertex depot,
-		//std::array<vehicle, ? >),
-		std::map<std::string, vertex> requests
-	);
+	//carrier(
+	//	const std::string& id,
+	//	vertex depot,
+	//	std::vector<vehicle>,
+	//	std::map<std::string, vertex> requests
+
+	//);
+	carrier(nlohmann::json carrier_json);
 
 	// Setters and Getters
 	void set_depot(vertex depot);
