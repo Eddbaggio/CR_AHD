@@ -5,7 +5,7 @@ vehicle::vehicle(std::string id, int capacity)
 {
 }
 
-vehicle::vehicle(nlohmann::json vehicle_json)
+vehicle::vehicle(nlohmann::ordered_json vehicle_json)
 {
 	id_ = vehicle_json.at("id_");
 	//capacity_ = vehicle_json.at("capacity");	//implemented with NULL in Python

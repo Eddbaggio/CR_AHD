@@ -16,7 +16,7 @@ private:
 public:
 	//constructors
 	vehicle(std::string id, int capacity);
-	vehicle(nlohmann::json);
+	vehicle(nlohmann::ordered_json);
 
 	// operators
 	friend std::ostream& operator<<(std::ostream os, const vehicle& vehicle);

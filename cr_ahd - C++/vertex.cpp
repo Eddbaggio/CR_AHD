@@ -41,7 +41,7 @@ vertex::vertex(
 	
 }
 
-vertex::vertex(const nlohmann::json& json)
+vertex::vertex(const nlohmann::ordered_json& json)
 {
 	id_ = json.at("id_");
 	coordinates_ = coordinates(json.at("x_coord"), json.at("y_coord"));
@@ -51,28 +51,20 @@ vertex::vertex(const nlohmann::json& json)
 }
 
 
-coordinates vertex::get_coordinates() const
-{
-	return coordinates_;
-}
+std::string vertex::get_id() const{	return id_;}
 
-void vertex::set_coordinates(coordinates coordinates)
-{
-	coordinates_ = coordinates;
-}
+coordinates vertex::get_coordinates() const{	return coordinates_;}
 
-time_window vertex::get_time_window() const
-{
-	return time_window_;
-}
+void vertex::set_coordinates(coordinates coordinates){coordinates_ = coordinates;}
 
-void vertex::set_time_window(time_window time_window)
-{
-	time_window_ = time_window;
-}
+time_window vertex::get_time_window() const{return time_window_;}
 
-void vertex::print_coordinates()
-{
-	std::cout << coordinates_.x_coordinate_ << ", " << coordinates_.y_coordinate_ << std::endl;  // should later be replaced by overloading the << operator for the coordinates struct
-}
+void vertex::set_time_window(time_window time_window){time_window_ = time_window;}
 
+
+//operators
+std::ostream& operator<<(std::ostream& os, vertex& vertex)
+{
+	os << "Vertex:\n" << "id:\t" + vertex.id_ << "\n" << "coordinates:\t" << vertex.coordinates_ << "\n" << "time window:\t" << vertex.time_window_ << "\n" << "demand:\t" << vertex.demand_;
+	return os;
+}
