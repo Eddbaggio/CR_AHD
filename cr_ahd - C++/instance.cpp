@@ -1,15 +1,26 @@
 #include <memory>
 #include "instance.h"
 
-instance::instance()	//default constructor
+instance::instance() //default constructor
 {
-
 }
 
-//instance::instance(std::string id, std::vector<vertex> requests, std::vector<carrier> carriers, std::unordered_map<std::string, std::unordered_map<std::string, float>> dist_matrix)
-//	:id_{ id }, requests_{ requests }, carriers_{ carriers }, distance_matrix_{ dist_matrix }
-//{
-//}
+instance::instance(const std::string& id,
+                   const std::vector<vertex>& requests,
+                   const std::vector<carrier>& carriers,
+                   const std::map<std::string, std::map<std::string, float>>& distance_matrix)
+	: id_(id), requests_(requests), carriers_(carriers), distance_matrix_(distance_matrix)
+{
+}
+
+//move constructor
+instance::instance(std::string&& id,
+                   std::vector<vertex>&& requests,
+                   std::vector<carrier>&& carriers,
+                   std::map<std::string, std::map<std::string, float>>&& distance_matrix) noexcept
+{
+}
+
 
 instance::instance(const std::filesystem::path& path) // construct from json path
 {
@@ -22,32 +33,52 @@ instance::instance(const std::filesystem::path& path) // construct from json pat
 	id_ = path.stem().string();
 
 	// create request vertices
-	for (auto& request_json : json_file.at("requests")) {
-		auto r = std::make_unique<vertex>(request_json);
-		requests_.push_back(std::move(r));
+	for (auto& request_json : json_file.at("requests"))
+	{
+		auto r = vertex(request_json);
+		requests_.push_back(r);
 	}
 
 	// create carriers
-	for (auto& carrier_json : json_file.at("carriers")) {
-		auto c = std::make_unique<carrier>(carrier_json);
-		carriers_.push_back(std::move(c));
-	}	
+	for (auto& carrier_json : json_file.at("carriers"))
+	{
+		auto c = carrier(carrier_json);
+		carriers_.push_back(c);
+	}
 
 	//distance matrix
-	std::map<std::string, std::map<std::string, float>> distance_matrix_ = json_file.at("dist_matrix");
+	distance_matrix_ = json_file.at("dist_matrix").get<std::map<std::string, std::map<std::string, float>>>();	// does not work, don't know why not
 }
 
-instance::~instance() {
+instance::~instance()
+{
 	std::cout << "instance destroyed" << '\n';
 }
 
 //setters and getters
+const std::vector<carrier>& instance::get_carriers() const { return carriers_; }
+const std::vector<vertex>& instance::get_requests() const { return requests_; }
 
-const std::vector<std::unique_ptr<carrier>>& instance::get_carriers() {return carriers_;}
+//operators
+std::ostream& operator<<(std::ostream& os, const instance& inst)
+{
+	os << "Instance:\n" << "id:\t" + inst.id_ << "\n" << "requests:\t" << inst.requests_.size() << "\n" << "carriers:\t"
+		<< inst.carriers_.size() << "\n";
+	return os;
+}
 
-const std::vector<std::unique_ptr<vertex>>& instance::get_requests() { return requests_; }
+//algorithms
+void instance::static_I1_construction(std::string init_method, int verbose, int plot_level)
+{
+	assert(solved_ == false);
+	if (verbose > 0)
+		std::cout << "STATIC I1 construction for " << id_ << '\n';
+	//timer timer;
+	//timer.start()
 
-std::ostream& operator<<(std::ostream& os, const instance& inst){
-		os << "Instance:\n" << "id:\t" + inst.id_ << "\n" << "reqeusts:\t" << inst.requests_.size() << "\n" << "carriers:\t" << inst.carriers_.size() << "\n";
-		return os;
+	for (auto& c : carriers_)
+	{
+		//if (plot_level>1){}
+		c.compute_all_vehicle_cost_and_schedules(distance_matrix_);
+	}
 }

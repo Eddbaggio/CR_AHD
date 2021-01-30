@@ -32,14 +32,9 @@ vertex::vertex(
 	float tw_open,
 	float tw_close,
 	float demand,
-	float service_duration
-)
-
-	// member initializer list
+	float service_duration)
 	: id_(id), coordinates_(x, y), time_window_(tw_open, tw_close), demand_(demand), service_duration_(service_duration)
-{
-	
-}
+{}
 
 vertex::vertex(const nlohmann::ordered_json& json)
 {
@@ -48,6 +43,11 @@ vertex::vertex(const nlohmann::ordered_json& json)
 	time_window_= time_window(json.at("tw_open"), json.at("tw_close"));
 	demand_= json.at("demand");
 	service_duration_= json.at("service_duration");
+}
+
+vertex::~vertex()
+{
+	std::cout << "V" << id_ << " destroyed!\n";
 }
 
 
@@ -60,6 +60,8 @@ void vertex::set_coordinates(coordinates coordinates){coordinates_ = coordinates
 time_window vertex::get_time_window() const{return time_window_;}
 
 void vertex::set_time_window(time_window time_window){time_window_ = time_window;}
+
+int vertex::get_service_duration() const {return service_duration_;}
 
 
 //operators

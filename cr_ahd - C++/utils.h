@@ -1,7 +1,9 @@
 #pragma once
 #include <string>
-#include <array>
+#include <vector>
+#include <unordered_map>
 #include <iostream>
+#include <cmath>
 
 struct coordinates
 {
@@ -50,16 +52,28 @@ struct time_window
 	}
 };
 
-void print(const std::string& x);
-void print(int x);
-void print(int* x);
 
-const std::array<std::string, 7> univie_colors_100 = {
-		"#0063A6", // universitätsblau
-		"#666666", // universtitätsgrau
-		"#A71C49", // weinrot
-		"#DD4814", // orangerot
-		"#F6A800", // goldgelb
-		"#94C154", // hellgrün
-		"#11897A", // mintgrün
-};
+namespace utils {
+	//const std::vector<std::string> univie_colors_100 = {
+	//		"#0063A6", // universitätsblau
+	//		"#666666", // universtitätsgrau
+	//		"#A71C49", // weinrot
+	//		"#DD4814", // orangerot
+	//		"#F6A800", // goldgelb
+	//		"#94C154", // hellgrün
+	//		"#11897A", // mintgrün
+	//};
+
+	
+	const std::unordered_map<std::string, float> opts = {
+		{"verbose", static_cast<float>(3.0)},
+		//{"plot_level", 1.0},
+		//{"speed_kmh", static_cast<float>(std::pow(60, 2))},
+		{"start_time", static_cast < float>(0.0)},
+		//{"alpha_1", 0.5},
+		//{"mu", 1.0},
+		//{"lambda", 2.0},
+	};
+
+	float travel_time(const float& distance);
+}

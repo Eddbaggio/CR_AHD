@@ -15,15 +15,19 @@ int main() {
 	instance instance{json_path};
 	std::cout << instance;
 
-	for (auto const& r : instance.get_requests())
-		std::cout << *r << '\n';
+	/*for (auto const& r : instance.get_requests())
+		std::cout << *r << '\n';*/
 
-	for (auto const& c : instance.get_carriers()) {
-		std::cout << *c << '\n';
-		for (auto const& r : c->get_requests()) {
-			std::cout << *r << '\n';
-		}
-	}
+	//for (auto const& c : instance.get_carriers()) {
+	//	std::cout << *c << '\n';
+	//	//for (auto const& r : c->get_requests()) {
+	//	//	std::cout << *r << '\n';
+	//	//}
+	//	for (auto const& v : c->get_vehicles()) {
+	//		std::cout << *v->get_tour() << '\n';
+	//	}
+	//}
 
+	instance.static_I1_construction();
 
 }

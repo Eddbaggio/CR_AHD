@@ -19,7 +19,8 @@ public:
 	vertex(std::string id, float x, float y, float demand, float tw_open, float tw_close, float service_duration);
 	vertex(const nlohmann::ordered_json& json);
 	// no destructor, not copy constructor, no copy assignment (& no move semantics) as i only use built in types as members (?!)
-
+	~vertex();
+	
 	// Setters and Getters
 	std::string get_id() const;
 
@@ -33,5 +34,5 @@ public:
 
 	//operators
 	friend std::ostream& operator<<(std::ostream& os, vertex& vertex);
-		
+	int get_service_duration() const;
 };

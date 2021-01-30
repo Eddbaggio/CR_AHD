@@ -11,9 +11,9 @@ class carrier
 private:
 	std::string id_;
 	vertex depot_;
-	std::vector<std::unique_ptr<vehicle>> vehicles_;
-	std::vector<std::unique_ptr<vertex>> requests_;
-	std::vector<std::unique_ptr<vertex>> unrouted_; //should this be pointers to elements of unordered map requests_?
+	std::vector<vehicle> vehicles_;
+	std::vector<vertex> requests_;
+	std::vector<vertex> unrouted_; //should this be pointers to elements of unordered map requests_?
 	//float cost_;
 	//float revenue_;
 	//float profit_;
@@ -29,15 +29,20 @@ public:
 	//TODO copy and move semantics!
 
 	// Setters and Getters
-	const std::vector<std::unique_ptr<vertex>>& get_requests();
+	const std::vector<vertex>& get_requests() const;
+
+	const std::vector<vehicle>& get_vehicles() const;
 	
 	//operators
 	friend std::ostream& operator<<(std::ostream& os, carrier& carrier);
 
-	// other member functions / methods
+	// other member functions / methods 
 	//void assign_request(const vertex& request);
-	int num_vehicles();
-	int num_requests();
-	int num_unrouted();
+	int num_vehicles() const;
+	int num_requests() const;
+	int num_unrouted() const;
+
+	//algorithms
+	void compute_all_vehicle_cost_and_schedules(const std::map<std::string, std::map<std::string, float>>& distance_matrix);
 };
 
