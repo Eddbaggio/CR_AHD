@@ -12,7 +12,7 @@ import itertools
 
 opts = {
     # 'num_trials': 10,
-    'verbose': 3,
+    'verbose': 0,
     'plot_level': 1,
     'speed_kmh': 60 ** 2,
     'start_time': 0,
