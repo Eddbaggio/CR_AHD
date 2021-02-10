@@ -41,6 +41,7 @@ class Carrier(object):
             self.unrouted: OrderedDictType[str, vx.Vertex] = OrderedDict()
         for v in vehicles:
             v.tour = Tour(id_=v.id_, sequence=[self.depot, self.depot])
+        self._initialization_strategy = None
 
     def __str__(self):
         return f'Carrier (ID:{self.id_}, Depot:{self.depot}, Vehicles:{len(self.vehicles)}, Requests:{len(self.requests)}, Unrouted:{len(self.unrouted)})'
@@ -73,6 +74,15 @@ class Carrier(object):
     def inactive_vehicles(self):
         """List of vehicles that serve no request Vertex but have depot-depot tour only"""
         return [v for v in self.vehicles if not v.is_active]
+
+    @property
+    def initialization_strategy(self):
+        return self._initialization_strategy
+
+    @initialization_strategy.setter
+    def initialization_strategy(self, strategy):
+        assert self._initialization_strategy is None, f'Initialization strategy already set'
+        self._initialization_strategy = strategy
 
     def to_dict(self):
         """Nested dictionary representation of self"""
@@ -117,7 +127,7 @@ class Carrier(object):
         for v in self.vehicles:
             v.tour.compute_cost_and_schedules(dist_matrix)
 
-    def find_seed_request(self, method: str) -> vx.Vertex:
+    '''def find_seed_request(self, method: str) -> vx.Vertex:
         """
         Searches for the best request to be used for a tour initialization based on the given method (Either of
         'earliest_due_date' or 'furthest_distance).
@@ -136,8 +146,9 @@ class Carrier(object):
                     seed = self.unrouted[key]
         elif method == 'furthest_distance':
             raise NotImplementedError()
-        return seed
+        return seed'''
 
+    '''
     def initialize_tour(self, vehicle: vh.Vehicle, dist_matrix, method: str):
         """
         Builds a pendulum tour for the specified vehicle by finding a so-called "seed" request. the _method_ parameter
@@ -158,7 +169,10 @@ class Carrier(object):
                 self.unrouted.pop(seed.id_)
             else:
                 raise InsertionError('', f'Seed request {seed} cannot be inserted feasibly into {vehicle}')
-        return
+        return'''
+
+    def initialize(self):
+        self._initialization_strategy.initialize()
 
     def find_best_feasible_I1_insertion(self, dist_matrix, verbose=opts['verbose'],
                                         ) -> Tuple[vx.Vertex, vh.Vehicle, int, float]:

@@ -3,7 +3,6 @@ import os
 from pathlib import Path
 import warnings
 from copy import copy
-from itertools import islice
 from typing import List
 
 import matplotlib.pyplot as plt
@@ -15,11 +14,11 @@ from tqdm import tqdm
 import carrier as cr
 import vehicle as vh
 import vertex as vx
-from plotting import CarrierConstructionAnimation
-from profiling import Timer
-from utils import split_iterable, make_dist_matrix, opts, InsertionError, Solomon_Instances, path_output, \
-    path_input_custom, \
-    path_input_solomon, unique_path
+from solution_strategies.initialization_strategy import RouteInitializationStrategy
+from solution_strategies.local_search_strategy import LocalSearchStrategy
+from solution_strategies.routing_strategy import RoutingStrategy
+from utils import split_iterable, make_dist_matrix, opts, Solomon_Instances, path_input_custom, \
+    path_input_solomon, unique_path, path_output_custom
 
 
 class Instance(object):
@@ -43,7 +42,12 @@ class Instance(object):
             self.dist_matrix = dist_matrix
         else:
             self.dist_matrix = make_dist_matrix([*self.requests, *[c.depot for c in self.carriers]])
+        self._initialized = False
         self._solved = False
+        self._finalized = False
+        self._initialization_strategy: RouteInitializationStrategy = None
+        self._routing_strategy: RoutingStrategy = None
+        self._finalizing_strategy: LocalSearchStrategy = None
 
     def __str__(self):
         return f'{"Solved " if self._solved else ""}Instance {self.id_} with {len(self.requests)} customers and {len(self.carriers)} carriers'
@@ -67,6 +71,44 @@ class Instance(object):
     def num_requests(self):
         """The number of requests"""
         return len(self.requests)
+
+    @property
+    def initialization_strategy(self):
+        """route initialization strategy to create (preliminary) pendulum tours"""
+        return self._initialization_strategy
+
+    @initialization_strategy.setter
+    def initialization_strategy(self, strategy):
+        """Setter for the pendulum tour initialization strategy"""
+        assert (
+            not self._initialized), f"Instance's tours have been initialized with strategy {self._initialization_strategy.__class__.__name__} already!"
+        self._initialization_strategy = strategy
+        for c in self.carriers:
+            c.initialization_strategy = strategy    # TODO this won't work
+
+    @property
+    def routing_strategy(self):
+        """The algorithm to solve the routing problem"""
+        return self._routing_strategy
+
+    @routing_strategy.setter
+    def routing_strategy(self, strategy):
+        """Setter for the routing  algorithm"""
+        assert (
+            not self._solved), f"Instance has been solved with strategy {self._routing_strategy.__class__.__name__} already!"
+        self._routing_strategy = strategy
+
+    @property
+    def local_search_strategy(self):
+        """the finalizer local search optimization, such as 2opt or 3opt"""
+        return self._finalizing_strategy
+
+    @local_search_strategy.setter
+    def local_search_strategy(self, strategy):
+        """Setter for the local search algorithm that can be used to finalize the results"""
+        assert (
+            not self._finalized), f"Instance has been finalized with strategy {self._finalizing_strategy.__class__.__name__} already!"
+        self._finalizing_strategy = strategy
 
     @property
     def cost(self):
@@ -160,23 +202,18 @@ class Instance(object):
                     cost=self.cost,
                     revenue=self.revenue,
                     profit=self.profit,
-                    runtime=self._runtime,
-                    algorithm=self._solution_algorithm,
+                    initialization_strategy=self.initialization_strategy.__class__.__name__,
+                    initialized=self._initialized,
+                    routing_strategy=self._routing_strategy.__class__.__name__,
+                    solved=self._solved,
+                    finalizing_strategy=self._finalizing_strategy.__class__.__name__,
+                    finalized=self._finalized,
+                    runtime=self._routing_strategy._runtime,
                     **self.num_act_veh_per_carrier,
                     **self.num_requests_per_carrier,
                     **self.cost_per_carrier,
                     **self.revenue_per_carrier,
                     **self.profit_per_carrier, )
-
-    @property
-    def all_algorithms_and_parameters(self):
-        return [
-            (self.static_I1_construction, dict(init_method='earliest_due_date')),
-            (self.static_I1_construction, dict(init_method='furthest_distance')),
-            (self.dynamic_construction, dict(with_auction=False)),
-            (self.dynamic_construction, dict(with_auction=True)),
-            (self.static_CI_construction, dict()),
-        ]
 
     def to_dict(self):
         """Convert the instance to a nested dictionary. Primarily useful for storing in .json format"""
@@ -193,14 +230,32 @@ class Instance(object):
         stored in there already and should be retained to ensure comparability between methods, even dynamic methods.
         """
 
-        # raise UserWarning('Only call this method for constructing new
-        # instances & writing them to disk.')
+        raise UserWarning('Only call this method for constructing new instances & writing them to disk.')
         assert not self._solved, f'Instance {self} has already been solved'
         # np.random.seed(0)
         for r in self.requests:
             c = self.carriers[np.random.choice(range(len(self.carriers)))]
             c.assign_request(r)
 
+    def initialize(self):
+        assert (not self._initialized), \
+            f'Instance has been initialized with strategy {self._initialization_strategy.__class__.__name__} already!'
+        self._initialization_strategy.initialize(self)
+        self._initialized = True
+
+    def solve(self):
+        assert (not self._solved), \
+            f'Instance has been solved with strategy {self._routing_strategy.__class__.__name__} already!'
+        self._routing_strategy.solve(self)
+        self._solved = True
+
+    def finalize(self):
+        assert (not self._finalized), \
+            f'Instance has been finalized with strategy {self._finalizing_strategy.__class__.__name__} already!'
+        self._finalizing_strategy.optimize(self)
+        self._finalized = True
+
+    ''' HAS BEEN MOVED TO routing_strategy
     def static_CI_construction(self,
                                verbose: int = opts['verbose'],
                                plot_level: int = opts['plot_level']):
@@ -253,9 +308,11 @@ class Instance(object):
         timer.stop()
         self._runtime = timer.duration
         self._solved = True
-        self._solution_algorithm = f'{"cen_" if self.num_carriers == 1 else ""}sta_CI'
+        self.routing_strategy = f'{"cen_" if self.num_carriers == 1 else ""}sta_CI'
         return
+    '''
 
+    '''
     def static_I1_construction(self,
                                init_method: str = 'earliest_due_date',
                                verbose: int = opts['verbose'],
@@ -317,8 +374,9 @@ class Instance(object):
         timer.stop()
         self._runtime = timer.duration
         self._solved = True
-        self._solution_algorithm = f'{"cen_" if self.num_carriers == 1 else ""}sta_I1'
+        self.routing_strategy = f'{"cen_" if self.num_carriers == 1 else ""}sta_I1'
         return
+    '''
 
     def cheapest_insertion_auction(self, request: vx.Vertex, initial_carrier: cr.Carrier, verbose=opts['verbose'], ):
         """
@@ -360,6 +418,7 @@ class Instance(object):
                 print(f'{request.id_} is finally assigned to {carrier_best.id_}')
         return carrier_best, vehicle_best, position_best, cost_best
 
+    '''
     def dynamic_construction(self, with_auction: bool = True, verbose=opts['verbose'], plot_level=opts['plot_level']):
         """
         Iterates over each request, finds the carrier it belongs to (this is necessary because the request-to-carrier
@@ -430,13 +489,15 @@ class Instance(object):
         timer.stop()
         self._runtime = timer.duration
         self._solved = True
-        self._solution_algorithm = f'dyn{"_auc" if with_auction else ""}'
+        self.routing_strategy = f'dyn{"_auc" if with_auction else ""}'
         return
+    '''
 
     def static_auction(self):
         for c in self.carriers:
             c.determine_auction_set()
 
+    '''
     def two_opt(self):
         """
         Improve the current solution with a 2-opt local search as in
@@ -447,7 +508,8 @@ class Instance(object):
         for c in self.carriers:
             c.two_opt(self.dist_matrix)
         # print(f'After 2-opt: {self.cost_per_carrier}')
-        self._solution_algorithm += '_2opt'
+        self.routing_strategy += '_2opt'
+    '''
 
     def to_centralized(self, depot_xy: tuple):
         """
@@ -527,7 +589,8 @@ class Instance(object):
         """
         assert self._solved
 
-        file_name = path_output.joinpath(self.solomon_base, f'{self.id_}_{self._solution_algorithm}_sol')
+        file_name = path_output_custom.joinpath(self.solomon_base,
+                                                f'{self.id_}_{self._routing_strategy.__class__.__name__}_solution')
         file_name = file_name.with_suffix('.json')
         file_name.parent.mkdir(parents=True, exist_ok=True)
 
@@ -541,7 +604,7 @@ class Instance(object):
     # def write_evaluation_metrics_to_csv(self):
     #     assert self._solved
     #     file_name =
-    #     f'../data/Output/Custom/{self.solomon_base}/{self.id_}_{self._solution_algorithm}_eval.csv'
+    #     f'../data/Output/Custom/{self.solomon_base}/{self.id_}_{self.routing_strategy}_eval.csv'
     #     df = pd.Series(self.evaluation_metrics)
     #     df.to_csv(file_name)
     #     return file_name

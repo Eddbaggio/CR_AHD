@@ -1,20 +1,18 @@
 import multiprocessing
 import os
-from pathlib import Path
-from copy import deepcopy
 
 import pandas as pd
 from tqdm import tqdm
 
 import instance as it
-import evaluation as ev
+from solution_strategies import routing_strategy as rs, local_search_strategy as lss
 from utils import path_input_custom, path_output_custom
 
 
 # TODO: describe what this file is for and how it works exactly
 
 
-def run_all_algorithms(base_instance: it.Instance, centralized_flag: bool, two_opt_flag: bool, two_opt_only_flag: bool):
+def execute_all_routing_strategies(base_instance: it.Instance, centralized_flag: bool, two_opt_flag: bool, two_opt_only_flag: bool):
     """
     :param base_instance: (custom) instance that will we (deep)copied for each algorithm
     :param centralized_flag: TRUE if also a central (a single central carrier) instance (deep)copy shall be created
@@ -24,7 +22,20 @@ def run_all_algorithms(base_instance: it.Instance, centralized_flag: bool, two_o
     results = []
 
     # non-centralized instances
-    algorithms_and_parameters = [
+    for strategy in [rs.static_cheapest_insertion_construction, rs.static_I1_construction, rs.dynamic_construction]:
+        base_instance.routing_strategy = strategy()
+        base_instance.solve()
+        base_instance.write_solution_to_json()
+        results.append(base_instance.evaluation_metrics)
+        if two_opt_flag:
+            base_instance.local_search_strategy = lss.TwoOpt()
+            base_instance.finalize()    # TODO adjust phrasing: finalizing vs. optimizing vs. local_search
+            base_instance.write_solution_to_json()
+            results.append(base_instance.evaluation_metrics)
+
+
+
+    """algorithms_and_parameters = [
         (it.Instance.static_I1_construction, dict()),
         (it.Instance.dynamic_construction, dict(with_auction=False)),
         (it.Instance.dynamic_construction, dict(with_auction=True))
@@ -39,10 +50,10 @@ def run_all_algorithms(base_instance: it.Instance, centralized_flag: bool, two_o
         if two_opt_flag:
             instance_copy.two_opt()
             instance_copy.write_solution_to_json()
-            results.append(instance_copy.evaluation_metrics)
+            results.append(instance_copy.evaluation_metrics)"""
 
     # centralized instances
-    if centralized_flag:
+    """if centralized_flag:
         algorithms_and_parameters = [
             (it.Instance.static_CI_construction, dict()),
             (it.Instance.static_I1_construction, dict(init_method='earliest_due_date'))
@@ -59,7 +70,7 @@ def run_all_algorithms(base_instance: it.Instance, centralized_flag: bool, two_o
             if two_opt_flag:
                 instance_copy.two_opt()
                 instance_copy.write_solution_to_json()
-                results.append(instance_copy.evaluation_metrics)
+                results.append(instance_copy.evaluation_metrics)"""
 
     return results
 
@@ -83,8 +94,8 @@ def multi_func(solomon, num_of_inst):
     for inst_path in tqdm(iterable=instance_paths):
         path = directory.joinpath(inst_path)
         base_instance = it.read_custom_json_instance(path)
-        results = run_all_algorithms(base_instance,
-                                     centralized_flag)  # TODO: extract the creation of the eval.csv file!!
+        results = execute_all_routing_strategies(base_instance,
+                                                 centralized_flag, True, False)  # TODO: extract the creation of the eval.csv file!!
         solomon_base_results.extend(results)
         centralized_flag = False
 
@@ -92,8 +103,9 @@ def multi_func(solomon, num_of_inst):
     performance = performance.set_index(['solomon_base', 'rand_copy', 'algorithm', 'num_carriers', 'num_vehicles'])
 
     # write the results
-    write_dir=path_output_custom.joinpath(solomon)
-    write_dir.mkdir(parents=True, exist_ok=True)  # TODO All the directory creation should happen in the beginning somewhere once
+    write_dir = path_output_custom.joinpath(solomon)
+    write_dir.mkdir(parents=True,
+                    exist_ok=True)  # TODO All the directory creation should happen in the beginning somewhere once
     file_name = f'{base_instance.id_.split("#")[0]}eval.csv'
     write_path = write_dir.joinpath(file_name)
     performance.to_csv(write_path)
