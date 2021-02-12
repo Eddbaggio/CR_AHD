@@ -19,7 +19,7 @@ def main() -> it.Instance:
         plt.show()
 
     if opts['verbose'] > 1:
-        print(C101_3_10_assigned.dist_matrix)
+        print(C101_3_10_assigned._distance_matrix)
 
     # construct initial solution
     C101_3_10_assigned.static_CI_construction(method='cheapest_insertion')

@@ -1,36 +1,41 @@
 from abc import ABC, abstractmethod
-from itertools import islice
 
-from plotting import CarrierConstructionAnimation
 from profiling import Timer
-from tour import Tour
-from utils import opts, path_output, InsertionError
-
-"""Using the 'Strategy Pattern' to implement different routing algorithms."""
+from utils import opts, InsertionError
 
 
-class RoutingStrategy(ABC):
+class RoutingVisitor(ABC):
+    """
+    Visitor Interface to apply a tour construction heuristic to either an instance (i.e. each of its carriers)
+    or a single specific carrier. Contrary to the initializer this visitor will allocate all requests
+    """
 
     def __init__(self, verbose=opts['verbose'], plot_level=opts['plot_level']):
         """
-        Use a static construction method to build tours for all carriers via SEQUENTIAL CHEAPEST INSERTION.
-        (Can also be used for dynamic route construction if the request-to-carrier assignment is known.)
-
         :param verbose:
         :param plot_level:
-        :return:
         """
+
         self.verbose = verbose
         self.plot_level = plot_level
         self._runtime = 0
+        # TODO: add timer for profiling?
 
     @abstractmethod
-    def solve(self, instance) -> Tour:
+    def solve_instance(self, instance):
+        pass
+
+    @abstractmethod
+    def solve_carrier(self, carrier):
+        pass
+
+    @abstractmethod
+    def find_insertion(self, vertex, carrier):
         pass
 
 
-class static_cheapest_insertion_construction(RoutingStrategy):
-    def solve(self, instance) -> Tour:
+class StaticCheapestInsertion(RoutingVisitor):
+    def solve_instance(self, instance):
         """
         Use a static construction method to build tours for all carriers via SEQUENTIAL CHEAPEST INSERTION.
         (Can also be used for dynamic route construction if the request-to-carrier assignment is known.)
@@ -42,43 +47,95 @@ class static_cheapest_insertion_construction(RoutingStrategy):
         timer.start()
 
         for c in instance.carriers:
-            if self.plot_level > 1:
-                ani = CarrierConstructionAnimation(c,
-                                                   f'{instance.id_}{" centralized" if instance.num_carriers == 0 else ""}: '
-                                                   f'Cheapest Insertion construction: {c.id_}')
-
-            # TODO why is this necessary here?  why aren't these things computed already before?
-            c.compute_all_vehicle_cost_and_schedules(instance.dist_matrix)
-
-            # TODO no initialization of vehicle tours is done, while I1 has initialization - is it unfair?
-
-            # construction loop
-            for _ in range(len(c.unrouted)):
-                key, u = c.unrouted.popitem(last=False)  # sequential removal from list of unrouted from first to last
-                vehicle, position, _ = c.find_cheapest_feasible_insertion(u, instance.dist_matrix)
-
-                if self.verbose > 0:
-                    print(f'\tInserting {u.id_} into {c.id_}.{vehicle.tour.id_}')
-                vehicle.tour.insert_and_reset(index=position, vertex=u)
-                vehicle.tour.compute_cost_and_schedules(instance.dist_matrix)
-
-                if self.plot_level > 1:
-                    ani.add_current_frame()
-
-            assert len(c.unrouted) == 0  # just to be completely sure
-
-            if self.plot_level > 1:
-                ani.show()
-                file_name = f'{instance.id_}_{"cen_" if instance.num_carriers == 1 else ""}sta_CI_{c.id_ if instance.num_carriers > 1 else ""}.gif'
-                ani.save(filename=path_output.joinpath('Animations', file_name))
-            if self.verbose > 0:
-                print(f'Total Route cost of carrier {c.id_}: {c.cost()}\n')
+            c.solve(StaticCheapestInsertion(self.verbose, self.plot_level))
 
         timer.stop()
         self._runtime = timer.duration
-        return
+        pass
+
+    def solve_carrier(self, carrier):
+        # if self.plot_level > 1:
+        #     ani = CarrierConstructionAnimation(carrier,
+        #                                        f'{instance.id_}{" centralized" if instance.num_carriers == 0 else ""}: '
+        #                                        f'Cheapest Insertion construction: {carrier.id_}')
+
+        # TODO why is this necessary here?  why aren't these things computed already before?
+        carrier.compute_all_vehicle_cost_and_schedules()
+
+        # construction loop
+        for _ in range(len(carrier.unrouted)):
+            key, vertex = carrier.unrouted.popitem(last=False)  # sequential removal from list of unrouted from first to last
+            vehicle, position, _ = self.find_insertion(vertex, carrier)
+            if self.verbose > 0:
+                print(f'\tInserting {vertex.id_} into {carrier.id_}.{vehicle.tour.id_}')
+            vehicle.tour.insert_and_reset(index=position, vertex=vertex)
+            vehicle.tour.compute_cost_and_schedules()
+
+            # if self.plot_level > 1:
+            #     ani.add_current_frame()
+
+        assert len(carrier.unrouted) == 0  # just to be completely sure
+
+        # if self.plot_level > 1:
+        #     ani.show()
+        #     file_name = f'{instance.id_}_{"cen_" if instance.num_carriers == 1 else ""}sta_CI_{carrier.id_ if instance.num_carriers > 1 else ""}.gif'
+        #     ani.save(filename=path_output.joinpath('Animations', file_name))
+        if self.verbose > 0:
+            print(f'Total Route cost of carrier {carrier.id_}: {carrier.cost()}\n')
+        pass
+
+    def find_insertion(self, vertex, carrier):
+        """
+        Checks EVERY vehicle/tour for a feasible insertion and return the cheapest one
+
+        :param vertex: Vertex to be inserted
+        :param carrier: carrier which shall insert the vertex into his routes
+        :return: triple (vehicle_best, position_best, cost_best) defining the cheapest vehicle/tour, index and
+        associated cost to insert the given vertex u
+        """
+        vehicle_best = None
+        cost_best = float('inf')
+        position_best = None
+        for v in carrier.vehicles:  # check ALL vehicles (also the inactive ones)
+            try:
+                position, cost = v.tour.find_cheapest_feasible_insertion(u=vertex)
+                # TODO tour should not have a find_cheapest_feasible_insertion method! Do i need an InsertionVisitor?
+                if self.verbose > 1:
+                    print(f'\t\tInsertion cost {vertex.id_} -> {v.id_}: {cost}')
+                if cost < cost_best:  # a new cheapest insertion was found -> update the incumbents
+                    vehicle_best = v
+                    cost_best = cost
+                    position_best = position
+            except InsertionError:
+                if self.verbose > 0:
+                    print(f'x\t{vertex.id_} cannot be feasibly inserted into {v.id_}')
+        return vehicle_best, position_best, cost_best
 
 
+class StaticI1Insertion(RoutingVisitor):
+    def find_insertion(self, vertex, carrier):
+        pass
+
+    def solve_instance(self, instance):
+        pass
+
+    def solve_carrier(self, carrier):
+        pass
+
+
+class DynamicInsertion(RoutingVisitor):
+    def find_insertion(self, vertex, carrier):
+        pass
+
+    def solve_instance(self, instance):
+        pass
+
+    def solve_carrier(self, carrier):
+        pass
+
+
+# ========================================================= OLD using strategy
+'''
 class static_I1_construction(RoutingStrategy):
     def solve(self, instance) -> Tour:
         """
@@ -101,23 +158,23 @@ class static_I1_construction(RoutingStrategy):
 
             # TODO why is this necessary here?  why aren't these things computed already before?
             c.compute_all_vehicle_cost_and_schedules(
-                instance.dist_matrix)  # tour empty at this point (depot to depot tour)
+                instance._distance_matrix)  # tour empty at this point (depot to depot tour)
 
             # construction loop
             while any(c.unrouted):
-                u, vehicle, position, _ = c.find_best_feasible_I1_insertion(instance.dist_matrix)
+                u, vehicle, position, _ = c.find_best_feasible_I1_insertion(instance._distance_matrix)
                 if position is not None:  # insert
                     c.unrouted.pop(u.id_)
                     vehicle.tour.insert_and_reset(index=position, vertex=u)
-                    vehicle.tour.compute_cost_and_schedules(instance.dist_matrix)
+                    vehicle.tour.compute_cost_and_schedules(instance._distance_matrix)
                     if self.verbose > 0:
                         print(f'\tInserting {u.id_} into {c.id_}.{vehicle.tour.id_}')
                     if self.plot_level > 1:
                         ani.add_current_frame()
                 else:
                     if any(c.inactive_vehicles):
-                        instance.initialization_strategy
-                        c.initialize_tour(c.inactive_vehicles[0], instance.dist_matrix, self._init_method)
+                        instance.initialization_visitor
+                        c.initialize_tour(c.inactive_vehicles[0], instance._distance_matrix, self._init_method)
                         if self.plot_level > 1:
                             ani.add_current_frame()
                     else:
@@ -193,14 +250,14 @@ class dynamic_construction(RoutingStrategy):
             else:
                 # find cheapest insertion
                 carrier = c
-                vehicle, position, cost = c.find_cheapest_feasible_insertion(u, instance.dist_matrix)
+                vehicle, position, cost = c.find_cheapest_feasible_insertion(u, instance._distance_matrix)
 
             # attempt insertion
             try:
                 if self.verbose > 0:
                     print(f'\tInserting {u.id_} into {carrier.id_}.{vehicle.id_} with cost of {round(cost, 2)}')
                 vehicle.tour.insert_and_reset(position, u)
-                vehicle.tour.compute_cost_and_schedules(instance.dist_matrix)
+                vehicle.tour.compute_cost_and_schedules(instance._distance_matrix)
                 carrier.unrouted.pop(u.id_)  # remove inserted request from unrouted
             except TypeError:
                 raise InsertionError('', f"Cannot insert {u} feasibly into {carrier.id_}.{vehicle.id_}")
@@ -208,3 +265,4 @@ class dynamic_construction(RoutingStrategy):
         timer.stop()
         self._runtime = timer.duration
         return
+'''

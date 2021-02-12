@@ -5,14 +5,17 @@ import pandas as pd
 from tqdm import tqdm
 
 import instance as it
-from solution_strategies import routing_strategy as rs, local_search_strategy as lss
+from solution_visitors.initialization_visitor import InitializationVisitor
+from solution_visitors.local_search_visitor import FinalizingVisitor
+from solution_visitors.routing_visitor import RoutingVisitor
 from utils import path_input_custom, path_output_custom
 
 
 # TODO: describe what this file is for and how it works exactly
 
 
-def execute_all_routing_strategies(base_instance: it.Instance, centralized_flag: bool, two_opt_flag: bool, two_opt_only_flag: bool):
+def execute_all_routing_strategies(base_instance: it.Instance, centralized_flag: bool, two_opt_flag: bool,
+                                   two_opt_only_flag: bool):
     """
     :param base_instance: (custom) instance that will we (deep)copied for each algorithm
     :param centralized_flag: TRUE if also a central (a single central carrier) instance (deep)copy shall be created
@@ -22,16 +25,12 @@ def execute_all_routing_strategies(base_instance: it.Instance, centralized_flag:
     results = []
 
     # non-centralized instances
-    for strategy in [rs.static_cheapest_insertion_construction, rs.static_I1_construction, rs.dynamic_construction]:
-        base_instance.routing_strategy = strategy()
-        base_instance.solve()
-        base_instance.write_solution_to_json()
-        results.append(base_instance.evaluation_metrics)
-        if two_opt_flag:
-            base_instance.local_search_strategy = lss.TwoOpt()
-            base_instance.finalize()    # TODO adjust phrasing: finalizing vs. optimizing vs. local_search
-            base_instance.write_solution_to_json()
-            results.append(base_instance.evaluation_metrics)
+    for init_visitor in InitializationVisitor.__subclasses__():
+        base_instance.initialize(init_visitor(5))
+        for routing_visitor in RoutingVisitor.__subclasses__():
+            base_instance.solve(routing_visitor(1))
+            for local_search_visitor in FinalizingVisitor.__subclasses__():
+                base_instance.finalize(local_search_visitor())
 
 
 
@@ -77,6 +76,7 @@ def execute_all_routing_strategies(base_instance: it.Instance, centralized_flag:
 
 def multi_func(solomon, num_of_inst):
     """
+    splits different instances to multiple threads/cores
     for the first num_of_inst custom instances that exists in the solomon type folder, this function runs all available
     algorithms to solve each of these instances. The results are collected, transformed into a pd.DataFrame and saved as
     .csv
@@ -95,7 +95,8 @@ def multi_func(solomon, num_of_inst):
         path = directory.joinpath(inst_path)
         base_instance = it.read_custom_json_instance(path)
         results = execute_all_routing_strategies(base_instance,
-                                                 centralized_flag, True, False)  # TODO: extract the creation of the eval.csv file!!
+                                                 centralized_flag, True,
+                                                 False)  # TODO: extract the creation of the eval.csv file!!
         solomon_base_results.extend(results)
         centralized_flag = False
 

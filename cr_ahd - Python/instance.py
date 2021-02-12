@@ -14,14 +14,15 @@ from tqdm import tqdm
 import carrier as cr
 import vehicle as vh
 import vertex as vx
-from solution_strategies.initialization_strategy import RouteInitializationStrategy
-from solution_strategies.local_search_strategy import LocalSearchStrategy
-from solution_strategies.routing_strategy import RoutingStrategy
+from Optimizable import Optimizable
+from solution_visitors.initialization_visitor import InitializationVisitor
+from solution_visitors.local_search_visitor import FinalizingVisitor
+from solution_visitors.routing_visitor import RoutingVisitor
 from utils import split_iterable, make_dist_matrix, opts, Solomon_Instances, path_input_custom, \
     path_input_solomon, unique_path, path_output_custom
 
 
-class Instance(object):
+class Instance(Optimizable):
     def __init__(self, id_: str, requests: List[vx.Vertex], carriers: List[cr.Carrier],
                  dist_matrix: pd.DataFrame = None):
         """
@@ -39,18 +40,27 @@ class Instance(object):
         self.requests = requests
         self.carriers = carriers
         if dist_matrix is not None:
-            self.dist_matrix = dist_matrix
+            self._distance_matrix = dist_matrix
         else:
-            self.dist_matrix = make_dist_matrix([*self.requests, *[c.depot for c in self.carriers]])
+            self._distance_matrix = make_dist_matrix([*self.requests, *[c.depot for c in self.carriers]])
+
         self._initialized = False
         self._solved = False
         self._finalized = False
-        self._initialization_strategy: RouteInitializationStrategy = None
-        self._routing_strategy: RoutingStrategy = None
-        self._finalizing_strategy: LocalSearchStrategy = None
+        self._initialization_visitor: InitializationVisitor = None
+        self._routing_visitor: RoutingVisitor = None
+        self._finalizing_visitor: FinalizingVisitor = None
 
     def __str__(self):
         return f'{"Solved " if self._solved else ""}Instance {self.id_} with {len(self.requests)} customers and {len(self.carriers)} carriers'
+
+    @property
+    def distance_matrix(self):
+        return self._distance_matrix
+
+    @distance_matrix.setter
+    def distance_matrix(self, dist_matrix):
+        self._distance_matrix = dist_matrix
 
     @property
     def solomon_base(self):
@@ -73,42 +83,43 @@ class Instance(object):
         return len(self.requests)
 
     @property
-    def initialization_strategy(self):
+    def initialization_visitor(self):
         """route initialization strategy to create (preliminary) pendulum tours"""
-        return self._initialization_strategy
+        return self._initialization_visitor
 
-    @initialization_strategy.setter
-    def initialization_strategy(self, strategy):
-        """Setter for the pendulum tour initialization strategy"""
+    @initialization_visitor.setter
+    def initialization_visitor(self, visitor):
+        """Setter for the pendulum tour initialization strategy. Will set the given visitor also for all carriers and
+        their vehicles """
         assert (
-            not self._initialized), f"Instance's tours have been initialized with strategy {self._initialization_strategy.__class__.__name__} already!"
-        self._initialization_strategy = strategy
+            not self._initialized), f"Instance's tours have been initialized with strategy {self._initialization_visitor.__class__.__name__} already!"
+        self._initialization_visitor = visitor
         for c in self.carriers:
-            c.initialization_strategy = strategy    # TODO this won't work
+            c.initialization_visitor = visitor
 
     @property
-    def routing_strategy(self):
+    def routing_visitor(self):
         """The algorithm to solve the routing problem"""
-        return self._routing_strategy
+        return self._routing_visitor
 
-    @routing_strategy.setter
-    def routing_strategy(self, strategy):
+    @routing_visitor.setter
+    def routing_visitor(self, visitor):
         """Setter for the routing  algorithm"""
         assert (
-            not self._solved), f"Instance has been solved with strategy {self._routing_strategy.__class__.__name__} already!"
-        self._routing_strategy = strategy
+            not self._solved), f"Instance has been solved with visitor {self._routing_visitor.__class__.__name__} already!"
+        self._routing_visitor = visitor
 
     @property
-    def local_search_strategy(self):
+    def finalizing_visitor(self):
         """the finalizer local search optimization, such as 2opt or 3opt"""
-        return self._finalizing_strategy
+        return self._finalizing_visitor
 
-    @local_search_strategy.setter
-    def local_search_strategy(self, strategy):
+    @finalizing_visitor.setter
+    def finalizing_visitor(self, visitor):
         """Setter for the local search algorithm that can be used to finalize the results"""
         assert (
-            not self._finalized), f"Instance has been finalized with strategy {self._finalizing_strategy.__class__.__name__} already!"
-        self._finalizing_strategy = strategy
+            not self._finalized), f"Instance has been finalized with visitor {self._finalizing_visitor.__class__.__name__} already!"
+        self._finalizing_visitor = visitor
 
     @property
     def cost(self):
@@ -202,13 +213,13 @@ class Instance(object):
                     cost=self.cost,
                     revenue=self.revenue,
                     profit=self.profit,
-                    initialization_strategy=self.initialization_strategy.__class__.__name__,
+                    initialization_strategy=self.initialization_visitor.__class__.__name__,
                     initialized=self._initialized,
-                    routing_strategy=self._routing_strategy.__class__.__name__,
+                    routing_strategy=self._routing_visitor.__class__.__name__,
                     solved=self._solved,
-                    finalizing_strategy=self._finalizing_strategy.__class__.__name__,
+                    finalizing_strategy=self._finalizing_visitor.__class__.__name__,
                     finalized=self._finalized,
-                    runtime=self._routing_strategy._runtime,
+                    runtime=self._routing_visitor._runtime,
                     **self.num_act_veh_per_carrier,
                     **self.num_requests_per_carrier,
                     **self.cost_per_carrier,
@@ -221,7 +232,7 @@ class Instance(object):
             'id_': self.id_,
             'requests': [r.to_dict() for r in self.requests],
             'carriers': [c.to_dict() for c in self.carriers],
-            'dist_matrix': self.dist_matrix.to_dict()
+            'dist_matrix': self._distance_matrix.to_dict()
         }
 
     def _assign_all_requests_randomly(self):
@@ -230,87 +241,35 @@ class Instance(object):
         stored in there already and should be retained to ensure comparability between methods, even dynamic methods.
         """
 
-        raise UserWarning('Only call this method for constructing new instances & writing them to disk.')
+        # raise UserWarning('Only call this method for constructing new instances & writing them to disk.')
         assert not self._solved, f'Instance {self} has already been solved'
         # np.random.seed(0)
         for r in self.requests:
             c = self.carriers[np.random.choice(range(len(self.carriers)))]
             c.assign_request(r)
 
-    def initialize(self):
+    def initialize(self, visitor: InitializationVisitor):
         assert (not self._initialized), \
-            f'Instance has been initialized with strategy {self._initialization_strategy.__class__.__name__} already!'
-        self._initialization_strategy.initialize(self)
+            f'Instance has been initialized with strategy {self._initialization_visitor} already!'
+        visitor.initialize_instance(self)
+        self._initialization_visitor = visitor.__class__.__name__
         self._initialized = True
 
-    def solve(self):
+    def solve(self, visitor: RoutingVisitor):
         assert (not self._solved), \
-            f'Instance has been solved with strategy {self._routing_strategy.__class__.__name__} already!'
-        self._routing_strategy.solve(self)
+            f'Instance has been solved with strategy {self._routing_visitor} already!'
+        visitor.solve_instance(self)
+        self._routing_visitor = visitor.__class__.__name__
         self._solved = True
+        pass
 
-    def finalize(self):
+    def finalize(self, visitor: FinalizingVisitor):
         assert (not self._finalized), \
-            f'Instance has been finalized with strategy {self._finalizing_strategy.__class__.__name__} already!'
-        self._finalizing_strategy.optimize(self)
+            f'Instance has been finalized with strategy {self._finalizing_visitor.__class__.__name__} already!'
+        self._finalizing_visitor = visitor.__class__.__name__
+        visitor.finalize_instance(self)
         self._finalized = True
-
-    ''' HAS BEEN MOVED TO routing_strategy
-    def static_CI_construction(self,
-                               verbose: int = opts['verbose'],
-                               plot_level: int = opts['plot_level']):
-        """
-        Use a static construction method to build tours for all carriers via SEQUENTIAL CHEAPEST INSERTION.
-        (Can also be used for dynamic route construction if the request-to-carrier assignment is known.)
-
-        :param verbose:
-        :param plot_level:
-        :return:
-        """
-        assert not self._solved, f'Instance {self} has already been solved'
-        if verbose > 0:
-            print(f'STATIC Cheapest Insertion Construction for {self}:')
-        timer = Timer()
-        timer.start()
-
-        for c in self.carriers:
-            if plot_level > 1:
-                ani = CarrierConstructionAnimation(c, f'{self.id_}{" centralized" if self.num_carriers == 0 else ""}: '
-                                                      f'Cheapest Insertion construction: {c.id_}')
-
-            # TODO why is this necessary here?  why aren't these things computed already before?
-            c.compute_all_vehicle_cost_and_schedules(self.dist_matrix)
-
-            # TODO no initialization of vehicle tours is done, while I1 has initialization - is it unfair?
-
-            # construction loop
-            for _ in range(len(c.unrouted)):
-                key, u = c.unrouted.popitem(last=False)  # sequential removal from list of unrouted from first to last
-                vehicle, position, _ = c.find_cheapest_feasible_insertion(u, self.dist_matrix)
-
-                if verbose > 0:
-                    print(f'\tInserting {u.id_} into {c.id_}.{vehicle.tour.id_}')
-                vehicle.tour.insert_and_reset(index=position, vertex=u)
-                vehicle.tour.compute_cost_and_schedules(self.dist_matrix)
-
-                if plot_level > 1:
-                    ani.add_current_frame()
-
-            assert len(c.unrouted) == 0  # just to be completely sure
-
-            if plot_level > 1:
-                ani.show()
-                file_name = f'{self.id_}_{"cen_" if self.num_carriers == 1 else ""}sta_CI_{c.id_ if self.num_carriers > 1 else ""}.gif'
-                ani.save(filename=path_output.joinpath('Animations', file_name))
-            if verbose > 0:
-                print(f'Total Route cost of carrier {c.id_}: {c.cost()}\n')
-
-        timer.stop()
-        self._runtime = timer.duration
-        self._solved = True
-        self.routing_strategy = f'{"cen_" if self.num_carriers == 1 else ""}sta_CI'
-        return
-    '''
+        pass
 
     '''
     def static_I1_construction(self,
@@ -391,7 +350,7 @@ class Instance(object):
             print(f'{request.id_} is originally assigned to {initial_carrier.id_}')
             print(f'Checking profitability of {request.id_} for {initial_carrier.id_}')
         vehicle_best, position_best, cost_best = initial_carrier.find_cheapest_feasible_insertion(request,
-                                                                                                  self.dist_matrix)
+                                                                                                  self._distance_matrix)
         carrier_best = initial_carrier
         # auction: determine and return the collaborator with the cheapest
         # insertion cost
@@ -404,7 +363,7 @@ class Instance(object):
                 else:
                     if verbose > 0:
                         print(f'Checking profitability of {request.id_} for {carrier.id_}')
-                    vehicle, position, cost = carrier.find_cheapest_feasible_insertion(request, self.dist_matrix)
+                    vehicle, position, cost = carrier.find_cheapest_feasible_insertion(request, self._distance_matrix)
                     if cost < cost_best:
                         carrier_best = carrier
                         vehicle_best = vehicle
@@ -497,20 +456,6 @@ class Instance(object):
         for c in self.carriers:
             c.determine_auction_set()
 
-    '''
-    def two_opt(self):
-        """
-        Improve the current solution with a 2-opt local search as in
-        G. A. Croes, A method for solving traveling salesman problems. Operations Res. 6 (1958)
-        """
-
-        # print(f'Before 2-opt: {self.cost_per_carrier}')
-        for c in self.carriers:
-            c.two_opt(self.dist_matrix)
-        # print(f'After 2-opt: {self.cost_per_carrier}')
-        self.routing_strategy += '_2opt'
-    '''
-
     def to_centralized(self, depot_xy: tuple):
         """
         Convert the instance to a centralized instance, i.e. this function returns the same instance but with only a
@@ -590,7 +535,7 @@ class Instance(object):
         assert self._solved
 
         file_name = path_output_custom.joinpath(self.solomon_base,
-                                                f'{self.id_}_{self._routing_strategy.__class__.__name__}_solution')
+                                                f'{self.id_}_{self._routing_visitor.__class__.__name__}_solution')
         file_name = file_name.with_suffix('.json')
         file_name.parent.mkdir(parents=True, exist_ok=True)
 
@@ -762,16 +707,15 @@ def read_custom_json_instance(path: Path):
         json_data = json.load(reader_file)
     requests = [vx.Vertex(**r_dict) for r_dict in json_data['requests']]
     carriers = []
+    dist_matrix = pd.DataFrame.from_dict(json_data['dist_matrix'])
     for c_dict in json_data['carriers']:
         depot = vx.Vertex(**c_dict['depot'])
         vehicles = [vh.Vehicle(**v_dict) for v_dict in c_dict['vehicles']]
         assigned_requests = {r_dict['id_']: vx.Vertex(**r_dict) for r_dict in c_dict['requests']}
-        c = cr.Carrier(c_dict['id_'], depot, vehicles, requests=assigned_requests, unrouted=assigned_requests)
+        c = cr.Carrier(c_dict['id_'], depot, vehicles, requests=assigned_requests, unrouted=assigned_requests,
+                       dist_matrix=dist_matrix)
         carriers.append(c)
-    dist_matrix = pd.DataFrame.from_dict(json_data['dist_matrix'])
-    _, name = os.path.split(path)
-    name = name.split(sep='.')[0]
-    inst = Instance(name, requests, carriers, dist_matrix)
+    inst = Instance(path.stem, requests, carriers, dist_matrix)
     return inst
 
 
