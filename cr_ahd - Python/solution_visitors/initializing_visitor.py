@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from utils import opts, InsertionError
 
 
-class InitializationVisitor(ABC):
+class InitializingVisitor(ABC):
     """
     Visitor Interface to apply a tour initialization heuristic to either an instance (i.e. each of its carriers)
     or a single specific carrier. Contrary to the routing visitor, this one will only allocate a single seed request
@@ -28,21 +28,20 @@ class InitializationVisitor(ABC):
     def initialize_carrier(self, carrier):
         pass
 
-    @abstractmethod
-    def initialize_vehicle(self, vehicle):
-        pass
+    # a method initialize_tour (or initialize_vehicle) is not required as the initialization on a tour-level does not
+    # depend on the visitor, i.e. on the initialization strategy: the tour cannot distinguish between earliest due
+    # date or furthest distance as it does not have access to the vertex information that shall be inserted
 
     @abstractmethod
     def find_seed_request(self, carrier):
         pass
 
 
-class EarliestDueDate(InitializationVisitor):
+class EarliestDueDate(InitializingVisitor):
     """
     Visitor for building a pendulum tour for
     a) every carrier's first inactive vehicle
     b) a unique carrier's first inactive vehicle
-    c) a unique inactive vehicle
     by finding the vertex with earliest due date
     """
 
@@ -57,6 +56,7 @@ class EarliestDueDate(InitializationVisitor):
     def initialize_instance(self, instance):
         for c in instance.carriers:
             c.initialize(EarliestDueDate(self.verbose, self.plot_level))
+        instance._initialized = True
         return
 
     def initialize_carrier(self, carrier):
@@ -65,17 +65,14 @@ class EarliestDueDate(InitializationVisitor):
         if len(carrier.unrouted) > 0:
             # find request with earliest deadline and initialize pendulum tour
             seed = self.find_seed_request(carrier)
+
             vehicle.tour.insert_and_reset(index=1, vertex=seed)
             if vehicle.tour.is_feasible():
                 vehicle.tour.compute_cost_and_schedules()
                 carrier.unrouted.pop(seed.id_)
             else:
                 raise InsertionError('', f'Seed request {seed} cannot be inserted feasibly into {vehicle}')
-        pass
-
-    def initialize_vehicle(self, vehicle):
-        # will be tricky because we need access to the carrier's requests. But maybe this one won't even be necessary
-        # in the end
+        carrier._initialized = True
         pass
 
 
@@ -91,10 +88,6 @@ class FurthestDistance(InitializationVisitor):
         pass
 
     def initialize_carrier(self, carrier):
-        raise NotImplementedError
-        pass
-
-    def initialize_vehicle(self, vehicle):
         raise NotImplementedError
         pass
 """

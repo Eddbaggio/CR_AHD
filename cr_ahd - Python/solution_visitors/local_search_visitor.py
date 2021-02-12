@@ -40,13 +40,16 @@ class TwoOpt(FinalizingVisitor):
     def finalize_instance(self, instance):
         for carrier in instance.carriers:
             carrier.finalize(TwoOpt(self.verbose, self.plot_level))
-            carrier._finalized = True
+        instance._finalized = True
         pass
 
     def finalize_carrier(self, carrier):
         """Applies the 2-Opt local search operator to all vehicles/tours"""
+        if self.verbose > 0:
+            print(f'2-opt finalizing for {carrier}')
         for vehicle in carrier.active_vehicles:
             vehicle.tour.finalize(TwoOpt(self.verbose, self.plot_level))
+        carrier._finalized = True
         pass
 
     def finalize_tour(self, tour):
@@ -67,14 +70,24 @@ class TwoOpt(FinalizingVisitor):
                         best = new_tour
                         improved = True
                         if self.verbose > 0:
-                            print(f'2-opt swapped {new_tour.sequence[i]} and {new_tour.sequence[j]}')
+                            print(f'{tour.id_}: 2-opt swapped {new_tour.sequence[i]} and {new_tour.sequence[j]}')
 
         # replace tour's information with best's information
         tour.reset_cost_and_schedules()
         tour.copy_cost_and_schedules(best)
-        return
+        tour._finalized = True
+        pass
 
 
-# class Exchange(FinalizationVisitor):
+# class Swap(FinalizationVisitor):
 #     pass
 
+class NoLocalSearch(FinalizingVisitor):
+    def finalize_instance(self, instance):
+        pass
+
+    def finalize_carrier(self, carrier):
+        pass
+
+    def finalize_tour(self, tour):
+        pass

@@ -29,9 +29,9 @@ class RoutingVisitor(ABC):
     def solve_carrier(self, carrier):
         pass
 
-    @abstractmethod
-    def find_insertion(self, vertex, carrier):
-        pass
+    # @abstractmethod
+    # def find_insertion(self, vertex, carrier):
+    #     pass
 
 
 class StaticCheapestInsertion(RoutingVisitor):
@@ -51,6 +51,7 @@ class StaticCheapestInsertion(RoutingVisitor):
 
         timer.stop()
         self._runtime = timer.duration
+        instance._solved = True
         pass
 
     def solve_carrier(self, carrier):
@@ -64,7 +65,8 @@ class StaticCheapestInsertion(RoutingVisitor):
 
         # construction loop
         for _ in range(len(carrier.unrouted)):
-            key, vertex = carrier.unrouted.popitem(last=False)  # sequential removal from list of unrouted from first to last
+            key, vertex = carrier.unrouted.popitem(
+                last=False)  # sequential removal from list of unrouted from first to last
             vehicle, position, _ = self.find_insertion(vertex, carrier)
             if self.verbose > 0:
                 print(f'\tInserting {vertex.id_} into {carrier.id_}.{vehicle.tour.id_}')
@@ -113,25 +115,101 @@ class StaticCheapestInsertion(RoutingVisitor):
 
 
 class StaticI1Insertion(RoutingVisitor):
-    def find_insertion(self, vertex, carrier):
-        pass
+    def find_insertion(self, carrier):
+        """
+        Find the next optimal Vertex and its optimal insertion position based on the I1 insertion scheme.
+        :return: Tuple(u_best, vehicle_best, rho_best, max_c2)
+        """
+
+        vehicle_best = None
+        rho_best = None
+        u_best = None
+        max_c2 = float('-inf')
+
+        for _, u in carrier.unrouted.items():  # take the unrouted requests
+            for vehicle in carrier.active_vehicles:  # check first the vehicles that are active (to avoid small tours)
+                rho, c2 = vehicle.tour.find_best_feasible_I1_insertion(
+                    u)  # TODO method must be moved from tour class to (the tour's?) visitor!
+                if c2 > max_c2:
+                    if self.verbose > 1:
+                        print(f'^ is the new best c2')
+                    vehicle_best = vehicle
+                    rho_best = rho
+                    u_best = u
+                    max_c2 = c2
+
+        return u_best, vehicle_best, rho_best, max_c2
 
     def solve_instance(self, instance):
+        """
+        Use the I1 construction method (Solomon 1987) to build tours for all carriers.
+        """
+        assert not instance._solved, f'Instance {instance} has already been solved'
+        # ensure that tours have been initialized as is done in the original I1 algorithm
+        assert instance._initialized, f'Tours must be initialized before solving with I1'
+
+        if self.verbose > 0:
+            print(f'STATIC I1 Construction for {instance}:')
+        timer = Timer()
+        timer.start()
+
+        for carrier in instance.carriers:
+            # if self.plot_level > 1:
+            #     ani = CarrierConstructionAnimation(
+            #         carrier,
+            #         f"{instance.id_}{' centralized' if instance.num_carriers == 0 else ''}: Solomon's I1 construction: {carrier.id_}")
+
+            carrier.solve(StaticI1Insertion(self.verbose, self.plot_level))
+
+        timer.stop()
+        self._runtime = timer.duration
+        instance._solved = True
         pass
 
     def solve_carrier(self, carrier):
+        # TODO why is this necessary here?  why aren't these things computed already before?
+        carrier.compute_all_vehicle_cost_and_schedules()  # tour empty at this point (depot to depot tour)
+
+        # construction loop
+        while any(carrier.unrouted):
+            u, vehicle, position, _ = self.find_insertion(carrier)
+            if position is not None:  # insert
+                carrier.unrouted.pop(u.id_)
+                vehicle.tour.insert_and_reset(index=position, vertex=u)
+                vehicle.tour.compute_cost_and_schedules()
+                if self.verbose > 0:
+                    print(f'\tInserting {u.id_} into {carrier.id_}.{vehicle.tour.id_}')
+                # if self.plot_level > 1:
+                #     ani.add_current_frame()
+            else:  # no feasible insertion exists for the vehicles that are active already
+                if any(carrier.inactive_vehicles):
+                    carrier.initialize_another_tour()
+                    # if self.plot_level > 1:
+                    #     ani.add_current_frame()
+                else:
+                    InsertionError('', 'No more vehicles available')
+
+        assert len(carrier.unrouted) == 0  # just to be on the safe side
+
+        # if self.plot_level > 1:
+        #     ani.show()
+        #     ani.save(
+        #         filename=f'.{path_output}/Animations/{instance.id_}_{"cen_" if instance.num_carriers == 1 else ""}sta_I1_{carrier.id_ if instance.num_carriers > 1 else ""}.gif')
+        if self.verbose > 0:
+            print(f'Total Route cost of carrier {carrier.id_}: {carrier.cost()}\n')
+        carrier._solved = True
         pass
 
 
-class DynamicInsertion(RoutingVisitor):
-    def find_insertion(self, vertex, carrier):
-        pass
-
-    def solve_instance(self, instance):
-        pass
-
-    def solve_carrier(self, carrier):
-        pass
+# class DynamicInsertion(RoutingVisitor):
+#     def find_insertion(self, vertex, carrier):
+#         pass
+#
+#     def solve_instance(self, instance):
+#         pass
+#
+#     def solve_carrier(self, carrier):
+#         pass
 
 
 # ========================================================= OLD using strategy
@@ -173,7 +251,7 @@ class static_I1_construction(RoutingStrategy):
                         ani.add_current_frame()
                 else:
                     if any(c.inactive_vehicles):
-                        instance.initialization_visitor
+                        instance.initializing_visitor
                         c.initialize_tour(c.inactive_vehicles[0], instance._distance_matrix, self._init_method)
                         if self.plot_level > 1:
                             ani.add_current_frame()
@@ -191,9 +269,10 @@ class static_I1_construction(RoutingStrategy):
 
         timer.stop()
         self._runtime = timer.duration
-        return
+        return'''
 
 
+'''
 class dynamic_construction(RoutingStrategy):
     def __init__(self, with_auction: bool = True, verbose=opts['verbose'], plot_level=opts['plot_level']):
         super().__init__(verbose=opts['verbose'], plot_level=opts['plot_level'])

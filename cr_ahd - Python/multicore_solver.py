@@ -1,11 +1,12 @@
 import multiprocessing
 import os
+from copy import deepcopy
 
 import pandas as pd
 from tqdm import tqdm
 
 import instance as it
-from solution_visitors.initialization_visitor import InitializationVisitor
+from solution_visitors.initializing_visitor import InitializingVisitor
 from solution_visitors.local_search_visitor import FinalizingVisitor
 from solution_visitors.routing_visitor import RoutingVisitor
 from utils import path_input_custom, path_output_custom
@@ -14,8 +15,7 @@ from utils import path_input_custom, path_output_custom
 # TODO: describe what this file is for and how it works exactly
 
 
-def execute_all_routing_strategies(base_instance: it.Instance, centralized_flag: bool, two_opt_flag: bool,
-                                   two_opt_only_flag: bool):
+def execute_all_routing_strategies(base_instance: it.Instance, centralized_flag: bool):
     """
     :param base_instance: (custom) instance that will we (deep)copied for each algorithm
     :param centralized_flag: TRUE if also a central (a single central carrier) instance (deep)copy shall be created
@@ -25,12 +25,23 @@ def execute_all_routing_strategies(base_instance: it.Instance, centralized_flag:
     results = []
 
     # non-centralized instances
-    for init_visitor in InitializationVisitor.__subclasses__():
-        base_instance.initialize(init_visitor(5))
+    for init_visitor in InitializingVisitor.__subclasses__():
         for routing_visitor in RoutingVisitor.__subclasses__():
-            base_instance.solve(routing_visitor(1))
             for local_search_visitor in FinalizingVisitor.__subclasses__():
-                base_instance.finalize(local_search_visitor())
+                copy = deepcopy(base_instance)
+                copy.initialize(init_visitor(2))
+                copy.solve(routing_visitor(1))
+                copy.finalize(local_search_visitor(2))
+                results.append(copy.evaluation_metrics)
+
+    # for r in results:
+    #     for k, v in r.items():
+    #         print(f'{k}:\t {v}')
+    #
+    # print()
+
+
+
 
 
 

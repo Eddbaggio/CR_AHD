@@ -15,7 +15,7 @@ import carrier as cr
 import vehicle as vh
 import vertex as vx
 from Optimizable import Optimizable
-from solution_visitors.initialization_visitor import InitializationVisitor
+from solution_visitors.initializing_visitor import InitializingVisitor
 from solution_visitors.local_search_visitor import FinalizingVisitor
 from solution_visitors.routing_visitor import RoutingVisitor
 from utils import split_iterable, make_dist_matrix, opts, Solomon_Instances, path_input_custom, \
@@ -47,7 +47,7 @@ class Instance(Optimizable):
         self._initialized = False
         self._solved = False
         self._finalized = False
-        self._initialization_visitor: InitializationVisitor = None
+        self._initializing_visitor: InitializingVisitor = None
         self._routing_visitor: RoutingVisitor = None
         self._finalizing_visitor: FinalizingVisitor = None
 
@@ -83,19 +83,19 @@ class Instance(Optimizable):
         return len(self.requests)
 
     @property
-    def initialization_visitor(self):
+    def initializing_visitor(self):
         """route initialization strategy to create (preliminary) pendulum tours"""
-        return self._initialization_visitor
+        return self._initializing_visitor
 
-    @initialization_visitor.setter
-    def initialization_visitor(self, visitor):
+    @initializing_visitor.setter
+    def initializing_visitor(self, visitor):
         """Setter for the pendulum tour initialization strategy. Will set the given visitor also for all carriers and
         their vehicles """
         assert (
-            not self._initialized), f"Instance's tours have been initialized with strategy {self._initialization_visitor.__class__.__name__} already!"
-        self._initialization_visitor = visitor
+            not self._initialized), f"Instance's tours have been initialized with strategy {self._initializing_visitor.__class__.__name__} already!"
+        self._initializing_visitor = visitor
         for c in self.carriers:
-            c.initialization_visitor = visitor
+            c.initializing_visitor = visitor
 
     @property
     def routing_visitor(self):
@@ -213,13 +213,13 @@ class Instance(Optimizable):
                     cost=self.cost,
                     revenue=self.revenue,
                     profit=self.profit,
-                    initialization_strategy=self.initialization_visitor.__class__.__name__,
+                    initialization_strategy=self.initializing_visitor.__class__.__name__,
                     initialized=self._initialized,
                     routing_strategy=self._routing_visitor.__class__.__name__,
                     solved=self._solved,
                     finalizing_strategy=self._finalizing_visitor.__class__.__name__,
                     finalized=self._finalized,
-                    runtime=self._routing_visitor._runtime,
+                    # runtime=self._runtime,
                     **self.num_act_veh_per_carrier,
                     **self.num_requests_per_carrier,
                     **self.cost_per_carrier,
@@ -248,94 +248,33 @@ class Instance(Optimizable):
             c = self.carriers[np.random.choice(range(len(self.carriers)))]
             c.assign_request(r)
 
-    def initialize(self, visitor: InitializationVisitor):
+    def initialize(self, visitor: InitializingVisitor):
+        """apply visitor's route initialization procedure to create pendulum tour for each carrier"""
         assert (not self._initialized), \
-            f'Instance has been initialized with strategy {self._initialization_visitor} already!'
+            f'Instance has been initialized with strategy {self._initializing_visitor} already!'
+        self._initializing_visitor = visitor
         visitor.initialize_instance(self)
-        self._initialization_visitor = visitor.__class__.__name__
-        self._initialized = True
+        pass
 
     def solve(self, visitor: RoutingVisitor):
+        """apply visitor's routing procedure to built routes for all carriers"""
         assert (not self._solved), \
             f'Instance has been solved with strategy {self._routing_visitor} already!'
+        self._routing_visitor = visitor
         visitor.solve_instance(self)
-        self._routing_visitor = visitor.__class__.__name__
-        self._solved = True
         pass
 
     def finalize(self, visitor: FinalizingVisitor):
+        """apply visitor's local search procedure to improve the result after the routing itself has been done"""
         assert (not self._finalized), \
-            f'Instance has been finalized with strategy {self._finalizing_visitor.__class__.__name__} already!'
-        self._finalizing_visitor = visitor.__class__.__name__
+            f'Instance has been finalized with strategy {self._finalizing_visitor} already!'
+        self._finalizing_visitor = visitor
         visitor.finalize_instance(self)
-        self._finalized = True
         pass
 
-    '''
-    def static_I1_construction(self,
-                               init_method: str = 'earliest_due_date',
-                               verbose: int = opts['verbose'],
-                               plot_level: int = opts['plot_level']):
-        """
-        Use the I1 construction method (Solomon 1987) to build tours for all carriers.
-
-        :param init_method: pendulum tours are created if necessary. 'earliest_due_date' or 'furthest_distance' methods are available
-        :param verbose:
-        :param plot_level:
-        :return:
-        """
-        assert not self._solved, f'Instance {self} has already been solved'
-        if verbose > 0:
-            print(f'STATIC I1 Construction for {self}:')
-        timer = Timer()
-        timer.start()
-
-        for c in self.carriers:
-            if plot_level > 1:
-                ani = CarrierConstructionAnimation(
-                    c,
-                    f"{self.id_}{' centralized' if self.num_carriers == 0 else ''}: Solomon's I1 construction: {c.id_}")
-
-            # TODO why is this necessary here?  why aren't these things computed already before?
-            c.compute_all_vehicle_cost_and_schedules(self.dist_matrix)  # tour empty at this point (depot to depot tour)
-
-            # initialize one tour to begin with
-            c.initialize_tour(c.inactive_vehicles[0], self.dist_matrix, init_method)
-
-            # construction loop
-            while any(c.unrouted):
-                u, vehicle, position, _ = c.find_best_feasible_I1_insertion(self.dist_matrix)
-                if position is not None:  # insert
-                    c.unrouted.pop(u.id_)
-                    vehicle.tour.insert_and_reset(index=position, vertex=u)
-                    vehicle.tour.compute_cost_and_schedules(self.dist_matrix)
-                    if verbose > 0:
-                        print(f'\tInserting {u.id_} into {c.id_}.{vehicle.tour.id_}')
-                    if plot_level > 1:
-                        ani.add_current_frame()
-                else:
-                    if any(c.inactive_vehicles):
-                        c.initialize_tour(c.inactive_vehicles[0], self.dist_matrix, init_method)
-                        if plot_level > 1:
-                            ani.add_current_frame()
-                    else:
-                        InsertionError('', 'No more vehicles available')
-
-            assert len(c.unrouted) == 0  # just to be on the safe side
-
-            if plot_level > 1:
-                ani.show()
-                ani.save(
-                    filename=f'.{path_output}/Animations/{self.id_}_{"cen_" if self.num_carriers == 1 else ""}sta_I1_{c.id_ if self.num_carriers > 1 else ""}.gif')
-            if verbose > 0:
-                print(f'Total Route cost of carrier {c.id_}: {c.cost()}\n')
-
-        timer.stop()
-        self._runtime = timer.duration
-        self._solved = True
-        self.routing_strategy = f'{"cen_" if self.num_carriers == 1 else ""}sta_I1'
-        return
-    '''
+    def reset_solution(self):
+        for carrier in self.carriers:
+            carrier.reset_solution()
 
     def cheapest_insertion_auction(self, request: vx.Vertex, initial_carrier: cr.Carrier, verbose=opts['verbose'], ):
         """

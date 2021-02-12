@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import vehicle as vh
 import vertex as vx
 from Optimizable import Optimizable
-from solution_visitors.initialization_visitor import InitializationVisitor
+from solution_visitors.initializing_visitor import InitializingVisitor
 from solution_visitors.local_search_visitor import FinalizingVisitor
 from solution_visitors.routing_visitor import RoutingVisitor
 from tour import Tour
@@ -47,7 +47,7 @@ class Carrier(Optimizable):
         for v in vehicles:
             v.tour = Tour(id_=v.id_, sequence=[self.depot, self.depot], distance_matrix=dist_matrix)
         self._distance_matrix = dist_matrix
-        self._initialization_visitor: InitializationVisitor = None
+        self._initializing_visitor: InitializingVisitor = None
         self._initialized = False
         self._routing_visitor: RoutingVisitor = None
         self._solved = False
@@ -95,13 +95,13 @@ class Carrier(Optimizable):
         return [v for v in self.vehicles if not v.is_active]
 
     @property
-    def initialization_visitor(self):
-        return self._initialization_visitor
+    def initializing_visitor(self):
+        return self._initializing_visitor
 
-    @initialization_visitor.setter
-    def initialization_visitor(self, visitor):
-        assert self._initialization_visitor is None, f'Initialization visitor already set'
-        self._initialization_visitor = visitor
+    @initializing_visitor.setter
+    def initializing_visitor(self, visitor):
+        assert self._initializing_visitor is None, f'Initialization visitor already set'
+        self._initializing_visitor = visitor
 
     @property
     def routing_visitor(self):
@@ -166,25 +166,34 @@ class Carrier(Optimizable):
         for v in self.vehicles:
             v.tour.compute_cost_and_schedules()
 
-    def initialize(self, visitor: InitializationVisitor):
+    def initialize(self, visitor: InitializingVisitor):
+        """apply visitor's initialization procedure to create a pendulum tour"""
         assert not self._initialized
-        self._initialization_visitor = visitor.__class__.__name__
+        self.initializing_visitor = visitor
         visitor.initialize_carrier(self)
-        self._initialized = True
+
+    def initialize_another_tour(self):
+        """does not require the carrier to be uninitialized. For now, only allows to use the initializingVisitor that
+        has been set the first time around"""
+        self.initializing_visitor.initialize_carrier(self)
 
     def solve(self, visitor: RoutingVisitor):
+        """apply visitor's routing procedure to build routes"""
         assert not self._solved
-        self._routing_visitor = visitor.__class__.__name__
+        self._routing_visitor = visitor
         visitor.solve_carrier(self)
-        self._solved = True
 
     def finalize(self, visitor: FinalizingVisitor):
+        """apply visitor's local search procedure to improve the result after the routing itself has been done"""
         assert not self._finalized
-        self._finalizing_visitor = visitor.__class__.__name__
+        self._finalizing_visitor = visitor
         visitor.finalize_carrier(self)
-        self._finalized = True
 
-    def find_best_feasible_I1_insertion(self, verbose=opts['verbose'],
+    def reset_solution(self):
+        for vehicle in self.vehicles:
+            vehicle.tour.reset_solution()
+
+    '''def find_best_feasible_I1_insertion(self, verbose=opts['verbose'],
                                         ) -> Tuple[vx.Vertex, vh.Vehicle, int, float]:
         """
         Find the next optimal Vertex and its optimal insertion position based on the I1 insertion scheme.
@@ -209,7 +218,7 @@ class Carrier(Optimizable):
                     u_best = u
                     max_c2 = c2
 
-        return u_best, vehicle_best, rho_best, max_c2
+        return u_best, vehicle_best, rho_best, max_c2'''
 
     def plot(self, annotate: bool = True, alpha: float = 1):
         """

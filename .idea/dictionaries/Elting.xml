@@ -2,6 +2,7 @@
   <dictionary name="Elting">
     <words>
       <w>matplotlib</w>
+      <w>optimizable</w>
       <w>pathlib</w>
       <w>univie</w>
       <w>unrouted</w>

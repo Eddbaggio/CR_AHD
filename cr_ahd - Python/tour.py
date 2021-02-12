@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 
 import vertex as vx
 from Optimizable import Optimizable
+from solution_visitors.initializing_visitor import InitializingVisitor
 from solution_visitors.local_search_visitor import FinalizingVisitor
 from utils import travel_time, opts, InsertionError
 
@@ -18,7 +19,9 @@ class Tour(Optimizable):
         # TODO: should this really be a sequence? What about the successor/adjacency-list?
         self.arrival_schedule = [None] * len(sequence)  # arrival times
         self.service_schedule = [None] * len(sequence)  # start of service times
-        self.cost = 0   # TODO better make this a property?
+        self._cost = 0  # TODO better make this a property? -> Yes! + have increase_cost, reduce_cost methods but no setter
+        self._initializing_visitor: InitializingVisitor = None
+        self._initialized = False
         self._finalizing_visitor: FinalizingVisitor = None
         self._finalized = False
 
@@ -70,6 +73,17 @@ class Tour(Optimizable):
             not self._finalized), f"Instance has been finalized with visitor {self._finalizing_visitor.__class__.__name__} already!"
         self._finalizing_visitor = visitor
 
+    @property
+    def cost(self):
+        return self._cost
+
+    def increase_cost(self, amount):
+        self._cost += amount
+
+    def decrease_cost(self, amount):
+        assert amount <= self.cost, "Cannot have negative costs"
+        self._cost -= amount
+
     # def copy(self):
     #     tour = Tour(self.sequence)
     #     tour.arrival_schedule = self.arrival_schedule
@@ -77,11 +91,18 @@ class Tour(Optimizable):
     #     tour.cost = self.cost
     #     return tour
 
+    def reset_solution(self):
+        """Replace existing sequence and schedules by depot-depot schedules and set cost to 0"""
+        self.decrease_cost(self.cost)
+        self.sequence = [self.depot, self.depot]
+        self.arrival_schedule = None
+        self.service_schedule = None
+
     def reset_cost_and_schedules(self):
         """
         Resets self.cost, self.arrival_schedule and self.service_schedule to None.
         """
-        self.cost = None
+        self.decrease_cost(self.cost)
         self.arrival_schedule = [None] * len(self)  # reset arrival times
         self.service_schedule = [None] * len(self)  # reset start of service times
 
@@ -91,7 +112,8 @@ class Tour(Optimizable):
         self.sequence = other.sequence
         self.arrival_schedule = other.arrival_schedule
         self.service_schedule = other.service_schedule
-        self.cost = other.cost
+        self.decrease_cost(self.cost)
+        self.increase_cost(other.cost)
 
     def insert_and_reset(self, index: int, vertex: vx.Vertex):
         """
@@ -139,14 +161,14 @@ class Tour(Optimizable):
         :param verbose:
         :return:
         """
-        self.cost = 0
+        self.decrease_cost(self.cost)
         self.arrival_schedule[0] = start_time
         self.service_schedule[0] = start_time
         for rho in range(1, len(self)):
             i: vx.Vertex = self.sequence[rho - 1]
             j: vx.Vertex = self.sequence[rho]
             dist = self.distance_matrix.loc[i.id_, j.id_]
-            self.cost += dist  # sum up the total routing cost
+            self.increase_cost(dist)  # sum up the total routing cost
             planned_arrival = self.service_schedule[rho - 1] + i.service_duration + travel_time(dist)
             if verbose > 2:
                 print(f'Planned arrival at {j}: {planned_arrival}')
@@ -271,7 +293,8 @@ class Tour(Optimizable):
         return alpha_1 * c11 + alpha_2 * c12
 
     def _c11(self, i, u, j, mu):
-        c11 = self.distance_matrix.loc[i.id_, u.id_] + self.distance_matrix.loc[u.id_, j.id_] - mu * self.distance_matrix.loc[i.id_, j.id_]
+        c11 = self.distance_matrix.loc[i.id_, u.id_] + self.distance_matrix.loc[u.id_, j.id_] - mu * \
+              self.distance_matrix.loc[i.id_, j.id_]
         return c11
 
     def _c12(self, j_index, u):
@@ -337,10 +360,11 @@ class Tour(Optimizable):
         return rho_best, max_c2
 
     def finalize(self, visitor):
+        """apply visitor's local search procedure to improve the result after the routing itself has been done"""
         assert (not self._finalized), f'Instance has been finalized with {self._finalizing_visitor} already'
+        self._finalizing_visitor = visitor
         visitor.finalize_tour(self)
-        self._finalizing_visitor = visitor.__class__.__name__
-        self._finalized = True
+        pass
 
     def plot(self,
              plot_depot: bool = True,
