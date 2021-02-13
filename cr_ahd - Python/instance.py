@@ -122,6 +122,14 @@ class Instance(Optimizable):
         self._finalizing_visitor = visitor
 
     @property
+    def parameters_string(self) -> str:
+        return '_'.join([
+            self.initializing_visitor.__class__.__name__,
+            self.routing_visitor.__class__.__name__,
+            self.finalizing_visitor.__class__.__name__
+        ])
+
+    @property
     def cost(self):
         """The total routing costs over all carriers over all vehicles"""
         total_cost = 0
@@ -213,11 +221,11 @@ class Instance(Optimizable):
                     cost=self.cost,
                     revenue=self.revenue,
                     profit=self.profit,
-                    initialization_strategy=self.initializing_visitor.__class__.__name__,
+                    initializing_visitor=self.initializing_visitor.__class__.__name__,
                     initialized=self._initialized,
-                    routing_strategy=self._routing_visitor.__class__.__name__,
+                    routing_visitor=self._routing_visitor.__class__.__name__,
                     solved=self._solved,
-                    finalizing_strategy=self._finalizing_visitor.__class__.__name__,
+                    finalizing_visitor=self._finalizing_visitor.__class__.__name__,
                     finalized=self._finalized,
                     # runtime=self._runtime,
                     **self.num_act_veh_per_carrier,
@@ -468,22 +476,20 @@ class Instance(Optimizable):
     def write_solution_to_json(self):
         """
         Write the instance's solution to a json file
-
         :return: the file path as a pathlib.Path object
         """
         assert self._solved
 
-        file_name = path_output_custom.joinpath(self.solomon_base,
-                                                f'{self.id_}_{self._routing_visitor.__class__.__name__}_solution')
-        file_name = file_name.with_suffix('.json')
-        file_name.parent.mkdir(parents=True, exist_ok=True)
+        file_path = path_output_custom.joinpath(self.solomon_base, f'{self.id_}_{self.parameters_string}_solution')
+        file_path = file_path.with_suffix('.json')
+        file_path.parent.mkdir(parents=True, exist_ok=True)
 
-        if file_name.exists():
+        if file_path.exists():
             # raise FileExistsError
-            warnings.warn('Existing solution file is overwritten')
-        with open(file_name, mode='w') as write_file:
+            warnings.warn(f'Existing solution file at {file_path} is overwritten')
+        with open(file_path, mode='w') as write_file:
             json.dump(self.solution, write_file, indent=4)
-        return file_name
+        return file_path
 
     # def write_evaluation_metrics_to_csv(self):
     #     assert self._solved

@@ -29,9 +29,10 @@ def execute_all_routing_strategies(base_instance: it.Instance, centralized_flag:
         for routing_visitor in RoutingVisitor.__subclasses__():
             for local_search_visitor in FinalizingVisitor.__subclasses__():
                 copy = deepcopy(base_instance)
-                copy.initialize(init_visitor(2))
-                copy.solve(routing_visitor(1))
-                copy.finalize(local_search_visitor(2))
+                copy.initialize(init_visitor())
+                copy.solve(routing_visitor())
+                copy.finalize(local_search_visitor())
+                copy.write_solution_to_json()
                 results.append(copy.evaluation_metrics)
 
     # for r in results:
@@ -105,14 +106,13 @@ def multi_func(solomon, num_of_inst):
     for inst_path in tqdm(iterable=instance_paths):
         path = directory.joinpath(inst_path)
         base_instance = it.read_custom_json_instance(path)
-        results = execute_all_routing_strategies(base_instance,
-                                                 centralized_flag, True,
-                                                 False)  # TODO: extract the creation of the eval.csv file!!
+        results = execute_all_routing_strategies(base_instance, centralized_flag)
         solomon_base_results.extend(results)
         centralized_flag = False
 
     performance = pd.DataFrame(solomon_base_results)
-    performance = performance.set_index(['solomon_base', 'rand_copy', 'algorithm', 'num_carriers', 'num_vehicles'])
+    performance = performance.set_index(['solomon_base', 'rand_copy', 'initializing_visitor', 'routing_visitor',
+                                         'finalizing_visitor', 'num_carriers', 'num_vehicles'])
 
     # write the results
     write_dir = path_output_custom.joinpath(solomon)
@@ -124,14 +124,14 @@ def multi_func(solomon, num_of_inst):
 
 
 if __name__ == '__main__':
-    # jobs = []
-    # solomon_list = ['C101', 'C201', 'R101', 'R201', 'RC101', 'RC201']
-    # for solomon in solomon_list:
-    #     process = multiprocessing.Process(target=multi_func, args=(solomon, 3,))
-    #     jobs.append(process)
-    #     process.start()
-    # for j in jobs:  # to ensure that program waits until all processes have finished before continuing
-    #     j.join()
+    jobs = []
+    solomon_list = ['C101', 'C201', 'R101', 'R201', 'RC101', 'RC201']
+    for solomon in solomon_list:
+        process = multiprocessing.Process(target=multi_func, args=(solomon, 1,))
+        jobs.append(process)
+        process.start()
+    for j in jobs:  # to ensure that program waits until all processes have finished before continuing
+        j.join()
 
     # for running just a single instance
-    multi_func('C101', num_of_inst=10)
+    # multi_func('C101', num_of_inst=1)
