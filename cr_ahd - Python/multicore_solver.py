@@ -26,7 +26,7 @@ def execute_all_routing_strategies(base_instance: it.Instance, centralized_flag:
 
     # non-centralized instances
     for init_visitor in InitializingVisitor.__subclasses__():
-        for routing_visitor in RoutingVisitor.__subclasses__():
+        for routing_visitor in [RoutingVisitor.__subclasses__()[-1]]:
             for local_search_visitor in FinalizingVisitor.__subclasses__():
                 copy = deepcopy(base_instance)
                 copy.initialize(init_visitor())
@@ -124,14 +124,14 @@ def multi_func(solomon, num_of_inst):
 
 
 if __name__ == '__main__':
-    jobs = []
-    solomon_list = ['C101', 'C201', 'R101', 'R201', 'RC101', 'RC201']
-    for solomon in solomon_list:
-        process = multiprocessing.Process(target=multi_func, args=(solomon, 1,))
-        jobs.append(process)
-        process.start()
-    for j in jobs:  # to ensure that program waits until all processes have finished before continuing
-        j.join()
+    # jobs = []
+    # solomon_list = ['C101', 'C201', 'R101', 'R201', 'RC101', 'RC201']
+    # for solomon in solomon_list:
+    #     process = multiprocessing.Process(target=multi_func, args=(solomon, 1,))
+    #     jobs.append(process)
+    #     process.start()
+    # for j in jobs:  # to ensure that program waits until all processes have finished before continuing
+    #     j.join()
 
     # for running just a single instance
-    # multi_func('C101', num_of_inst=1)
+    multi_func('C101', num_of_inst=1)

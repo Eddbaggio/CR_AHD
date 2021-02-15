@@ -18,6 +18,7 @@ class Vertex(object):
         self.demand = demand
         self.tw = TimeWindow(tw_open, tw_close)  # time windows opening and closing
         self.service_duration = service_duration
+        self._carrier_assignment = None
 
     def __str__(self):
         return f'Vertex (ID={self.id_}, {self.coords}, {self.tw}, Demand={self.demand})'
@@ -32,6 +33,17 @@ class Vertex(object):
             'tw_close': self.tw.l,
             'service_duration': self.service_duration
         }
+
+    @property
+    def carrier_assignment(self):
+        return self._carrier_assignment
+
+    @carrier_assignment.setter
+    def carrier_assignment(self, carrier_id):
+        assert not self._carrier_assignment, f'vertex has already been assigned to carrier {self.carrier_assignment}!'
+        self._carrier_assignment = carrier_id
+
+
 
 
 # if __name__ == '__main__':

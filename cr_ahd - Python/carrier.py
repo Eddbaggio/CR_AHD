@@ -142,6 +142,7 @@ class Carrier(Optimizable):
         """
         self.requests[request.id_] = request
         self.unrouted[request.id_] = request
+        request.carrier_assignment = self.id_
         # TODO: add dist matrix attribute and extend it with each request assignment? -> inefficient,
         #  too much updating? instead have an extra function to extend the matrix whenever necessary?
         pass
@@ -154,7 +155,8 @@ class Carrier(Optimizable):
         :return:
         """
         self.unrouted.pop(request_id)  # auction: remove from initial carrier
-        retracted = self.requests.pop(request_id)
+        retracted: vx.Vertex = self.requests.pop(request_id)
+        retracted.carrier_assignment = None
         return retracted
 
     def compute_all_vehicle_cost_and_schedules(self):

@@ -296,8 +296,7 @@ class Instance(Optimizable):
         if verbose > 0:
             print(f'{request.id_} is originally assigned to {initial_carrier.id_}')
             print(f'Checking profitability of {request.id_} for {initial_carrier.id_}')
-        vehicle_best, position_best, cost_best = initial_carrier.find_cheapest_feasible_insertion(request,
-                                                                                                  self._distance_matrix)
+        vehicle_best, position_best, cost_best = initial_carrier.routing_visitor.find_insertion(initial_carrier, request)
         carrier_best = initial_carrier
         # auction: determine and return the collaborator with the cheapest
         # insertion cost
@@ -310,7 +309,7 @@ class Instance(Optimizable):
                 else:
                     if verbose > 0:
                         print(f'Checking profitability of {request.id_} for {carrier.id_}')
-                    vehicle, position, cost = carrier.find_cheapest_feasible_insertion(request, self._distance_matrix)
+                    vehicle, position, cost = carrier.routing_visitor.find_insertion(carrier, request)
                     if cost < cost_best:
                         carrier_best = carrier
                         vehicle_best = vehicle
