@@ -1,29 +1,33 @@
 from copy import deepcopy
 from typing import List
-
+from varname import nameof
 import matplotlib.pyplot as plt
 
 import vertex as vx
 from Optimizable import Optimizable
 from solution_visitors.initializing_visitor import InitializingVisitor
 from solution_visitors.local_search_visitor import FinalizingVisitor
-from utils import travel_time, opts, InsertionError
+from helper.utils import travel_time, opts, InsertionError
 
 
 class Tour(Optimizable):
-    def __init__(self, id_: str, sequence: List[vx.Vertex], distance_matrix):
+    def __init__(self, id_: str, depot: vx.DepotVertex, distance_matrix):
         self.id_ = id_
         self._distance_matrix = distance_matrix
-        self.sequence = sequence  # sequence of vertices
-        self.depot = sequence[0]
-        # TODO: should this really be a sequence? What about the successor/adjacency-list?
-        self.arrival_schedule = [None] * len(sequence)  # arrival times
-        self.service_schedule = [None] * len(sequence)  # start of service times
-        self._cost = 0  # TODO better make this a property? -> Yes! + have increase_cost, reduce_cost methods but no setter
+        self._sequence = []  # sequence of vertices
+        self._cost = 0
+        self.depot = depot
+        # TODO: should this really be a sequence? What about the successor/adjacency-list? or at least a deque
+        self.arrival_schedule = []  # arrival times  # TODO better make it a property that will be computed when requested. then, no compute_cost_and_schedules() is required any more
+        self.service_schedule = []  # start of service times  # TODO better make it a property that will be computed when requested. then, no compute_cost_and_schedules() is required any more
         self._initializing_visitor: InitializingVisitor = None
         self._initialized = False
         self._finalizing_visitor: FinalizingVisitor = None
         self._finalized = False
+
+        self.insert_and_reset(0, depot)
+        self.insert_and_reset(1, depot)
+        # self.compute_cost_and_schedules()
 
     def __str__(self):
         sequence = [vertex.id_ for vertex in self.sequence]
@@ -46,6 +50,11 @@ class Tour(Optimizable):
         return len(self.sequence)
 
     @property
+    def sequence(self):
+        """immutable sequence of routed vertices. can only be modified by inserting"""
+        return tuple(self._sequence)
+
+    @property
     def revenue(self):
         return sum([r.demand for r in self.sequence])
 
@@ -53,7 +62,7 @@ class Tour(Optimizable):
     def profit(self):
         return self.revenue - self.cost
 
-    @property
+    @property  # why exactly is this a property and not just a member attribute?
     def distance_matrix(self):
         return self._distance_matrix
 
@@ -69,8 +78,8 @@ class Tour(Optimizable):
     @finalizing_visitor.setter
     def finalizing_visitor(self, visitor):
         """Setter for the local search algorithm that can be used to finalize the results"""
-        assert (
-            not self._finalized), f"Instance has been finalized with visitor {self._finalizing_visitor.__class__.__name__} already!"
+        assert (not self._finalized), f"Instance has been finalized with " \
+                                      f"visitor {self._finalizing_visitor.__class__.__name__} already!"
         self._finalizing_visitor = visitor
 
     @property
@@ -91,12 +100,16 @@ class Tour(Optimizable):
     #     tour.cost = self.cost
     #     return tour
 
-    def reset_solution(self):
-        """Replace existing sequence and schedules by depot-depot schedules and set cost to 0"""
-        self.decrease_cost(self.cost)
-        self.sequence = [self.depot, self.depot]
-        self.arrival_schedule = None
-        self.service_schedule = None
+    def reset(self):
+        """Replace existing sequence and schedules by [depot->depot] and set cost to 0"""
+        self.decrease_cost(self.cost)  # reduce cost to 0
+        for vertex in self.sequence:
+            vertex.routed = False
+        self._sequence = []
+        self.insert_and_reset(0, self.depot)
+        self.insert_and_reset(1, self.depot)
+        self.arrival_schedule = []
+        self.service_schedule = []
 
     def reset_cost_and_schedules(self):
         """
@@ -109,13 +122,13 @@ class Tour(Optimizable):
     def copy_cost_and_schedules(self, other):
         """copy sequence, arrival schedule, service schedule and cost from other to self"""
         # TODO maybe i should rather attempt operator overloading? self = other
-        self.sequence = other.sequence
+        self._sequence = list(other.sequence)
         self.arrival_schedule = other.arrival_schedule
         self.service_schedule = other.service_schedule
         self.decrease_cost(self.cost)
         self.increase_cost(other.cost)
 
-    def insert_and_reset(self, index: int, vertex: vx.Vertex):
+    def insert_and_reset(self, index: int, vertex: vx.BaseVertex):
         """
          inserts a vertex before the specified index and resets/deletes all cost and schedules.
 
@@ -123,14 +136,41 @@ class Tour(Optimizable):
         :param vertex: vertex to insert into the tour
         :return:
         """
-        assert type(vertex) == vx.Vertex
-        self.sequence.insert(index, vertex)
+        assert isinstance(vertex, vx.BaseVertex)
+        self._sequence.insert(index, vertex)
+        vertex.routed = True
         self.reset_cost_and_schedules()
         pass
 
-    # TODO: custom versions of the list methods, e.g. insert method that automatically updates the schedules?!
-    def _insert_and_update_schedules(self):
-        pass
+    def pop_and_reset(self, index: int):
+        """removes the vertex at the index position from the tour and resets all cost and schedules"""
+        removed = self._sequence.pop(index)
+        removed.routed = False
+        self.reset_cost_and_schedules()
+        return removed
+
+    def reverse_section(self, i, j):
+        """
+        reverses a section of the route from index i to index j-1.
+        Example:
+        tour.sequence = [0, 1, 2, 3, 4, 0]
+        tour.reverse_section(1, 4)
+        print (tour.sequence)
+        >> [0, 3, 2, 1, 4, 0]
+        """
+        for k in range(1, j - i):
+            popped = self.pop_and_reset(i)
+            self.insert_and_reset(j - k, popped)
+
+    def insertion_cost(self, i: vx.Vertex, j: vx.Vertex, u: vx.Vertex):
+        """
+        compute insertion cost for insertion of vertex u between vertices i and j using the distance matrix
+        """
+        dist_i_u = self.distance_matrix.loc[i.id_, u.id_]
+        dist_u_j = self.distance_matrix.loc[u.id_, j.id_]
+        dist_i_j = self.distance_matrix.loc[i.id_, j.id_]
+        insertion_cost = dist_i_u + dist_u_j - dist_i_j
+        return insertion_cost
 
     # def is_insertion_feasible(self, index: int, vertex: vx.Vertex, dist_matrix, verbose=opts['verbose']) -> bool:
     #     i = self.sequence[index - 1]
@@ -175,9 +215,9 @@ class Tour(Optimizable):
             if not ignore_tw:
                 assert planned_arrival <= j.tw.l  # assert that arrival happens before time window closes
             self.arrival_schedule[rho] = planned_arrival  # set the arrival time
+            # if arrival is later than time window opening, choose service time = arrival time
             if planned_arrival >= j.tw.e:
-                self.service_schedule[
-                    rho] = planned_arrival  # if arrival is later than time window opening, choose service time = arrival time
+                self.service_schedule[rho] = planned_arrival
             else:
                 self.service_schedule[
                     rho] = j.tw.e  # if arrival is later than time window opening, chooseservie time =  tw opening
@@ -186,7 +226,6 @@ class Tour(Optimizable):
     def is_feasible(self, start_time=opts['start_time'], verbose=opts['verbose']) -> bool:
         """
 
-        :param dist_matrix:
         :param start_time:
         :param verbose:
         :return:
@@ -221,6 +260,7 @@ class Tour(Optimizable):
         """
         :return: Tuple (position, cost) of the best insertion position index and the associated (lowest) cost
         """
+        assert u.routed == False, f'Trying to insert an already routed vertex! {u}'
         if verbose > 2:
             print(f'\n= Cheapest insertion of {u.id_} into {self.id_}')
             print(self)
@@ -230,33 +270,27 @@ class Tour(Optimizable):
 
         # test all insertion positions
         for rho in range(1, len(self)):
-
             i: vx.Vertex = self.sequence[rho - 1]
             j: vx.Vertex = self.sequence[rho]
 
             # trivial feasibility check
             if i.tw.e < u.tw.l and u.tw.e < j.tw.l:
-
                 # compute insertion cost
-                dist_i_u = self.distance_matrix.loc[i.id_, u.id_]
-                dist_u_j = self.distance_matrix.loc[u.id_, j.id_]
-                insertion_cost = dist_i_u + dist_u_j
+                insertion_cost = self.insertion_cost(i, j, u)
 
                 if verbose > 2:
                     print(f'Between {i.id_} and {j.id_}: {insertion_cost}')
 
                 if insertion_cost < min_insertion_cost:
-
                     # check feasibility
-                    temp_tour = deepcopy(self)
-                    temp_tour.insert_and_reset(index=rho, vertex=u)
-                    if temp_tour.is_feasible():
+                    self.insert_and_reset(index=rho, vertex=u)
+                    if self.is_feasible():
                         # update best known insertion position
                         min_insertion_cost = insertion_cost
                         i_best = i
                         j_best = j
                         insertion_position = rho
-
+                    self.pop_and_reset(rho)
         # return the best found position and cost or raise an error if no feasible position was found
         if i_best:
             if verbose > 2:
@@ -273,7 +307,7 @@ class Tour(Optimizable):
            mu: float,
            ) -> float:
         """
-        c1 criterion of Solomon's I1 insertion heuristic Does NOT include a feasibility check Following the
+        c1 criterion of Solomon's I1 insertion heuristic Does NOT include a feasibility check. Following the
         description by (Bräysy, Olli; Gendreau, Michel (2005): Vehicle Routing Problem with Time Windows,
         Part I: Route Construction and Local Search Algorithms. In Transportation Science 39 (1), pp. 104–118. DOI:
         10.1287/trsc.1030.0056.)
@@ -299,17 +333,16 @@ class Tour(Optimizable):
 
     def _c12(self, j_index, u):
         service_start_j = self.service_schedule[j_index]
-        temp_tour = deepcopy(self)
-        temp_tour.insert_and_reset(index=j_index, vertex=u)
-        temp_tour.compute_cost_and_schedules(ignore_tw=True)
-        service_start_j_new = temp_tour.service_schedule[j_index + 1]
+        self.insert_and_reset(index=j_index, vertex=u)
+        self.compute_cost_and_schedules(ignore_tw=True)  # TODO Why do I ignore TW here?
+        service_start_j_new = self.service_schedule[j_index + 1]
         c12 = service_start_j_new - service_start_j
+        self.pop_and_reset(j_index)
         return c12
 
     def c2(self,
            u: vx.Vertex,
            c1: float,
-
            lambda_: float = opts['lambda'],
            ):
         """
@@ -318,8 +351,7 @@ class Tour(Optimizable):
         Part I: Route Construction and Local Search Algorithms. In Transportation Science 39 (1), pp. 104–118. DOI:
         10.1287/trsc.1030.0056.)
         """
-        depot_id = self.sequence[0].id_
-        return lambda_ * self.distance_matrix.loc[depot_id, u.id_] - c1
+        return lambda_ * self.distance_matrix.loc[self.depot.id_, u.id_] - c1
 
     def find_best_feasible_I1_insertion(self, u: vx.Vertex, verbose=opts['verbose']):
         """
@@ -336,12 +368,10 @@ class Tour(Optimizable):
 
             # trivial feasibility check
             if i.tw.e < u.tw.l and u.tw.e < j.tw.l:
-
                 # proper feasibility check
                 # TODO: check Solomon (1987) for an efficient and sufficient feasibility check
-                temp_tour = deepcopy(self)
-                temp_tour.insert_and_reset(index=rho, vertex=u)
-                if temp_tour.is_feasible():
+                self.insert_and_reset(index=rho, vertex=u)
+                if self.is_feasible():
                     # compute c1 and c2 and update their best values
                     c1 = self.c1(i_index=rho - 1,
                                  u=u,
@@ -357,6 +387,7 @@ class Tour(Optimizable):
                     if c2 > max_c2:
                         max_c2 = c2
                         rho_best = rho
+                self.pop_and_reset(rho)
         return rho_best, max_c2
 
     def finalize(self, visitor):
@@ -418,3 +449,22 @@ class Tour(Optimizable):
                                            )
                 artists.append(annotations)
         return artists
+
+
+if __name__ == '__main__':
+    from helper.utils import make_dist_matrix
+
+    requests = [vx.Vertex(f'{i}', i, i, 0, 0, 10, 0) for i in range(3)]
+    new_request = vx.Vertex('new', 99, 99, 0, 0, 10, 0)
+    distance_matrix = make_dist_matrix([*requests, new_request])
+    tour = Tour('tour', vx.DepotVertex('depot', 0, 0), distance_matrix)
+    for r in requests:
+        tour.insert_and_reset(1, r)
+    print(tour)
+
+    new_tour = deepcopy(tour)
+    print(new_request)
+    new_tour.insert_and_reset(1, new_request)
+    print(new_request)
+
+    print('End')

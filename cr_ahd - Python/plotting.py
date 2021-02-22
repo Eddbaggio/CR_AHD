@@ -5,8 +5,7 @@ import matplotlib.pyplot as plt
 from matplotlib.text import Annotation
 from carrier import Carrier
 from vehicle import Vehicle
-from pathlib import Path
-from utils import path_output
+from helper.utils import path_output
 
 
 class CarrierConstructionAnimation(object):
@@ -20,8 +19,8 @@ class CarrierConstructionAnimation(object):
         self.ax.set_xlim(0, 100)
         self.ax.set_ylim(0, 100)
         self.ax.set_title(title)
-        x = [r.coords.x for _, r in carrier.requests.items()]
-        y = [r.coords.y for _, r in carrier.requests.items()]
+        x = [r.coords.x for r in carrier.requests]
+        y = [r.coords.y for r in carrier.requests]
         self.requests = self.ax.plot(x, y, marker='o', markersize=9, mfc='white', c='black', ls='')
         self.depot = self.ax.plot(*carrier.depot.coords, marker='s', markersize=9, c='black', ls='',
                                   label=carrier.depot.id_)

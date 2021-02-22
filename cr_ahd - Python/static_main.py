@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 import instance as it
 from carrier import Carrier
-from utils import opts
+from helper.utils import opts
 
 
 # TODO: describe what this file is for

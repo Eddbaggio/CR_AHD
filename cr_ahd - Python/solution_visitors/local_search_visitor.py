@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
-from copy import deepcopy
+from copy import deepcopy, copy
 
-from utils import opts
+from helper.utils import opts
 
 
 class FinalizingVisitor(ABC):
@@ -54,27 +54,24 @@ class TwoOpt(FinalizingVisitor):
 
     def finalize_tour(self, tour):
         tour.compute_cost_and_schedules()
-        best = deepcopy(tour)
+        best_cost = tour.cost
         improved = True
         while improved:
             improved = False
             for i in range(1, len(tour) - 2):
                 for j in range(i + 1, len(tour)):
                     if j - i == 1:
-                        continue  # changes nothing, skip then
-                    new_tour = deepcopy(tour)
-                    new_tour.reset_cost_and_schedules()
-                    new_tour.sequence[i:j] = tour.sequence[j - 1:i - 1:-1]  # this is the 2optSwap
-                    new_tour.compute_cost_and_schedules()
-                    if new_tour.cost < best.cost and new_tour.is_feasible():
-                        best = new_tour
+                        continue  # no effect
+                    # the actual 2opt swap
+                    tour.reverse_section(i, j)
+                    # check for improvement
+                    tour.compute_cost_and_schedules()
+                    if tour.cost < best_cost and tour.is_feasible():
                         improved = True
-                        if self.verbose > 0:
-                            print(f'{tour.id_}: 2-opt swapped {new_tour.sequence[i]} and {new_tour.sequence[j]}')
-
-        # replace tour's information with best's information
-        tour.reset_cost_and_schedules()
-        tour.copy_cost_and_schedules(best)
+                        best_cost = tour.cost
+                    # if no improvement -> undo the 2opt swap
+                    else:
+                        tour.reverse_section(i, j)
         tour._finalized = True
         pass
 

@@ -135,6 +135,24 @@ def unique_path(directory, name_pattern):
             return path
 
 
+def ask_for_overwrite_permission(path: Path):
+    if path.exists():
+        permission = input(f'Should files and directories that exist at {path} be overwritten?\n[y/n]: ')
+        if permission == 'y':
+            return True
+        else:
+            raise FileExistsError
+    else:
+        return True
+
+
+def get_carrier_by_id(carriers, id_):
+    for c in carriers:
+        if c.id_ == id_:
+            return c
+    raise ValueError
+
+
 if __name__ == '__main__':
     th = np.linspace(0, 2 * np.pi, 128)
     fig, ax = plt.subplots()

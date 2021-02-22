@@ -5,7 +5,7 @@ from matplotlib.ticker import AutoMinorLocator
 from typing import List
 
 from solution_visitors.routing_visitor import RoutingVisitor
-from utils import univie_cmap, univie_cmap_paired, path_output_custom
+from helper.utils import univie_cmap, path_output_custom
 
 
 def bar_plot_with_errors(solomon_list: list, algorithms: List[str], columns: List[str], fig_size: tuple = (10.5, 4.5)):

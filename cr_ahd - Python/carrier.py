@@ -1,5 +1,4 @@
-from collections import OrderedDict
-from typing import List, OrderedDict as OrderedDictType, Tuple
+from typing import List
 
 import matplotlib.pyplot as plt
 
@@ -10,16 +9,14 @@ from solution_visitors.initializing_visitor import InitializingVisitor
 from solution_visitors.local_search_visitor import FinalizingVisitor
 from solution_visitors.routing_visitor import RoutingVisitor
 from tour import Tour
-from utils import opts, InsertionError
 
 
 class Carrier(Optimizable):
     def __init__(self,
                  id_: str,
-                 depot: vx.Vertex,
+                 depot: vx.DepotVertex,
                  vehicles: List[vh.Vehicle],
-                 requests: dict = None,
-                 unrouted: dict = None,
+                 requests=None,
                  dist_matrix=None):
         """
         Class that represents carriers in the auction-based collaborative transportation network
@@ -31,28 +28,26 @@ class Carrier(Optimizable):
         :param unrouted: List of this carrier's requests that are still unrouted (usually all requests upon
         instantiation of the carrier)
         """
+
         self.id_ = id_
         self.depot = depot
         self.vehicles = vehicles
         self.num_vehicles = len(self.vehicles)
-        if requests is not None:
-            self.requests = OrderedDict(requests)
-            # TODO: write comment explaining why these HAVE to be (ordered)dicts instead of lists
-        else:
-            self.requests = OrderedDict()
-        if unrouted is not None:
-            self.unrouted = OrderedDict(unrouted)
-        else:
-            self.unrouted: OrderedDictType[str, vx.Vertex] = OrderedDict()
-        for v in vehicles:
-            v.tour = Tour(id_=v.id_, sequence=[self.depot, self.depot], distance_matrix=dist_matrix)
+
+        self._unrouted = []
+        if requests is None:
+            requests = []
+        self._requests = requests
         self._distance_matrix = dist_matrix
+
         self._initializing_visitor: InitializingVisitor = None
         self._initialized = False
         self._routing_visitor: RoutingVisitor = None
         self._solved = False
         self._finalizing_visitor: FinalizingVisitor = None
         self._finalized = False
+        for v in vehicles:
+            v.tour = Tour(id_=v.id_, depot=depot, distance_matrix=dist_matrix)
 
     def __str__(self):
         return f'Carrier (ID:{self.id_}, Depot:{self.depot}, Vehicles:{len(self.vehicles)}, Requests:{len(self.requests)}, Unrouted:{len(self.unrouted)})'
@@ -62,6 +57,31 @@ class Carrier(Optimizable):
         for v in self.vehicles:
             route_cost += v.tour.cost
         return round(route_cost, ndigits=ndigits)
+
+    @property
+    def requests(self):
+        # return immutable tuple rather than mutable list
+        return tuple(self._requests)
+
+    @requests.setter
+    def requests(self, requests: List[vx.Vertex]):
+        for request in requests:
+            self.assign_request(request)
+
+    @property
+    def unrouted(self):
+        # return immutable tuple rather than list
+        return tuple(r for r in self.requests if not r.routed)
+
+    @property
+    def depot(self):
+        return self._depot
+
+    @depot.setter
+    def depot(self, depot: vx.DepotVertex):
+        depot.carrier_assignment = self.id_
+        self._depot = depot
+        pass
 
     @property
     def distance_matrix(self):
@@ -130,7 +150,10 @@ class Carrier(Optimizable):
             'id_': self.id_,
             'depot': self.depot.to_dict(),
             'vehicles': [v.to_dict() for v in self.vehicles],
-            'requests': [r.to_dict() for r in self.requests.values()]
+            # 'initialization_visitor': self.initializing_visitor.__class__.__name__,
+            # 'routing_visitor': self.routing_visitor.__class__.__name__,
+            # 'finalizing_visitor': self.finalizing_visitor.__class__.__name__,
+
         }
 
     def assign_request(self, request: vx.Vertex):
@@ -140,24 +163,28 @@ class Carrier(Optimizable):
         :param request: the request vertex to be assigned
         :return:
         """
-        self.requests[request.id_] = request
-        self.unrouted[request.id_] = request
+        self._requests.append(request)  # access private member directly to modify it
+        self._unrouted.append(request)
         request.carrier_assignment = self.id_
         # TODO: add dist matrix attribute and extend it with each request assignment? -> inefficient,
         #  too much updating? instead have an extra function to extend the matrix whenever necessary?
         pass
 
-    def retract_request(self, request_id: str):
+    def retract_request(self, request: vx.Vertex):
         """
         remove the specified request from self.requests.
 
-        :param request_id: the id of the request to be removed
+        :param request: the id of the request to be removed
         :return:
         """
-        self.unrouted.pop(request_id)  # auction: remove from initial carrier
-        retracted: vx.Vertex = self.requests.pop(request_id)
-        retracted.carrier_assignment = None
-        return retracted
+        self._requests.remove(request)  # access private member directly to modify it
+        self._unrouted.remove(request)  # auction: remove from initial carrier
+        request._carrier_assignment = None
+        return request
+
+    def retract_all_requests(self):
+        while self.requests:
+            self.retract_request(self.requests[0])
 
     def compute_all_vehicle_cost_and_schedules(self):
         """
@@ -193,7 +220,7 @@ class Carrier(Optimizable):
 
     def reset_solution(self):
         for vehicle in self.vehicles:
-            vehicle.tour.reset_solution()
+            vehicle.tour.reset()
 
     '''def find_best_feasible_I1_insertion(self, verbose=opts['verbose'],
                                         ) -> Tuple[vx.Vertex, vh.Vehicle, int, float]:

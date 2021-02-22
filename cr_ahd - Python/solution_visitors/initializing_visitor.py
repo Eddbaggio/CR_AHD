@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from utils import opts, InsertionError
+from helper.utils import opts, InsertionError
 
 
 class InitializingVisitor(ABC):
@@ -47,15 +47,15 @@ class EarliestDueDate(InitializingVisitor):
 
     def find_seed_request(self, carrier):
         """find request with earliest deadline"""
-        seed = list(carrier.unrouted.values())[0]
-        for key, request in carrier.unrouted.items():
+        seed = carrier.unrouted[0]
+        for request in carrier.unrouted:
             if request.tw.l < seed.tw.l:
-                seed = carrier.unrouted[key]
+                seed = request
         return seed
 
     def initialize_instance(self, instance):
-        for c in instance.carriers:
-            c.initialize(EarliestDueDate(self.verbose, self.plot_level))
+        for carrier in instance.carriers:
+            carrier.initialize(EarliestDueDate(self.verbose, self.plot_level))
         instance._initialized = True
         return
 
@@ -65,11 +65,9 @@ class EarliestDueDate(InitializingVisitor):
         if len(carrier.unrouted) > 0:
             # find request with earliest deadline and initialize pendulum tour
             seed = self.find_seed_request(carrier)
-
             vehicle.tour.insert_and_reset(index=1, vertex=seed)
             if vehicle.tour.is_feasible():
                 vehicle.tour.compute_cost_and_schedules()
-                carrier.unrouted.pop(seed.id_)
             else:
                 raise InsertionError('', f'Seed request {seed} cannot be inserted feasibly into {vehicle}')
         carrier._initialized = True
