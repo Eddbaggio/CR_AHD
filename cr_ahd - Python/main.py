@@ -1,16 +1,13 @@
 import multiprocessing
-import os
-from pathlib import Path
 from copy import deepcopy
+from pathlib import Path
 
 import pandas as pd
 from tqdm import tqdm
 
 import instance as it
-from solution_visitors.initializing_visitor import InitializingVisitor
-from solution_visitors.local_search_visitor import FinalizingVisitor, TwoOpt
-from solution_visitors.routing_visitor import RoutingVisitor, DynamicInsertionWithAuction, SequentialCheapestInsertion
-from helper.utils import path_input_custom, path_output_custom, Solomon_Instances
+from solving.Solver import Solver
+from helper.utils import path_input_custom, path_output_custom
 
 
 # TODO write pseudo codes for ALL the stuff that's happening
@@ -49,16 +46,13 @@ def execute_all_visitors(base_instance: it.Instance, centralized_flag: bool = Tr
     results = []
 
     # non-centralized instances
-    for init_visitor in InitializingVisitor.__subclasses__():
-        for routing_visitor in [SequentialCheapestInsertion, DynamicInsertionWithAuction]:
-            for local_search_visitor in [TwoOpt]:
-                print(f'Solving {base_instance.id_} with {init_visitor.__name__}, {routing_visitor.__name__} and {local_search_visitor.__name__}...')
-                copy = deepcopy(base_instance)
-                copy.initialize(init_visitor())
-                copy.solve(routing_visitor())
-                copy.finalize(local_search_visitor())
-                copy.write_solution_to_json()
-                results.append(copy.evaluation_metrics)
+
+    for solver in Solver.__subclasses__():
+        print(f'Solving {base_instance.id_} with {solver.__name__}...')
+        copy = deepcopy(base_instance)
+        solver().solve(copy)
+        copy.write_solution_to_json()
+        results.append(copy.evaluation_metrics)
 
     # for r in results:
     #     for k, v in r.items():
@@ -119,7 +113,7 @@ def read_n_and_execute_all_visitors_parallel(n=100):
     custom_files_paths = []
     for cd in custom_directories:
         custom_files_paths.extend(list(cd.iterdir())[:n])
-    
+
     result_collection = []
     with multiprocessing.Pool() as pool:
         for results in tqdm(pool.map(read_and_execute_all_visitors, custom_files_paths), total=len(custom_files_paths)):
@@ -139,6 +133,7 @@ def read_n_and_execute_all_visitors_parallel(n=100):
         group.to_csv(write_path)
 
     return grouped
+
 
 '''
 def multi_func(solomon, num_of_inst):
@@ -189,5 +184,6 @@ if __name__ == '__main__':
     #     j.join()
 
     # NEW
-    read_and_execute_all_visitors(Path("C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home Deliveries/01_Code/data/Input/Custom/C101/C101_3_15_ass_#001.json"))
+    read_and_execute_all_visitors(Path(
+        "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home Deliveries/01_Code/data/Input/Custom/C101/C101_3_15_ass_#001.json"))
     # grouped_evaluations = read_n_and_execute_all_visitors_parallel(3)

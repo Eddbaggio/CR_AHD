@@ -17,9 +17,9 @@ import vertex as vx
 from Optimizable import Optimizable
 from helper.utils import split_iterable, make_dist_matrix, opts, Solomon_Instances, path_input_custom, \
     path_input_solomon, unique_path, path_output_custom, ask_for_overwrite_permission, get_carrier_by_id
-from solution_visitors.initializing_visitor import InitializingVisitor
-from solution_visitors.local_search_visitor import FinalizingVisitor
-from solution_visitors.routing_visitor import RoutingVisitor, SequentialCheapestInsertion
+from solving.initializing_visitor import InitializingVisitor
+from solving.local_search_visitor import FinalizingVisitor
+from solving.routing_visitor import RoutingVisitor, SequentialCheapestInsertion
 
 
 class Instance(Optimizable):
@@ -94,8 +94,8 @@ class Instance(Optimizable):
         assert (
             not self._initialized), f"Instance's tours have been initialized with strategy {self.initializing_visitor.__class__.__name__} already!"
         self._initializing_visitor = visitor
-        for c in self.carriers:
-            c.initializing_visitor = visitor
+        # for c in self.carriers:
+        #     c.initializing_visitor = visitor
 
     @property
     def routing_visitor(self):
@@ -197,7 +197,7 @@ class Instance(Optimizable):
         for c in self.carriers:
             carrier_solution = {}
             for v in c.vehicles:
-                vehicle_solution = dict(sequence=[r.id_ for r in v.tour.sequence],
+                vehicle_solution = dict(sequence=[r.id_ for r in v.tour.routing_sequence],
                                         arrival=v.tour.arrival_schedule,
                                         service=v.tour.service_schedule,
                                         cost=v.tour.cost)
@@ -269,12 +269,30 @@ class Instance(Optimizable):
                     **self.profit_per_carrier, )
 
     @property
-    def unrouted(self):
-        unrouted = []
-        for carriers_unrouted in [carrier.unrouted for carrier in self.carriers]:
-            for unrouted_request in carriers_unrouted:
-                unrouted.append(unrouted_request)
+    def unrouted_requests(self):
+        unrouted = [r for r in self.requests if not r.routed]
         return unrouted
+
+    @property
+    def routed(self):
+        routed = [r for r in self.requests if r.routed]
+        return routed
+
+    @property
+    def assigned_requests(self):
+        assigned_requests = []
+        for carrier in self.carriers:
+            assigned_requests.extend(carrier.requests)
+        return assigned_requests
+
+    def unassigned_requests(self):
+        unassigned_requests = self.requests[:]
+        for assigned_request in self.assigned_requests:
+            unassigned_requests.remove(assigned_request)
+        return unassigned_requests
+
+    def assigned_unrouted_requests(self):
+        return [r for r in self.assigned_requests if not r.routed]
 
     def to_dict(self):
         """Convert the instance to a nested dictionary. Primarily useful for storing in .json format"""
@@ -309,34 +327,30 @@ class Instance(Optimizable):
             c = self.carriers[np.random.choice(range(len(self.carriers)))]
             c.assign_request(r)
 
-    def initialize(self, visitor: InitializingVisitor):
-        """apply visitor's route initialization procedure to create pendulum tour for each carrier"""
-        assert (not self._initialized), \
-            f'Instance has been initialized with strategy {self._initializing_visitor} already!'
-        self._initializing_visitor = visitor
-        visitor.initialize_instance(self)
-        pass
+    # def initialize(self, visitor: InitializingVisitor):
+    #     """apply visitor's route initialization procedure to create pendulum tour for each carrier"""
+    #     assert (not self._initialized), \
+    #         f'Instance has been initialized with strategy {self._initializing_visitor} already!'
+    #     self._initializing_visitor = visitor
+    #     visitor.initialize_instance(self)
+    #     pass
 
-    def solve(self, visitor: RoutingVisitor):
-        """apply visitor's routing procedure to built routes for all carriers"""
-        # todo clean up the use of _routing_visitor vs routing_visitor. Same for init and final!
-        assert not self.solved, \
-            f'Instance has been solved with strategy {self.routing_visitor} already!'
-        self.routing_visitor = visitor
-        visitor.solve_instance(self)
-        pass
+    # def solve(self, visitor: RoutingVisitor):
+    #     """apply visitor's routing procedure to built routes for all carriers"""
+    #     assert not self.solved, \
+    #         f'Instance has been solved with strategy {self.routing_visitor} already!'
+    #     self.routing_visitor = visitor
+    #     visitor.solve_instance(self)
+    #     pass
 
-    def finalize(self, visitor: FinalizingVisitor):
-        """apply visitor's local search procedure to improve the result after the routing itself has been done"""
-        assert not self._finalized, \
-            f'Instance has been finalized with strategy {self._finalizing_visitor} already!'
-        self._finalizing_visitor = visitor
-        visitor.finalize_instance(self)
-        pass
+    # def finalize(self, visitor: FinalizingVisitor):
+    #     """apply visitor's local search procedure to improve the result after the routing itself has been done"""
+    #     assert not self._finalized, \
+    #         f'Instance has been finalized with strategy {self._finalizing_visitor} already!'
+    #     self._finalizing_visitor = visitor
+    #     visitor.finalize_instance(self)
+    #     pass
 
-    def reset_solution(self):
-        for carrier in self.carriers:
-            carrier.reset_solution()
 
     def cheapest_insertion_auction(self, request: vx.Vertex, initial_carrier: cr.Carrier, verbose=opts['verbose'], ):
         """
@@ -712,8 +726,8 @@ def read_custom_json_instance(path: Path):
     requests = []
     for request_dict in json_data['requests']:
         request = vx.Vertex(**request_dict)
-        carrier = get_carrier_by_id(carriers, request_dict['carrier_assignment'])
-        carrier.assign_request(request)
+        # carrier = get_carrier_by_id(carriers, request_dict['carrier_assignment'])  # TODO this should happen later: it's different for static and dynamic cases
+        # carrier.assign_request(request)
         requests.append(request)
 
     inst = Instance(path.stem, requests, carriers, dist_matrix)

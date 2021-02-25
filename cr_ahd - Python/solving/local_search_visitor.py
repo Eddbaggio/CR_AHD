@@ -39,7 +39,8 @@ class TwoOpt(FinalizingVisitor):
 
     def finalize_instance(self, instance):
         for carrier in instance.carriers:
-            carrier.finalize(TwoOpt(self.verbose, self.plot_level))
+            self.finalize_carrier(carrier)
+        instance.finalizing_visitor = self
         instance._finalized = True
         pass
 
@@ -48,7 +49,7 @@ class TwoOpt(FinalizingVisitor):
         if self.verbose > 0:
             print(f'2-opt finalizing for {carrier}')
         for vehicle in carrier.active_vehicles:
-            vehicle.tour.finalize(TwoOpt(self.verbose, self.plot_level))
+            self.finalize_tour(vehicle.tour)
         carrier._finalized = True
         pass
 
@@ -72,6 +73,7 @@ class TwoOpt(FinalizingVisitor):
                     # if no improvement -> undo the 2opt swap
                     else:
                         tour.reverse_section(i, j)
+        tour.compute_cost_and_schedules()
         tour._finalized = True
         pass
 

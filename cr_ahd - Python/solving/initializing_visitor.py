@@ -21,6 +21,10 @@ class InitializingVisitor(ABC):
         # TODO: adding a timer to measure the performance?
 
     @abstractmethod
+    def find_seed_request(self, carrier):
+        pass
+
+    @abstractmethod
     def initialize_instance(self, instance):
         pass
 
@@ -31,10 +35,6 @@ class InitializingVisitor(ABC):
     # a method initialize_tour (or initialize_vehicle) is not required as the initialization on a tour-level does not
     # depend on the visitor, i.e. on the initialization strategy: the tour cannot distinguish between earliest due
     # date or furthest distance as it does not have access to the vertex information that shall be inserted
-
-    @abstractmethod
-    def find_seed_request(self, carrier):
-        pass
 
 
 class EarliestDueDate(InitializingVisitor):
@@ -47,29 +47,32 @@ class EarliestDueDate(InitializingVisitor):
 
     def find_seed_request(self, carrier):
         """find request with earliest deadline"""
-        seed = carrier.unrouted[0]
-        for request in carrier.unrouted:
+        seed = carrier.unrouted_requests[0]
+        for request in carrier.unrouted_requests:
             if request.tw.l < seed.tw.l:
                 seed = request
         return seed
 
     def initialize_instance(self, instance):
         for carrier in instance.carriers:
-            carrier.initialize(EarliestDueDate(self.verbose, self.plot_level))
+            # carrier.initialize(EarliestDueDate(self.verbose, self.plot_level))
+            self.initialize_carrier(carrier)
+        instance.initializing_visitor = self
         instance._initialized = True
         return
 
     def initialize_carrier(self, carrier):
         vehicle = carrier.inactive_vehicles[0]
         assert len(vehicle.tour) == 2, 'Vehicle already has a tour'
-        if len(carrier.unrouted) > 0:
+        if len(carrier.unrouted_requests) > 0:
             # find request with earliest deadline and initialize pendulum tour
             seed = self.find_seed_request(carrier)
-            vehicle.tour.insert_and_reset(index=1, vertex=seed)
+            vehicle.tour.insert_and_update(index=1, vertex=seed)
             if vehicle.tour.is_feasible():
                 vehicle.tour.compute_cost_and_schedules()
             else:
                 raise InsertionError('', f'Seed request {seed} cannot be inserted feasibly into {vehicle}')
+        carrier.initializing_visitor = self
         carrier._initialized = True
         pass
 

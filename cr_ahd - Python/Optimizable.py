@@ -10,5 +10,5 @@ class Optimizable(object):
 
     # @abstractmethod
     # not applicable for a tour
-    def initialize(self, visitor):
-        pass
+    # def initialize(self, visitor):
+    #     pass

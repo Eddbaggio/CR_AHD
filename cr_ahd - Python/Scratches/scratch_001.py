@@ -35,7 +35,7 @@ def TwoOpt(tour: Tour):
                 tour.reverse_section(i, j)
                 # check for improvement
                 tour.compute_cost_and_schedules()
-                print(tour.sequence)
+                print(tour.routing_sequence)
                 if tour.cost < best_cost and tour.is_feasible():
                     improved = True
                     best_cost = tour.cost

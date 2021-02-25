@@ -5,9 +5,9 @@ import matplotlib.pyplot as plt
 import vehicle as vh
 import vertex as vx
 from Optimizable import Optimizable
-from solution_visitors.initializing_visitor import InitializingVisitor
-from solution_visitors.local_search_visitor import FinalizingVisitor
-from solution_visitors.routing_visitor import RoutingVisitor
+from solving.initializing_visitor import InitializingVisitor
+from solving.local_search_visitor import FinalizingVisitor
+from solving.routing_visitor import RoutingVisitor
 from tour import Tour
 
 
@@ -50,7 +50,7 @@ class Carrier(Optimizable):
             v.tour = Tour(id_=v.id_, depot=depot, distance_matrix=dist_matrix)
 
     def __str__(self):
-        return f'Carrier (ID:{self.id_}, Depot:{self.depot}, Vehicles:{len(self.vehicles)}, Requests:{len(self.requests)}, Unrouted:{len(self.unrouted)})'
+        return f'Carrier (ID:{self.id_}, Depot:{self.depot}, Vehicles:{len(self.vehicles)}, Requests:{len(self.requests)}, Unrouted:{len(self.unrouted_requests)})'
 
     def cost(self, ndigits: int = 15):
         route_cost = 0
@@ -69,9 +69,14 @@ class Carrier(Optimizable):
             self.assign_request(request)
 
     @property
-    def unrouted(self):
+    def unrouted_requests(self):
         # return immutable tuple rather than list
         return tuple(r for r in self.requests if not r.routed)
+
+    @property
+    def routed_requests(self):
+        # return immutable tuple rather than list
+        return tuple(r for r in self.requests if r.routed)
 
     @property
     def depot(self):
@@ -166,8 +171,7 @@ class Carrier(Optimizable):
         self._requests.append(request)  # access private member directly to modify it
         self._unrouted.append(request)
         request.carrier_assignment = self.id_
-        # TODO: add dist matrix attribute and extend it with each request assignment? -> inefficient,
-        #  too much updating? instead have an extra function to extend the matrix whenever necessary?
+        request.assigned = True
         pass
 
     def retract_request(self, request: vx.Vertex):
@@ -180,6 +184,7 @@ class Carrier(Optimizable):
         self._requests.remove(request)  # access private member directly to modify it
         self._unrouted.remove(request)  # auction: remove from initial carrier
         request._carrier_assignment = None
+        request.assigned = False
         return request
 
     def retract_all_requests(self):
@@ -195,7 +200,7 @@ class Carrier(Optimizable):
         for v in self.vehicles:
             v.tour.compute_cost_and_schedules()
 
-    def initialize(self, visitor: InitializingVisitor):
+    '''def initialize(self, visitor: InitializingVisitor):
         """apply visitor's initialization procedure to create a pendulum tour"""
         assert not self._initialized
         self.initializing_visitor = visitor
@@ -216,11 +221,8 @@ class Carrier(Optimizable):
         """apply visitor's local search procedure to improve the result after the routing itself has been done"""
         assert not self._finalized
         self._finalizing_visitor = visitor
-        visitor.finalize_carrier(self)
+        visitor.finalize_carrier(self)'''
 
-    def reset_solution(self):
-        for vehicle in self.vehicles:
-            vehicle.tour.reset()
 
     '''def find_best_feasible_I1_insertion(self, verbose=opts['verbose'],
                                         ) -> Tuple[vx.Vertex, vh.Vehicle, int, float]:
@@ -278,7 +280,7 @@ class Carrier(Optimizable):
             r.get_profit()
         # OR
         for v in self.vehicles:
-            for r_id in v.tour.sequence:
+            for r_id in v.tour.routing_sequence:
                 r.get_profit()
     # TODO: determine the value/ profit of each request for the carrier based some criteria (a) demand/distance from
     #  depot, (b) insertion cost (c) c1 or c2 value of I1 algorithm?! (d) ...

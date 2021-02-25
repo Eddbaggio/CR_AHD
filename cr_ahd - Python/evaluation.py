@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import AutoMinorLocator
 from typing import List
 
-from solution_visitors.routing_visitor import RoutingVisitor
+from solving.routing_visitor import RoutingVisitor
 from helper.utils import univie_cmap, path_output_custom
 
 
