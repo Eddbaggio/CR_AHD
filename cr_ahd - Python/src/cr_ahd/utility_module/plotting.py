@@ -3,9 +3,9 @@ from typing import Union
 import matplotlib.animation as ani
 import matplotlib.pyplot as plt
 from matplotlib.text import Annotation
-from carrier import Carrier
-from vehicle import Vehicle
-from helper.utils import path_output
+from src.cr_ahd.core_module.carrier import Carrier
+from src.cr_ahd.core_module.vehicle import Vehicle
+from src.cr_ahd.utility_module.utils import path_output
 
 
 class CarrierConstructionAnimation(object):

@@ -1,5 +1,5 @@
-from tour import Tour
-from helper.utils import opts
+from src.cr_ahd.core_module.tour import Tour
+from src.cr_ahd.utility_module.utils import opts
 
 
 class Vehicle(object):

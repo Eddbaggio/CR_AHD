@@ -11,15 +11,15 @@ import pandas as pd
 from adjustText import adjust_text
 from tqdm import tqdm
 
-import carrier as cr
-import vehicle as vh
-import vertex as vx
-from Optimizable import Optimizable
-from helper.utils import split_iterable, make_dist_matrix, opts, Solomon_Instances, path_input_custom, \
+import src.cr_ahd.core_module.carrier as cr
+import src.cr_ahd.core_module.vehicle as vh
+import src.cr_ahd.core_module.vertex as vx
+from src.cr_ahd.core_module.Optimizable import Optimizable
+from src.cr_ahd.utility_module.utils import split_iterable, make_dist_matrix, opts, Solomon_Instances, path_input_custom, \
     path_input_solomon, unique_path, path_output_custom, ask_for_overwrite_permission, get_carrier_by_id
-from solving.initializing_visitor import InitializingVisitor
-from solving.local_search_visitor import FinalizingVisitor
-from solving.routing_visitor import RoutingVisitor, SequentialCheapestInsertion
+from src.cr_ahd.solving_module.initializing_visitor import InitializingVisitor
+from src.cr_ahd.solving_module.local_search_visitor import FinalizingVisitor
+from src.cr_ahd.solving_module.routing_visitor import RoutingVisitor, SequentialCheapestInsertion
 
 
 class Instance(Optimizable):
@@ -278,21 +278,20 @@ class Instance(Optimizable):
         routed = [r for r in self.requests if r.routed]
         return routed
 
-    @property
     def assigned_requests(self):
         assigned_requests = []
         for carrier in self.carriers:
             assigned_requests.extend(carrier.requests)
-        return assigned_requests
+        return sorted(assigned_requests, key=lambda request: int(request.id_[1:]))
 
     def unassigned_requests(self):
         unassigned_requests = self.requests[:]
-        for assigned_request in self.assigned_requests:
+        for assigned_request in self.assigned_requests():
             unassigned_requests.remove(assigned_request)
         return unassigned_requests
 
     def assigned_unrouted_requests(self):
-        return [r for r in self.assigned_requests if not r.routed]
+        return [r for r in self.assigned_requests() if not r.routed]
 
     def to_dict(self):
         """Convert the instance to a nested dictionary. Primarily useful for storing in .json format"""
@@ -498,8 +497,8 @@ class Instance(Optimizable):
         """
         for c in self.carriers:
             plt.plot(*c.depot.coords, marker='s', alpha=alpha, linestyle='', c='black')  # depots
-            r_x_coords = [r.coords.x for r in c.requests.values()]
-            r_y_coords = [r.coords.y for r in c.requests.values()]
+            r_x_coords = [r.coords.x for r in c.requests]
+            r_y_coords = [r.coords.y for r in c.requests]
             plt.plot(r_x_coords, r_y_coords, marker='o', alpha=alpha, label=c.id_, ls='')  # requests
 
         if annotate:

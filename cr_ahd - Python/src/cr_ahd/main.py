@@ -5,35 +5,33 @@ from pathlib import Path
 import pandas as pd
 from tqdm import tqdm
 
-import instance as it
-from solving.Solver import Solver
-from helper.utils import path_input_custom, path_output_custom
+from solving_module.Solver import Solver
+from src.cr_ahd.core_module import instance as it
+from utility_module.utils import path_input_custom, path_output_custom
+import matplotlib.pyplot as plt
 
 
 # TODO write pseudo codes for ALL the stuff that's happening
 
 # TODO how do carriers 'buy' requests from others? Is there some kind of money exchange happening?
 
-# TODO storing the vehicle assignment with each vertex (also in the file) may greatly simplify a few things.
-#  Alternatively, store the assignment in the instance? Or have some kind of AssignmentManager class?! Another
-#  possibility would be to have a class hierarchy for nodes: base_node, tw_node, depot_node, customer_node,
-#  assigned_node, ... <- using inheritance and polymorphism
-
 # TODO which of the @properties should be converted to proper class attributes, i.e. without delaying their
 #  computation? the @property may slow down the code, BUT in many cases it's probably a more idiot-proof way
 #  because otherwise I'd have to update the attribute which can easily be forgotten
 
-# TODO re-integrate animated plots for
-#  (1) static/dynamic sequential cheapest insertion construction => DONE
+# TODO re-integrate (animated) plots for
+#  (1) static/dynamic sequential cheapest insertion construction
 #  (2) dynamic construction
-#  (3) I1 insertion construction => DONE
-
-# TODO's with * are from 06/12/20 or later from when I tried to understand my own code
+#  (3) I1 insertion construction
 
 # TODO create class hierarchy! E.g. vertex (base, tw_vertex, depot_vertex, assigned_vertex, ...) and instance(
 #  base, centralized_instance, ...)
 
 # TODO: describe what THIS file is for and how it works exactly
+
+# TODO use Memento Pattern for (e.g.) Tours and Vertices. This will avoid costly "undo" operations that are currently
+#  handled specifically. E.g. atm an infeasible route section reversal (as in 2opt) will be reverted / "undone" by
+#  re-reverting the attempt
 
 
 def execute_all_visitors(base_instance: it.Instance, centralized_flag: bool = True):
@@ -46,7 +44,6 @@ def execute_all_visitors(base_instance: it.Instance, centralized_flag: bool = Tr
     results = []
 
     # non-centralized instances
-
     for solver in Solver.__subclasses__():
         print(f'Solving {base_instance.id_} with {solver.__name__}...')
         copy = deepcopy(base_instance)
@@ -54,48 +51,13 @@ def execute_all_visitors(base_instance: it.Instance, centralized_flag: bool = Tr
         copy.write_solution_to_json()
         results.append(copy.evaluation_metrics)
 
-    # for r in results:
-    #     for k, v in r.items():
-    #         print(f'{k}:\t {v}')
-    #
-    # print()
+    for r in results:
+        for k, v in r.items():
+            print(f'{k}:\t {v}')
 
-    """algorithms_and_parameters = [
-        (it.Instance.static_I1_construction, dict()),
-        (it.Instance.dynamic_construction, dict(with_auction=False)),
-        (it.Instance.dynamic_construction, dict(with_auction=True))
-    ]
-    for algorithm, parameters in algorithms_and_parameters:
-        if not two_opt_only_flag:
-            instance_copy = deepcopy(base_instance)
-            algorithm(instance_copy, **parameters)
-            instance_copy.write_solution_to_json()
-            results.append(instance_copy.evaluation_metrics)
-        # ====== 2 opt
-        if two_opt_flag:
-            instance_copy.two_opt()
-            instance_copy.write_solution_to_json()
-            results.append(instance_copy.evaluation_metrics)"""
+    print()
 
-    # centralized instances
-    """if centralized_flag:
-        algorithms_and_parameters = [
-            (it.Instance.static_CI_construction, dict()),
-            (it.Instance.static_I1_construction, dict(init_method='earliest_due_date'))
-        ]
-        # create a centralized instance, i.e. only one carrier
-        centralized_instance = base_instance.to_centralized(base_instance.carriers[0].depot.coords)
-        for algorithm, parameters in algorithms_and_parameters:
-            if not two_opt_only_flag:
-                instance_copy = deepcopy(centralized_instance)
-                algorithm(instance_copy, **parameters)
-                instance_copy.write_solution_to_json()
-                results.append(instance_copy.evaluation_metrics)
-            # ====== 2 opt
-            if two_opt_flag:
-                instance_copy.two_opt()
-                instance_copy.write_solution_to_json()
-                results.append(instance_copy.evaluation_metrics)"""
+
 
     return results
 
@@ -109,16 +71,18 @@ def read_and_execute_all_visitors(path: Path):
 
 def read_n_and_execute_all_visitors_parallel(n=100):
     """reads the first n variants of the CUSTOM instances and runs all visitors via multiprocessing"""
-    custom_directories = path_input_custom.iterdir()
-    custom_files_paths = []
-    for cd in custom_directories:
-        custom_files_paths.extend(list(cd.iterdir())[:n])
+    custom_files_paths = get_first_n_instance_paths(n)
 
     result_collection = []
     with multiprocessing.Pool() as pool:
         for results in tqdm(pool.map(read_and_execute_all_visitors, custom_files_paths), total=len(custom_files_paths)):
             result_collection.extend(results)
 
+    grouped = write_results(result_collection)  # rename function; not clear what are the results?
+    return grouped
+
+
+def write_results(result_collection: list):
     performance = pd.DataFrame(result_collection)
     performance = performance.set_index(['solomon_base', 'rand_copy', 'initializing_visitor', 'routing_visitor',
                                          'finalizing_visitor', 'num_carriers', 'num_vehicles'])
@@ -131,8 +95,16 @@ def read_n_and_execute_all_visitors_parallel(n=100):
         file_name = f'{name}_custom_eval.csv'
         write_path = write_dir.joinpath(file_name)
         group.to_csv(write_path)
-
     return grouped
+
+
+def get_first_n_instance_paths(n):
+    """retrieve the Path to the first n custom instances"""
+    custom_directories = path_input_custom.iterdir()
+    custom_files_paths = []
+    for cd in custom_directories:
+        custom_files_paths.extend(list(cd.iterdir())[:n])
+    return custom_files_paths
 
 
 '''
@@ -185,5 +157,5 @@ if __name__ == '__main__':
 
     # NEW
     read_and_execute_all_visitors(Path(
-        "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home Deliveries/01_Code/data/Input/Custom/C101/C101_3_15_ass_#001.json"))
+        "../../../data/Input/Custom/C101/C101_3_15_ass_#001.json"))
     # grouped_evaluations = read_n_and_execute_all_visitors_parallel(3)

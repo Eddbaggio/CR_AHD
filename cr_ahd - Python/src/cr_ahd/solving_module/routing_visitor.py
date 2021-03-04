@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
-from profiling import Timer
-from helper.utils import opts, InsertionError, get_carrier_by_id
+from src.cr_ahd.utility_module.profiling import Timer
+from src.cr_ahd.utility_module.utils import opts, InsertionError, get_carrier_by_id
 
 
 class RoutingVisitor(ABC):
@@ -58,8 +58,8 @@ class SequentialCheapestInsertion(RoutingVisitor):
         # check all active vehicles and the first INACTIVE one for insertion cost
         for vehicle in [*carrier.active_vehicles, carrier.inactive_vehicles[0]]:
             try:
-                position, cost = vehicle.tour.find_cheapest_feasible_insertion(u=vertex)
-                # TODO tour should not have a find_cheapest_feasible_insertion method! Do i need an InsertionVisitor?
+                # TODO: ugly solution to have a standalone function for this:
+                position, cost = find_cheapest_feasible_insertion(vehicle.tour, request=vertex)
                 if self.verbose > 1:
                     print(f'\t\tInsertion cost {vertex.id_} -> {vehicle.id_}: {cost}')
                 if cost < cost_best:  # a new cheapest insertion was found -> update the incumbents
@@ -78,11 +78,8 @@ class SequentialCheapestInsertion(RoutingVisitor):
         """
         assert not instance.solved, f'Instance {instance} has already been solved'
 
-        for carrier in instance.carriers:
-            carrier.compute_all_vehicle_cost_and_schedules()  # TODO why is this necessary?
-
         if self.verbose > 0:
-            print(f'STATIC Cheapest Insertion Construction for {instance}:')
+            print(f'Cheapest Insertion Construction for {instance}:')
         timer = Timer()
         timer.start()
 
@@ -91,7 +88,6 @@ class SequentialCheapestInsertion(RoutingVisitor):
             carrier = get_carrier_by_id(instance.carriers, vertex.carrier_assignment)
             vehicle, position, _ = self.find_insertion(carrier, vertex)
             vehicle.tour.insert_and_update(index=position, vertex=vertex)
-            vehicle.tour.compute_cost_and_schedules()
 
         timer.stop()
         self._runtime = timer.duration
@@ -114,8 +110,8 @@ class SequentialCheapestInsertion(RoutingVisitor):
         #     vehicle, position, _ = self.find_insertion(carrier, vertex)
         #     vehicle.tour.insert_and_reset(index=position, vertex=vertex)
         #     vehicle.tour.compute_cost_and_schedules()
-            # if self.plot_level > 1:
-            #     ani.add_current_frame()
+        # if self.plot_level > 1:
+        #     ani.add_current_frame()
 
         # if self.plot_level > 1:
         #     ani.show()
@@ -185,15 +181,11 @@ class StaticI1Insertion(RoutingVisitor):
         pass
 
     def solve_carrier(self, carrier):
-        # TODO why is this necessary here?  why aren't these things computed already before?
-        carrier.compute_all_vehicle_cost_and_schedules()  # tour empty at this point (depot to depot tour)
-
         # construction loop
         while carrier.unrouted_requests:
             vertex, vehicle, position, _ = self.find_insertion(carrier)
             if position is not None:  # insert
                 vehicle.tour.insert_and_update(index=position, vertex=vertex)
-                vehicle.tour.compute_cost_and_schedules()
                 if self.verbose > 0:
                     print(f'\tInserting {vertex.id_} into {carrier.id_}.{vehicle.tour.id_}')
                 # if self.plot_level > 1:
@@ -261,7 +253,6 @@ class DynamicInsertionWithAuction(RoutingVisitor):
                 if self.verbose > 0:
                     print(f'\tInserting {request.id_} into {carrier.id_}.{vehicle.id_} with cost of {round(cost, 2)}')
                 vehicle.tour.insert_and_update(position, request)
-                vehicle.tour.compute_cost_and_schedules()
             except TypeError:
                 raise InsertionError('', f"Cannot insert {request} feasibly into {carrier.id_}.{vehicle.id_}")
 
@@ -274,3 +265,44 @@ class DynamicInsertionWithAuction(RoutingVisitor):
     def solve_carrier(self, carrier):
         raise NotImplementedError
         pass
+
+
+def find_cheapest_feasible_insertion(tour, request, verbose=opts['verbose']):
+    """
+    :return: Tuple (position, cost) of the best insertion position index and the associated (lowest) cost
+    """
+    assert request.routed is False, f'Trying to insert an already routed vertex! {request}'
+    if verbose > 2:
+        print(f'\n= Cheapest insertion of {request.id_} into {tour.id_}')
+        print(tour)
+    min_insertion_cost = float('inf')
+    i_best = None
+    j_best = None
+
+    # test all insertion positions
+    for rho in range(1, len(tour)):
+        i = tour.routing_sequence[rho - 1]
+        j = tour.routing_sequence[rho]
+
+        # trivial feasibility check
+        if i.tw.e < request.tw.l and request.tw.e < j.tw.l:
+            insertion_cost = tour.insertion_cost_no_fc(i, j, request)
+            if verbose > 2:
+                print(f'Between {i.id_} and {j.id_}: {insertion_cost}')
+            if insertion_cost < min_insertion_cost:
+                try:
+                    tour.insert_and_update(index=rho, vertex=request)  # may throw an InsertionError
+                    min_insertion_cost = insertion_cost
+                    i_best = i
+                    j_best = j
+                    insertion_position = rho
+                    tour.pop_and_update(index=rho)
+                except InsertionError:
+                    continue
+    # return the best found position and cost or raise an error if no feasible position was found
+    if i_best:
+        if verbose > 2:
+            print(f'== Best: between {i_best.id_} and {j_best.id_}: {min_insertion_cost}')
+        return insertion_position, min_insertion_cost
+    else:
+        raise InsertionError('', 'No feasible insertion position found')

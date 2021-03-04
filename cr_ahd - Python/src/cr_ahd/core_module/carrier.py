@@ -2,13 +2,13 @@ from typing import List
 
 import matplotlib.pyplot as plt
 
-import vehicle as vh
-import vertex as vx
-from Optimizable import Optimizable
-from solving.initializing_visitor import InitializingVisitor
-from solving.local_search_visitor import FinalizingVisitor
-from solving.routing_visitor import RoutingVisitor
-from tour import Tour
+import src.cr_ahd.core_module.vehicle as vh
+import src.cr_ahd.core_module.vertex as vx
+from src.cr_ahd.core_module.Optimizable import Optimizable
+from src.cr_ahd.solving_module.initializing_visitor import InitializingVisitor
+from src.cr_ahd.solving_module.local_search_visitor import FinalizingVisitor
+from src.cr_ahd.solving_module.routing_visitor import RoutingVisitor
+from src.cr_ahd.core_module.tour import Tour
 
 
 class Carrier(Optimizable):
@@ -125,7 +125,7 @@ class Carrier(Optimizable):
 
     @initializing_visitor.setter
     def initializing_visitor(self, visitor):
-        assert self._initializing_visitor is None, f'Initialization visitor already set'
+        assert self._initializing_visitor is None or self._initializing_visitor == visitor, f'Initialization visitor already set: '
         self._initializing_visitor = visitor
 
     @property
@@ -191,25 +191,16 @@ class Carrier(Optimizable):
         while self.requests:
             self.retract_request(self.requests[0])
 
-    def compute_all_vehicle_cost_and_schedules(self):
-        """
-        Computes for all vehicles of this carrier the routing costs and the corresponding schedules (sequence,
-        arrival time, service start time) See Vehicle.tour.compute_cost_and_schedules
-        :return:
-        """
-        for v in self.vehicles:
-            v.tour.compute_cost_and_schedules()
+    def initialize_another_tour(self):
+        """initializes another vehicle pendulum tour, using the InitializingVisitor that has been set the first time
+         around"""
+        self.initializing_visitor.initialize_carrier(self)
 
     '''def initialize(self, visitor: InitializingVisitor):
         """apply visitor's initialization procedure to create a pendulum tour"""
         assert not self._initialized
         self.initializing_visitor = visitor
         visitor.initialize_carrier(self)
-
-    def initialize_another_tour(self):
-        """does not require the carrier to be uninitialized. For now, only allows to use the initializingVisitor that
-        has been set the first time around"""
-        self.initializing_visitor.initialize_carrier(self)
 
     def solve(self, visitor: RoutingVisitor):
         """apply visitor's routing procedure to build routes"""

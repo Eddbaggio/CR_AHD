@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from helper.utils import opts, InsertionError
+from src.cr_ahd.utility_module.utils import opts
 
 
 class InitializingVisitor(ABC):
@@ -68,10 +68,6 @@ class EarliestDueDate(InitializingVisitor):
             # find request with earliest deadline and initialize pendulum tour
             seed = self.find_seed_request(carrier)
             vehicle.tour.insert_and_update(index=1, vertex=seed)
-            if vehicle.tour.is_feasible():
-                vehicle.tour.compute_cost_and_schedules()
-            else:
-                raise InsertionError('', f'Seed request {seed} cannot be inserted feasibly into {vehicle}')
         carrier.initializing_visitor = self
         carrier._initialized = True
         pass

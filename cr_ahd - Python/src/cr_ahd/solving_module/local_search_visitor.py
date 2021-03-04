@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
-from copy import deepcopy, copy
 
-from helper.utils import opts
+from src.cr_ahd.utility_module.utils import opts, InsertionError
 
 
 class FinalizingVisitor(ABC):
@@ -34,7 +33,7 @@ class FinalizingVisitor(ABC):
 class TwoOpt(FinalizingVisitor):
     """
     Improve the current solution with a 2-opt local search as in
-    G. A. Croes, A method for solving traveling salesman problems. Operations Res. 6 (1958)
+    G. A. Croes, A method for solving_module traveling salesman problems. Operations Res. 6 (1958)
     """
 
     def finalize_instance(self, instance):
@@ -54,7 +53,6 @@ class TwoOpt(FinalizingVisitor):
         pass
 
     def finalize_tour(self, tour):
-        tour.compute_cost_and_schedules()
         best_cost = tour.cost
         improved = True
         while improved:
@@ -63,17 +61,18 @@ class TwoOpt(FinalizingVisitor):
                 for j in range(i + 1, len(tour)):
                     if j - i == 1:
                         continue  # no effect
-                    # the actual 2opt swap
-                    tour.reverse_section(i, j)
-                    # check for improvement
-                    tour.compute_cost_and_schedules()
-                    if tour.cost < best_cost and tour.is_feasible():
-                        improved = True
-                        best_cost = tour.cost
-                    # if no improvement -> undo the 2opt swap
-                    else:
+                    try:
+                        # the actual 2opt swap
                         tour.reverse_section(i, j)
-        tour.compute_cost_and_schedules()
+                        if tour.cost < best_cost:
+                            improved = True
+                            best_cost = tour.cost
+                        # if no improvement -> undo the 2opt swap
+                        else:
+                            tour.reverse_section(i, j)
+                    except InsertionError as e:
+                        continue  # if reversal is infeasible, continue with next iteration
+
         tour._finalized = True
         pass
 

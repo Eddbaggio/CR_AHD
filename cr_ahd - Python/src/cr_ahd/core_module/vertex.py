@@ -1,6 +1,6 @@
 import numpy as np
 
-from helper.utils import TimeWindow, Coords, opts
+from src.cr_ahd.utility_module.utils import TimeWindow, Coords, opts
 from abc import ABC, abstractmethod
 
 
@@ -21,7 +21,7 @@ class DepotVertex(BaseVertex):
                  carrier_assignment: str = None):
         super().__init__(id_, x_coord, y_coord)
         self.carrier_assignment = carrier_assignment
-        self.assigned = True
+        self.assigned = True  # TODO why is this true by default?
         self.tw = TimeWindow(opts['start_time'], np.infty)
         self.service_duration = 0
         self.demand = 0

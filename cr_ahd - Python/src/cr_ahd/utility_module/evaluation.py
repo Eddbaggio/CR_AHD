@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import AutoMinorLocator
 from typing import List
 
-from solving.routing_visitor import RoutingVisitor
-from helper.utils import univie_cmap, path_output_custom
+from src.cr_ahd.solving_module.routing_visitor import RoutingVisitor
+from src.cr_ahd.utility_module.utils import univie_cmap, path_output_custom
 
 
 def bar_plot_with_errors(solomon_list: list, algorithms: List[str], columns: List[str], fig_size: tuple = (10.5, 4.5)):

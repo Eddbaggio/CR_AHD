@@ -2,24 +2,23 @@ from copy import deepcopy
 from typing import List
 import matplotlib.pyplot as plt
 
-import vertex as vx
-from Optimizable import Optimizable
-from solving.initializing_visitor import InitializingVisitor
-from solving.local_search_visitor import FinalizingVisitor
-from helper.utils import travel_time, opts, InsertionError
+from src.cr_ahd.core_module.Optimizable import Optimizable
+import src.cr_ahd.core_module.vertex as vx
+from src.cr_ahd.solving_module.initializing_visitor import InitializingVisitor
+from src.cr_ahd.solving_module.local_search_visitor import FinalizingVisitor
+from src.cr_ahd.utility_module.utils import travel_time, opts, InsertionError
 
 
 class Tour(Optimizable):
     def __init__(self, id_: str, depot: vx.DepotVertex, distance_matrix):
         self.id_ = id_
+        self.depot = depot
         self._distance_matrix = distance_matrix
         self._routing_sequence = []  # sequence of vertices
-        self._cost_sequence = []
+        self._cost_sequence = []  # sequence of arc costs
         self._cost = 0
-        self.depot = depot
-        # TODO: should this really be a sequence? What about the successor/adjacency-list? or at least a deque
-        self.arrival_schedule = []  # arrival times  # TODO better make it a property that will be computed when requested. then, no compute_cost_and_schedules() is required any more
-        self.service_schedule = []  # start of service times  # TODO better make it a property that will be computed when requested. then, no compute_cost_and_schedules() is required any more
+        self.arrival_schedule = []  # arrival times
+        self.service_schedule = []  # start of service times
         self._initializing_visitor: InitializingVisitor = None
         self._initialized = False
         self._finalizing_visitor: FinalizingVisitor = None
@@ -27,7 +26,6 @@ class Tour(Optimizable):
 
         self.insert_and_update(0, depot)
         self.insert_and_update(1, depot)
-        # self.compute_cost_and_schedules()
 
     def __str__(self):
         sequence = [vertex.id_ for vertex in self.routing_sequence]
@@ -87,9 +85,11 @@ class Tour(Optimizable):
         return sum(self._cost_sequence)
 
     def increase_cost(self, amount):
+        raise NotImplementedError  # has been replaced with the cost_sequence
         self._cost += amount
 
     def decrease_cost(self, amount):
+        raise NotImplementedError  # has been replaced with the cost_sequence
         assert amount <= self.cost, "Cannot have negative costs"
         self._cost -= amount
 
@@ -101,97 +101,103 @@ class Tour(Optimizable):
         self.arrival_schedule = [None] * len(self)  # reset arrival times
         self.service_schedule = [None] * len(self)  # reset start of service times
 
-    def insert_and_update(self, index: int, vertex: vx.BaseVertex):
-        """
-         inserts a vertex BEFORE the specified index and resets/deletes all cost and schedules.
-
-        :param index: index before which the given vertex/request is to be inserted
-        :param vertex: vertex to insert into the tour
-        :return:
-        """
+    def _insert_no_update(self, index: int, vertex: vx.BaseVertex):
+        """highly discouraged to use this as it does not ensure feasibility of the route! use insert_and_update instead.
+        use this only if infeasible route is acceptable, as e.g. reversing a section where intermediate states of the
+        reversal may be infeasible"""
         assert isinstance(vertex, vx.BaseVertex)
         self._routing_sequence.insert(index, vertex)
         vertex.routed = True
-        self.update_cost_and_schedules_from(index)
+        if len(self) <= 1:
+            self._cost_sequence.insert(index, 0)
+            self.arrival_schedule.insert(index, opts['start_time'])
+            self.service_schedule.insert(index, opts['start_time'])
+        else:
+            self._cost_sequence.insert(index, None)
+            self.arrival_schedule.insert(index, None)
+            self.service_schedule.insert(index, None)
+
+    def insert_and_update(self, index: int, vertex: vx.BaseVertex):
+        """
+         inserts a vertex BEFORE the specified index and resets/deletes all cost and schedules. If insertion is
+         infeasible due to time window constraints, it will undo the insertion and raise InsertionError
+
+        :param index: index before which the given vertex/request is to be inserted
+        :param vertex: vertex to insert into the tour
+        """
+        try:
+            self._insert_no_update(index, vertex)
+            if len(self) > 1:
+                self.update_cost_and_schedules_from(index)
+        except InsertionError as e:
+            self.pop_and_update(index)
+            raise e
         pass
+
+    def _pop_no_update(self, index:int):
+        """highly discouraged to use this as it does not ensure feasibility. only use for intermediate states that
+        allow infeasible states such as for reversing a section! use pop_and_update instead"""
+        popped = self._routing_sequence.pop(index)
+        self._cost_sequence.pop(index)
+        self.arrival_schedule.pop(index)
+        self.service_schedule.pop(index)
+        popped.routed = False
+        return popped
 
     def pop_and_update(self, index: int):
         """removes the vertex at the index position from the tour and resets all cost and schedules"""
-        removed = self._routing_sequence.pop(index)
-        removed.routed = False
+        popped = self._pop_no_update(index)
         self.update_cost_and_schedules_from(index)
-        return removed
-
-    def reverse_section(self, i, j):
-        """
-        reverses a section of the route from index i to index j-1.
-        Example:
-        tour.sequence = [0, 1, 2, 3, 4, 0]
-        tour.reverse_section(1, 4)
-        print (tour.sequence)
-        >> [0, 3, 2, 1, 4, 0]
-        """
-        for k in range(1, j - i):
-            popped = self.pop_and_update(i)
-            self.insert_and_update(j - k, popped)
-
-    def insertion_cost(self, i: vx.Vertex, j: vx.Vertex, u: vx.Vertex):
-        """
-        compute insertion cost for insertion of vertex u between vertices i and j using the distance matrix
-        """
-        dist_i_u = self.distance_matrix.loc[i.id_, u.id_]
-        dist_u_j = self.distance_matrix.loc[u.id_, j.id_]
-        dist_i_j = self.distance_matrix.loc[i.id_, j.id_]
-        insertion_cost = dist_i_u + dist_u_j - dist_i_j
-        return insertion_cost
+        return popped
 
     def update_cost_and_schedules_from(self, index: int = 1):
         """update schedules from given index to end of routing sequence. index should be the same as the insertion
-        index. """
+        or removal index. """
         for rho in range(index, len(self)):
             i: vx.Vertex = self.routing_sequence[rho - 1]
             j: vx.Vertex = self.routing_sequence[rho]
             dist = self.distance_matrix.loc[i.id_, j.id_]
             self._cost_sequence[rho] = dist
             arrival = self.service_schedule[rho - 1] + i.service_duration + travel_time(dist)
-            assert arrival <= j.tw.l
-            self.arrival_schedule[rho] = arrival
-            self.service_schedule[rho] = min(arrival, j.tw.e)
+            try:
+                assert arrival <= j.tw.l
+                self.arrival_schedule[rho] = arrival
+                self.service_schedule[rho] = max(arrival, j.tw.e)
+            except AssertionError:
+                raise InsertionError(f'{arrival} <= {j.tw.l}', f'cannot arrive at {j} after time window has closed')
+            # TODO "You shouldn't throw exceptions for things that happen all the time. Then they'd be "ordinaries"."
+            #  https://softwareengineering.stackexchange.com/questions/139171/check-first-vs-exception-handling
 
-    def compute_cost_and_schedules(self, start_time=opts['start_time'], ignore_tw=True, verbose=opts['verbose']):
-
+    def reverse_section(self, i, j):
         """
-        Computes the total routing cost (distance-based) and the corresponding routing schedule (comprising sequence
-        of vertex visits, arrival times and service start times). Based on an ASAP-principle (vehicle leaves as early as
-        possible, serves as early as possible, No waiting strategies or similar things are applied)
+        reverses a section of the route from index i to index j-1. If reversal is infeasible, will raise InsertionError
+        (and undoes the attempted reversal)
 
-        :param start_time:
-        :param ignore_tw: Should time windows be ignored?
-        :param verbose:
-        :return:
+        Example: \n
+        >> tour.sequence = [0, 1, 2, 3, 4, 0] \n
+        >> tour.reverse_section(1, 4) \n
+        >> print (tour.sequence) \n
+        >> [0, 3, 2, 1, 4, 0]
         """
-        raise NotImplementedError
-        self.decrease_cost(self.cost)
-        self.arrival_schedule[0] = start_time
-        self.service_schedule[0] = start_time
-        for rho in range(1, len(self)):
-            i: vx.Vertex = self.routing_sequence[rho - 1]
-            j: vx.Vertex = self.routing_sequence[rho]
-            dist = self.distance_matrix.loc[i.id_, j.id_]
-            self.increase_cost(dist)  # sum up the total routing cost
-            planned_arrival = self.service_schedule[rho - 1] + i.service_duration + travel_time(dist)
-            if verbose > 2:
-                print(f'Planned arrival at {j}: {planned_arrival}')
-            if not ignore_tw:
-                assert planned_arrival <= j.tw.l  # assert that arrival happens before time window closes
-            self.arrival_schedule[rho] = planned_arrival  # set the arrival time
-            # if arrival is later than time window opening, choose service time = arrival time
-            if planned_arrival >= j.tw.e:
-                self.service_schedule[rho] = planned_arrival
-            # else if arrival is later than time window opening, choose service time =  tw opening
-            else:
-                self.service_schedule[rho] = j.tw.e
-        pass
+        for k in range(1, j - i):
+            popped = self._pop_no_update(i)
+            self._insert_no_update(j - k, popped)
+        try:
+            self.update_cost_and_schedules_from(i)  # maybe the new routing sequence is infeasible
+        except InsertionError as e:
+            self.reverse_section(i, j)  # undo all the reversal
+            raise e
+
+    def insertion_cost_no_fc(self, i: vx.Vertex, j: vx.Vertex, u: vx.Vertex):  # TODO what about Time Windows?
+        """
+        compute insertion cost for insertion of vertex u between vertices i and j using the distance matrix. Does NOT
+        consider time window restrictions, i.e. no feasibility check is done!
+        """
+        dist_i_u = self.distance_matrix.loc[i.id_, u.id_]
+        dist_u_j = self.distance_matrix.loc[u.id_, j.id_]
+        dist_i_j = self.distance_matrix.loc[i.id_, j.id_]
+        insertion_cost = dist_i_u + dist_u_j - dist_i_j
+        return insertion_cost
 
     def is_feasible(self, start_time=opts['start_time'], verbose=opts['verbose']) -> bool:
         """
@@ -225,49 +231,6 @@ class Tour(Optimizable):
             else:
                 service_schedule[rho] = max(j.tw.e, earliest_arrival)
         return True
-
-    def find_cheapest_feasible_insertion(self, u: vx.Vertex, verbose=opts['verbose']):
-        """
-        :return: Tuple (position, cost) of the best insertion position index and the associated (lowest) cost
-        """
-        assert u.routed == False, f'Trying to insert an already routed vertex! {u}'
-        if verbose > 2:
-            print(f'\n= Cheapest insertion of {u.id_} into {self.id_}')
-            print(self)
-        min_insertion_cost = float('inf')
-        i_best = None
-        j_best = None
-
-        # test all insertion positions
-        for rho in range(1, len(self)):
-            i: vx.Vertex = self.routing_sequence[rho - 1]
-            j: vx.Vertex = self.routing_sequence[rho]
-
-            # trivial feasibility check
-            if i.tw.e < u.tw.l and u.tw.e < j.tw.l:
-                # compute insertion cost
-                insertion_cost = self.insertion_cost(i, j, u)
-
-                if verbose > 2:
-                    print(f'Between {i.id_} and {j.id_}: {insertion_cost}')
-
-                if insertion_cost < min_insertion_cost:
-                    # check feasibility
-                    self.insert_and_update(index=rho, vertex=u)
-                    if self.is_feasible():
-                        # update best known insertion position
-                        min_insertion_cost = insertion_cost
-                        i_best = i
-                        j_best = j
-                        insertion_position = rho
-                    self.pop_and_update(rho)
-        # return the best found position and cost or raise an error if no feasible position was found
-        if i_best:
-            if verbose > 2:
-                print(f'== Best: between {i_best.id_} and {j_best.id_}: {min_insertion_cost}')
-            return insertion_position, min_insertion_cost
-        else:
-            raise InsertionError('', 'No feasible insertion position found')
 
     def c1(self,
            i_index: int,
@@ -307,7 +270,6 @@ class Tour(Optimizable):
         """how much will the arrival time of vertex at index j be pushed back?"""
         service_start_j = self.service_schedule[j_index]
         self.insert_and_update(index=j_index, vertex=u)
-        self.compute_cost_and_schedules(ignore_tw=True)  # TODO Why do I ignore TW here?
         service_start_j_new = self.service_schedule[j_index + 1]
         c12 = service_start_j_new - service_start_j
         self.pop_and_update(j_index)
@@ -336,31 +298,31 @@ class Tour(Optimizable):
         """
         rho_best = None
         max_c2 = float('-inf')
-        self.compute_cost_and_schedules()
         for rho in range(1, len(self)):
             i = self.routing_sequence[rho - 1]
             j = self.routing_sequence[rho]
 
             # trivial feasibility check
             if i.tw.e < u.tw.l and u.tw.e < j.tw.l:
-                # proper feasibility check
                 # TODO: check Solomon (1987) for an efficient and sufficient feasibility check
-                if self.is_feasible():
-                    # compute c1(=best feasible insertion cost) and c2(=best request) and update their best values
+                # compute c1(=best feasible insertion cost) and c2(=best request) and update their best values
+                try:
                     c1 = self.c1(i_index=rho - 1,
                                  u=u,
                                  j_index=rho,
                                  alpha_1=opts['alpha_1'],
                                  mu=opts['mu'],
                                  )
-                    if verbose > 1:
-                        print(f'c1({u.id_}->{self.id_}): {c1}')
-                    c2 = self.c2(u=u, lambda_=opts['lambda'], c1=c1)
-                    if verbose > 1:
-                        print(f'c2({u.id_}->{self.id_}): {c2}')
-                    if c2 > max_c2:
-                        max_c2 = c2
-                        rho_best = rho
+                except InsertionError:
+                    continue
+                if verbose > 1:
+                    print(f'c1({u.id_}->{self.id_}): {c1}')
+                c2 = self.c2(u=u, lambda_=opts['lambda'], c1=c1)
+                if verbose > 1:
+                    print(f'c2({u.id_}->{self.id_}): {c2}')
+                if c2 > max_c2:
+                    max_c2 = c2
+                    rho_best = rho
         return rho_best, max_c2
 
     '''
@@ -379,7 +341,7 @@ class Tour(Optimizable):
              color: str = 'black') -> List:
 
         """
-        :return: List of artists to be drawn. Use for animated plotting
+        :return: List of artists to be drawn. Use for ANIMATED plotting
         """
         artists = []  # list of artists to be plotted
 
@@ -427,19 +389,4 @@ class Tour(Optimizable):
 
 
 if __name__ == '__main__':
-    from helper.utils import make_dist_matrix
-
-    requests = [vx.Vertex(f'{i}', i, i, 0, 0, 10, 0) for i in range(3)]
-    new_request = vx.Vertex('new', 99, 99, 0, 0, 10, 0)
-    distance_matrix = make_dist_matrix([*requests, new_request])
-    tour = Tour('tour', vx.DepotVertex('depot', 0, 0), distance_matrix)
-    for r in requests:
-        tour.insert_and_update(1, r)
-    print(tour)
-
-    new_tour = deepcopy(tour)
-    print(new_request)
-    new_tour.insert_and_update(1, new_request)
-    print(new_request)
-
-    print('End')
+    pass
