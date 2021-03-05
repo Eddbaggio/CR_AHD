@@ -14,12 +14,14 @@ from tqdm import tqdm
 import src.cr_ahd.core_module.carrier as cr
 import src.cr_ahd.core_module.vehicle as vh
 import src.cr_ahd.core_module.vertex as vx
-from src.cr_ahd.core_module.Optimizable import Optimizable
-from src.cr_ahd.utility_module.utils import split_iterable, make_dist_matrix, opts, Solomon_Instances, path_input_custom, \
-    path_input_solomon, unique_path, path_output_custom, ask_for_overwrite_permission, get_carrier_by_id
+from src.cr_ahd.core_module.optimizable import Optimizable
 from src.cr_ahd.solving_module.initializing_visitor import InitializingVisitor
 from src.cr_ahd.solving_module.local_search_visitor import FinalizingVisitor
-from src.cr_ahd.solving_module.routing_visitor import RoutingVisitor, SequentialCheapestInsertion
+from src.cr_ahd.solving_module.routing_visitor import RoutingVisitor
+from src.cr_ahd.utility_module.istarmap import istarmap
+from src.cr_ahd.utility_module.utils import split_iterable, make_dist_matrix, opts, Solomon_Instances, \
+    path_input_custom, \
+    path_input_solomon, unique_path, path_output_custom, ask_for_overwrite_permission
 
 
 class Instance(Optimizable):
@@ -44,15 +46,16 @@ class Instance(Optimizable):
         else:
             self._distance_matrix = make_dist_matrix([*self.requests, *[c.depot for c in self.carriers]])
 
-        self._initialized = False
-        self._solved = False
-        self._finalized = False
-        self._initializing_visitor: InitializingVisitor = None
-        self._routing_visitor: RoutingVisitor = None
-        self._finalizing_visitor: FinalizingVisitor = None
+        # self._initialized = False
+        # self._solved = False
+        # self._finalized = False
+        # self._initializing_visitor: InitializingVisitor = None
+        # self._routing_visitor: RoutingVisitor = None
+        # self._finalizing_visitor: FinalizingVisitor = None
+        self.solution_algorithm = None
 
     def __str__(self):
-        return f'{"Solved " if self.solved else ""}Instance {self.id_} with {len(self.requests)} customers and {len(self.carriers)} carriers'
+        return f'Instance {self.id_} with {len(self.requests)} customers and {len(self.carriers)} carriers'
 
     @property
     def distance_matrix(self):
@@ -81,7 +84,9 @@ class Instance(Optimizable):
     def num_requests(self):
         """The number of requests"""
         return len(self.requests)
+        pass
 
+    '''
     @property
     def initializing_visitor(self):
         """route initialization strategy to create (preliminary) pendulum tours"""
@@ -91,11 +96,11 @@ class Instance(Optimizable):
     def initializing_visitor(self, visitor):
         """Setter for the pendulum tour initialization strategy. Will set the given visitor also for all carriers and
         their vehicles """
-        assert (
-            not self._initialized), f"Instance's tours have been initialized with strategy {self.initializing_visitor.__class__.__name__} already!"
+        # assert (
+        #     not self._initialized), f"Instance's tours have been initialized with strategy {self.initializing_visitor.__class__.__name__} already!"
         self._initializing_visitor = visitor
-        # for c in self.carriers:
-        #     c.initializing_visitor = visitor
+        for c in self.carriers:
+            c.initializing_visitor = visitor
 
     @property
     def routing_visitor(self):
@@ -105,11 +110,11 @@ class Instance(Optimizable):
     @routing_visitor.setter
     def routing_visitor(self, visitor):
         """Setter for the routing  algorithm"""
-        assert (
-            not self.solved), f"Instance has been solved with visitor {self.routing_visitor.__class__.__name__} already!"
+        # assert (
+        #     not self.solved), f"Instance has been solved with visitor {self.routing_visitor.__class__.__name__} already!"
         self._routing_visitor = visitor
-        # for carrier in self.carriers:
-        #     carrier.routing_visitor = visitor
+        for carrier in self.carriers:
+            carrier.routing_visitor = visitor
         pass
 
     @property
@@ -120,10 +125,13 @@ class Instance(Optimizable):
     @finalizing_visitor.setter
     def finalizing_visitor(self, visitor):
         """Setter for the local search algorithm that can be used to finalize the results"""
-        assert (
-            not self._finalized), f"Instance has been finalized with visitor {self.finalizing_visitor.__class__.__name__} already!"
+        # assert (
+        #     not self._finalized), f"Instance has been finalized with visitor {self.finalizing_visitor.__class__.__name__} already!"
         self._finalizing_visitor = visitor
+        for carrier in self.carriers:
+            carrier.finalizing_visitor = visitor
         pass
+
 
     @property
     def parameters_string(self) -> str:
@@ -132,7 +140,6 @@ class Instance(Optimizable):
             self.routing_visitor.__class__.__name__,
             self.finalizing_visitor.__class__.__name__
         ])
-
     @property
     def initialized(self):
         return self._initialized
@@ -162,6 +169,7 @@ class Instance(Optimizable):
         assert not self.finalized, f'{self} has already been finalized'
         self._finalized = finalized
         pass
+    '''
 
     @property
     def cost(self):
@@ -244,7 +252,7 @@ class Instance(Optimizable):
 
     @property
     def evaluation_metrics(self):
-        assert self.solved, f'{self} has not been solved yet'
+        # assert self.solved, f'{self} has not been solved yet'
         return dict(id=self.id_,
                     rand_copy=self.id_.split('#')[-1],
                     solomon_base=self.solomon_base,
@@ -255,12 +263,13 @@ class Instance(Optimizable):
                     cost=self.cost,
                     revenue=self.revenue,
                     profit=self.profit,
-                    initializing_visitor=self.initializing_visitor.__class__.__name__,
-                    initialized=self._initialized,
-                    routing_visitor=self._routing_visitor.__class__.__name__,
-                    solved=self.solved,
-                    finalizing_visitor=self._finalizing_visitor.__class__.__name__,
-                    finalized=self._finalized,
+                    # initializing_visitor=self.initializing_visitor.__class__.__name__,
+                    # initialized=self._initialized,
+                    # routing_visitor=self._routing_visitor.__class__.__name__,
+                    # solved=self.solved,
+                    # finalizing_visitor=self._finalizing_visitor.__class__.__name__,
+                    # finalized=self._finalized,
+                    solution_algorithm=self.solution_algorithm.__class__.__name__.replace('Solver', ''),
                     # runtime=self._runtime,
                     **self.num_act_veh_per_carrier,
                     **self.num_requests_per_carrier,
@@ -317,7 +326,7 @@ class Instance(Optimizable):
         """
 
         # raise UserWarning('Only call this method for constructing new instances & writing them to disk.')
-        assert not self.solved, f'Instance {self} has already been solved'
+        # assert not self.solved, f'Instance {self} has already been solved'
         if random_seed:
             np.random.seed(random_seed)
 
@@ -349,7 +358,6 @@ class Instance(Optimizable):
     #     self._finalizing_visitor = visitor
     #     visitor.finalize_instance(self)
     #     pass
-
 
     def cheapest_insertion_auction(self, request: vx.Vertex, initial_carrier: cr.Carrier, verbose=opts['verbose'], ):
         """
@@ -520,21 +528,11 @@ class Instance(Optimizable):
         :return: the file path as a pathlib.Path object
         """
         file_name = path_input_custom.joinpath(self.solomon_base, self.id_)
-        file_name.parent.mkdir(parents=True, exist_ok=True)
-
-        # check if any customers are assigned to carriers already and set the
-        # file name
-        assigned_requests = []
-        for c in self.carriers:
-            assigned_requests.extend(c.requests)
-        if any(assigned_requests):
+        # check if any customers are assigned to carriers already and set the file name
+        if self.assigned_requests():
             file_name = file_name.with_name(file_name.stem + '_ass')
-
-        # check how many instances of this type already have been stored and
-        # enumerate file name accordingly
         file_name = unique_path(file_name.parent, file_name.stem + '_#{:03d}' + '.json')
-
-        file_name = file_name.with_suffix('.json')  # TODO redundant?
+        file_name.parent.mkdir(parents=True, exist_ok=True)
         with open(file_name, mode='w') as write_file:
             json.dump(self.to_dict(), write_file, indent=4)
         return file_name
@@ -544,9 +542,9 @@ class Instance(Optimizable):
         Write the instance's solution to a json file
         :return: the file path as a pathlib.Path object
         """
-        assert self.solved
+        # assert self.solved
 
-        file_path = path_output_custom.joinpath(self.solomon_base, f'{self.id_}_{self.parameters_string}_solution')
+        file_path = path_output_custom.joinpath(self.solomon_base, f'{self.id_}_{self.solution_algorithm.__class__.__name__.replace("Solver", "")}_solution')
         file_path = file_path.with_suffix('.json')
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -574,9 +572,6 @@ def read_solomon(name: str, num_carriers: int) -> Instance:
     :param num_carriers: number of carriers to be added to the instance
     :return: realization of the Instance class
     """
-    # TODO: a more efficient way of reading the data, e.g.  by reading all
-    # vertices at once and split off the depot
-    #  after; and by not using pd to read vehicles
     file_name = path_input_solomon / f'{name}.txt'
 
     # vehicles
@@ -593,12 +588,14 @@ def read_solomon(name: str, num_carriers: int) -> Instance:
 
     # depots
     depot_df = pd.read_csv(file_name, skiprows=9, nrows=1, delim_whitespace=True, names=cols)
+    depots = [vx.DepotVertex(f'd{i}', int(depot_df.x_coord[0]), int(depot_df.y_coord[0])) for i in range(num_carriers)]
+
+    distance_matrix = make_dist_matrix([*requests, *depots])
 
     # carriers
     carriers = []
     for i in range(num_carriers):
-        depot = vx.DepotVertex(f'd{i}', int(depot_df.x_coord[0]), int(depot_df.y_coord[0]))
-        c = cr.Carrier(f'c{i}', depot, next(vehicles))
+        c = cr.Carrier(f'c{i}', depots[i], next(vehicles), dist_matrix=distance_matrix)
         carriers.append(c)
     inst = Instance(name, requests, carriers)
     if opts['verbose'] > 0:
@@ -610,8 +607,8 @@ def read_solomon(name: str, num_carriers: int) -> Instance:
 def make_custom_from_solomon(solomon: Instance, custom_name: str, num_carriers: int, num_vehicles_per_carrier: int,
                              vehicle_capacity: int, verbose: int = opts['verbose']):
     """
-    Create a customized instance for the collaborative transportation network from a Solomon instance. First, reads the
-    specified solomon instance with the given number of carriers, then adds the defined number of vehicles
+    Create a customized instance for the collaborative transportation network from a Solomon instance with the given
+    number of carriers, then adds the defined number of vehicles
 
     :param solomon: The solomon instance (already read in) that serves as the base for the custom instance
     :param custom_name: name/id for the customized instance
@@ -621,8 +618,7 @@ def make_custom_from_solomon(solomon: Instance, custom_name: str, num_carriers: 
     :param verbose: level of console output
     :return: the custom instance as a realization of the Instance class
     """
-    carriers = []  # collect carriers.  these will overwrite the ones created by the
-    # read_solomon() function
+    carriers = []  # collect carriers.  these will overwrite the ones created by the read_solomon() function
     for i in range(num_carriers):
         vehicles = []
         for j in range(num_vehicles_per_carrier):
@@ -632,9 +628,10 @@ def make_custom_from_solomon(solomon: Instance, custom_name: str, num_carriers: 
         depot = vx.DepotVertex(depot.id_, depot.coords.x, depot.coords.y, depot.carrier_assignment)
         carrier = cr.Carrier(f'c{i}',
                              depot=depot,
-                             vehicles=vehicles)
+                             vehicles=vehicles,
+                             dist_matrix=solomon.distance_matrix)
         carriers.append(carrier)
-    inst = Instance(custom_name, solomon.requests, carriers)
+    inst = Instance(custom_name, solomon.requests, carriers, solomon.distance_matrix)
     if verbose > 0:
         print(f'Created custom instance {inst}')
     return inst
@@ -748,13 +745,17 @@ def make_and_write_custom_instances(solomon_name, num_carriers, num_vehicles, nu
     pass
 
 
-def make_and_write_custom_instances_parallel(num_carriers, num_vehicles, num_new_instances):
+def make_and_write_custom_instances_parallel(num_carriers, num_vehicles, num_new_instances,
+                                             include_central_instances: bool = True):
     ask_for_overwrite_permission(path_input_custom)
-    iterables = [(s, c, v, n)
-                 for s in Solomon_Instances
-                 for c in [num_carriers]
-                 for v in [num_vehicles]
-                 for n in [num_new_instances]]
+    iterables = []
+    for s in Solomon_Instances:
+        for c in [num_carriers]:
+            for v in [num_vehicles]:
+                for n in [num_new_instances]:
+                    iterables.append((s, c, v, n))
+        if include_central_instances:
+            iterables.append((s, 1, num_carriers * num_vehicles, 1))
     with multiprocessing.Pool() as pool:
         for _ in tqdm(pool.istarmap(make_and_write_custom_instances, iterables), total=len(iterables)):
             pass
@@ -764,8 +765,11 @@ def make_and_write_custom_instances_parallel(num_carriers, num_vehicles, num_new
 if __name__ == '__main__':
     # If you need to re-create the custom instances run the following:
     start_time = time.time()
-    make_and_write_custom_instances_parallel(num_carriers=3, num_vehicles=15, num_new_instances=100)
-    # make_and_write_custom_instances('C101', 3, 15, 3)
+    # make_and_write_custom_instances('C101', 3, 15, 3)  # single, for testing
+    make_and_write_custom_instances_parallel(num_carriers=3,
+                                             num_vehicles=15,
+                                             num_new_instances=100,
+                                             include_central_instances=True)  # all
     duration = time.time() - start_time
     print(f"Duration: {duration} seconds")
     pass

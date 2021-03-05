@@ -39,8 +39,8 @@ class TwoOpt(FinalizingVisitor):
     def finalize_instance(self, instance):
         for carrier in instance.carriers:
             self.finalize_carrier(carrier)
-        instance.finalizing_visitor = self
-        instance._finalized = True
+        # instance.finalizing_visitor = self
+        # instance._finalized = True
         pass
 
     def finalize_carrier(self, carrier):
@@ -49,7 +49,7 @@ class TwoOpt(FinalizingVisitor):
             print(f'2-opt finalizing for {carrier}')
         for vehicle in carrier.active_vehicles:
             self.finalize_tour(vehicle.tour)
-        carrier._finalized = True
+        # carrier._finalized = True
         pass
 
     def finalize_tour(self, tour):
@@ -73,7 +73,7 @@ class TwoOpt(FinalizingVisitor):
                     except InsertionError as e:
                         continue  # if reversal is infeasible, continue with next iteration
 
-        tour._finalized = True
+        # tour._finalized = True
         pass
 
 

@@ -57,8 +57,8 @@ class EarliestDueDate(InitializingVisitor):
         for carrier in instance.carriers:
             # carrier.initialize(EarliestDueDate(self.verbose, self.plot_level))
             self.initialize_carrier(carrier)
-        instance.initializing_visitor = self
-        instance._initialized = True
+        # instance.initializing_visitor = self
+        # instance._initialized = True
         return
 
     def initialize_carrier(self, carrier):
@@ -68,8 +68,8 @@ class EarliestDueDate(InitializingVisitor):
             # find request with earliest deadline and initialize pendulum tour
             seed = self.find_seed_request(carrier)
             vehicle.tour.insert_and_update(index=1, vertex=seed)
-        carrier.initializing_visitor = self
-        carrier._initialized = True
+        # carrier.initializing_visitor = self
+        # carrier._initialized = True
         pass
 
 

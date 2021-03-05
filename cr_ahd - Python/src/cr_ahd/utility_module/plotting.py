@@ -21,10 +21,10 @@ class CarrierConstructionAnimation(object):
         self.ax.set_title(title)
         x = [r.coords.x for r in carrier.requests]
         y = [r.coords.y for r in carrier.requests]
-        self.requests = self.ax.plot(x, y, marker='o', markersize=9, mfc='white', c='black', ls='')
-        self.depot = self.ax.plot(*carrier.depot.coords, marker='s', markersize=9, c='black', ls='',
+        self.requests_artist = self.ax.plot(x, y, marker='o', markersize=9, mfc='white', c='black', ls='')
+        self.depot_artist = self.ax.plot(*carrier.depot.coords, marker='s', markersize=9, c='black', ls='',
                                   label=carrier.depot.id_)
-        self.freeze_frames = [*self.requests, *self.depot]  # artists that are plotted each frame
+        self.freeze_frames = [*self.requests_artist, *self.depot_artist]  # artists that are plotted each frame
         self.ims = []
 
     def add_current_frame(self, vehicle: Union['all', Vehicle] = 'all'):
@@ -36,7 +36,7 @@ class CarrierConstructionAnimation(object):
                 a = v.tour.plot(color=v.color, plot_depot=False)
                 artists.extend(a)
         legend_artists = [a for a in artists if type(a) != Annotation]
-        legend_artists.extend(self.depot)
+        legend_artists.extend(self.depot_artist)
         self.ax: plt.Axes
         legend = self.ax.legend(handles=legend_artists,
                                 labels=[la.get_label() for la in legend_artists],
@@ -48,7 +48,7 @@ class CarrierConstructionAnimation(object):
                                 # mode="expand",
                                 # borderaxespad=0.
                                 )
-        frame = [*self.requests, *self.freeze_frames, *artists, legend]
+        frame = [*self.requests_artist, *self.freeze_frames, *artists, legend]
         self.ims.append(frame)
         return frame
 

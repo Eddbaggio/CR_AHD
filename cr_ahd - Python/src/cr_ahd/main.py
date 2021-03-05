@@ -1,14 +1,16 @@
 import multiprocessing
 from copy import deepcopy
 from pathlib import Path
+from typing import List
 
 import pandas as pd
 from tqdm import tqdm
 
 from solving_module.Solver import Solver
 from src.cr_ahd.core_module import instance as it
+from src.cr_ahd.solving_module.routing_visitor import RoutingVisitor
+from src.cr_ahd.utility_module.evaluation import bar_plot_with_errors
 from utility_module.utils import path_input_custom, path_output_custom
-import matplotlib.pyplot as plt
 
 
 # TODO write pseudo codes for ALL the stuff that's happening
@@ -34,48 +36,43 @@ import matplotlib.pyplot as plt
 #  re-reverting the attempt
 
 
-def execute_all_visitors(base_instance: it.Instance, centralized_flag: bool = True):
+def execute_all(instance: it.Instance):
     """
-    :param base_instance: (custom) instance that will we (deep)copied for each algorithm
-    :param centralized_flag: TRUE if also a central (a single central carrier) instance (deep)copy shall be created
-    and solved
+    :param instance: (custom) instance that will we (deep)copied for each algorithm
     :return: evaluation metrics (Instance.evaluation_metrics) of all the solutions obtained
     """
     results = []
 
     # non-centralized instances
     for solver in Solver.__subclasses__():
-        print(f'Solving {base_instance.id_} with {solver.__name__}...')
-        copy = deepcopy(base_instance)
-        solver().solve(copy)
+        # print(f'Solving {base_instance.id_} with {solver.__name__}...')
+        copy = deepcopy(instance)
+        solver().execute(copy)
         copy.write_solution_to_json()
         results.append(copy.evaluation_metrics)
-
-    for r in results:
-        for k, v in r.items():
-            print(f'{k}:\t {v}')
-
-    print()
-
-
-
     return results
 
 
-def read_and_execute_all_visitors(path: Path):
+def read_and_execute_all(path: Path):
     """reads CUSTOM instance from a given path before executing all available visitors"""
     instance = it.read_custom_json_instance(path)
-    results = execute_all_visitors(instance)
+    results = execute_all(instance)
     return results
 
 
-def read_n_and_execute_all_visitors_parallel(n=100):
-    """reads the first n variants of the CUSTOM instances and runs all visitors via multiprocessing"""
-    custom_files_paths = get_first_n_instance_paths(n)
+def read_and_execute_all_parallel(n: int, which: List):
+    """reads the first n variants of the CUSTOM instances specified by the solomon list and runs all visitors via
+    multiprocessing
+
+    :param n:number of randomized instances to consider
+    :param which: which instances (defined by Solomon string) to consider
+    """
+    custom_files_paths = get_custom_instance_paths(n, which)
 
     result_collection = []
     with multiprocessing.Pool() as pool:
-        for results in tqdm(pool.map(read_and_execute_all_visitors, custom_files_paths), total=len(custom_files_paths)):
+        for results in tqdm(pool.imap(read_and_execute_all, custom_files_paths),
+                            total=len(custom_files_paths)):
             result_collection.extend(results)
 
     grouped = write_results(result_collection)  # rename function; not clear what are the results?
@@ -84,8 +81,7 @@ def read_n_and_execute_all_visitors_parallel(n=100):
 
 def write_results(result_collection: list):
     performance = pd.DataFrame(result_collection)
-    performance = performance.set_index(['solomon_base', 'rand_copy', 'initializing_visitor', 'routing_visitor',
-                                         'finalizing_visitor', 'num_carriers', 'num_vehicles'])
+    performance = performance.set_index(['solomon_base', 'rand_copy', 'solution_algorithm', 'num_carriers', 'num_vehicles'])
     grouped = performance.groupby('solomon_base')
     # write the results
     for name, group in grouped:
@@ -98,64 +94,24 @@ def write_results(result_collection: list):
     return grouped
 
 
-def get_first_n_instance_paths(n):
-    """retrieve the Path to the first n custom instances"""
-    custom_directories = path_input_custom.iterdir()
+def get_custom_instance_paths(n, which: List):
+    """retrieve the Path to the first n custom instances
+    :param n: number of custom paths to retrieve, if None, then all available files are considered
+    :param which: List of customized solomon name instances to consider"""
+
+    custom_directories = (path_input_custom.joinpath(s) for s in which)
     custom_files_paths = []
     for cd in custom_directories:
         custom_files_paths.extend(list(cd.iterdir())[:n])
     return custom_files_paths
 
 
-'''
-def multi_func(solomon, num_of_inst):
-    """
-    splits different instances to multiple threads/cores
-    for the first num_of_inst custom instances that exists in the solomon type folder, this function runs all available
-    algorithms to solve each of these instances. The results are collected, transformed into a pd.DataFrame and saved as
-    .csv
-    :param solomon: solomon base class to be used. will read custom made classes from this base class
-    :param num_of_inst: number of instances to read and solve
-    """
-    name = multiprocessing.current_process().name
-    pid = os.getpid()
-    print(f'{solomon} in {name} - {pid}')
-
-    directory = path_input_custom.joinpath(solomon)
-    instance_paths = list(directory.iterdir())[:num_of_inst]  # find the first num_of_inst custom instances
-    centralized_flag = True  # TRUE if also the centralized versions should be solved
-    solomon_base_results = []  # collecting all the results
-    for inst_path in tqdm(iterable=instance_paths):
-        path = directory.joinpath(inst_path)
-        base_instance = it.read_custom_json_instance(path)
-        results = execute_all_visitors(base_instance, centralized_flag)
-        solomon_base_results.extend(results)
-        centralized_flag = False
-
-    performance = pd.DataFrame(solomon_base_results)
-    performance = performance.set_index(['solomon_base', 'rand_copy', 'initializing_visitor', 'routing_visitor',
-                                         'finalizing_visitor', 'num_carriers', 'num_vehicles'])
-
-    # write the results
-    write_dir = path_output_custom.joinpath(solomon)
-    write_dir.mkdir(parents=True,
-                    exist_ok=True)  # TODO All the directory creation should happen in the beginning somewhere once
-    file_name = f'{base_instance.id_.split("#")[0]}eval.csv'
-    write_path = write_dir.joinpath(file_name)
-    performance.to_csv(write_path)
-'''
-
 if __name__ == '__main__':
-    # jobs = []
-    # solomon_list = ['C101', 'C201', 'R101', 'R201', 'RC101', 'RC201']
-    # for solomon in solomon_list:
-    #     process = multiprocessing.Process(target=multi_func, args=(solomon, 1,))
-    #     jobs.append(process)
-    #     process.start()
-    # for j in jobs:  # to ensure that program waits until all processes have finished before continuing
-    #     j.join()
-
-    # NEW
-    read_and_execute_all_visitors(Path(
-        "../../../data/Input/Custom/C101/C101_3_15_ass_#001.json"))
-    # grouped_evaluations = read_n_and_execute_all_visitors_parallel(3)
+    solomon_list = ['C101', 'C201', 'R101', 'R201', 'RC101', 'RC201']
+    # read_and_execute_all(Path("../../../data/Input/Custom/C101/C101_3_15_ass_#001.json"))  # single
+    grouped_evaluations = read_and_execute_all_parallel(n=5, which=solomon_list)  # multiple
+    bar_plot_with_errors(solomon_list,
+                         columns=['num_act_veh',
+                                  'cost',
+                                  ],
+                         )

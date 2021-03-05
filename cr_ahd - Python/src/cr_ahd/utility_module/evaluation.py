@@ -5,10 +5,10 @@ from matplotlib.ticker import AutoMinorLocator
 from typing import List
 
 from src.cr_ahd.solving_module.routing_visitor import RoutingVisitor
-from src.cr_ahd.utility_module.utils import univie_cmap, path_output_custom
+from src.cr_ahd.utility_module.utils import univie_cmap, path_output_custom, univie_cmap_paired
 
 
-def bar_plot_with_errors(solomon_list: list, algorithms: List[str], columns: List[str], fig_size: tuple = (10.5, 4.5)):
+def bar_plot_with_errors(solomon_list: list, columns: List[str], fig_size: tuple = (10.5, 4.5)):
     """
     Reads and combines the evaluation csv files of each instance type in solomon_list. Filters for only the given
     algorithms and saves an individual comparison bar plot for each given column.
@@ -18,21 +18,22 @@ def bar_plot_with_errors(solomon_list: list, algorithms: List[str], columns: Lis
     :param solomon_list: the solomon base instances that shall be compared
     :param columns: the columns for which an individual bar plot is saved
     """
-    eval = combine_eval_files(algorithms, solomon_list)
+    eval = combine_eval_files(solomon_list)
     for col in columns:
-        grouped = eval[col].unstack('solomon_base').groupby(['initializing_visitor', 'routing_visitor', 'finalizing_visitor' ])
+        grouped = eval[col].unstack('solomon_base').groupby(['solution_algorithm',
+                                                             'num_carriers'])
 
         # plotting parameters
         width = 1 / (grouped.ngroups + 2)
         ind = np.arange(len(solomon_list))
-        cmap = univie_cmap
+        cmap = univie_cmap_paired
         # plt.get_cmap('Set1')  # 'Paired', 'Set1',
         cmap_median = ['#C9D9E7', '#91B2CD',
                        '#EDBBA7', '#EDBBA7',
                        '#CED1BC', '#CED1BC',
                        '#E9D4AC', '#E9D4AC',
                        '#B9CEC9', '#B9CEC9']
-        cmap_coolors = ['#F94144',
+        cmap_colors = ['#F94144',
                         '#F3722C',
                         '#F8961E',
                         '#F9C74F',
@@ -84,45 +85,38 @@ def bar_plot_with_errors(solomon_list: list, algorithms: List[str], columns: Lis
             bbox_to_anchor=(0.5, -0.1),
             fancybox=True,
             shadow=True,
-            ncol=5
+            # ncol=5
         )
         ax.set_title(f'Mean + Std of {col} per algorithm ')
         fig.set_size_inches(fig_size)
-        fig.savefig(f'../data/Output/Custom/bar_plot_{col}.pdf', bbox_inches='tight')
-        fig.savefig(f'../data/Output/Custom/bar_plot_{col}.png', bbox_inches='tight')
+        fig.savefig(path_output_custom.joinpath(f'bar_plot_{col}.pdf'), bbox_inches='tight')
+        fig.savefig(path_output_custom.joinpath(f'bar_plot_{col}.png'), bbox_inches='tight')
         # plt.show()
 
 
-def combine_eval_files(algorithms, solomon_list, save: bool = True):
+def combine_eval_files(solomon_list, save: bool = True):
     """
+    iterates through the dir
 
-
-    :param algorithms:
     :param solomon_list:
     :param save:
     :return:
     """
-    eval = pd.DataFrame()
+    evaluation = pd.DataFrame()
     for solomon in solomon_list:
-        file_name = path_output_custom.joinpath(solomon, f'{solomon}_3_15_ass_eval').with_suffix('.csv')
+        file_name = next(path_output_custom.joinpath(solomon).glob('*eval.csv'))  # there should only be one eval file
         df = pd.read_csv(file_name)
-        eval = eval.append(df)
-    eval = eval[eval.routing_visitor.isin(algorithms)]
-    eval = eval.set_index(['solomon_base', 'rand_copy', 'initializing_visitor', 'routing_visitor',
-                           'finalizing_visitor'])
+        evaluation = evaluation.append(df)
+    evaluation = evaluation.set_index(['solomon_base', 'rand_copy', 'solution_algorithm', 'num_carriers'])
     if save:
-        eval.to_csv(path_output_custom.joinpath('Evaluation').with_suffix('.csv'))
-    return eval
+        evaluation.to_csv(path_output_custom.joinpath('Evaluation').with_suffix('.csv'))
+    return evaluation
 
 
 if __name__ == '__main__':
     solomon_list = ['C101', 'C201', 'R101', 'R201', 'RC101', 'RC201']
-    # no need to solve the instances before evaluation, the plotting function will read the solution json files
-
     bar_plot_with_errors(solomon_list,
-                         algorithms=[rs.__name__ for rs in RoutingVisitor.__subclasses__()],
                          columns=['num_act_veh',
                                   'cost',
                                   ],
                          )
-#     bar_plot_with_errors('cost')

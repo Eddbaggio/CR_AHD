@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 import src.cr_ahd.core_module.vehicle as vh
 import src.cr_ahd.core_module.vertex as vx
-from src.cr_ahd.core_module.Optimizable import Optimizable
+from src.cr_ahd.core_module.optimizable import Optimizable
 from src.cr_ahd.solving_module.initializing_visitor import InitializingVisitor
 from src.cr_ahd.solving_module.local_search_visitor import FinalizingVisitor
 from src.cr_ahd.solving_module.routing_visitor import RoutingVisitor
@@ -40,17 +40,17 @@ class Carrier(Optimizable):
         self._requests = requests
         self._distance_matrix = dist_matrix
 
-        self._initializing_visitor: InitializingVisitor = None
-        self._initialized = False
-        self._routing_visitor: RoutingVisitor = None
-        self._solved = False
-        self._finalizing_visitor: FinalizingVisitor = None
-        self._finalized = False
+        # self._initializing_visitor: InitializingVisitor = None
+        # self._initialized = False
+        # self._routing_visitor: RoutingVisitor = None
+        # self._solved = False
+        # self._finalizing_visitor: FinalizingVisitor = None
+        # self._finalized = False
         for v in vehicles:
             v.tour = Tour(id_=v.id_, depot=depot, distance_matrix=dist_matrix)
 
     def __str__(self):
-        return f'Carrier (ID:{self.id_}, Depot:{self.depot}, Vehicles:{len(self.vehicles)}, Requests:{len(self.requests)}, Unrouted:{len(self.unrouted_requests)})'
+        return f'Carrier (ID:{self.id_}, Depot:{self.depot.id_}, Vehicles:{len(self.vehicles)}, Requests:{len(self.requests)}, Unrouted:{len(self.unrouted_requests)})'
 
     def cost(self, ndigits: int = 15):
         route_cost = 0
@@ -119,6 +119,7 @@ class Carrier(Optimizable):
         """List of vehicles that serve no request Vertex but have depot-depot tour only"""
         return [v for v in self.vehicles if not v.is_active]
 
+    '''
     @property
     def initializing_visitor(self):
         return self._initializing_visitor
@@ -134,7 +135,7 @@ class Carrier(Optimizable):
 
     @routing_visitor.setter
     def routing_visitor(self, visitor):
-        assert self._routing_visitor is None, f'routing visitor already set'
+        assert self._routing_visitor is None or self._routing_visitor == visitor, f'routing visitor already set'
         self._routing_visitor = visitor
 
     @property
@@ -145,10 +146,10 @@ class Carrier(Optimizable):
     @finalizing_visitor.setter
     def finalizing_visitor(self, visitor):
         """Setter for the local search algorithm that can be used to finalize the results"""
-        assert (
-            not self._finalized), f"carrier has been finalized with visitor {self._finalizing_visitor.__class__.__name__} already!"
+        # assert (
+        #     not self._finalized), f"carrier has been finalized with visitor {self._finalizing_visitor.__class__.__name__} already!"
         self._finalizing_visitor = visitor
-
+    '''
     def to_dict(self):
         """Nested dictionary representation of self"""
         return {
@@ -161,7 +162,7 @@ class Carrier(Optimizable):
 
         }
 
-    def assign_request(self, request: vx.Vertex):
+    def assign_request(self, request: vx.BaseVertex):
         """
         Assign a request to the carrier (self). It will be stored in self.requests by its id
 
@@ -191,10 +192,12 @@ class Carrier(Optimizable):
         while self.requests:
             self.retract_request(self.requests[0])
 
+    '''
     def initialize_another_tour(self):
         """initializes another vehicle pendulum tour, using the InitializingVisitor that has been set the first time
          around"""
         self.initializing_visitor.initialize_carrier(self)
+    '''
 
     '''def initialize(self, visitor: InitializingVisitor):
         """apply visitor's initialization procedure to create a pendulum tour"""

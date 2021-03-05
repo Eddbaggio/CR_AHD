@@ -2,7 +2,7 @@ from copy import deepcopy
 from typing import List
 import matplotlib.pyplot as plt
 
-from src.cr_ahd.core_module.Optimizable import Optimizable
+from src.cr_ahd.core_module.optimizable import Optimizable
 import src.cr_ahd.core_module.vertex as vx
 from src.cr_ahd.solving_module.initializing_visitor import InitializingVisitor
 from src.cr_ahd.solving_module.local_search_visitor import FinalizingVisitor
@@ -19,10 +19,10 @@ class Tour(Optimizable):
         self._cost = 0
         self.arrival_schedule = []  # arrival times
         self.service_schedule = []  # start of service times
-        self._initializing_visitor: InitializingVisitor = None
-        self._initialized = False
-        self._finalizing_visitor: FinalizingVisitor = None
-        self._finalized = False
+        # self._initializing_visitor: InitializingVisitor = None
+        # self._initialized = False
+        # self._finalizing_visitor: FinalizingVisitor = None
+        # self._finalized = False
 
         self.insert_and_update(0, depot)
         self.insert_and_update(1, depot)
@@ -67,7 +67,7 @@ class Tour(Optimizable):
     @distance_matrix.setter
     def distance_matrix(self, distance_matrix):
         self._distance_matrix = distance_matrix
-
+    '''
     @property
     def finalizing_visitor(self):
         """the finalizer local search optimization, such as 2opt or 3opt"""
@@ -76,9 +76,10 @@ class Tour(Optimizable):
     @finalizing_visitor.setter
     def finalizing_visitor(self, visitor):
         """Setter for the local search algorithm that can be used to finalize the results"""
-        assert (not self._finalized), f"Instance has been finalized with " \
-                                      f"visitor {self._finalizing_visitor.__class__.__name__} already!"
+        # assert (not self._finalized), f"Instance has been finalized with " \
+        #                               f"visitor {self._finalizing_visitor.__class__.__name__} already!"
         self._finalizing_visitor = visitor
+    '''
 
     @property
     def cost(self):
@@ -199,131 +200,7 @@ class Tour(Optimizable):
         insertion_cost = dist_i_u + dist_u_j - dist_i_j
         return insertion_cost
 
-    def is_feasible(self, start_time=opts['start_time'], verbose=opts['verbose']) -> bool:
-        """
 
-        :param start_time:
-        :param verbose:
-        :return:
-        """
-        if verbose > 2:
-            print(f'== Feasibility Check')
-            print(self)
-        service_schedule = self.service_schedule.copy()
-        service_schedule[0] = start_time
-        for rho in range(1, len(self)):
-            i: vx.Vertex = self.routing_sequence[rho - 1]
-            j: vx.Vertex = self.routing_sequence[rho]
-            dist = self.distance_matrix.loc[i.id_, j.id_]
-            if verbose > 3:
-                print(f'iteration {rho}; service_schedule: {service_schedule}')
-            earliest_arrival = service_schedule[rho - 1] + i.service_duration + travel_time(dist)
-            if earliest_arrival > j.tw.l:
-                if verbose > 2:
-                    # print(f'From {i} to {j}')
-                    # print(f'Predecessor start of service : {service_schedule[rho - 1]}')
-                    # print(f'Predecessor service time : {i.service_duration}')
-                    # print(f'Distance : {dist}')
-                    # print(f'Travel time: {travel_time(dist)}')
-                    print(f'Infeasible! {round(earliest_arrival, 2)} > {j.id_}.tw.l: {j.tw.l}')
-                    # print()
-                return False
-            else:
-                service_schedule[rho] = max(j.tw.e, earliest_arrival)
-        return True
-
-    def c1(self,
-           i_index: int,
-           u: vx.Vertex,
-           j_index: int,
-           alpha_1: float,
-           mu: float,
-           ) -> float:
-        """
-        c1 criterion of Solomon's I1 insertion heuristic: "best feasible insertion cost"
-        Does NOT include a feasibility check. Following the
-        description by (Bräysy, Olli; Gendreau, Michel (2005): Vehicle Routing Problem with Time Windows,
-        Part I: Route Construction and Local Search Algorithms. In Transportation Science 39 (1), pp. 104–118. DOI:
-        10.1287/trsc.1030.0056.)
-        """
-        alpha_2 = 1 - alpha_1
-
-        i = self.routing_sequence[i_index]
-        j = self.routing_sequence[j_index]
-
-        # compute c11
-        c11 = self._c11(i, u, j, mu)
-
-        # compute c12
-        c12 = self._c12(j_index, u)
-
-        # compute and return c1
-        return alpha_1 * c11 + alpha_2 * c12
-
-    def _c11(self, i, u, j, mu):
-        """weighted insertion cost"""
-        c11 = self.distance_matrix.loc[i.id_, u.id_] + self.distance_matrix.loc[u.id_, j.id_] - mu * \
-              self.distance_matrix.loc[i.id_, j.id_]
-        return c11
-
-    def _c12(self, j_index, u):
-        """how much will the arrival time of vertex at index j be pushed back?"""
-        service_start_j = self.service_schedule[j_index]
-        self.insert_and_update(index=j_index, vertex=u)
-        service_start_j_new = self.service_schedule[j_index + 1]
-        c12 = service_start_j_new - service_start_j
-        self.pop_and_update(j_index)
-        return c12
-
-    def c2(self,
-           u: vx.Vertex,
-           c1: float,
-           lambda_: float = opts['lambda'],
-           ):
-        """
-        c2 criterion of Solomon's I1 insertion heuristic: "find the best customer/request"
-        Does NOT include a feasibility check Following the
-        description by (Bräysy, Olli; Gendreau, Michel (2005): Vehicle Routing Problem with Time Windows,
-        Part I: Route Construction and Local Search Algorithms. In Transportation Science 39 (1), pp. 104–118. DOI:
-        10.1287/trsc.1030.0056.)
-        """
-        return lambda_ * self.distance_matrix.loc[self.depot.id_, u.id_] - c1
-
-    def find_best_feasible_I1_insertion(self, u: vx.Vertex, verbose=opts['verbose']):
-        """
-        returns float('-inf') if no feasible insertion position was found
-        :param u:
-        :param verbose:
-        :return:
-        """
-        rho_best = None
-        max_c2 = float('-inf')
-        for rho in range(1, len(self)):
-            i = self.routing_sequence[rho - 1]
-            j = self.routing_sequence[rho]
-
-            # trivial feasibility check
-            if i.tw.e < u.tw.l and u.tw.e < j.tw.l:
-                # TODO: check Solomon (1987) for an efficient and sufficient feasibility check
-                # compute c1(=best feasible insertion cost) and c2(=best request) and update their best values
-                try:
-                    c1 = self.c1(i_index=rho - 1,
-                                 u=u,
-                                 j_index=rho,
-                                 alpha_1=opts['alpha_1'],
-                                 mu=opts['mu'],
-                                 )
-                except InsertionError:
-                    continue
-                if verbose > 1:
-                    print(f'c1({u.id_}->{self.id_}): {c1}')
-                c2 = self.c2(u=u, lambda_=opts['lambda'], c1=c1)
-                if verbose > 1:
-                    print(f'c2({u.id_}->{self.id_}): {c2}')
-                if c2 > max_c2:
-                    max_c2 = c2
-                    rho_best = rho
-        return rho_best, max_c2
 
     '''
     def finalize(self, visitor):
