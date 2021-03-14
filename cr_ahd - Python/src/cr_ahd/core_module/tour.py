@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 
 from src.cr_ahd.core_module.optimizable import Optimizable
 import src.cr_ahd.core_module.vertex as vx
-from src.cr_ahd.solving_module.initializing_visitor import InitializingVisitor
-from src.cr_ahd.solving_module.local_search_visitor import FinalizingVisitor
+from src.cr_ahd.solving_module.tour_initialization import TourInitializationBehavior
+from src.cr_ahd.solving_module.tour_improvement import TourImprovementBehavior
 from src.cr_ahd.utility_module.utils import travel_time, opts, InsertionError
 
 
@@ -67,6 +67,7 @@ class Tour(Optimizable):
     @distance_matrix.setter
     def distance_matrix(self, distance_matrix):
         self._distance_matrix = distance_matrix
+
     '''
     @property
     def finalizing_visitor(self):
@@ -85,30 +86,13 @@ class Tour(Optimizable):
     def cost(self):
         return sum(self._cost_sequence)
 
-    def increase_cost(self, amount):
-        raise NotImplementedError  # has been replaced with the cost_sequence
-        self._cost += amount
-
-    def decrease_cost(self, amount):
-        raise NotImplementedError  # has been replaced with the cost_sequence
-        assert amount <= self.cost, "Cannot have negative costs"
-        self._cost -= amount
-
-    def reset_cost_and_schedules(self):
-        """
-        Resets self.cost, self.arrival_schedule and self.service_schedule to None.
-        """
-        self.decrease_cost(self.cost)
-        self.arrival_schedule = [None] * len(self)  # reset arrival times
-        self.service_schedule = [None] * len(self)  # reset start of service times
-
     def _insert_no_update(self, index: int, vertex: vx.BaseVertex):
         """highly discouraged to use this as it does not ensure feasibility of the route! use insert_and_update instead.
         use this only if infeasible route is acceptable, as e.g. reversing a section where intermediate states of the
         reversal may be infeasible"""
         assert isinstance(vertex, vx.BaseVertex)
         self._routing_sequence.insert(index, vertex)
-        vertex.routed = True
+        vertex.routed = [self, index]
         if len(self) <= 1:
             self._cost_sequence.insert(index, 0)
             self.arrival_schedule.insert(index, opts['start_time'])
@@ -135,7 +119,7 @@ class Tour(Optimizable):
             raise e
         pass
 
-    def _pop_no_update(self, index:int):
+    def _pop_no_update(self, index: int):
         """highly discouraged to use this as it does not ensure feasibility. only use for intermediate states that
         allow infeasible states such as for reversing a section! use pop_and_update instead"""
         popped = self._routing_sequence.pop(index)
@@ -157,6 +141,7 @@ class Tour(Optimizable):
         for rho in range(index, len(self)):
             i: vx.Vertex = self.routing_sequence[rho - 1]
             j: vx.Vertex = self.routing_sequence[rho]
+            i.routed[1] = rho-1  # update the stored index position
             dist = self.distance_matrix.loc[i.id_, j.id_]
             self._cost_sequence[rho] = dist
             arrival = self.service_schedule[rho - 1] + i.service_duration + travel_time(dist)
@@ -199,8 +184,6 @@ class Tour(Optimizable):
         dist_i_j = self.distance_matrix.loc[i.id_, j.id_]
         insertion_cost = dist_i_u + dist_u_j - dist_i_j
         return insertion_cost
-
-
 
     '''
     def finalize(self, visitor):

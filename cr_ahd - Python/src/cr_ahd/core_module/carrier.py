@@ -1,13 +1,10 @@
-from typing import List
+from typing import List, Iterable
 
 import matplotlib.pyplot as plt
 
 import src.cr_ahd.core_module.vehicle as vh
 import src.cr_ahd.core_module.vertex as vx
 from src.cr_ahd.core_module.optimizable import Optimizable
-from src.cr_ahd.solving_module.initializing_visitor import InitializingVisitor
-from src.cr_ahd.solving_module.local_search_visitor import FinalizingVisitor
-from src.cr_ahd.solving_module.routing_visitor import RoutingVisitor
 from src.cr_ahd.core_module.tour import Tour
 
 
@@ -34,11 +31,12 @@ class Carrier(Optimizable):
         self.vehicles = vehicles
         self.num_vehicles = len(self.vehicles)
 
+        self._requests = []
         self._unrouted = []
         if requests is None:
             requests = []
-        self._requests = requests
-        self._distance_matrix = dist_matrix
+        self.assign_requests(requests)
+        self._distance_matrix = dist_matrix  # TODO is is meaningful to compute the dist_matrix from requests and depot?
 
         # self._initializing_visitor: InitializingVisitor = None
         # self._initialized = False
@@ -62,11 +60,6 @@ class Carrier(Optimizable):
     def requests(self):
         # return immutable tuple rather than mutable list
         return tuple(self._requests)
-
-    @requests.setter
-    def requests(self, requests: List[vx.Vertex]):
-        for request in requests:
-            self.assign_request(request)
 
     @property
     def unrouted_requests(self):
@@ -162,35 +155,36 @@ class Carrier(Optimizable):
 
         }
 
-    def assign_request(self, request: vx.BaseVertex):
+    def assign_requests(self, requests: List[vx.BaseVertex]):
         """
         Assign a request to the carrier (self). It will be stored in self.requests by its id
 
-        :param request: the request vertex to be assigned
+        :param requests: the request vertex to be assigned
         :return:
         """
-        self._requests.append(request)  # access private member directly to modify it
-        self._unrouted.append(request)
-        request.carrier_assignment = self.id_
-        request.assigned = True
+        for r in requests:
+            self._requests.append(r)
+            self._unrouted.append(r)
+            r.carrier_assignment = self.id_
+            r.assigned = True
         pass
 
-    def retract_request(self, request: vx.Vertex):
+    def retract_requests_and_update_routes(self, requests: Iterable[vx.Vertex]):
         """
-        remove the specified request from self.requests.
+        remove the specified requests from self.requests.
 
-        :param request: the id of the request to be removed
+        :param requests: the request to be removed
         :return:
         """
-        self._requests.remove(request)  # access private member directly to modify it
-        self._unrouted.remove(request)  # auction: remove from initial carrier
-        request._carrier_assignment = None
-        request.assigned = False
-        return request
-
-    def retract_all_requests(self):
-        while self.requests:
-            self.retract_request(self.requests[0])
+        for request in requests:
+            if request.routed:
+                routed_tour, routed_index = request.routed
+                routed_tour.pop_and_update(routed_index)
+            self._requests.remove(request)
+            self._unrouted.remove(request)
+            request._carrier_assignment = None
+            request.assigned = False
+        return requests
 
     '''
     def initialize_another_tour(self):
@@ -267,14 +261,3 @@ class Carrier(Optimizable):
                 v.tour.plot(plot_depot=False, annotate=annotate, color=v.color, alpha=alpha)
                 ax.legend()
         return
-
-    def determine_auction_set(self):
-        expensive_requests = []
-        for r in self.requests:
-            r.get_profit()
-        # OR
-        for v in self.vehicles:
-            for r_id in v.tour.routing_sequence:
-                r.get_profit()
-    # TODO: determine the value/ profit of each request for the carrier based some criteria (a) demand/distance from
-    #  depot, (b) insertion cost (c) c1 or c2 value of I1 algorithm?! (d) ...

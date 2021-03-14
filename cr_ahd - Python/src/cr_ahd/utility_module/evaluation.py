@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import AutoMinorLocator
 from typing import List
 
-from src.cr_ahd.solving_module.routing_visitor import RoutingVisitor
+from src.cr_ahd.solving_module.tour_construction import TourConstructionBehavior
 from src.cr_ahd.utility_module.utils import univie_cmap, path_output_custom, univie_cmap_paired
 
 

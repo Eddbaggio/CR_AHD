@@ -1,13 +1,13 @@
 import numpy as np
 
-from src.cr_ahd.utility_module.utils import TimeWindow, Coords, opts
+from src.cr_ahd.utility_module.utils import TimeWindow, Coordinates, opts
 from abc import ABC, abstractmethod
 
 
 class BaseVertex(ABC):
     def __init__(self, id_: str, x_coord: float, y_coord: float):
         self.id_ = id_  # unique identifier TODO: assert that the id is unique?
-        self.coords = Coords(x_coord, y_coord)  # Location in a 2D plane
+        self.coords = Coordinates(x_coord, y_coord)  # Location in a 2D plane
 
     @abstractmethod
     def to_dict(self):
@@ -102,8 +102,11 @@ class Vertex(BaseVertex):
     @routed.setter
     def routed(self, routed: bool):
         # XOR: can only set from True to False or vice versa
-        assert routed ^ self.routed, f'routed attribute of {self} can only set from True to False or vice versa'
+        assert bool(routed) ^ bool(self.routed), f'routed attribute of {self} can only set from True to False or vice versa'
         self._routed = routed
+
+def midpoint(vertex_A:BaseVertex, vertex_B:BaseVertex):
+    return Coordinates((vertex_A.coords.x + vertex_B.coords.x)/2, (vertex_A.coords.y + vertex_B.coords.y)/2)
 
 # if __name__ == '__main__':
 # carrier = carrier.Carrier(-99, Vertex('dummy', 0, 0, 0, 0, 0), [])

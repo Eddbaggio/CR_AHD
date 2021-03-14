@@ -6,28 +6,20 @@ from typing import List
 import pandas as pd
 from tqdm import tqdm
 
-from solving_module.Solver import Solver
+from src.cr_ahd.solving_module.solver import Solver
 from src.cr_ahd.core_module import instance as it
-from src.cr_ahd.solving_module.routing_visitor import RoutingVisitor
 from src.cr_ahd.utility_module.evaluation import bar_plot_with_errors
-from utility_module.utils import path_input_custom, path_output_custom
+from src.cr_ahd.utility_module.utils import path_input_custom, path_output_custom
 
 
 # TODO write pseudo codes for ALL the stuff that's happening
 
 # TODO how do carriers 'buy' requests from others? Is there some kind of money exchange happening?
 
-# TODO which of the @properties should be converted to proper class attributes, i.e. without delaying their
-#  computation? the @property may slow down the code, BUT in many cases it's probably a more idiot-proof way
-#  because otherwise I'd have to update the attribute which can easily be forgotten
-
 # TODO re-integrate (animated) plots for
 #  (1) static/dynamic sequential cheapest insertion construction
 #  (2) dynamic construction
 #  (3) I1 insertion construction
-
-# TODO create class hierarchy! E.g. vertex (base, tw_vertex, depot_vertex, assigned_vertex, ...) and instance(
-#  base, centralized_instance, ...)
 
 # TODO: describe what THIS file is for and how it works exactly
 
@@ -43,7 +35,6 @@ def execute_all(instance: it.Instance):
     """
     results = []
 
-    # non-centralized instances
     for solver in Solver.__subclasses__():
         # print(f'Solving {base_instance.id_} with {solver.__name__}...')
         copy = deepcopy(instance)
@@ -110,8 +101,4 @@ if __name__ == '__main__':
     solomon_list = ['C101', 'C201', 'R101', 'R201', 'RC101', 'RC201']
     # read_and_execute_all(Path("../../../data/Input/Custom/C101/C101_3_15_ass_#001.json"))  # single
     grouped_evaluations = read_and_execute_all_parallel(n=5, which=solomon_list)  # multiple
-    bar_plot_with_errors(solomon_list,
-                         columns=['num_act_veh',
-                                  'cost',
-                                  ],
-                         )
+    bar_plot_with_errors(solomon_list, columns=['num_act_veh', 'cost', ], )

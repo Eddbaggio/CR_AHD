@@ -15,9 +15,9 @@ import src.cr_ahd.core_module.carrier as cr
 import src.cr_ahd.core_module.vehicle as vh
 import src.cr_ahd.core_module.vertex as vx
 from src.cr_ahd.core_module.optimizable import Optimizable
-from src.cr_ahd.solving_module.initializing_visitor import InitializingVisitor
-from src.cr_ahd.solving_module.local_search_visitor import FinalizingVisitor
-from src.cr_ahd.solving_module.routing_visitor import RoutingVisitor
+from src.cr_ahd.solving_module.tour_initialization import TourInitializationBehavior
+from src.cr_ahd.solving_module.tour_improvement import TourImprovementBehavior
+from src.cr_ahd.solving_module.tour_construction import TourConstructionBehavior
 from src.cr_ahd.utility_module.istarmap import istarmap
 from src.cr_ahd.utility_module.utils import split_iterable, make_dist_matrix, opts, Solomon_Instances, \
     path_input_custom, \
@@ -283,7 +283,7 @@ class Instance(Optimizable):
         return unrouted
 
     @property
-    def routed(self):
+    def routed_requests(self):
         routed = [r for r in self.requests if r.routed]
         return routed
 
@@ -316,7 +316,7 @@ class Instance(Optimizable):
 
     def retract_all_vertices_from_carriers(self):
         for c in self.carriers:
-            c.retract_all_requests()
+            c.retract_requests_and_update_routes(c.requests)
         pass
 
     def _assign_all_requests_randomly(self, random_seed=None):
@@ -333,7 +333,7 @@ class Instance(Optimizable):
         # assign all vertices
         for r in self.requests:
             c = self.carriers[np.random.choice(range(len(self.carriers)))]
-            c.assign_request(r)
+            c.assign_requests([r])
 
     # def initialize(self, visitor: InitializingVisitor):
     #     """apply visitor's route initialization procedure to create pendulum tour for each carrier"""
@@ -473,10 +473,6 @@ class Instance(Optimizable):
         return
     '''
 
-    def static_auction(self):
-        for c in self.carriers:
-            c.determine_auction_set()
-
     def to_centralized(self, depot_xy: tuple):
         """
         Convert the instance to a centralized instance, i.e. this function returns the same instance but with only a
@@ -491,8 +487,7 @@ class Instance(Optimizable):
             central_vehicles.extend(c.vehicles)
         central_carrier = cr.Carrier('c0', central_depot, central_vehicles)
         centralized = Instance(self.id_, self.requests, [central_carrier])
-        for r in centralized.requests:
-            centralized.carriers[0].assign_request(r)
+        centralized.carriers[0].assign_requests(centralized.requests)
         return centralized
 
     def plot(self, annotate: bool = True, alpha: float = 1):

@@ -1,14 +1,15 @@
 import functools
-from pathlib import Path
+import itertools
+import random
 import time
 from collections import namedtuple
-from typing import List
+from pathlib import Path
+from typing import List, Tuple, Dict, Any
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
-import itertools
 
 opts = {
     # 'num_trials': 10,
@@ -19,13 +20,15 @@ opts = {
     'alpha_1': 0.5,
     'mu': 1,
     'lambda': 2,
-    'ccycler': plt.cycler(color=plt.get_cmap('Set1').colors)()
+    'ccycler': plt.cycler(color=plt.get_cmap('Set1').colors)(),
+    'dynamic_cycle_time': 5,
 }
 
-Coords = namedtuple('Coords', ['x', 'y'])
+Coordinates = namedtuple('Coords', ['x', 'y'])
 TimeWindow = namedtuple('TimeWindow', ['e', 'l'])
 # Solomon_Instances = [file[:-4] for file in os.listdir('..\\data\\Input\\Solomon')]
-path_project = Path('C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home Deliveries/01_Code')
+path_project = Path(
+    'C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home Deliveries/01_Code')
 path_input = path_project.joinpath('data', 'Input')
 path_input_custom = path_input.joinpath('Custom')
 path_input_solomon = path_input.joinpath('Solomon')
@@ -68,7 +71,7 @@ def split_iterable(iterable, num_chunks):
     return (iterable[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(num_chunks))
 
 
-def euclidean_distance(a: Coords, b: Coords):
+def euclidean_distance(a: Coordinates, b: Coordinates):
     return np.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 
 
@@ -153,12 +156,65 @@ def get_carrier_by_id(carriers, id_):
     raise ValueError
 
 
-if __name__ == '__main__':
-    th = np.linspace(0, 2 * np.pi, 128)
-    fig, ax = plt.subplots()
-    ax.plot(th, np.cos(th), 'C1', label='C1')
-    ax.plot(th, np.sin(th), 'C2', label='C2')
-    ax.plot(th, np.sin(th + np.pi), 'C3', label='C3')
-    ax.plot(th, np.cos(th + np.pi), 'C4', label='C4')
-    ax.legend()
-    plt.show()
+def powerset(iterable, include_empty_set=True):
+    """powerset([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"""
+    s = list(iterable)
+    if include_empty_set:
+        rng = range(len(s) + 1)
+    else:
+        rng = range(1, len(s) + 1)
+    return itertools.chain.from_iterable(itertools.combinations(s, r) for r in rng)
+
+
+def flatten_dict_of_lists(d: dict):
+    """d is a dict of (str, list) pairs. This unpacks it such that there is only a list"""
+    pool = []
+    for _, v in d.items():
+        pool.extend(v)
+    return pool
+
+
+def random_partition(li):
+    min_chunk = 1
+    max_chunk = len(li)
+    it = iter(li)
+    while True:
+        randint = np.random.randint(min_chunk, max_chunk)
+        nxt = list(itertools.islice(it, randint))
+        if nxt:
+            yield nxt
+        else:
+            break
+
+
+def random_max_k_partition(ls, max_k) -> Dict[int, Tuple[Any, ...]]:
+    """partition ls in at most k randomly sized disjoint subsets
+
+    """
+    # https://stackoverflow.com/a/45880095
+    # we need to know the length of ls, so convert it into a list
+    ls = list(ls)
+    # sanity check
+    if max_k < 1:
+        return []
+    # randomly determine the actual k
+    k = random.randint(1, min(max_k, len(ls)))
+    # Create a list of length ls, where each element is the index of
+    # the subset that the corresponding member of ls will be assigned
+    # to.
+    #
+    # We require that this list contains k different values, so we
+    # start by adding each possible different value.
+    indices = list(range(k))
+    # now we add random values from range(k) to indices to fill it up
+    # to the length of ls
+    indices.extend([random.choice(list(range(k))) for _ in range(len(ls) - k)])
+    # shuffle the indices into a random order
+    random.shuffle(indices)
+    # construct and return the random subset: sort the elements by
+    # which subset they will be assigned to, and group them into sets
+    partitions = dict()
+    sortd = sorted(zip(indices, ls), key=lambda x: x[0])
+    for index, subset in itertools.groupby(sortd, key=lambda x: x[0]):
+        partitions[index] = tuple(x[1] for x in subset)  # TODO: better use frozenset (rather than tuple) for dict values?
+    return partitions

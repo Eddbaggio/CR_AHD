@@ -4,7 +4,7 @@ from src.cr_ahd.utility_module.profiling import Timer
 from src.cr_ahd.utility_module.utils import opts, InsertionError, get_carrier_by_id
 
 
-class RoutingVisitor(ABC):
+class TourConstructionBehavior(ABC):
     """
     Visitor Interface to apply a tour construction heuristic to either an instance (i.e. each of its carriers)
     or a single specific carrier. Contrary to the initializer this visitor will allocate all requests
@@ -35,7 +35,7 @@ class RoutingVisitor(ABC):
     #     pass
 
 
-class SequentialCheapestInsertion(RoutingVisitor):
+class SequentialCheapestInsertion(TourConstructionBehavior):
     """
     For one customer at a time, will iterate over requests in their order of assignment and finds their cheapest
     insertion based on the route built so far.
@@ -83,7 +83,7 @@ class SequentialCheapestInsertion(RoutingVisitor):
         timer = Timer()
         timer.start()
 
-        while instance.assigned_unrouted_requests():
+        while any(instance.assigned_unrouted_requests()):
             vertex = instance.assigned_unrouted_requests()[0]
             carrier = get_carrier_by_id(instance.carriers, vertex.carrier_assignment)
             vehicle, position, _ = self.find_insertion(carrier, vertex)
@@ -99,7 +99,7 @@ class SequentialCheapestInsertion(RoutingVisitor):
         pass
 
 
-class I1Insertion(RoutingVisitor):
+class I1Insertion(TourConstructionBehavior):
     def find_insertion(self, carrier):
         """
         Find the next optimal Vertex and its optimal insertion position based on the I1 insertion scheme.
@@ -112,7 +112,7 @@ class I1Insertion(RoutingVisitor):
         max_c2 = float('-inf')
 
         for unrouted in carrier.unrouted_requests:  # take the unrouted requests
-            # check first the vehicles that are active (to avoid small tours), if infeasible -> caller must take care
+            # check first the vehicles that are active (to avoid small tours), if infeasible -> caller must take care!
             for vehicle in carrier.active_vehicles:
                 # TODO tour.find_best_feasible_I1_insertion() must be moved from tour class to (the tour's?) visitor!
                 rho, c2 = find_best_feasible_I1_insertion(vehicle.tour, unrouted)
@@ -167,16 +167,9 @@ class I1Insertion(RoutingVisitor):
                 vehicle.tour.insert_and_update(index=position, vertex=vertex)
                 if self.verbose > 0:
                     print(f'\tInserting {vertex.id_} into {carrier.id_}.{vehicle.tour.id_}')
-            else:  # no feasible insertion exists for the vehicles that are active already
-                raise InsertionError('', '')
+            else:
+                raise InsertionError('', 'no feasible insertion exists for the vehicles that are active already')
 
-        assert len(carrier.unrouted_requests) == 0  # just to be on the safe side
-
-        # if self.plot_level > 1:
-        #     ani.show()
-        #     ani.save(
-        #         filename=f'.{path_output}/Animations/{instance.id_}_{"cen_" if instance.num_carriers == 1 else ""}' \
-        #                  f'sta_I1_{carrier.id_ if instance.num_carriers > 1 else ""}.gif')
         if self.verbose > 0:
             print(f'Total Route cost of carrier {carrier.id_}: {carrier.cost()}\n')
         # carrier.routing_visitor = self
@@ -184,6 +177,7 @@ class I1Insertion(RoutingVisitor):
         pass
 
 
+'''
 class DynamicInsertionWithAuction(RoutingVisitor):
     """Like DynamicInsertion but also has an auction after each request"""
 
@@ -237,8 +231,11 @@ class DynamicInsertionWithAuction(RoutingVisitor):
     def solve_carrier(self, carrier):
         raise NotImplementedError
         pass
+'''
+
 
 # ===============================================================================
+
 
 def find_cheapest_feasible_insertion(tour, request, verbose=opts['verbose']):
     """
@@ -257,8 +254,10 @@ def find_cheapest_feasible_insertion(tour, request, verbose=opts['verbose']):
         i = tour.routing_sequence[rho - 1]
         j = tour.routing_sequence[rho]
 
-        # trivial feasibility check
-        if i.tw.e < request.tw.l and request.tw.e < j.tw.l:
+        # trivial feasibility checks
+        # if request.tw.e > j.tw.l:
+        #     break
+        if i.tw.e < request.tw.l and request.tw.e < j.tw.l:  # todo does not consider service times
             insertion_cost = tour.insertion_cost_no_fc(i, j, request)
             if verbose > 2:
                 print(f'Between {i.id_} and {j.id_}: {insertion_cost}')
@@ -282,7 +281,26 @@ def find_cheapest_feasible_insertion(tour, request, verbose=opts['verbose']):
 
 
 # ===================================
-def c1(self, i_index: int, u, j_index: int, alpha_1: float, mu: float, ) -> float:
+
+
+def _c11(tour, i, u, j, mu):
+    """weighted insertion cost"""
+    c11 = tour.distance_matrix.loc[i.id_, u.id_] + tour.distance_matrix.loc[u.id_, j.id_] - mu * \
+          tour.distance_matrix.loc[i.id_, j.id_]
+    return c11
+
+
+def _c12(tour, j_index, u):
+    """how much will the arrival time of vertex at index j be pushed back?"""
+    service_start_j = tour.service_schedule[j_index]
+    tour.insert_and_update(index=j_index, vertex=u)
+    service_start_j_new = tour.service_schedule[j_index + 1]
+    c12 = service_start_j_new - service_start_j
+    tour.pop_and_update(j_index)
+    return c12
+
+
+def _c1(tour, i_index: int, u, j_index: int, alpha_1: float, mu: float, ) -> float:
     """
     c1 criterion of Solomon's I1 insertion heuristic: "best feasible insertion cost"
     Does NOT include a feasibility check. Following the
@@ -291,31 +309,14 @@ def c1(self, i_index: int, u, j_index: int, alpha_1: float, mu: float, ) -> floa
     10.1287/trsc.1030.0056.)
     """
     alpha_2 = 1 - alpha_1
-    i = self.routing_sequence[i_index]
-    j = self.routing_sequence[j_index]
-    c11 = self._c11(i, u, j, mu)
-    c12 = self._c12(j_index, u)
+    i = tour.routing_sequence[i_index]
+    j = tour.routing_sequence[j_index]
+    c11 = _c11(tour, i, u, j, mu)
+    c12 = _c12(tour, j_index, u)
     return alpha_1 * c11 + alpha_2 * c12
 
 
-def _c11(self, i, u, j, mu):
-    """weighted insertion cost"""
-    c11 = self.distance_matrix.loc[i.id_, u.id_] + self.distance_matrix.loc[u.id_, j.id_] - mu * \
-          self.distance_matrix.loc[i.id_, j.id_]
-    return c11
-
-
-def _c12(self, j_index, u):
-    """how much will the arrival time of vertex at index j be pushed back?"""
-    service_start_j = self.service_schedule[j_index]
-    self.insert_and_update(index=j_index, vertex=u)
-    service_start_j_new = self.service_schedule[j_index + 1]
-    c12 = service_start_j_new - service_start_j
-    self.pop_and_update(j_index)
-    return c12
-
-
-def c2(self, u, c1: float, lambda_: float = opts['lambda'], ):
+def _c2(tour, u, c1: float, lambda_: float = opts['lambda'], ):
     """
     c2 criterion of Solomon's I1 insertion heuristic: "find the best customer/request"
     Does NOT include a feasibility check Following the
@@ -323,7 +324,7 @@ def c2(self, u, c1: float, lambda_: float = opts['lambda'], ):
     Part I: Route Construction and Local Search Algorithms. In Transportation Science 39 (1), pp. 104–118. DOI:
     10.1287/trsc.1030.0056.)
     """
-    return lambda_ * self.distance_matrix.loc[self.depot.id_, u.id_] - c1
+    return lambda_ * tour.distance_matrix.loc[tour.depot.id_, u.id_] - c1
 
 
 def find_best_feasible_I1_insertion(tour, u, verbose=opts['verbose']):
@@ -345,17 +346,18 @@ def find_best_feasible_I1_insertion(tour, u, verbose=opts['verbose']):
             # TODO: check Solomon (1987) for an efficient and sufficient feasibility check
             # compute c1(=best feasible insertion cost) and c2(=best request) and update their best values
             try:
-                c1 = tour.c1(i_index=rho - 1,
-                             u=u,
-                             j_index=rho,
-                             alpha_1=opts['alpha_1'],
-                             mu=opts['mu'],
-                             )
+                c1 = _c1(tour,
+                         i_index=rho - 1,
+                         u=u,
+                         j_index=rho,
+                         alpha_1=opts['alpha_1'],
+                         mu=opts['mu'],
+                         )
             except InsertionError:
                 continue
             if verbose > 1:
                 print(f'c1({u.id_}->{tour.id_}): {c1}')
-            c2 = tour.c2(u=u, lambda_=opts['lambda'], c1=c1)
+            c2 = _c2(tour=tour, u=u, lambda_=opts['lambda'], c1=c1)
             if verbose > 1:
                 print(f'c2({u.id_}->{tour.id_}): {c2}')
             if c2 > max_c2:

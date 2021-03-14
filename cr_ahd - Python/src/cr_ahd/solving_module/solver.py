@@ -1,9 +1,15 @@
 import abc
+
+import src.cr_ahd.auction_module.request_selection as rs
+import src.cr_ahd.auction_module.bundle_generation as bg
+import src.cr_ahd.auction_module.bidding as bd
+import src.cr_ahd.auction_module.winner_determination as wd
+
 from src.cr_ahd.core_module import instance as it
-from src.cr_ahd.utility_module.utils import get_carrier_by_id, InsertionError
-from src.cr_ahd.solving_module.initializing_visitor import EarliestDueDate
-from src.cr_ahd.solving_module.routing_visitor import SequentialCheapestInsertion, I1Insertion
-from src.cr_ahd.solving_module.local_search_visitor import TwoOpt
+from src.cr_ahd.solving_module.tour_construction import SequentialCheapestInsertion, I1Insertion
+from src.cr_ahd.solving_module.tour_improvement import TwoOpt
+from src.cr_ahd.solving_module.tour_initialization import EarliestDueDate
+from src.cr_ahd.utility_module.utils import get_carrier_by_id, opts
 
 
 # crude Template method implementation
@@ -11,8 +17,14 @@ from src.cr_ahd.solving_module.local_search_visitor import TwoOpt
 
 class Solver(abc.ABC):
     def execute(self, instance):
+        """
+        apply the concrete solution algorithm
+        :param instance:
+        :return: None
+        """
         self._solve(instance)
         instance.solution_algorithm = self
+        pass
 
     @abc.abstractmethod
     def _solve(self, instance: it.Instance):
@@ -30,7 +42,7 @@ class StaticSequentialInsertionSolver(Solver):
     def assign_all_requests(self, instance):
         for request in instance.unrouted_requests:
             carrier = get_carrier_by_id(instance.carriers, request.carrier_assignment)
-            carrier.assign_request(request)
+            carrier.assign_requests([request])
 
     def initialize_pendulum_tours(self, instance):
         EarliestDueDate().initialize_instance(instance)  # not flexible!
@@ -41,7 +53,7 @@ class StaticSequentialInsertionSolver(Solver):
         pass
 
     def finalize_with_local_search(self, instance):
-        TwoOpt().finalize_instance(instance)
+        TwoOpt().improve_instance(instance)
         pass
 
 
@@ -60,7 +72,7 @@ class StaticI1InsertionSolver(Solver):
     def assign_all_requests(self, instance):
         for request in instance.unrouted_requests:
             carrier = get_carrier_by_id(instance.carriers, request.carrier_assignment)
-            carrier.assign_request(request)
+            carrier.assign_requests([request])
 
     def initialize_pendulum_tours(self, instance):
         EarliestDueDate().initialize_instance(instance)  # not flexible!
@@ -74,7 +86,7 @@ class StaticI1InsertionSolver(Solver):
         return carrier
 
     def finalize_with_local_search(self, instance):
-        TwoOpt().finalize_instance(instance)
+        TwoOpt().improve_instance(instance)
         pass
 
 
@@ -85,13 +97,13 @@ class StaticI1InsertionSolver(Solver):
 def assign_n_requests(instance, n):
     for request in instance.unassigned_requests()[:n]:
         carrier = get_carrier_by_id(instance.carriers, request.carrier_assignment)
-        carrier.assign_request(request)
+        carrier.assign_requests([request])
 
 
 class DynamicSequentialInsertionSolver(Solver):
     def _solve(self, instance: it.Instance):
         while instance.unrouted_requests:
-            assign_n_requests(instance, 5)
+            assign_n_requests(instance, opts['dynamic_cycle_time'])
             self.build_routes(instance)
             # instance._solved = False
             # self.finalize_with_local_search(instance)
@@ -105,14 +117,14 @@ class DynamicSequentialInsertionSolver(Solver):
         pass
 
     def finalize_with_local_search(self, instance):
-        TwoOpt().finalize_instance(instance)
+        TwoOpt().improve_instance(instance)
         pass
 
 
 class DynamicI1InsertionSolver(Solver):
     def _solve(self, instance: it.Instance):
         while instance.unrouted_requests:
-            assign_n_requests(instance, 5)
+            assign_n_requests(instance, opts['dynamic_cycle_time'])
             carrier = True
             while carrier:
                 carrier = self.build_routes(instance)
@@ -133,12 +145,39 @@ class DynamicI1InsertionSolver(Solver):
         return carrier
 
     def finalize_with_local_search(self, instance):
-        TwoOpt().finalize_instance(instance)
+        TwoOpt().improve_instance(instance)
         pass
 
 
-# class DynamicSequentialInsertionWithAuctionSolver(Solver):
-    # def solve(self, instance:it.Instance):
-    #     while instance.unrouted_requests:
-    #
-    # pass
+class DynamicI1InsertionWithAuctionSolver(Solver):
+    def _solve(self, instance: it.Instance):
+        while instance.unrouted_requests:
+            assign_n_requests(instance, opts['dynamic_cycle_time'])
+            self.run_auction(instance)
+            carrier = True
+            while carrier:
+                carrier = self.build_routes(instance)
+                if carrier:
+                    self.initialize_another_tour(carrier)
+        self.finalize_with_local_search(instance)
+
+    pass
+
+    def run_auction(self, instance):
+        submitted_requests = rs.SingleLowestMarginalCost().execute(instance)
+        bundle_set = bg.RandomBundles(instance.distance_matrix).execute(submitted_requests)
+        bids = bd.I1MarginalCostBidding().execute(bundle_set, instance.carriers)
+        wd.LowestBid().execute(bids)
+
+        pass
+
+    def initialize_another_tour(self, carrier):
+        EarliestDueDate().initialize_carrier(carrier)
+
+    def build_routes(self, instance):
+        carrier = I1Insertion().solve_instance(instance)
+        return carrier
+
+    def finalize_with_local_search(self, instance):
+        TwoOpt().improve_instance(instance)
+        pass

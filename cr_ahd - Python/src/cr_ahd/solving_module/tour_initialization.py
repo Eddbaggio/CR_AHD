@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
+import numpy as np
 
 from src.cr_ahd.utility_module.utils import opts
 
 
-class InitializingVisitor(ABC):
+class TourInitializationBehavior(ABC):
     """
     Visitor Interface to apply a tour initialization heuristic to either an instance (i.e. each of its carriers)
     or a single specific carrier. Contrary to the routing visitor, this one will only allocate a single seed request
@@ -37,7 +38,7 @@ class InitializingVisitor(ABC):
     # date or furthest distance as it does not have access to the vertex information that shall be inserted
 
 
-class EarliestDueDate(InitializingVisitor):
+class EarliestDueDate(TourInitializationBehavior):
     """
     Visitor for building a pendulum tour for
     a) every carrier's first inactive vehicle
@@ -47,10 +48,11 @@ class EarliestDueDate(InitializingVisitor):
 
     def find_seed_request(self, carrier):
         """find request with earliest deadline"""
-        seed = carrier.unrouted_requests[0]
+        earliest = np.infty
         for request in carrier.unrouted_requests:
-            if request.tw.l < seed.tw.l:
+            if request.tw.l < earliest:
                 seed = request
+                earliest = request.tw.l
         return seed
 
     def initialize_instance(self, instance):
@@ -64,7 +66,7 @@ class EarliestDueDate(InitializingVisitor):
     def initialize_carrier(self, carrier):
         vehicle = carrier.inactive_vehicles[0]
         assert len(vehicle.tour) == 2, 'Vehicle already has a tour'
-        if len(carrier.unrouted_requests) > 0:
+        if carrier.unrouted_requests:
             # find request with earliest deadline and initialize pendulum tour
             seed = self.find_seed_request(carrier)
             vehicle.tour.insert_and_update(index=1, vertex=seed)
