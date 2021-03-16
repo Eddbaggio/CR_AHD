@@ -6,10 +6,10 @@ from typing import List
 import pandas as pd
 from tqdm import tqdm
 
-from src.cr_ahd.solving_module.solver import Solver
+import src.cr_ahd.solving_module.solver as sl
 from src.cr_ahd.core_module import instance as it
 from src.cr_ahd.utility_module.evaluation import bar_plot_with_errors
-from src.cr_ahd.utility_module.utils import path_input_custom, path_output_custom
+from src.cr_ahd.utility_module.utils import path_input_custom, path_output_custom, conjunction
 
 
 # TODO write pseudo codes for ALL the stuff that's happening
@@ -35,7 +35,14 @@ def execute_all(instance: it.Instance):
     """
     results = []
 
-    for solver in Solver.__subclasses__():
+    for solver in [
+        sl.StaticSequentialInsertion,
+        sl.StaticI1Insertion,
+        sl.StaticI1InsertionWithAuction,
+        sl.DynamicSequentialInsertion,
+        sl.DynamicI1Insertion,
+        sl.DynamicI1InsertionWithAuction,
+    ]:
         # print(f'Solving {base_instance.id_} with {solver.__name__}...')
         copy = deepcopy(instance)
         solver().execute(copy)
@@ -60,19 +67,24 @@ def read_and_execute_all_parallel(n: int, which: List):
     """
     custom_files_paths = get_custom_instance_paths(n, which)
 
-    result_collection = []
     with multiprocessing.Pool() as pool:
-        for results in tqdm(pool.imap(read_and_execute_all, custom_files_paths),
-                            total=len(custom_files_paths)):
-            result_collection.extend(results)
-
-    grouped = write_results(result_collection)  # rename function; not clear what are the results?
+        results_collection = list(
+            tqdm(pool.imap(read_and_execute_all, custom_files_paths), total=len(custom_files_paths)))
+    flat_results_collection = [r for results in results_collection for r in results]
+    grouped = write_results(flat_results_collection)  # rename function; not clear what are the results?
     return grouped
 
 
 def write_results(result_collection: list):
+    """
+    write the collected outputs of the execute_all function to csv files. One file is created for each solomon_base
+
+    :param result_collection:  (flat) list of single results of the execute_all function
+    :return: the solomon_base grouped dataframe of results
+    """
     performance = pd.DataFrame(result_collection)
-    performance = performance.set_index(['solomon_base', 'rand_copy', 'solution_algorithm', 'num_carriers', 'num_vehicles'])
+    performance = performance.set_index(
+        ['solomon_base', 'rand_copy', 'solution_algorithm', 'num_carriers', 'num_vehicles'])
     grouped = performance.groupby('solomon_base')
     # write the results
     for name, group in grouped:
@@ -100,5 +112,15 @@ def get_custom_instance_paths(n, which: List):
 if __name__ == '__main__':
     solomon_list = ['C101', 'C201', 'R101', 'R201', 'RC101', 'RC201']
     # read_and_execute_all(Path("../../../data/Input/Custom/C101/C101_3_15_ass_#001.json"))  # single
-    grouped_evaluations = read_and_execute_all_parallel(n=5, which=solomon_list)  # multiple
-    bar_plot_with_errors(solomon_list, columns=['num_act_veh', 'cost', ], )
+    # read_and_execute_all(Path("../../../data/Input/Custom/C101/C101_1_45_ass_#001.json"))  # single centralized
+    # grouped_evaluations = read_and_execute_all_parallel(n=5, which=solomon_list)  # multiple
+
+    bar_plot_with_errors(solomon_list,
+                         columns=['num_act_veh', 'cost', ],
+                         filter_conditions=[('StaticI1InsertionWithAuction', 3),
+                                            ('DynamicI1InsertionWithAuction', 3),
+                                            ('StaticI1Insertion', 1),
+                                            ('DynamicI1Insertion', 1),
+                                            ('StaticI1Insertion', 3),
+                                            ('DynamicI1Insertion', 3),
+                                            ])

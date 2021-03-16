@@ -32,23 +32,23 @@ class RequestSelectionBehavior(ABC):
         pass
 
 
-class SingleLowestMarginalCost(RequestSelectionBehavior):
-    """given the current set of routes, returns the single unrouted request that has the lowest marginal cost. NOTE:
-    since routes may not be final, the current lowest-marginal-profit request might not have been chosen at an earlier
+class FiftyPercentHighestMarginalCost(RequestSelectionBehavior):
+    """given the current set of routes, returns the n unrouted requests that has the HIGHEST marginal cost. NOTE:
+    since routes may not be final, the current highest-marginal-cost request might not have been chosen at an earlier
     or later stage!"""
 
     def _select_requests(self, carrier) -> List:
-        lowest_marginal_cost = np.infty
-        selected_request = []
+        if not carrier.unrouted_requests:
+            return []
+        selected_requests = []
         for unrouted in carrier.unrouted_requests:
-            mc = marginal_cost_request(unrouted, carrier)
-            if mc < lowest_marginal_cost:
-                selected_request = [unrouted]
-                lowest_marginal_cost = mc
-        return selected_request  # , [lowest_marginal_cost]
+            mc = cost_of_cheapest_insertion(unrouted, carrier)
+            selected_requests.append((unrouted, mc))
+        selected_requests, marginal_costs = zip(*sorted(selected_requests, key=lambda x: x[1], reverse=True))
+        return selected_requests[:int(np.ceil(len(carrier.unrouted_requests)*0.5))]
 
 
-def marginal_cost_request(request, carrier):  # rename!
+def cost_of_cheapest_insertion(request, carrier):
     lowest = float('inf')
     for vehicle in carrier.active_vehicles:
         try:
@@ -60,4 +60,5 @@ def marginal_cost_request(request, carrier):  # rename!
         t = carrier.inactive_vehicles[0].tour
         t.insert_and_update(1, request)
         lowest = t.cost
+        t.pop_and_update(1)
     return lowest

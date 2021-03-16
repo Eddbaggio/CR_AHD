@@ -87,7 +87,7 @@ def request_vertices_c():
 
 @pytest.fixture
 def request_vertices_d():
-    """use to test SingleLowestMarginalProfit request selection"""
+    """use to test nHighestMarginalCost request selection"""
     return [
         Vertex('r0', 10, 10, 0, 0, 1000),
         Vertex('r1', 20, 10, 0, 0, 1000),

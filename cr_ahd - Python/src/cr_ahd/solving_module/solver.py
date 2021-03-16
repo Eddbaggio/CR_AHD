@@ -31,7 +31,10 @@ class Solver(abc.ABC):
         pass
 
 
-class StaticSequentialInsertionSolver(Solver):
+class StaticSequentialInsertion(Solver):
+    """
+    Initializes pendulum tours first! Then builds the routes. The Dynamic Version does NOT initialize tours
+    """
     def _solve(self, instance: it.Instance):
         self.assign_all_requests(instance)
         self.initialize_pendulum_tours(instance)
@@ -57,7 +60,7 @@ class StaticSequentialInsertionSolver(Solver):
         pass
 
 
-class StaticI1InsertionSolver(Solver):
+class StaticI1Insertion(Solver):
     def _solve(self, instance: it.Instance):
         self.assign_all_requests(instance)
         self.initialize_pendulum_tours(instance)
@@ -90,6 +93,40 @@ class StaticI1InsertionSolver(Solver):
         pass
 
 
+class StaticI1InsertionWithAuction(Solver):
+    def _solve(self, instance: it.Instance):
+        self.assign_all_requests(instance)
+        if instance.num_carriers > 1:
+            self.run_auction(instance)
+        carrier = True
+        while carrier:
+            carrier = self.build_routes(instance)
+            if carrier:
+                self.initialize_another_tour(carrier)
+        self.finalize_with_local_search(instance)
+
+    def assign_all_requests(self, instance):
+        for request in instance.unrouted_requests:
+            carrier = get_carrier_by_id(instance.carriers, request.carrier_assignment)
+            carrier.assign_requests([request])
+
+    def run_auction(self, instance):
+        submitted_requests = rs.FiftyPercentHighestMarginalCost().execute(instance)
+        bundle_set = bg.RandomBundles(instance.distance_matrix).execute(submitted_requests)
+        bids = bd.I1MarginalCostBidding().execute(bundle_set, instance.carriers)
+        wd.LowestBid().execute(bids)
+
+    def initialize_another_tour(self, carrier):
+        EarliestDueDate().initialize_carrier(carrier)
+
+    def build_routes(self, instance):
+        carrier = I1Insertion().solve_instance(instance)
+        return carrier
+
+    def finalize_with_local_search(self, instance):
+        TwoOpt().improve_instance(instance)
+
+
 # =====================================================================================================================
 # =====================================================================================================================
 
@@ -100,7 +137,10 @@ def assign_n_requests(instance, n):
         carrier.assign_requests([request])
 
 
-class DynamicSequentialInsertionSolver(Solver):
+class DynamicSequentialInsertion(Solver):
+    """
+    Does NOT initialize pendulum tours!
+    """
     def _solve(self, instance: it.Instance):
         while instance.unrouted_requests:
             assign_n_requests(instance, opts['dynamic_cycle_time'])
@@ -121,7 +161,7 @@ class DynamicSequentialInsertionSolver(Solver):
         pass
 
 
-class DynamicI1InsertionSolver(Solver):
+class DynamicI1Insertion(Solver):
     def _solve(self, instance: it.Instance):
         while instance.unrouted_requests:
             assign_n_requests(instance, opts['dynamic_cycle_time'])
@@ -149,11 +189,12 @@ class DynamicI1InsertionSolver(Solver):
         pass
 
 
-class DynamicI1InsertionWithAuctionSolver(Solver):
+class DynamicI1InsertionWithAuction(Solver):
     def _solve(self, instance: it.Instance):
         while instance.unrouted_requests:
             assign_n_requests(instance, opts['dynamic_cycle_time'])
-            self.run_auction(instance)
+            if instance.num_carriers > 1:
+                self.run_auction(instance)
             carrier = True
             while carrier:
                 carrier = self.build_routes(instance)
@@ -161,15 +202,11 @@ class DynamicI1InsertionWithAuctionSolver(Solver):
                     self.initialize_another_tour(carrier)
         self.finalize_with_local_search(instance)
 
-    pass
-
     def run_auction(self, instance):
-        submitted_requests = rs.SingleLowestMarginalCost().execute(instance)
+        submitted_requests = rs.FiftyPercentHighestMarginalCost().execute(instance)
         bundle_set = bg.RandomBundles(instance.distance_matrix).execute(submitted_requests)
         bids = bd.I1MarginalCostBidding().execute(bundle_set, instance.carriers)
         wd.LowestBid().execute(bids)
-
-        pass
 
     def initialize_another_tour(self, carrier):
         EarliestDueDate().initialize_carrier(carrier)
@@ -180,4 +217,3 @@ class DynamicI1InsertionWithAuctionSolver(Solver):
 
     def finalize_with_local_search(self, instance):
         TwoOpt().improve_instance(instance)
-        pass

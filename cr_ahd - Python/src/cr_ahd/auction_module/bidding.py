@@ -37,6 +37,7 @@ class I1MarginalCostBidding(BiddingBehavior):
     def _generate_bid(self, bundle, carrier):
 
         without_bundle = carrier.cost()
+        prior_unrouted = carrier.unrouted_requests
         carrier.assign_requests(bundle)
 
         # TODO duplicated code fragment, is there a nicer way to do this? do error codes instead of exception handling?
@@ -50,5 +51,7 @@ class I1MarginalCostBidding(BiddingBehavior):
 
         with_bundle = carrier.cost()
         carrier.retract_requests_and_update_routes(bundle)
+        carrier.retract_requests_and_update_routes(prior_unrouted)  # need to unroute the previously unrouted again
+        carrier.assign_requests(prior_unrouted)  # and then reassign them (missing a function that only unroutes them)
         marginal_cost = with_bundle - without_bundle
         return marginal_cost

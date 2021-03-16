@@ -21,7 +21,7 @@ opts = {
     'mu': 1,
     'lambda': 2,
     'ccycler': plt.cycler(color=plt.get_cmap('Set1').colors)(),
-    'dynamic_cycle_time': 5,
+    'dynamic_cycle_time': 10,
 }
 
 Coordinates = namedtuple('Coords', ['x', 'y'])
@@ -216,5 +216,26 @@ def random_max_k_partition(ls, max_k) -> Dict[int, Tuple[Any, ...]]:
     partitions = dict()
     sortd = sorted(zip(indices, ls), key=lambda x: x[0])
     for index, subset in itertools.groupby(sortd, key=lambda x: x[0]):
-        partitions[index] = tuple(x[1] for x in subset)  # TODO: better use frozenset (rather than tuple) for dict values?
+        partitions[index] = tuple(
+            x[1] for x in subset)  # TODO: better use frozenset (rather than tuple) for dict values?
     return partitions
+
+
+def conjunction(*conditions):
+    """
+    combines multiple logical conditions such that all must hold
+
+    :param conditions:
+    :return:
+    """
+    return functools.reduce(np.logical_and, conditions)
+
+
+def disjunction(*conditions):
+    """
+    combines multiple logical conditions such that at least one must hold
+
+    :param conditions:
+    :return:
+    """
+    return functools.reduce(np.logical_or, conditions)
