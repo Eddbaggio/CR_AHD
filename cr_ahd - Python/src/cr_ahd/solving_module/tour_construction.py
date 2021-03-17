@@ -114,7 +114,6 @@ class I1Insertion(TourConstructionBehavior):
         for unrouted in carrier.unrouted_requests:  # take the unrouted requests
             # check first the vehicles that are active (to avoid small tours), if infeasible -> caller must take care!
             for vehicle in carrier.active_vehicles:
-                # TODO tour.find_best_feasible_I1_insertion() must be moved from tour class to (the tour's?) visitor!
                 rho, c2 = find_best_feasible_I1_insertion(vehicle.tour, unrouted)
                 if c2 > max_c2:
                     if self.verbose > 1:
@@ -136,7 +135,7 @@ class I1Insertion(TourConstructionBehavior):
         # assert instance.initialized, f'Tours must be initialized before solving with I1'
 
         if self.verbose > 0:
-            print(f'STATIC I1 Construction for {instance}:')
+            print(f'I1 Construction for {instance}:')
         timer = Timer()
         timer.start()
 

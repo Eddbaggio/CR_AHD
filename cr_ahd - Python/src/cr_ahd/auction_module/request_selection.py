@@ -45,7 +45,15 @@ class FiftyPercentHighestMarginalCost(RequestSelectionBehavior):
             mc = cost_of_cheapest_insertion(unrouted, carrier)
             selected_requests.append((unrouted, mc))
         selected_requests, marginal_costs = zip(*sorted(selected_requests, key=lambda x: x[1], reverse=True))
-        return selected_requests[:int(np.ceil(len(carrier.unrouted_requests)*0.5))]
+        return selected_requests[:int(np.ceil(len(carrier.unrouted_requests) * 0.5))]
+
+
+class Cluster(RequestSelectionBehavior):
+    """
+    Based on: Gansterer,M., & Hartl,R.F. (2016). Request evaluation strategies for carriers in auction-based
+    collaborations.
+    """
+    pass
 
 
 def cost_of_cheapest_insertion(request, carrier):

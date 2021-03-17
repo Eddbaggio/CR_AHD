@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 import src.cr_ahd.solving_module.solver as sl
 from src.cr_ahd.core_module import instance as it
-from src.cr_ahd.utility_module.evaluation import bar_plot_with_errors
+from src.cr_ahd.utility_module.evaluation import bar_plot_with_errors, plotly_bar_plot
 from src.cr_ahd.utility_module.utils import path_input_custom, path_output_custom, conjunction
 
 
@@ -36,12 +36,12 @@ def execute_all(instance: it.Instance):
     results = []
 
     for solver in [
-        sl.StaticSequentialInsertion,
+        # sl.StaticSequentialInsertion,
         sl.StaticI1Insertion,
-        sl.StaticI1InsertionWithAuction,
-        sl.DynamicSequentialInsertion,
+        # sl.StaticI1InsertionWithAuction,
+        # sl.DynamicSequentialInsertion,
         sl.DynamicI1Insertion,
-        sl.DynamicI1InsertionWithAuction,
+        # sl.DynamicI1InsertionWithAuction,
     ]:
         # print(f'Solving {base_instance.id_} with {solver.__name__}...')
         copy = deepcopy(instance)
@@ -111,16 +111,9 @@ def get_custom_instance_paths(n, which: List):
 
 if __name__ == '__main__':
     solomon_list = ['C101', 'C201', 'R101', 'R201', 'RC101', 'RC201']
-    # read_and_execute_all(Path("../../../data/Input/Custom/C101/C101_3_15_ass_#001.json"))  # single
-    # read_and_execute_all(Path("../../../data/Input/Custom/C101/C101_1_45_ass_#001.json"))  # single centralized
+    # read_and_execute_all(Path("../../../data/Input/Custom/C101/C101_3_15_ass_#001.json"))  # single collaborative
+    read_and_execute_all(Path("../../../data/Input/Custom/C201/C201_1_45_ass_#001.json"))  # single centralized
     # grouped_evaluations = read_and_execute_all_parallel(n=5, which=solomon_list)  # multiple
 
-    bar_plot_with_errors(solomon_list,
-                         columns=['num_act_veh', 'cost', ],
-                         filter_conditions=[('StaticI1InsertionWithAuction', 3),
-                                            ('DynamicI1InsertionWithAuction', 3),
-                                            ('StaticI1Insertion', 1),
-                                            ('DynamicI1Insertion', 1),
-                                            ('StaticI1Insertion', 3),
-                                            ('DynamicI1Insertion', 3),
-                                            ])
+    plotly_bar_plot(solomon_list, attributes=['num_act_veh', 'cost', ])
+    bar_plot_with_errors(solomon_list, attributes=['num_act_veh', 'cost', ])

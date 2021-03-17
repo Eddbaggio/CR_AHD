@@ -5,43 +5,83 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+import plotly.express as px
+from bokeh.layouts import column
+from bokeh.models import ColumnDataSource, FactorRange
 from matplotlib.ticker import AutoMinorLocator
+from bokeh.plotting import figure, show, output_file
 
 from src.cr_ahd.utility_module.utils import univie_cmap, path_output_custom, univie_colors_100
+
+labels = {
+    'num_carriers': 'Number of Carriers',
+    'solomon_base': 'Instance',
+    'cost': 'Routing Costs',
+    'num_act_veh': 'Number of Vehicles',
+    'StaticI1Insertion': 'Static, no collaboration',
+    'StaticI1InsertionWithAuction': 'Static, with auction',
+    'StaticSequentialInsertion': 'Static Sequential, no collaboration',
+    'DynamicI1Insertion': 'Dynamic, no collaboration',
+    'DynamicI1InsertionWithAuction': 'Dynamic, with auction',
+    'DynamicSequentialInsertion': 'Dynamic  Sequential, no collaboration',
+}
+
+
+# =================================================================================================
+# BOKEH
+# =================================================================================================
+
+def bokeh_plot(solomon_list: List, attributes: List[str]):
+    df: pd.DataFrame = combine_eval_files(solomon_list).reset_index()
+    df.num_carriers = df.num_carriers.astype(str)
+    x_range = [(nc, sol) for nc in np.unique(df['num_carriers']) for sol in np.unique(df['solomon_base'])]
+    for col in attributes:
+        subplots = []
+        for name, group in df.groupby('solution_algorithm'):
+            p = figure(x_range=FactorRange(*x_range),
+                       sizing_mode='stretch_width')
+            grouped = group.groupby(['num_carriers', 'solomon_base'])
+            source = ColumnDataSource(grouped)
+            p.vbar(source=source,
+                   x='solomon_base_num_carriers',
+                   top=f'{col}_mean',
+                   width=0.9,
+                   legend_label=name,
+                   )
+            subplots.append(p)
+
+        path = path_output_custom.joinpath(f'bokeh_{col}.html')
+        output_file(str(path), f'bokeh_{col}')
+        show(column(*subplots))
+    pass
 
 
 # =================================================================================================
 # PLOTLY
 # =================================================================================================
 
-def plotly_plot(solomon_list: List, columns: List[str], ):
-    df: pd.DataFrame = combine_eval_files(solomon_list).reset_index()
-    df2 = df.groupby(['solution_algorithm', 'num_carriers', 'solomon_base'])[columns].agg('mean')
-    df3 = df2.reset_index()
-    for col in columns:
+def plotly_bar_plot(solomon_list: List, attributes: List[str], ):
+    df: pd.DataFrame = combine_eval_files(solomon_list)[attributes]
+    for attr in attributes:
+        attr_df = df[attr].unstack('solution_algorithm').reset_index('rand_copy', drop=True).groupby(level=[0, 1]).agg(
+            'mean')
         fig = go.Figure()
         colors = itertools.cycle(univie_colors_100)
-        for name, group in df3.groupby('solution_algorithm'):
-            x_axis_1, x_axis_2 = zip(*group[['solomon_base', 'num_carriers']].values)
-            fig.add_bar(x=[x_axis_1, x_axis_2],
-                        y=group[col],
-                        name=name,
-                        text=group[col],
+        for col in attr_df.columns:
+            fig.add_bar(x=list(zip(*attr_df.index)),
+                        y=attr_df[col],
+                        name=labels[col],
                         marker_color=next(colors),
                         hovertemplate='%{y:.2f}'
                         )
-
-        # fig = px.bar(df3,
-        #              x='solomon_base',
-        #              y=col,
-        #              color='solution_algorithm',
-        #              barmode='group',
-        #              facet_row='num_carriers',
-        #              text=col,
-        #              )
-        fig.update_traces(texttemplate='%{text:.0f}', textposition='outside', textangle=-90,)
-        # fig.update_layout()
-        path = path_output_custom.joinpath(f'plotly_bar_plot_{col}.html')
+        fig.update_traces(texttemplate='%{y:.0f}', textposition='outside', textangle=-90, textfont_size=14)
+        fig.update_layout(title=f'Mean {labels[attr]}',
+                          xaxis_title=f'{labels["num_carriers"]} // {labels["solomon_base"]}',  # line break with <br>, but then its outside the plot
+                          template='plotly_white',
+                          uniformtext_minsize=14, uniformtext_mode='show')
+        # multicategory axis not supported by plotly express
+        # fig = px.bar(attr_df, x=attr_df.index.names, y=attr_df.columns)
+        path = path_output_custom.joinpath(f'plotly_bar_plot{attr}.html')
         fig.write_html(str(path), auto_open=True)
     pass
 
@@ -50,7 +90,8 @@ def plotly_plot(solomon_list: List, columns: List[str], ):
 # MATPLOTLIB
 # =================================================================================================
 
-def bar_plot_with_errors(solomon_list: list, columns: List[str], filter_conditions=None, fig_size: tuple = (10.5, 4.5)):
+def bar_plot_with_errors(solomon_list: list, attributes: List[str], filter_conditions=None,
+                         fig_size: tuple = (10.5, 4.5)):
     """
     Reads and combines the evaluation csv files of each instance type in solomon_list. Filters for only the given
     algorithms and saves an individual comparison bar plot for each given column.
@@ -59,13 +100,13 @@ def bar_plot_with_errors(solomon_list: list, columns: List[str], filter_conditio
     specified columns. Only rows that fulfill one of these conditions will be plotted
     :param fig_size: Figure size (default is for A4 wide); (7, 4.5) for half slide PPT 16:9; ()
     :param solomon_list: the solomon base instances that shall be compared
-    :param columns: the columns for which an individual bar plot is saved
+    :param attributes: the columns for which an individual bar plot is saved
     """
     if filter_conditions is None:
         filter_conditions = []
     evaluation: pd.DataFrame = combine_eval_files(solomon_list)
 
-    for col in columns:
+    for col in attributes:
         grouped = evaluation[col].unstack('solomon_base').groupby(['solution_algorithm',
                                                                    'num_carriers'])
 
@@ -149,6 +190,8 @@ def combine_eval_files(solomon_list, save: bool = True):
 
 if __name__ == '__main__':
     solomon_list = ['C101', 'C201', 'R101', 'R201', 'RC101', 'RC201']
-    columns = ['num_act_veh', 'cost', ]
-    # bar_plot_with_errors(solomon_list, columns)
-    plotly_plot(solomon_list, columns)
+    attributes = ['num_act_veh', 'cost', ]
+    # bar_plot_with_errors(solomon_list, attributes)
+    # plotly_plot(solomon_list, attributes)
+    # bokeh_plot(solomon_list, attributes)
+    plotly_bar_plot(solomon_list, attributes)
