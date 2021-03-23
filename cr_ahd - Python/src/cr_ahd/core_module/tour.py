@@ -19,10 +19,6 @@ class Tour(Optimizable):
         self._cost = 0
         self.arrival_schedule = []  # arrival times
         self.service_schedule = []  # start of service times
-        # self._initializing_visitor: InitializingVisitor = None
-        # self._initialized = False
-        # self._finalizing_visitor: FinalizingVisitor = None
-        # self._finalized = False
 
         self.insert_and_update(0, depot)
         self.insert_and_update(1, depot)
@@ -67,20 +63,6 @@ class Tour(Optimizable):
     @distance_matrix.setter
     def distance_matrix(self, distance_matrix):
         self._distance_matrix = distance_matrix
-
-    '''
-    @property
-    def finalizing_visitor(self):
-        """the finalizer local search optimization, such as 2opt or 3opt"""
-        return self._finalizing_visitor
-
-    @finalizing_visitor.setter
-    def finalizing_visitor(self, visitor):
-        """Setter for the local search algorithm that can be used to finalize the results"""
-        # assert (not self._finalized), f"Instance has been finalized with " \
-        #                               f"visitor {self._finalizing_visitor.__class__.__name__} already!"
-        self._finalizing_visitor = visitor
-    '''
 
     @property
     def cost(self):
@@ -184,15 +166,6 @@ class Tour(Optimizable):
         dist_i_j = self.distance_matrix.loc[i.id_, j.id_]
         insertion_cost = dist_i_u + dist_u_j - dist_i_j
         return insertion_cost
-
-    '''
-    def finalize(self, visitor):
-        """apply visitor's local search procedure to improve the result after the routing itself has been done"""
-        assert (not self._finalized), f'Instance has been finalized with {self._finalizing_visitor} already'
-        self._finalizing_visitor = visitor
-        visitor.finalize_tour(self)
-        pass
-    '''
 
     def plot(self,
              plot_depot: bool = True,

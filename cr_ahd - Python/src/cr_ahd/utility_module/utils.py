@@ -21,7 +21,7 @@ opts = {
     'mu': 1,
     'lambda': 2,
     'ccycler': plt.cycler(color=plt.get_cmap('Set1').colors)(),
-    'dynamic_cycle_time': 10,
+    'dynamic_cycle_time': 25,
 }
 
 Coordinates = namedtuple('Coords', ['x', 'y'])
@@ -167,7 +167,7 @@ def powerset(iterable, include_empty_set=True):
 
 
 def flatten_dict_of_lists(d: dict):
-    """d is a dict of (str, list) pairs. This unpacks it such that there is only a list"""
+    """d is Dict[Any, List[Any]] pairs. This unpacks it such that there is only a flat list of all values"""
     pool = []
     for _, v in d.items():
         pool.extend(v)

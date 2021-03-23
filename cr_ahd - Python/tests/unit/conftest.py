@@ -96,6 +96,21 @@ def request_vertices_d():
         Vertex('r4', 10, 0, 0, 0, 1000),
     ]
 
+@pytest.fixture
+def request_vertices_e():
+    """2 clusters of 4"""
+    return [
+        Vertex('r0', 5, 20, 0, 0, 1000),
+        Vertex('r4', 20, 5, 0, 0, 1000),
+        Vertex('r2', 10, 25, 0, 0, 1000),
+        Vertex('r6', 25, 5, 0, 0, 1000),
+
+        Vertex('r3', 15, 20, 0, 0, 1000),
+        Vertex('r1', 10, 15, 0, 0, 1000),
+        Vertex('r5', 20, 10, 0, 0, 1000),
+        Vertex('r7', 25, 10, 0, 0, 1000),
+    ]
+
 
 @pytest.fixture
 def request_vertices_random_6():
@@ -163,6 +178,12 @@ def submitted_requests_random_6(request_vertices_random_6):
 def submitted_requests_random_15(request_vertices_random_15):
     split = list(utils.split_iterable(request_vertices_random_15, 3))
     return dict(c0=split[0], c1=split[1], c2=split[2])
+
+
+@pytest.fixture
+def submitted_requests_a(request_vertices_e):
+    split = list(utils.split_iterable(request_vertices_e, 2))
+    return dict(c0=split[0], c1=split[1])
 
 
 # ==========

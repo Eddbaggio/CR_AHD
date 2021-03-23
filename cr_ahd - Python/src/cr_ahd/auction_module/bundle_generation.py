@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List
+from typing import Dict, List, Iterable
 
 import numpy as np
+from sklearn.cluster import DBSCAN, KMeans
 
 from src.cr_ahd.core_module.carrier import Carrier
 from src.cr_ahd.core_module.vehicle import Vehicle
@@ -27,7 +28,7 @@ class BundleSetGenerationBehavior(ABC):
         return bundle_set
 
     @abstractmethod
-    def _generate_bundle_set(self, submitted_requests: dict):
+    def _generate_bundle_set(self, submitted_requests: Dict[Carrier, List[Vertex]]) -> Dict[int, Iterable[Vertex]]:
         pass
 
 
@@ -46,21 +47,32 @@ class AllBundles(BundleGenerationBehavior):
         return powerset(pool, False)'''
 
 
-class RandomBundles(BundleSetGenerationBehavior):
+class RandomPartition(BundleSetGenerationBehavior):
     """
-    creates a random partition of the submitted bundles with at most number_of_carriers subsets
+    creates a random partition of the submitted bundles with AT MOST number_of_carriers subsets
     """
-
-    def _generate_bundle_set(self, submitted_requests: dict):
+    def _generate_bundle_set(self, submitted_requests: Dict[Carrier, List[Vertex]]) -> Dict[int, Iterable[Vertex]]:
         pool = flatten_dict_of_lists(submitted_requests)
         num_carriers = len(submitted_requests)
         bundle_set = random_max_k_partition(pool, max_k=num_carriers)
+        return bundle_set
 
+
+class KMeansBundles(BundleSetGenerationBehavior):
+    """
+    creates a k-means partitions of the submitted requests with len(submitted_requests) locally clustered subsets
+    """
+    def _generate_bundle_set(self, submitted_requests: Dict[Carrier, List[Vertex]]) -> Dict[int, Iterable[Vertex]]:
+        flattened = flatten_dict_of_lists(submitted_requests)
+        X = [x.coords for x in flattened]
+        k = len(submitted_requests)
+        k_means = KMeans(n_clusters=k, random_state=0).fit(X)
+        bundle_set = {i: tuple(flattened[j] for j in range(len(flattened)) if i == k_means.labels_[j]) for i in range(k)}
         return bundle_set
 
 
 class GanstererProxyBundles(BundleSetGenerationBehavior):
-    def _generate_bundle_set(self, submitted_requests: dict):
+    def _generate_bundle_set(self, submitted_requests: Dict[Carrier, List[Vertex]]) -> Dict[int, Iterable[Vertex]]:
 
         pass
 
@@ -125,7 +137,3 @@ class GanstererProxyBundles(BundleSetGenerationBehavior):
         tour_length = carrier.cost()
         carrier.retract_requests_and_update_routes(carrier.requests)
         return tour_length
-
-
-class BundleSet(dict):
-    pass

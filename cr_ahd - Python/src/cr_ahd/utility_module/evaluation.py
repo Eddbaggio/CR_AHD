@@ -19,10 +19,11 @@ labels = {
     'cost': 'Routing Costs',
     'num_act_veh': 'Number of Vehicles',
     'StaticI1Insertion': 'Static, no collaboration',
-    'StaticI1InsertionWithAuction': 'Static, with auction',
+    'StaticI1InsertionWithAuction': 'Static, with collaboration',
     'StaticSequentialInsertion': 'Static Sequential, no collaboration',
     'DynamicI1Insertion': 'Dynamic, no collaboration',
-    'DynamicI1InsertionWithAuction': 'Dynamic, with auction',
+    'DynamicI1InsertionWithAuctionA': 'Dynamic, with collaboration (A)',
+    'DynamicI1InsertionWithAuctionB': 'Dynamic, with collaboration (B)',
     'DynamicSequentialInsertion': 'Dynamic  Sequential, no collaboration',
 }
 
@@ -66,23 +67,32 @@ def plotly_bar_plot(solomon_list: List, attributes: List[str], ):
         attr_df = df[attr].unstack('solution_algorithm').reset_index('rand_copy', drop=True).groupby(level=[0, 1]).agg(
             'mean')
         fig = go.Figure()
-        colors = itertools.cycle(univie_colors_100)
+        colors = itertools.cycle([univie_colors_100[0]]+univie_colors_100[2:])
         for col in attr_df.columns:
             fig.add_bar(x=list(zip(*attr_df.index)),
                         y=attr_df[col],
                         name=labels[col],
                         marker_color=next(colors),
-                        hovertemplate='%{y:.2f}'
+                        hovertemplate='%{y:.2f}',
+                        texttemplate='%{y:.0f}',
+                        textposition='outside',
+                        textangle=-90,
+                        textfont_size=14
                         )
-        fig.update_traces(texttemplate='%{y:.0f}', textposition='outside', textangle=-90, textfont_size=14)
+        for v_line_x in np.arange(1.5, 10.5, 2):
+            fig.add_vline(x=v_line_x, line_width=1, line_color="grey")
         fig.update_layout(title=f'Mean {labels[attr]}',
-                          xaxis_title=f'{labels["num_carriers"]} // {labels["solomon_base"]}',  # line break with <br>, but then its outside the plot
+                          xaxis_title=f'{labels["num_carriers"]} // {labels["solomon_base"]}',
+                          # line break with <br>, but then its outside the plot
                           template='plotly_white',
                           uniformtext_minsize=14, uniformtext_mode='show')
+
         # multicategory axis not supported by plotly express
         # fig = px.bar(attr_df, x=attr_df.index.names, y=attr_df.columns)
-        path = path_output_custom.joinpath(f'plotly_bar_plot{attr}.html')
+        path = path_output_custom.joinpath(f'plotly_bar_plot_{attr}.html')
         fig.write_html(str(path), auto_open=True)
+        path = path_output_custom.joinpath(f'plotly_bar_plot_{attr}.svg')
+        fig.write_image(str(path))
     pass
 
 
@@ -164,8 +174,8 @@ def bar_plot_with_errors(solomon_list: list, attributes: List[str], filter_condi
         )
         ax.set_title(f'Mean + Std of {col} per algorithm ')
         fig.set_size_inches(fig_size)
-        fig.savefig(path_output_custom.joinpath(f'bar_plot_{col}.pdf'), bbox_inches='tight')
-        fig.savefig(path_output_custom.joinpath(f'bar_plot_{col}.png'), bbox_inches='tight')
+        fig.savefig(path_output_custom.joinpath(f'matplotlib_bar_plot_{col}.pdf'), bbox_inches='tight')
+        fig.savefig(path_output_custom.joinpath(f'matplotlib_bar_plot_{col}.png'), bbox_inches='tight')
         # plt.show()
 
 
