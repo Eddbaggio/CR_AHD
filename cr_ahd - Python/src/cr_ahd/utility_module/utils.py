@@ -21,7 +21,8 @@ opts = {
     'mu': 1,
     'lambda': 2,
     'ccycler': plt.cycler(color=plt.get_cmap('Set1').colors)(),
-    'dynamic_cycle_time': 25,
+    'dynamic_cycle_time': 25,  # does not actually represent time but the number of requests being assigned each cycle
+    'num_requests_to_submit': 0.5  # has to be either relative [0, 1] or absolute
 }
 
 Coordinates = namedtuple('Coords', ['x', 'y'])
@@ -35,6 +36,7 @@ path_input_solomon = path_input.joinpath('Solomon')
 Solomon_Instances = [file.stem for file in path_input_solomon.iterdir()]
 path_output = path_project.joinpath('data', 'Output')
 path_output_custom = path_output.joinpath('Custom')
+
 
 # alpha 100%
 univie_colors_100 = [

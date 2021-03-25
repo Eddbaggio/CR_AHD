@@ -1,7 +1,7 @@
 import json
+import logging.config
 import multiprocessing
 import time
-import warnings
 from pathlib import Path
 from typing import List
 
@@ -14,14 +14,10 @@ from tqdm import tqdm
 import src.cr_ahd.core_module.carrier as cr
 import src.cr_ahd.core_module.vehicle as vh
 import src.cr_ahd.core_module.vertex as vx
+import src.cr_ahd.utility_module.utils as ut
 from src.cr_ahd.core_module.optimizable import Optimizable
-from src.cr_ahd.solving_module.tour_initialization import TourInitializationBehavior
-from src.cr_ahd.solving_module.tour_improvement import TourImprovementBehavior
-from src.cr_ahd.solving_module.tour_construction import TourConstructionBehavior
-from src.cr_ahd.utility_module.istarmap import istarmap
-from src.cr_ahd.utility_module.utils import split_iterable, make_dist_matrix, opts, Solomon_Instances, \
-    path_input_custom, \
-    path_input_solomon, unique_path, path_output_custom, ask_for_overwrite_permission
+
+logger = logging.getLogger(__name__)
 
 
 class Instance(Optimizable):
@@ -44,15 +40,10 @@ class Instance(Optimizable):
         if dist_matrix is not None:
             self._distance_matrix = dist_matrix
         else:
-            self._distance_matrix = make_dist_matrix([*self.requests, *[c.depot for c in self.carriers]])
-
-        # self._initialized = False
-        # self._solved = False
-        # self._finalized = False
-        # self._initializing_visitor: InitializingVisitor = None
-        # self._routing_visitor: RoutingVisitor = None
-        # self._finalizing_visitor: FinalizingVisitor = None
+            self._distance_matrix = ut.make_dist_matrix([*self.requests, *[c.depot for c in self.carriers]])
         self.solution_algorithm = None
+        # LOGGER.debug(f'{self.id_}: created')
+        pass
 
     def __str__(self):
         return f'Instance {self.id_} with {len(self.requests)} customers and {len(self.carriers)} carriers'
@@ -232,6 +223,7 @@ class Instance(Optimizable):
     def retract_all_vertices_from_carriers(self):
         for c in self.carriers:
             c.retract_requests_and_update_routes(c.requests)
+        # LOGGER.debug(f'{self.id_}: retracted all vertices from carriers')
         pass
 
     def _assign_all_requests_randomly(self, random_seed=None):
@@ -249,144 +241,8 @@ class Instance(Optimizable):
         for r in self.requests:
             c = self.carriers[np.random.choice(range(len(self.carriers)))]
             c.assign_requests([r])
-
-    # def initialize(self, visitor: InitializingVisitor):
-    #     """apply visitor's route initialization procedure to create pendulum tour for each carrier"""
-    #     assert (not self._initialized), \
-    #         f'Instance has been initialized with strategy {self._initializing_visitor} already!'
-    #     self._initializing_visitor = visitor
-    #     visitor.initialize_instance(self)
-    #     pass
-
-    # def solve(self, visitor: RoutingVisitor):
-    #     """apply visitor's routing procedure to built routes for all carriers"""
-    #     assert not self.solved, \
-    #         f'Instance has been solved with strategy {self.routing_visitor} already!'
-    #     self.routing_visitor = visitor
-    #     visitor.solve_instance(self)
-    #     pass
-
-    # def finalize(self, visitor: FinalizingVisitor):
-    #     """apply visitor's local search procedure to improve the result after the routing itself has been done"""
-    #     assert not self._finalized, \
-    #         f'Instance has been finalized with strategy {self._finalizing_visitor} already!'
-    #     self._finalizing_visitor = visitor
-    #     visitor.finalize_instance(self)
-    #     pass
-
-    def cheapest_insertion_auction(self, request: vx.Vertex, initial_carrier: cr.Carrier, verbose=opts['verbose'], ):
-        """
-        If insertion of the request is profitable (demand > insertion cost) for the initial carrier, returns the
-        <carrier, vehicle, position, cost> triple for the cheapest insertion. If insertion is not profitable for the
-        initially selected carrier, returns the associated triple for the collaborator with the cheapest insertion
-        cost for the given request
-
-        :return: The carrier, vehicle, insertion index, and insertion cost of the correct/best insertion
-        """
-        if verbose > 0:
-            print(f'{request.id_} is originally assigned to {initial_carrier.id_}')
-            print(f'Checking profitability of {request.id_} for {initial_carrier.id_}')
-        vehicle_best, position_best, cost_best = initial_carrier.routing_visitor.find_insertion(initial_carrier,
-                                                                                                request)
-        carrier_best = initial_carrier
-        # auction: determine and return the collaborator with the cheapest insertion cost
-        if cost_best > request.demand:
-            if verbose > 0:
-                print(f'{request.id_} is not profitable for {carrier_best.id_}')
-            for carrier in self.carriers:
-                if carrier is carrier_best:
-                    continue
-                else:
-                    if verbose > 0:
-                        print(f'Checking profitability of {request.id_} for {carrier.id_}')
-                    vehicle, position, cost = carrier.routing_visitor.find_insertion(carrier, request)
-                    if cost < cost_best:
-                        carrier_best = carrier
-                        vehicle_best = vehicle
-                        position_best = position
-                        cost_best = cost
-        if verbose > 0:
-            if cost_best > request.demand:
-                print(
-                    f'No carrier can insert request {request.id_} profitably! It will be assigned to {carrier_best.id_}')
-            else:
-                print(f'{request.id_} is finally assigned to {carrier_best.id_}')
-        return carrier_best, vehicle_best, position_best, cost_best
-
-    '''
-    def dynamic_construction(self, with_auction: bool = True, verbose=opts['verbose'], plot_level=opts['plot_level']):
-        """
-        Iterates over each request, finds the carrier it belongs to (this is necessary because the request-to-carrier
-        assignment is pre-determined in the instance files. Optimally, the assignment happens on the fly),
-        and then find the optimal insertion position for this request-carrier combination. If with_auction=True,
-        the request will be offered in an auction to all carriers. the optimal carrier is determined based on
-        cheapest insertion cost.
-
-        :param with_auction: Whether the requests shall be offered to all participating carriers in an auction.
-        :param verbose: level of console output
-        :param plot_level: level of plotting output
-        """
-
-        assert not self.solved, f'Instance {self} has already been solved'
-
-        if verbose > 0:
-            print(
-                f'DYNAMIC Cheapest Insertion Construction {"WITH" if with_auction else "WITHOUT"} auction for {self}:')
-
-        timer = Timer()
-        timer.start()
-        # find the next request u, that has id number i
-        # TODO this can be simplified/made more efficient if the assignment of
-        # a vertex is stored with its class
-        #  instance.  In that case, it must also be stored accordingly in the
-        #  json file.  Right now, it is not a big
-        #  problem since requests are assigned in ascending order, so only the
-        #  first request of each carrier must be
-        #  checked
-
-        # TODO this function assumes that requests have been assigned to
-        # carriers already which is not really logical
-        #  in a real-life case since they arrive dynamically
-        for i in range(len(self.requests)):  # iterate over all requests one by one
-            for c in self.carriers:
-                # this loop finds the carrier to which the request is
-                # assigned(based on the currently PRE -
-                # DETERMINED request-to-carrier assignment).  Optimally, the
-                # assignment happens on-the-fly
-                try:
-                    u_id, u = next(islice(c.unrouted.items(), 1))  # get the first unrouted request of carrier c
-                except StopIteration:  # if the next() function cannot return anything due to an exhausted iterator
-                    pass
-                if int(u_id[1:]) == i:  # if the correct carrier was found, exit the loop
-                    break
-
-            if with_auction:
-                # do the auction
-                carrier, vehicle, position, cost = self.cheapest_insertion_auction(request=u, initial_carrier=c)
-                if c != carrier:
-                    c.retract_request(u.id_)
-                    carrier.assign_request(u)  # assign to auction winner
-            else:
-                # find cheapest insertion
-                carrier = c
-                vehicle, position, cost = c.find_cheapest_feasible_insertion(u, self.dist_matrix)
-
-            # attempt insertion
-            try:
-                if opts['verbose'] > 0:
-                    print(f'\tInserting {u.id_} into {carrier.id_}.{vehicle.id_} with cost of {round(cost, 2)}')
-                vehicle.tour.insert_and_reset(position, u)
-                vehicle.tour.compute_cost_and_schedules(self.dist_matrix)
-                carrier.unrouted.pop(u.id_)  # remove inserted request from unrouted
-            except TypeError:
-                raise InsertionError('', f"Cannot insert {u} feasibly into {carrier.id_}.{vehicle.id_}")
-
-        timer.stop()
-        self._runtime = timer.duration
-        self.solved = True
-        self.routing_strategy = f'dyn{"_auc" if with_auction else ""}'
-        return
-    '''
+        # LOGGER.debug(f'{self.id_}: assigned all requests randomly')
+        pass
 
     def to_centralized(self, depot_xy: tuple):
         """
@@ -437,14 +293,15 @@ class Instance(Optimizable):
 
         :return: the file path as a pathlib.Path object
         """
-        file_name = path_input_custom.joinpath(self.solomon_base, self.id_)
+        file_name = ut.path_input_custom.joinpath(self.solomon_base, self.id_)
         # check if any customers are assigned to carriers already and set the file name
         if self.assigned_requests():
             file_name = file_name.with_name(file_name.stem + '_ass')
-        file_name = unique_path(file_name.parent, file_name.stem + '_#{:03d}' + '.json')
+        file_name = ut.unique_path(file_name.parent, file_name.stem + '_#{:03d}' + '.json')
         file_name.parent.mkdir(parents=True, exist_ok=True)
         with open(file_name, mode='w') as write_file:
             json.dump(self.to_dict(), write_file, indent=4)
+        # LOGGER.debug(f'{self.id_}: wrote instance to json at {file_name}')
         return file_name
 
     def write_solution_to_json(self):
@@ -453,16 +310,18 @@ class Instance(Optimizable):
         :return: the file path as a pathlib.Path object
         """
         # assert self.solved
-
-        file_path = path_output_custom.joinpath(self.solomon_base, f'{self.id_}_{self.solution_algorithm.__class__.__name__.replace("Solver", "")}_solution')
+        file_name = f'{self.id_}_{self.solution_algorithm.__class__.__name__}_solution'
+        file_path = ut.path_output_custom.joinpath(self.solomon_base, file_name)
         file_path = file_path.with_suffix('.json')
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
         if file_path.exists():
             # raise FileExistsError
-            warnings.warn(f'Existing solution file at {file_path} is overwritten')
+            # warnings.warn(f'Existing solution file at {file_path} is overwritten')
+            None
         with open(file_path, mode='w') as write_file:
             json.dump(self.solution, write_file, indent=4)
+        # LOGGER.debug(f'{self.id_}: wrote solution to {file_path}')
         return file_path
 
     # def write_evaluation_metrics_to_csv(self):
@@ -482,12 +341,12 @@ def read_solomon(name: str, num_carriers: int) -> Instance:
     :param num_carriers: number of carriers to be added to the instance
     :return: realization of the Instance class
     """
-    file_name = path_input_solomon / f'{name}.txt'
+    file_name = ut.path_input_solomon / f'{name}.txt'
 
     # vehicles
     vehicles = pd.read_csv(file_name, skiprows=4, nrows=1, delim_whitespace=True, names=['number', 'capacity'])
     vehicles = [vh.Vehicle('v' + str(i), vehicles.capacity[0]) for i in range(vehicles.number[0])]
-    vehicles = split_iterable(vehicles, num_carriers)
+    vehicles = ut.split_iterable(vehicles, num_carriers)
 
     # requests
     cols = ['cust_no', 'x_coord', 'y_coord', 'demand', 'ready_time', 'due_date', 'service_duration']
@@ -500,7 +359,7 @@ def read_solomon(name: str, num_carriers: int) -> Instance:
     depot_df = pd.read_csv(file_name, skiprows=9, nrows=1, delim_whitespace=True, names=cols)
     depots = [vx.DepotVertex(f'd{i}', int(depot_df.x_coord[0]), int(depot_df.y_coord[0])) for i in range(num_carriers)]
 
-    distance_matrix = make_dist_matrix([*requests, *depots])
+    distance_matrix = ut.make_dist_matrix([*requests, *depots])
 
     # carriers
     carriers = []
@@ -508,14 +367,14 @@ def read_solomon(name: str, num_carriers: int) -> Instance:
         c = cr.Carrier(f'c{i}', depots[i], next(vehicles), dist_matrix=distance_matrix)
         carriers.append(c)
     inst = Instance(name, requests, carriers)
-    if opts['verbose'] > 0:
+    if ut.opts['verbose'] > 0:
         print(f'Successfully read Solomon {name} with {num_carriers} carriers.')
         print(inst)
     return inst
 
 
 def make_custom_from_solomon(solomon: Instance, custom_name: str, num_carriers: int, num_vehicles_per_carrier: int,
-                             vehicle_capacity: int, verbose: int = opts['verbose']):
+                             vehicle_capacity: int, verbose: int = ut.opts['verbose']):
     """
     Create a customized instance for the collaborative transportation network from a Solomon instance with the given
     number of carriers, then adds the defined number of vehicles
@@ -641,6 +500,10 @@ def read_custom_json_instance(path: Path):
 
 
 def make_and_write_custom_instances(solomon_name, num_carriers, num_vehicles, num_new_instances=100):
+    """takes a solomon instance and creates custom instances based on random assignment of requests to carriers.
+    Finally, writes the new, custom instances to disk"""
+
+    # LOGGER.info(f'Creating and writing {num_new_instances} new, random instances')
     solomon_instance = read_solomon(solomon_name, num_carriers)
     custom = make_custom_from_solomon(solomon_instance,
                                       # Extract function from this loop, unnecessary to do it every iteration
@@ -657,9 +520,11 @@ def make_and_write_custom_instances(solomon_name, num_carriers, num_vehicles, nu
 
 def make_and_write_custom_instances_parallel(num_carriers, num_vehicles, num_new_instances,
                                              include_central_instances: bool = True):
-    ask_for_overwrite_permission(path_input_custom)
+    """takes a solomon instance and creates custom instances based on random assignment of requests to carriers.
+    Finally, writes the new, custom instances to disk. Does all this with multiprocessing"""
+    ut.ask_for_overwrite_permission(ut.path_input_custom)
     iterables = []
-    for s in Solomon_Instances:
+    for s in ut.Solomon_Instances:
         for c in [num_carriers]:
             for v in [num_vehicles]:
                 for n in [num_new_instances]:

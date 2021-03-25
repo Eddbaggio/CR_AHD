@@ -130,9 +130,6 @@ class I1Insertion(TourConstructionBehavior):
         Use the I1 construction method (Solomon 1987) to build tours for all carriers. If a carrier requires tour
         initialization, it will 'interrupt' and return the corresponding carrier
         """
-        # assert not instance.solved, f'Instance {instance} has already been solved'
-        # ensure that tours have been initialized as is done in the original I1 algorithm
-        # assert instance.initialized, f'Tours must be initialized before solving with I1'
 
         if self.verbose > 0:
             print(f'I1 Construction for {instance}:')
@@ -154,8 +151,6 @@ class I1Insertion(TourConstructionBehavior):
 
         timer.stop()
         self._runtime = timer.duration
-        # instance.routing_visitor = self
-        # instance.solved = True
         return None
 
     def solve_carrier(self, carrier):
@@ -171,66 +166,7 @@ class I1Insertion(TourConstructionBehavior):
 
         if self.verbose > 0:
             print(f'Total Route cost of carrier {carrier.id_}: {carrier.cost()}\n')
-        # carrier.routing_visitor = self
-        # carrier.solved = True
         pass
-
-
-'''
-class DynamicInsertionWithAuction(RoutingVisitor):
-    """Like DynamicInsertion but also has an auction after each request"""
-
-    def find_insertion(self, carrier, vertex):
-        """currently uses static cheapest insertion to find the position"""
-        vehicle_best, position_best, cost_best = \
-            SequentialCheapestInsertion(self.verbose, self.plot_level).find_insertion(carrier, vertex)
-        return vehicle_best, position_best, cost_best
-
-    def solve_instance(self, instance):
-        # assert not instance.solved, f'Instance {instance} has already been solved with {instance.routing_visitor.__class__.__name__}'
-
-        if self.verbose > 0:
-            print(f'DYNAMIC Cheapest Insertion Construction WITH AUCTION for {instance}:')
-
-        timer = Timer()
-        timer.start()
-
-        # TODO this function assumes that requests have been assigned to
-        #  carriers already which is not really logical
-        #  in a real-life case since they arrive dynamically
-        # for carrier in instance.carriers:
-        #     carrier.routing_visitor = SequentialCheapestInsertion()
-        for request in instance.requests:  # TODO: this will also include the requests that have been chosen for initiialization. Initialization does not make any sense for Dynamic Problems, so just iterating over the unrouted does not solve the issue
-            preliminary_carrier = get_carrier_by_id(instance.carriers, request.carrier_assignment)
-
-            # do the auction, i.e. find the (global) insertion
-            # TODO auction stuff shouldn't be a member function. Try strategy or visitor pattern or template
-            #  method instead
-            carrier, vehicle, position, cost = instance.cheapest_insertion_auction(
-                request=request,
-                initial_carrier=preliminary_carrier)
-            if preliminary_carrier != carrier:
-                preliminary_carrier.retract_request(request)
-                carrier.assign_request(request)  # assign to auction winner
-
-            # attempt insertion
-            try:
-                if self.verbose > 0:
-                    print(f'\tInserting {request.id_} into {carrier.id_}.{vehicle.id_} with cost of {round(cost, 2)}')
-                vehicle.tour.insert_and_update(position, request)
-            except TypeError:
-                raise InsertionError('', f"Cannot insert {request} feasibly into {carrier.id_}.{vehicle.id_}")
-
-        timer.stop()
-        self._runtime = timer.duration
-        # instance.solved = True
-        # instance.routing_visitor = self
-        pass
-
-    def solve_carrier(self, carrier):
-        raise NotImplementedError
-        pass
-'''
 
 
 # ===============================================================================

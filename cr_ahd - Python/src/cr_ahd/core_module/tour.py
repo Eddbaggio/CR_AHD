@@ -1,12 +1,13 @@
-from copy import deepcopy
+import logging.config
 from typing import List
+
 import matplotlib.pyplot as plt
 
-from src.cr_ahd.core_module.optimizable import Optimizable
 import src.cr_ahd.core_module.vertex as vx
-from src.cr_ahd.solving_module.tour_initialization import TourInitializationBehavior
-from src.cr_ahd.solving_module.tour_improvement import TourImprovementBehavior
+from src.cr_ahd.core_module.optimizable import Optimizable
 from src.cr_ahd.utility_module.utils import travel_time, opts, InsertionError
+
+logger = logging.getLogger(__name__)
 
 
 class Tour(Optimizable):
@@ -80,9 +81,11 @@ class Tour(Optimizable):
             self.arrival_schedule.insert(index, opts['start_time'])
             self.service_schedule.insert(index, opts['start_time'])
         else:
-            self._cost_sequence.insert(index, None)
-            self.arrival_schedule.insert(index, None)
-            self.service_schedule.insert(index, None)
+            self._cost_sequence.insert(index, 0)
+            self.arrival_schedule.insert(index, 0)
+            self.service_schedule.insert(index, 0)
+        logger.debug(f'{vertex.id_} inserted into {self.id_} at index {index}')
+        pass
 
     def insert_and_update(self, index: int, vertex: vx.BaseVertex):
         """
@@ -109,6 +112,7 @@ class Tour(Optimizable):
         self.arrival_schedule.pop(index)
         self.service_schedule.pop(index)
         popped.routed = False
+        logger.debug(f'{popped.id_} popped from {self.id_} at index {index}')
         return popped
 
     def pop_and_update(self, index: int):
@@ -123,7 +127,7 @@ class Tour(Optimizable):
         for rho in range(index, len(self)):
             i: vx.Vertex = self.routing_sequence[rho - 1]
             j: vx.Vertex = self.routing_sequence[rho]
-            i.routed[1] = rho-1  # update the stored index position
+            i.routed[1] = rho - 1  # update the stored index position
             dist = self.distance_matrix.loc[i.id_, j.id_]
             self._cost_sequence[rho] = dist
             arrival = self.service_schedule[rho - 1] + i.service_duration + travel_time(dist)
@@ -132,9 +136,12 @@ class Tour(Optimizable):
                 self.arrival_schedule[rho] = arrival
                 self.service_schedule[rho] = max(arrival, j.tw.e)
             except AssertionError:
+                logger.debug(f'{self.id_} update from index {index} failed: arrival:{arrival} > j.tw.l.:{j.tw.l}')
                 raise InsertionError(f'{arrival} <= {j.tw.l}', f'cannot arrive at {j} after time window has closed')
             # TODO "You shouldn't throw exceptions for things that happen all the time. Then they'd be "ordinaries"."
             #  https://softwareengineering.stackexchange.com/questions/139171/check-first-vs-exception-handling
+        logger.debug(f'{self.id_} updated from index {index}')
+        pass
 
     def reverse_section(self, i, j):
         """
@@ -219,7 +226,3 @@ class Tour(Optimizable):
                                            )
                 artists.append(annotations)
         return artists
-
-
-if __name__ == '__main__':
-    pass

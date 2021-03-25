@@ -1,8 +1,9 @@
+import logging
 from abc import ABC, abstractmethod
 from typing import Dict, List, Iterable
 
 import numpy as np
-from sklearn.cluster import DBSCAN, KMeans
+from sklearn.cluster import KMeans
 
 from src.cr_ahd.core_module.carrier import Carrier
 from src.cr_ahd.core_module.vehicle import Vehicle
@@ -11,6 +12,8 @@ from src.cr_ahd.solving_module.tour_construction import I1Insertion
 from src.cr_ahd.solving_module.tour_initialization import EarliestDueDate
 from src.cr_ahd.utility_module.utils import Coordinates, flatten_dict_of_lists, euclidean_distance, \
     InsertionError, random_max_k_partition
+
+logger = logging.getLogger(__name__)
 
 
 class BundleSetGenerationBehavior(ABC):
@@ -51,6 +54,7 @@ class RandomPartition(BundleSetGenerationBehavior):
     """
     creates a random partition of the submitted bundles with AT MOST number_of_carriers subsets
     """
+
     def _generate_bundle_set(self, submitted_requests: Dict[Carrier, List[Vertex]]) -> Dict[int, Iterable[Vertex]]:
         pool = flatten_dict_of_lists(submitted_requests)
         num_carriers = len(submitted_requests)
@@ -62,12 +66,14 @@ class KMeansBundles(BundleSetGenerationBehavior):
     """
     creates a k-means partitions of the submitted requests with len(submitted_requests) locally clustered subsets
     """
+
     def _generate_bundle_set(self, submitted_requests: Dict[Carrier, List[Vertex]]) -> Dict[int, Iterable[Vertex]]:
         flattened = flatten_dict_of_lists(submitted_requests)
         X = [x.coords for x in flattened]
         k = len(submitted_requests)
         k_means = KMeans(n_clusters=k, random_state=0).fit(X)
-        bundle_set = {i: tuple(flattened[j] for j in range(len(flattened)) if i == k_means.labels_[j]) for i in range(k)}
+        bundle_set = {i: tuple(flattened[j] for j in range(len(flattened)) if i == k_means.labels_[j]) for i in
+                      range(k)}
         return bundle_set
 
 

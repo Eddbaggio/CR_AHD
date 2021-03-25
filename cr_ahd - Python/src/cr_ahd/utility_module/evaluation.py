@@ -24,6 +24,7 @@ labels = {
     'DynamicI1Insertion': 'Dynamic, no collaboration',
     'DynamicI1InsertionWithAuctionA': 'Dynamic, with collaboration (A)',
     'DynamicI1InsertionWithAuctionB': 'Dynamic, with collaboration (B)',
+    'DynamicI1InsertionWithAuctionC': 'Dynamic, with collaboration (C)',
     'DynamicSequentialInsertion': 'Dynamic  Sequential, no collaboration',
 }
 
@@ -83,7 +84,7 @@ def plotly_bar_plot(solomon_list: List, attributes: List[str], ):
             fig.add_vline(x=v_line_x, line_width=1, line_color="grey")
         fig.update_layout(title=f'Mean {labels[attr]}',
                           xaxis_title=f'{labels["num_carriers"]} // {labels["solomon_base"]}',
-                          # line break with <br>, but then its outside the plot
+                          # line break with <br>, but then its outside the plot, needed to adjust margins then
                           template='plotly_white',
                           uniformtext_minsize=14, uniformtext_mode='show')
 
@@ -91,8 +92,8 @@ def plotly_bar_plot(solomon_list: List, attributes: List[str], ):
         # fig = px.bar(attr_df, x=attr_df.index.names, y=attr_df.columns)
         path = path_output_custom.joinpath(f'plotly_bar_plot_{attr}.html')
         fig.write_html(str(path), auto_open=True)
-        path = path_output_custom.joinpath(f'plotly_bar_plot_{attr}.svg')
-        fig.write_image(str(path))
+        # path = path_output_custom.joinpath(f'plotly_bar_plot_{attr}.svg')
+        # fig.write_image(str(path))
     pass
 
 

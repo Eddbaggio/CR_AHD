@@ -1,11 +1,12 @@
+import itertools
+import logging
 from abc import ABC, abstractmethod
 from typing import List
-
 import numpy as np
-
 from src.cr_ahd.solving_module.tour_construction import find_cheapest_feasible_insertion
 from src.cr_ahd.utility_module.utils import InsertionError
-import itertools
+
+logger = logging.getLogger(__name__)
 
 
 class RequestSelectionBehavior(ABC):
@@ -22,10 +23,12 @@ class RequestSelectionBehavior(ABC):
         """
         submitted_requests = dict()
         for carrier in instance.carriers:
-            k = self.abs_num_requests(carrier, num_requests)
-            submitted_requests[carrier] = self._select_requests(carrier, k)
-            carrier.retract_requests_and_update_routes(submitted_requests[carrier])
-            # TODO: why are these requests not popped inside the _select_requests method? -> because it has to be done for every concrete behavior anyway, I guess
+            if not carrier.unrouted_requests:
+                submitted_requests[carrier] = []
+            else:
+                k = self.abs_num_requests(carrier, num_requests)
+                submitted_requests[carrier] = self._select_requests(carrier, k)
+                carrier.retract_requests_and_update_routes(submitted_requests[carrier])
         # solution.request_selection = self.__class__.__name__
         return submitted_requests
 
@@ -43,14 +46,21 @@ class RequestSelectionBehavior(ABC):
             return round(len(carrier.unrouted_requests) * num_requests)
 
 
+class Random(RequestSelectionBehavior):
+    """
+    returns a random selection of unrouted requests
+    """
+
+    def _select_requests(self, carrier, num_requests: int) -> List:
+        return np.random.choice(carrier.unrouted_requests, num_requests, replace=False)
+
+
 class HighestMarginalCost(RequestSelectionBehavior):
     """given the current set of routes, returns the n unrouted requests that has the HIGHEST marginal cost. NOTE:
     since routes may not be final, the current highest-marginal-cost request might not have been chosen at an earlier
     or later stage!"""
 
     def _select_requests(self, carrier, num_requests: int) -> List:
-        if not carrier.unrouted_requests:
-            return []
         selected_requests = []
         for unrouted in carrier.unrouted_requests:
             mc = cost_of_cheapest_insertion(unrouted, carrier)

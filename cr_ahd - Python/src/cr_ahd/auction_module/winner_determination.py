@@ -1,3 +1,4 @@
+import logging
 from abc import ABC, abstractmethod
 from typing import Dict, Tuple
 
@@ -6,6 +7,7 @@ import numpy as np
 from src.cr_ahd.core_module.carrier import Carrier
 from src.cr_ahd.core_module.vertex import Vertex
 
+logger = logging.getLogger(__name__)
 
 class WinnerDeterminationBehavior(ABC):
     def execute(self, bids: Dict[Tuple[Vertex], Dict[Carrier, float]]):
