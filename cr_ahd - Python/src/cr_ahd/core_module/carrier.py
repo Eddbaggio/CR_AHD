@@ -1,5 +1,5 @@
 from typing import List, Iterable
-
+import datetime as dt
 import matplotlib.pyplot as plt
 
 import src.cr_ahd.core_module.vehicle as vh
@@ -36,25 +36,18 @@ class Carrier(Optimizable):
         if requests is None:
             requests = []
         self.assign_requests(requests)
-        self._distance_matrix = dist_matrix  # TODO is is meaningful to compute the dist_matrix from requests and depot?
-
-        # self._initializing_visitor: InitializingVisitor = None
-        # self._initialized = False
-        # self._routing_visitor: RoutingVisitor = None
-        # self._solved = False
-        # self._finalizing_visitor: FinalizingVisitor = None
-        # self._finalized = False
+        self._distance_matrix = dist_matrix
         for v in vehicles:
             v.tour = Tour(id_=v.id_, depot=depot, distance_matrix=dist_matrix)
 
     def __str__(self):
         return f'Carrier (ID:{self.id_}, Depot:{self.depot.id_}, Vehicles:{len(self.vehicles)}, Requests:{len(self.requests)}, Unrouted:{len(self.unrouted_requests)})'
 
-    def cost(self, ndigits: int = 15):
-        route_cost = 0
+    def sum_travel_durations(self):
+        sum_travel_durations = dt.timedelta()
         for v in self.vehicles:
-            route_cost += v.tour.cost
-        return round(route_cost, ndigits=ndigits)
+            sum_travel_durations += v.tour.sum_travel_durations
+        return sum_travel_durations
 
     @property
     def requests(self):
@@ -95,7 +88,7 @@ class Carrier(Optimizable):
 
     @property
     def profit(self):
-        return self.revenue - self.cost()
+        return self.revenue - self.sum_travel_durations()
 
     @property
     def num_act_veh(self) -> int:
@@ -112,37 +105,6 @@ class Carrier(Optimizable):
         """List of vehicles that serve no request Vertex but have depot-depot tour only"""
         return [v for v in self.vehicles if not v.is_active]
 
-    '''
-    @property
-    def initializing_visitor(self):
-        return self._initializing_visitor
-
-    @initializing_visitor.setter
-    def initializing_visitor(self, visitor):
-        assert self._initializing_visitor is None or self._initializing_visitor == visitor, f'Initialization visitor already set: '
-        self._initializing_visitor = visitor
-
-    @property
-    def routing_visitor(self):
-        return self._routing_visitor
-
-    @routing_visitor.setter
-    def routing_visitor(self, visitor):
-        assert self._routing_visitor is None or self._routing_visitor == visitor, f'routing visitor already set'
-        self._routing_visitor = visitor
-
-    @property
-    def finalizing_visitor(self):
-        """the finalizer local search optimization, such as 2opt or 3opt"""
-        return self._finalizing_visitor
-
-    @finalizing_visitor.setter
-    def finalizing_visitor(self, visitor):
-        """Setter for the local search algorithm that can be used to finalize the results"""
-        # assert (
-        #     not self._finalized), f"carrier has been finalized with visitor {self._finalizing_visitor.__class__.__name__} already!"
-        self._finalizing_visitor = visitor
-    '''
     def to_dict(self):
         """Nested dictionary representation of self"""
         return {
@@ -186,59 +148,6 @@ class Carrier(Optimizable):
             request.assigned = False
         return requests
 
-    '''
-    def initialize_another_tour(self):
-        """initializes another vehicle pendulum tour, using the InitializingVisitor that has been set the first time
-         around"""
-        self.initializing_visitor.initialize_carrier(self)
-    '''
-
-    '''def initialize(self, visitor: InitializingVisitor):
-        """apply visitor's initialization procedure to create a pendulum tour"""
-        assert not self._initialized
-        self.initializing_visitor = visitor
-        visitor.initialize_carrier(self)
-
-    def solve(self, visitor: RoutingVisitor):
-        """apply visitor's routing procedure to build routes"""
-        assert not self._solved
-        self._routing_visitor = visitor
-        visitor.solve_carrier(self)
-
-    def finalize(self, visitor: FinalizingVisitor):
-        """apply visitor's local search procedure to improve the result after the routing itself has been done"""
-        assert not self._finalized
-        self._finalizing_visitor = visitor
-        visitor.finalize_carrier(self)'''
-
-
-    '''def find_best_feasible_I1_insertion(self, verbose=opts['verbose'],
-                                        ) -> Tuple[vx.Vertex, vh.Vehicle, int, float]:
-        """
-        Find the next optimal Vertex and its optimal insertion position based on the I1 insertion scheme.
-
-        :param dist_matrix:
-        :return: Tuple(u_best, vehicle_best, rho_best, max_c2)
-        """
-
-        vehicle_best = None
-        rho_best = None
-        u_best = None
-        max_c2 = float('-inf')
-
-        for _, u in self.unrouted.items():  # take the unrouted requests
-            for v in self.active_vehicles:  # check first the vehicles that are active (to avoid small tours)
-                rho, c2 = v.tour.find_best_feasible_I1_insertion(u)
-                if c2 > max_c2:
-                    if verbose > 1:
-                        print(f'^ is the new best c2')
-                    vehicle_best = v
-                    rho_best = rho
-                    u_best = u
-                    max_c2 = c2
-
-        return u_best, vehicle_best, rho_best, max_c2'''
-
     def plot(self, annotate: bool = True, alpha: float = 1):
         """
         Create a matplotlib plot of the carrier and its tours.
@@ -250,7 +159,7 @@ class Carrier(Optimizable):
         fig, ax = plt.subplots()
         ax.set_xlim(0, 100)
         ax.set_ylim(0, 100)
-        ax.set_title(f'carrier {self.id_} with cost of {self.cost(2)}')
+        ax.set_title(f'carrier {self.id_} with cost of {self.sum_travel_durations(2)}')
 
         # plot depot
         ax.plot(*self.depot.coords, marker='s', alpha=alpha, label=self.depot.id_, ls='')

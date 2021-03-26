@@ -1,14 +1,14 @@
-from typing import Dict, List
+import datetime as dt
 
+import numpy as np
 import pytest
 
+import src.cr_ahd.utility_module.utils as utils
+from src.cr_ahd.core_module.carrier import Carrier
 from src.cr_ahd.core_module.instance import Instance
 from src.cr_ahd.core_module.tour import Tour
-from src.cr_ahd.core_module.vertex import DepotVertex, Vertex
-from src.cr_ahd.core_module.carrier import Carrier
 from src.cr_ahd.core_module.vehicle import Vehicle
-import src.cr_ahd.utility_module.utils as utils
-import numpy as np
+from src.cr_ahd.core_module.vertex import DepotVertex, Vertex
 
 
 # ==========
@@ -54,11 +54,11 @@ def depot_vertex():
 def request_vertices_a():
     """criss-cross sequence. use to test 2opt"""
     return [
-        Vertex('r0', 0, 10, 0, 0, 1000),
-        Vertex('r1', 20, 10, 0, 0, 1000),
-        Vertex('r2', 20, 20, 0, 0, 1000),
-        Vertex('r3', 10, 20, 0, 0, 1000),
-        Vertex('r4', 10, 0, 0, 0, 1000),
+        Vertex('r0', 0, 10, 0, dt.datetime.min, dt.datetime.max - dt.timedelta(microseconds=1)),
+        Vertex('r1', 20, 10, 0, dt.datetime.min, dt.datetime.max - dt.timedelta(microseconds=1)),
+        Vertex('r2', 20, 20, 0, dt.datetime.min, dt.datetime.max - dt.timedelta(microseconds=1)),
+        Vertex('r3', 10, 20, 0, dt.datetime.min, dt.datetime.max - dt.timedelta(microseconds=1)),
+        Vertex('r4', 10, 0, 0, dt.datetime.min, dt.datetime.max - dt.timedelta(microseconds=1)),
     ]
 
 
@@ -66,10 +66,10 @@ def request_vertices_a():
 def request_vertices_b():
     """used to test reversing part of a tour"""
     return [
-        Vertex('r0', 0, 10, 0, 0, 1000),
-        Vertex('r1', 10, 20, 0, 0, 1000),
-        Vertex('r2', 20, 10, 0, 0, 1000),
-        Vertex('r3', 10, 0, 0, 0, 1000),
+        Vertex('r0', 0, 10, 0, dt.datetime.min, dt.datetime.max - dt.timedelta(microseconds=1)),
+        Vertex('r1', 10, 20, 0, dt.datetime.min, dt.datetime.max - dt.timedelta(microseconds=1)),
+        Vertex('r2', 20, 10, 0, dt.datetime.min, dt.datetime.max - dt.timedelta(microseconds=1)),
+        Vertex('r3', 10, 0, 0, dt.datetime.min, dt.datetime.max - dt.timedelta(microseconds=1)),
     ]
 
 
@@ -77,11 +77,12 @@ def request_vertices_b():
 def request_vertices_c():
     """used to test whether tour.reverse_section() handles InsertionError correctly by going back to the original"""
     return [
-        Vertex('r0', 0, 10, 0, 0, 200),
-        Vertex('r1', 10, 20, 0, 20, 55),  # infeasible if positioned at routing_sequence[5]
-        Vertex('r2', 20, 20, 0, 0, 200),
-        Vertex('r3', 20, 10, 0, 0, 200),
-        Vertex('r4', 10, 0, 0, 0, 200),
+        Vertex('r0', 0, 10, 0, dt.datetime.min, dt.datetime(year=1, month=1, day=1, second=200)),
+        Vertex('r1', 10, 20, 0, dt.datetime(year=1, month=1, day=1, second=20),
+               dt.datetime(year=1, month=1, day=1, second=55)),  # infeasible if positioned at routing_sequence[5]
+        Vertex('r2', 20, 20, 0, dt.datetime.min, dt.datetime(year=1, month=1, day=1, second=200)),
+        Vertex('r3', 20, 10, 0, dt.datetime.min, dt.datetime(year=1, month=1, day=1, second=200)),
+        Vertex('r4', 10, 0, 0, dt.datetime.min, dt.datetime(year=1, month=1, day=1, second=200)),
     ]
 
 
@@ -89,39 +90,57 @@ def request_vertices_c():
 def request_vertices_d():
     """use to test nHighestMarginalCost request selection"""
     return [
-        Vertex('r0', 10, 10, 0, 0, 1000),
-        Vertex('r1', 20, 10, 0, 0, 1000),
-        Vertex('r2', 20, 20, 0, 0, 1000),
-        Vertex('r3', 10, 20, 0, 0, 1000),
-        Vertex('r4', 10, 0, 0, 0, 1000),
+        Vertex('r0', 10, 10, 0, dt.datetime.min, dt.datetime.max - dt.timedelta(microseconds=1)),
+        Vertex('r1', 20, 10, 0, dt.datetime.min, dt.datetime.max - dt.timedelta(microseconds=1)),
+        Vertex('r2', 20, 20, 0, dt.datetime.min, dt.datetime.max - dt.timedelta(microseconds=1)),
+        Vertex('r3', 10, 20, 0, dt.datetime.min, dt.datetime.max - dt.timedelta(microseconds=1)),
+        Vertex('r4', 10, 0, 0, dt.datetime.min, dt.datetime.max - dt.timedelta(microseconds=1)),
     ]
+
 
 @pytest.fixture
 def request_vertices_e():
     """2 clusters of 4"""
     return [
-        Vertex('r0', 5, 20, 0, 0, 1000),
-        Vertex('r4', 20, 5, 0, 0, 1000),
-        Vertex('r2', 10, 25, 0, 0, 1000),
-        Vertex('r6', 25, 5, 0, 0, 1000),
+        Vertex('r0', 5, 20, 0, dt.datetime.min, dt.datetime.max - dt.timedelta(microseconds=1)),
+        Vertex('r4', 20, 5, 0, dt.datetime.min, dt.datetime.max - dt.timedelta(microseconds=1)),
+        Vertex('r2', 10, 25, 0, dt.datetime.min, dt.datetime.max - dt.timedelta(microseconds=1)),
+        Vertex('r6', 25, 5, 0, dt.datetime.min, dt.datetime.max - dt.timedelta(microseconds=1)),
 
-        Vertex('r3', 15, 20, 0, 0, 1000),
-        Vertex('r1', 10, 15, 0, 0, 1000),
-        Vertex('r5', 20, 10, 0, 0, 1000),
-        Vertex('r7', 25, 10, 0, 0, 1000),
+        Vertex('r3', 15, 20, 0, dt.datetime.min, dt.datetime.max - dt.timedelta(microseconds=1)),
+        Vertex('r1', 10, 15, 0, dt.datetime.min, dt.datetime.max - dt.timedelta(microseconds=1)),
+        Vertex('r5', 20, 10, 0, dt.datetime.min, dt.datetime.max - dt.timedelta(microseconds=1)),
+        Vertex('r7', 25, 10, 0, dt.datetime.min, dt.datetime.max - dt.timedelta(microseconds=1)),
+    ]
+
+
+@pytest.fixture
+def request_vertices_f():
+    """testing travel times and distances"""
+    return [
+        DepotVertex('d0', 0, 0),
+        Vertex('r0', -10, 0, 0, dt.datetime.min, dt.datetime.max - dt.timedelta(microseconds=1)),
+        Vertex('r1', -10, -10, 0, dt.datetime.min, dt.datetime.max - dt.timedelta(microseconds=1)),
+        Vertex('r2', 10, -10, 0, dt.datetime.min, dt.datetime.max - dt.timedelta(microseconds=1)),
+        Vertex('r3', 10, 10, 0, dt.datetime.min, dt.datetime.max - dt.timedelta(microseconds=1)),
+        Vertex('r4', 0, 20, 0, dt.datetime.min, dt.datetime.max - dt.timedelta(microseconds=1)),
     ]
 
 
 @pytest.fixture
 def request_vertices_random_6():
-    """collection of 6 randomly placed vertices [0, 100] with equal tw (0, 1000) and no service time"""
-    return [Vertex(f'r{i}', np.random.randint(0, 100), np.random.randint(0, 100), 0, 0, 1000) for i in range(6)]
+    """collection of 6 randomly placed vertices [0, 100] with equal tw (0, max) and no service time"""
+    return [Vertex(f'r{i}', np.random.randint(0, 100), np.random.randint(0, 100), 0, dt.datetime.min,
+                   dt.datetime.max - dt.timedelta(microseconds=1))
+            for i in range(6)]
 
 
 @pytest.fixture
 def request_vertices_random_15():
-    """collection of 6 randomly placed vertices [0, 100] with equal tw (0, 1000) and no service time"""
-    return [Vertex(f'r{i}', np.random.randint(0, 100), np.random.randint(0, 100), 0, 0, 1000) for i in range(15)]
+    """collection of 6 randomly placed vertices [0, 100] with equal tw (0, max) and no service time"""
+    return [Vertex(f'r{i}', np.random.randint(0, 100), np.random.randint(0, 100), 0, dt.datetime.min,
+                   dt.datetime.max - dt.timedelta(microseconds=1))
+            for i in range(15)]
 
 
 # ==========
@@ -238,5 +257,5 @@ def bids_a(carriers_and_unassigned_requests_3_6):
 def instance_a(depot_vertex, carriers_and_unassigned_requests_3_6):
     carriers, requests = carriers_and_unassigned_requests_3_6
     for i, r in enumerate(requests):
-        r.carrier_assignment = carriers[int(i/2)].id_
+        r.carrier_assignment = carriers[int(i / 2)].id_
     return Instance('instance_a', requests, carriers, carriers[0].distance_matrix)

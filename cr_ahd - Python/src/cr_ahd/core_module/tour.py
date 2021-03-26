@@ -1,3 +1,4 @@
+import datetime as dt
 import logging.config
 from typing import List
 
@@ -16,10 +17,11 @@ class Tour(Optimizable):
         self.depot = depot
         self._distance_matrix = distance_matrix
         self._routing_sequence = []  # sequence of vertices
-        self._cost_sequence = []  # sequence of arc costs
-        self._cost = 0
-        self.arrival_schedule = []  # arrival times
-        self.service_schedule = []  # start of service times
+        self._travel_dist_sequence: List[float] = []  # sequence of arc costs
+        self._travel_duration_sequence: List[dt.timedelta] = []  # sequence of arc costs
+        self._sum_travel_times = 0
+        self.arrival_schedule: List[dt.datetime] = []  # arrival times
+        self.service_schedule: List[dt.datetime] = []  # start of service times
 
         self.insert_and_update(0, depot)
         self.insert_and_update(1, depot)
@@ -35,10 +37,10 @@ class Tour(Optimizable):
             else:
                 arrival_schedule.append(round(self.arrival_schedule[i], 2))
                 service_schedule.append(round(self.service_schedule[i], 2))
-        if self.cost is None:
+        if self.sum_travel_durations is None:
             cost = None
         else:
-            cost = round(self.cost)
+            cost = round(self.sum_travel_durations)
         return f'ID:\t\t\t{self.id_}\nSequence:\t{sequence}\nArrival:\t{arrival_schedule}\nService:\t{service_schedule}\nCost:\t\t{cost}'
 
     def __len__(self):
@@ -55,7 +57,7 @@ class Tour(Optimizable):
 
     @property
     def profit(self):
-        return self.revenue - self.cost
+        return self.revenue - self.sum_travel_durations
 
     @property  # why exactly is this a property and not just a member attribute?
     def distance_matrix(self):
@@ -66,8 +68,8 @@ class Tour(Optimizable):
         self._distance_matrix = distance_matrix
 
     @property
-    def cost(self):
-        return sum(self._cost_sequence)
+    def sum_travel_durations(self) -> dt.timedelta:
+        return sum(self._travel_duration_sequence, dt.timedelta())
 
     def _insert_no_update(self, index: int, vertex: vx.BaseVertex):
         """highly discouraged to use this as it does not ensure feasibility of the route! use insert_and_update instead.
@@ -77,13 +79,15 @@ class Tour(Optimizable):
         self._routing_sequence.insert(index, vertex)
         vertex.routed = [self, index]
         if len(self) <= 1:
-            self._cost_sequence.insert(index, 0)
+            self._travel_duration_sequence.insert(index, dt.timedelta(0))
+            self._travel_dist_sequence.insert(index, 0)
             self.arrival_schedule.insert(index, opts['start_time'])
             self.service_schedule.insert(index, opts['start_time'])
         else:
-            self._cost_sequence.insert(index, 0)
-            self.arrival_schedule.insert(index, 0)
-            self.service_schedule.insert(index, 0)
+            self._travel_duration_sequence.insert(index, dt.timedelta(0))
+            self._travel_dist_sequence.insert(index, 0)
+            self.arrival_schedule.insert(index, None)
+            self.service_schedule.insert(index, None)
         logger.debug(f'{vertex.id_} inserted into {self.id_} at index {index}')
         pass
 
@@ -108,7 +112,8 @@ class Tour(Optimizable):
         """highly discouraged to use this as it does not ensure feasibility. only use for intermediate states that
         allow infeasible states such as for reversing a section! use pop_and_update instead"""
         popped = self._routing_sequence.pop(index)
-        self._cost_sequence.pop(index)
+        self._travel_duration_sequence.pop(index)
+        self._travel_dist_sequence.pop(index)
         self.arrival_schedule.pop(index)
         self.service_schedule.pop(index)
         popped.routed = False
@@ -129,7 +134,8 @@ class Tour(Optimizable):
             j: vx.Vertex = self.routing_sequence[rho]
             i.routed[1] = rho - 1  # update the stored index position
             dist = self.distance_matrix.loc[i.id_, j.id_]
-            self._cost_sequence[rho] = dist
+            self._travel_dist_sequence[rho] = dist
+            self._travel_duration_sequence[rho] = travel_time(dist)
             arrival = self.service_schedule[rho - 1] + i.service_duration + travel_time(dist)
             try:
                 assert arrival <= j.tw.l

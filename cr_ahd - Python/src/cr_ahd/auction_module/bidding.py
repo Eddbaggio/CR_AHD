@@ -36,7 +36,7 @@ class I1MarginalCostBidding(BiddingBehavior):
 
     def _generate_bid(self, bundle, carrier):
 
-        without_bundle = carrier.cost()
+        without_bundle = carrier.sum_travel_durations()
         prior_unrouted = carrier.unrouted_requests
         carrier.assign_requests(bundle)
 
@@ -49,7 +49,7 @@ class I1MarginalCostBidding(BiddingBehavior):
             except InsertionError:
                 EarliestDueDate().initialize_carrier(carrier)
 
-        with_bundle = carrier.cost()
+        with_bundle = carrier.sum_travel_durations()
         carrier.retract_requests_and_update_routes(bundle)
         carrier.retract_requests_and_update_routes(prior_unrouted)  # need to unroute the previously unrouted again
         carrier.assign_requests(prior_unrouted)  # and then reassign them (missing a function that only unroutes them)

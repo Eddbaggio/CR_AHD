@@ -25,26 +25,26 @@ def test_k_means_bundle_set_generation(submitted_requests_a):
 
 
 # GanstererProxyBundles
-def test_bundle_centroid(request_vertices_b, depot_vertex):
-    distance_matrix = make_dist_matrix([*request_vertices_b, depot_vertex])
-    centroid = bg.GanstererProxyBundles(distance_matrix).bundle_centroid(request_vertices_b, depot_vertex)
-    assert centroid.x == centroid.y == 5.954915028125262
+# def test_bundle_centroid(request_vertices_b, depot_vertex):
+#     distance_matrix = make_dist_matrix([*request_vertices_b, depot_vertex])
+#     centroid = bg.GanstererProxyBundles(distance_matrix).bundle_centroid(request_vertices_b, depot_vertex)
+#     assert centroid.x == centroid.y == 5.954915028125262
 
 
-def test_bundle_radius(request_vertices_b, depot_vertex):
-    distance_matrix = make_dist_matrix([*request_vertices_b, depot_vertex])
-    radius = bg.GanstererProxyBundles(distance_matrix).bundle_radius(request_vertices_b, depot_vertex)
-    assert radius == 10.90742919249142
+# def test_bundle_radius(request_vertices_b, depot_vertex):
+#     distance_matrix = make_dist_matrix([*request_vertices_b, depot_vertex])
+#     radius = bg.GanstererProxyBundles(distance_matrix).bundle_radius(request_vertices_b, depot_vertex)
+#     assert radius == 10.90742919249142
 
 
-def test_bundle_density(request_vertices_b, depot_vertex):
-    # TODO too many distance matrices, group tests into a TestClass!
-    distance_matrix = make_dist_matrix([*request_vertices_b, depot_vertex])
-    density = bg.GanstererProxyBundles(distance_matrix).bundle_density(request_vertices_b, depot_vertex)
-    assert density == 1.107030134733417
+# def test_bundle_density(request_vertices_b, depot_vertex):
+#     # TODO too many distance matrices, group tests into a TestClass!
+#     distance_matrix = make_dist_matrix([*request_vertices_b, depot_vertex])
+#     density = bg.GanstererProxyBundles(distance_matrix).bundle_density(request_vertices_b, depot_vertex)
+#     assert density == 1.107030134733417
 
 
-def test_tour_length(request_vertices_b, depot_vertex):
-    distance_matrix = make_dist_matrix([*request_vertices_b, depot_vertex])
-    tour_length = bg.GanstererProxyBundles(distance_matrix).bundle_tour_length(request_vertices_b, depot_vertex)
-    assert tour_length == 62.42640687119285
+# def test_tour_length(request_vertices_b, depot_vertex):
+#     distance_matrix = make_dist_matrix([*request_vertices_b, depot_vertex])
+#     tour_length = bg.GanstererProxyBundles(distance_matrix).bundle_tour_length(request_vertices_b, depot_vertex)
+#     assert tour_length == 62.42640687119285

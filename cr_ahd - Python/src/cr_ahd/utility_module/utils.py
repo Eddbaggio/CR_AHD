@@ -2,6 +2,7 @@ import functools
 import itertools
 import random
 import time
+import datetime as dt
 from collections import namedtuple
 from pathlib import Path
 from typing import List, Tuple, Dict, Any
@@ -12,11 +13,11 @@ import pandas as pd
 from matplotlib.colors import LinearSegmentedColormap
 
 opts = {
-    # 'num_trials': 10,
     'verbose': 0,
     'plot_level': 1,
-    'speed_kmh': 60 ** 2,
-    'start_time': 0,
+    'speed_kmh': 25,
+    'start_time': dt.datetime(year=1, month=1, day=1, hour=6, minute=0, second=0),
+    'end_time': dt.datetime(year=1, month=1, day=1, hour=20, minute=0, second=0),
     'alpha_1': 0.5,
     'mu': 1,
     'lambda': 2,
@@ -36,7 +37,6 @@ path_input_solomon = path_input.joinpath('Solomon')
 Solomon_Instances = [file.stem for file in path_input_solomon.iterdir()]
 path_output = path_project.joinpath('data', 'Output')
 path_output_custom = path_output.joinpath('Custom')
-
 
 # alpha 100%
 univie_colors_100 = [
@@ -82,7 +82,6 @@ def make_dist_matrix(vertices: List):
     :param vertices: List of vertices each of class Vertex
     :return: pd.DataFrame distance matrix
     """
-    # assuming that vertices are of type rq.Request
     index = [i.id_ for i in vertices]
     dist_matrix: pd.DataFrame = pd.DataFrame(index=index, columns=index, dtype='float64')
 
@@ -92,8 +91,22 @@ def make_dist_matrix(vertices: List):
     return dist_matrix
 
 
+def make_travel_time_matrix(vertices: List):
+    """
+    :param vertices: List of vertices each of class Vertex
+    :return: pd.DataFrame travel time matrix
+    """
+    index = [i.id_ for i in vertices]
+    travel_time_matrix: pd.DataFrame = pd.DataFrame(index=index, columns=index, dtype='timedelta64[ns]')
+
+    for i in vertices:
+        for j in vertices:
+            travel_time_matrix.loc[i.id_, j.id_] = travel_time(euclidean_distance(i.coords, j.coords))
+    return travel_time_matrix
+
+
 def travel_time(dist):
-    return (dist / opts['speed_kmh']) * 60 ** 2  # compute time in seconds
+    return dt.timedelta(seconds=(dist / opts['speed_kmh']) * 60 ** 2)  # compute timedelta in seconds
 
 
 class InsertionError(Exception):
@@ -221,23 +234,3 @@ def random_max_k_partition(ls, max_k) -> Dict[int, Tuple[Any, ...]]:
         partitions[index] = tuple(
             x[1] for x in subset)  # TODO: better use frozenset (rather than tuple) for dict values?
     return partitions
-
-
-def conjunction(*conditions):
-    """
-    combines multiple logical conditions such that all must hold
-
-    :param conditions:
-    :return:
-    """
-    return functools.reduce(np.logical_and, conditions)
-
-
-def disjunction(*conditions):
-    """
-    combines multiple logical conditions such that at least one must hold
-
-    :param conditions:
-    :return:
-    """
-    return functools.reduce(np.logical_or, conditions)

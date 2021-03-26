@@ -53,7 +53,7 @@ class TwoOpt(TourImprovementBehavior):
         pass
 
     def improve_tour(self, tour):
-        best_cost = tour.cost
+        best_cost = tour.sum_travel_durations
         improved = True
         while improved:
             improved = False
@@ -64,9 +64,9 @@ class TwoOpt(TourImprovementBehavior):
                     try:
                         # the actual 2opt swap
                         tour.reverse_section(i, j)
-                        if tour.cost < best_cost:
+                        if tour.sum_travel_durations < best_cost:
                             improved = True
-                            best_cost = tour.cost
+                            best_cost = tour.sum_travel_durations
                         # if no improvement -> undo the 2opt swap
                         else:
                             tour.reverse_section(i, j)

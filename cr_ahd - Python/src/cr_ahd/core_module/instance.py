@@ -83,7 +83,7 @@ class Instance(Optimizable):
         total_cost = 0
         for c in self.carriers:
             for v in c.vehicles:
-                total_cost += v.tour.cost
+                total_cost += v.tour.sum_travel_durations
         return total_cost
 
     @property
@@ -114,9 +114,9 @@ class Instance(Optimizable):
                 vehicle_solution = dict(sequence=[r.id_ for r in v.tour.routing_sequence],
                                         arrival=v.tour.arrival_schedule,
                                         service=v.tour.service_schedule,
-                                        cost=v.tour.cost)
+                                        cost=v.tour.sum_travel_durations)
                 carrier_solution[v.id_] = vehicle_solution
-                carrier_solution['cost'] = c.cost()
+                carrier_solution['cost'] = c.sum_travel_durations()
             instance_solution[c.id_] = carrier_solution
             instance_solution['cost'] = self.cost
         return instance_solution
@@ -139,7 +139,7 @@ class Instance(Optimizable):
     def cost_per_carrier(self):
         cost_per_carrier = dict()
         for c in self.carriers:
-            cost_per_carrier[f'{c.id_}_cost'] = c.cost()
+            cost_per_carrier[f'{c.id_}_cost'] = c.sum_travel_durations()
         return cost_per_carrier
 
     @property

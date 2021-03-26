@@ -11,20 +11,20 @@ def test_tour_insert_and_pop(depot_vertex, request_vertices_b):
     for request in request_vertices_b:
         tour.insert_and_update(1, request)
     assert all([r.routed for r in request_vertices_b])
-    assert tour.cost == 20+3*np.sqrt(200)
+    assert tour.sum_travel_durations == 20 + 3 * np.sqrt(200)
     for request in request_vertices_b:
         tour.pop_and_update(request.routed[1])
     assert not any([r.routed for r in request_vertices_b])
-    assert tour.cost == 0
+    assert tour.sum_travel_durations == 0
 
 
 def test_tour_cost(small_criss_cross_tour: Tour):
-    assert small_criss_cross_tour.cost == 80
+    assert small_criss_cross_tour.sum_travel_durations == 80
 
 
 def test_TwoOpt_cost(small_criss_cross_tour: Tour):
     TwoOpt().improve_tour(small_criss_cross_tour)
-    assert small_criss_cross_tour.cost == 40 + 2 * np.sqrt(200)
+    assert small_criss_cross_tour.sum_travel_durations == 40 + 2 * np.sqrt(200)
 
 
 def test_tour_reverse(small_tour: Tour):

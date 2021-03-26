@@ -3,8 +3,8 @@ from typing import List
 from src.cr_ahd.auction_module.request_selection import find_cheapest_feasible_insertion
 from src.cr_ahd.utility_module import utils as ut
 
-TW_LENGTH = 2
-ALL_TW = [ut.TimeWindow(e, e + TW_LENGTH) for e in range(ut.opts['start_time'])]
+TW_LENGTH = 2 * 60 * 60  # two hours
+ALL_TW = [ut.TimeWindow(e, e + TW_LENGTH) for e in range(ut.opts['start_time'], ut.opts['end_time'], step=TW_LENGTH)]
 
 
 class TWOfferingBehavior(abc.ABC):

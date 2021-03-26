@@ -140,6 +140,6 @@ class GanstererProxyBundles(BundleSetGenerationBehavior):
             except InsertionError:
                 EarliestDueDate().initialize_carrier(carrier)
 
-        tour_length = carrier.cost()
+        tour_length = carrier.sum_travel_durations()
         carrier.retract_requests_and_update_routes(carrier.requests)
         return tour_length

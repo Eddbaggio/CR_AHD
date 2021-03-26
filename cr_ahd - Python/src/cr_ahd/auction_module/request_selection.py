@@ -113,6 +113,6 @@ def cost_of_cheapest_insertion(request, carrier):
     if lowest >= float('inf'):
         t = carrier.inactive_vehicles[0].tour
         t.insert_and_update(1, request)
-        lowest = t.cost
+        lowest = t.sum_travel_durations
         t.pop_and_update(1)
     return lowest

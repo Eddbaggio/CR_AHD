@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import numpy as np
+import datetime as dt
 
 from src.cr_ahd.utility_module.utils import opts
 
@@ -48,7 +49,7 @@ class EarliestDueDate(TourInitializationBehavior):
 
     def find_seed_request(self, carrier):
         """find request with earliest deadline"""
-        earliest = np.infty
+        earliest = dt.datetime.max
         for request in carrier.unrouted_requests:
             if request.tw.l < earliest:
                 seed = request

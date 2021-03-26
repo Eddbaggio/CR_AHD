@@ -1,13 +1,13 @@
-import numpy as np
+import datetime as dt
 
-from src.cr_ahd.utility_module.utils import TimeWindow, Coordinates, opts
+import src.cr_ahd.utility_module.utils as ut
 from abc import ABC, abstractmethod
 
 
 class BaseVertex(ABC):
     def __init__(self, id_: str, x_coord: float, y_coord: float):
         self.id_ = id_  # unique identifier TODO: assert that the id is unique?
-        self.coords = Coordinates(x_coord, y_coord)  # Location in a 2D plane
+        self.coords = ut.Coordinates(x_coord, y_coord)  # Location in a 2D plane
 
     @abstractmethod
     def to_dict(self):
@@ -21,8 +21,8 @@ class DepotVertex(BaseVertex):
                  carrier_assignment: str = None):
         super().__init__(id_, x_coord, y_coord)
         self.carrier_assignment = carrier_assignment
-        self.tw = TimeWindow(opts['start_time'], np.infty)
-        self.service_duration = 0
+        self.tw = ut.TimeWindow(ut.opts['start_time'], ut.opts['end_time'])
+        self.service_duration = dt.timedelta(0)
         self.demand = 0
         self.assigned = False
 
@@ -45,15 +45,15 @@ class Vertex(BaseVertex):
                  x_coord: float,
                  y_coord: float,
                  demand: float,
-                 tw_open: float,
-                 tw_close: float,
-                 service_duration: float = 0,
+                 tw_open: dt.datetime,
+                 tw_close: dt.datetime,
+                 service_duration: dt.timedelta = dt.timedelta(0),
                  carrier_assignment: str = None,
                  **kwargs
                  ):
         super().__init__(id_, x_coord, y_coord)
         self.demand = demand
-        self.tw = TimeWindow(tw_open, tw_close)  # time windows opening and closing
+        self.tw = ut.TimeWindow(tw_open, tw_close)  # time windows opening and closing
         self.service_duration = service_duration
         self._carrier_assignment = carrier_assignment
         self._assigned = False
@@ -102,12 +102,10 @@ class Vertex(BaseVertex):
     @routed.setter
     def routed(self, routed: bool):
         # XOR: can only set from True to False or vice versa
-        assert bool(routed) ^ bool(self.routed), f'routed attribute of {self} can only set from True to False or vice versa'
+        assert bool(routed) ^ bool(
+            self.routed), f'routed attribute of {self} can only set from True to False or vice versa'
         self._routed = routed
 
-def midpoint(vertex_A:BaseVertex, vertex_B:BaseVertex):
-    return Coordinates((vertex_A.coords.x + vertex_B.coords.x)/2, (vertex_A.coords.y + vertex_B.coords.y)/2)
 
-# if __name__ == '__main__':
-# carrier = carrier.Carrier(-99, Vertex('dummy', 0, 0, 0, 0, 0), [])
-# print(carrier)
+def midpoint(vertex_A: BaseVertex, vertex_B: BaseVertex):
+    return ut.Coordinates((vertex_A.coords.x + vertex_B.coords.x) / 2, (vertex_A.coords.y + vertex_B.coords.y) / 2)
