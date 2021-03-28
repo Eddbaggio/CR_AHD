@@ -16,7 +16,8 @@ from src.cr_ahd.utility_module.utils import univie_cmap, path_output_custom, uni
 labels = {
     'num_carriers': 'Number of Carriers',
     'solomon_base': 'Instance',
-    'cost': 'Routing Costs',
+    'distance': 'Routing Distance',
+    'duration': 'Routing Duration',
     'num_act_veh': 'Number of Vehicles',
     'StaticI1Insertion': 'Static, no collaboration',
     'StaticI1InsertionWithAuction': 'Static, with collaboration',
@@ -201,7 +202,7 @@ def combine_eval_files(solomon_list, save: bool = True):
 
 if __name__ == '__main__':
     solomon_list = ['C101', 'C201', 'R101', 'R201', 'RC101', 'RC201']
-    attributes = ['num_act_veh', 'cost', ]
+    attributes = ['num_act_veh', 'distance', 'duration', ]
     # bar_plot_with_errors(solomon_list, attributes)
     # plotly_plot(solomon_list, attributes)
     # bokeh_plot(solomon_list, attributes)

@@ -1,5 +1,6 @@
 import functools
 import itertools
+import json
 import random
 import time
 import datetime as dt
@@ -15,9 +16,9 @@ from matplotlib.colors import LinearSegmentedColormap
 opts = {
     'verbose': 0,
     'plot_level': 1,
-    'speed_kmh': 25,
-    'start_time': dt.datetime(year=1, month=1, day=1, hour=6, minute=0, second=0),
-    'end_time': dt.datetime(year=1, month=1, day=1, hour=20, minute=0, second=0),
+    'speed_kmh': 60,
+    'start_time': dt.datetime.min,
+    'end_time': dt.datetime.max,
     'alpha_1': 0.5,
     'mu': 1,
     'lambda': 2,
@@ -77,7 +78,7 @@ def euclidean_distance(a: Coordinates, b: Coordinates):
     return np.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 
 
-def make_dist_matrix(vertices: List):
+def make_travel_dist_matrix(vertices: List):
     """
     :param vertices: List of vertices each of class Vertex
     :return: pd.DataFrame distance matrix
@@ -88,25 +89,27 @@ def make_dist_matrix(vertices: List):
     for i in vertices:
         for j in vertices:
             dist_matrix.loc[i.id_, j.id_] = euclidean_distance(i.coords, j.coords)
+    assert dist_matrix.index.is_unique, f"Distance matrix must have unique row id's"
     return dist_matrix
 
 
-def make_travel_time_matrix(vertices: List):
+def make_travel_duration_matrix(vertices: List):
     """
     :param vertices: List of vertices each of class Vertex
     :return: pd.DataFrame travel time matrix
     """
     index = [i.id_ for i in vertices]
-    travel_time_matrix: pd.DataFrame = pd.DataFrame(index=index, columns=index, dtype='timedelta64[ns]')
+    travel_duration_matrix: pd.DataFrame = pd.DataFrame(index=index, columns=index, dtype='timedelta64[ns]')
 
     for i in vertices:
         for j in vertices:
-            travel_time_matrix.loc[i.id_, j.id_] = travel_time(euclidean_distance(i.coords, j.coords))
-    return travel_time_matrix
+            travel_duration_matrix.loc[i.id_, j.id_] = travel_time(euclidean_distance(i.coords, j.coords))
+    assert travel_duration_matrix.index.is_unique, f"Duration matrix must have unique row id's"
+    return travel_duration_matrix
 
 
 def travel_time(dist):
-    return dt.timedelta(seconds=(dist / opts['speed_kmh']) * 60 ** 2)  # compute timedelta in seconds
+    return dt.timedelta(hours=dist / opts['speed_kmh'])  # compute timedelta
 
 
 class InsertionError(Exception):
@@ -234,3 +237,12 @@ def random_max_k_partition(ls, max_k) -> Dict[int, Tuple[Any, ...]]:
         partitions[index] = tuple(
             x[1] for x in subset)  # TODO: better use frozenset (rather than tuple) for dict values?
     return partitions
+
+
+class DateTimeEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, dt.datetime):
+            return o.isoformat()
+        if isinstance(o, dt.timedelta):
+            return (dt.datetime.min + o).isoformat()
+        return super().default(o)

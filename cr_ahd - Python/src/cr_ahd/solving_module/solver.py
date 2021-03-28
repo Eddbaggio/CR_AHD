@@ -113,9 +113,9 @@ class StaticI1InsertionWithAuction(Solver):
             carrier.assign_requests([request])
 
     def run_auction(self, instance):
-        submitted_requests = rs.HighestMarginalCost().execute(instance, 0.5)
+        submitted_requests = rs.HighestInsertionCostDistance().execute(instance, 0.5)
         bundle_set = bg.RandomPartition(instance.distance_matrix).execute(submitted_requests)
-        bids = bd.I1MarginalCostBidding().execute(bundle_set, instance.carriers)
+        bids = bd.I1TravelDistanceIncrease().execute(bundle_set, instance.carriers)
         wd.LowestBid().execute(bids)
 
     def initialize_another_tour(self, carrier):

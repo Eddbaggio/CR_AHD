@@ -30,13 +30,13 @@ class BiddingBehavior(ABC):
         pass
 
 
-class I1MarginalCostBidding(BiddingBehavior):
-    """determine the bids as the marginal cost of inserting a bundle set. Marginal profit is difference in route cost
+class I1TravelDistanceIncrease(BiddingBehavior):
+    """determine the bids as the distance cost of inserting a bundle set. Marginal profit is difference in route cost
     with and without the set where insertion is done with I1 Insertion scheme"""
 
     def _generate_bid(self, bundle, carrier):
 
-        without_bundle = carrier.sum_travel_durations()
+        without_bundle = carrier.sum_travel_distance()
         prior_unrouted = carrier.unrouted_requests
         carrier.assign_requests(bundle)
 
@@ -49,9 +49,36 @@ class I1MarginalCostBidding(BiddingBehavior):
             except InsertionError:
                 EarliestDueDate().initialize_carrier(carrier)
 
-        with_bundle = carrier.sum_travel_durations()
+        with_bundle = carrier.sum_travel_distance()
         carrier.retract_requests_and_update_routes(bundle)
         carrier.retract_requests_and_update_routes(prior_unrouted)  # need to unroute the previously unrouted again
         carrier.assign_requests(prior_unrouted)  # and then reassign them (missing a function that only unroutes them)
-        marginal_cost = with_bundle - without_bundle
-        return marginal_cost
+        distance_increase = with_bundle - without_bundle
+        return distance_increase
+
+
+class I1TravelDurationIncrease(BiddingBehavior):
+    """determine the bids as the distance cost of inserting a bundle set. Marginal profit is difference in route cost
+    with and without the set where insertion is done with I1 Insertion scheme"""
+
+    def _generate_bid(self, bundle, carrier):
+
+        without_bundle = carrier.sum_travel_duration()
+        prior_unrouted = carrier.unrouted_requests
+        carrier.assign_requests(bundle)
+
+        # TODO duplicated code fragment, is there a nicer way to do this? do error codes instead of exception handling?
+        c = True
+        while c:
+            try:
+                I1Insertion().solve_carrier(carrier)
+                c = False
+            except InsertionError:
+                EarliestDueDate().initialize_carrier(carrier)
+
+        with_bundle = carrier.sum_travel_duration()
+        carrier.retract_requests_and_update_routes(bundle)
+        carrier.retract_requests_and_update_routes(prior_unrouted)  # need to unroute the previously unrouted again
+        carrier.assign_requests(prior_unrouted)  # and then reassign them (missing a function that only unroutes them)
+        duration_increase = with_bundle - without_bundle
+        return duration_increase

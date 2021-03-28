@@ -16,5 +16,5 @@ class Solution(object):
         pass
 
     def metrics(self):
-        """dict of all the features of the solution, incl. total cost, number of active vehicles, ..."""
+        """dict of all the features of the solution, incl. total duration & distance, number of active vehicles, ..."""
         pass

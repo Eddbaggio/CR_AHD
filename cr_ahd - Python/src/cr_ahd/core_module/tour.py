@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 import src.cr_ahd.core_module.vertex as vx
 from src.cr_ahd.core_module.optimizable import Optimizable
-from src.cr_ahd.utility_module.utils import travel_time, opts, InsertionError
+import src.cr_ahd.utility_module.utils as ut
 
 logger = logging.getLogger(__name__)
 
@@ -17,8 +17,8 @@ class Tour(Optimizable):
         self.depot = depot
         self._distance_matrix = distance_matrix
         self._routing_sequence = []  # sequence of vertices
-        self._travel_dist_sequence: List[float] = []  # sequence of arc costs
-        self._travel_duration_sequence: List[dt.timedelta] = []  # sequence of arc costs
+        self._travel_dist_sequence: List[float] = []  # sequence of arc distance costs
+        self._travel_duration_sequence: List[dt.timedelta] = []  # sequence of arc duration costs
         self._sum_travel_times = 0
         self.arrival_schedule: List[dt.datetime] = []  # arrival times
         self.service_schedule: List[dt.datetime] = []  # start of service times
@@ -35,13 +35,12 @@ class Tour(Optimizable):
                 arrival_schedule.append(None)
                 service_schedule.append(None)
             else:
-                arrival_schedule.append(round(self.arrival_schedule[i], 2))
-                service_schedule.append(round(self.service_schedule[i], 2))
-        if self.sum_travel_durations is None:
-            cost = None
-        else:
-            cost = round(self.sum_travel_durations)
-        return f'ID:\t\t\t{self.id_}\nSequence:\t{sequence}\nArrival:\t{arrival_schedule}\nService:\t{service_schedule}\nCost:\t\t{cost}'
+                arrival_schedule.append(self.arrival_schedule[i])
+                service_schedule.append(self.service_schedule[i])
+        distance = round(self.sum_travel_distance, 2)
+        duration = self.sum_travel_duration
+        return f'ID:\t\t\t{self.id_}\nSequence:\t{sequence}\nArrival:\t{arrival_schedule}\n' \
+               f'Service:\t{service_schedule}\nDistance:\t\t{distance}\nDuration:\t\t{duration} '
 
     def __len__(self):
         return len(self.routing_sequence)
@@ -57,7 +56,7 @@ class Tour(Optimizable):
 
     @property
     def profit(self):
-        return self.revenue - self.sum_travel_durations
+        return self.revenue - self.sum_travel_duration
 
     @property  # why exactly is this a property and not just a member attribute?
     def distance_matrix(self):
@@ -68,8 +67,12 @@ class Tour(Optimizable):
         self._distance_matrix = distance_matrix
 
     @property
-    def sum_travel_durations(self) -> dt.timedelta:
+    def sum_travel_duration(self) -> dt.timedelta:
         return sum(self._travel_duration_sequence, dt.timedelta())
+
+    @property
+    def sum_travel_distance(self) -> float:
+        return sum(self._travel_dist_sequence)
 
     def _insert_no_update(self, index: int, vertex: vx.BaseVertex):
         """highly discouraged to use this as it does not ensure feasibility of the route! use insert_and_update instead.
@@ -81,8 +84,8 @@ class Tour(Optimizable):
         if len(self) <= 1:
             self._travel_duration_sequence.insert(index, dt.timedelta(0))
             self._travel_dist_sequence.insert(index, 0)
-            self.arrival_schedule.insert(index, opts['start_time'])
-            self.service_schedule.insert(index, opts['start_time'])
+            self.arrival_schedule.insert(index, ut.opts['start_time'])
+            self.service_schedule.insert(index, ut.opts['start_time'])
         else:
             self._travel_duration_sequence.insert(index, dt.timedelta(0))
             self._travel_dist_sequence.insert(index, 0)
@@ -103,7 +106,7 @@ class Tour(Optimizable):
             self._insert_no_update(index, vertex)
             if len(self) > 1:
                 self.update_cost_and_schedules_from(index)
-        except InsertionError as e:
+        except ut.InsertionError as e:
             self.pop_and_update(index)
             raise e
         pass
@@ -135,15 +138,15 @@ class Tour(Optimizable):
             i.routed[1] = rho - 1  # update the stored index position
             dist = self.distance_matrix.loc[i.id_, j.id_]
             self._travel_dist_sequence[rho] = dist
-            self._travel_duration_sequence[rho] = travel_time(dist)
-            arrival = self.service_schedule[rho - 1] + i.service_duration + travel_time(dist)
+            self._travel_duration_sequence[rho] = ut.travel_time(dist)
+            arrival = self.service_schedule[rho - 1] + i.service_duration + ut.travel_time(dist)
             try:
-                assert arrival <= j.tw.l
+                assert arrival <= j.tw.l, f'Arrival at {arrival} is too late for {j}'
                 self.arrival_schedule[rho] = arrival
                 self.service_schedule[rho] = max(arrival, j.tw.e)
             except AssertionError:
                 logger.debug(f'{self.id_} update from index {index} failed: arrival:{arrival} > j.tw.l.:{j.tw.l}')
-                raise InsertionError(f'{arrival} <= {j.tw.l}', f'cannot arrive at {j} after time window has closed')
+                raise ut.InsertionError(f'{arrival} <= {j.tw.l}', f'cannot arrive at {j} after time window has closed')
             # TODO "You shouldn't throw exceptions for things that happen all the time. Then they'd be "ordinaries"."
             #  https://softwareengineering.stackexchange.com/questions/139171/check-first-vs-exception-handling
         logger.debug(f'{self.id_} updated from index {index}')
@@ -165,13 +168,14 @@ class Tour(Optimizable):
             self._insert_no_update(j - k, popped)
         try:
             self.update_cost_and_schedules_from(i)  # maybe the new routing sequence is infeasible
-        except InsertionError as e:
+        except ut.InsertionError as e:
             self.reverse_section(i, j)  # undo all the reversal
             raise e
 
-    def insertion_cost_no_fc(self, i: vx.Vertex, j: vx.Vertex, u: vx.Vertex):  # TODO what about Time Windows?
+    def insertion_distance_cost_no_feasibility_check(self, i: vx.Vertex, j: vx.Vertex,
+                                                     u: vx.Vertex):  # TODO what about Time Windows?
         """
-        compute insertion cost for insertion of vertex u between vertices i and j using the distance matrix. Does NOT
+        compute distance cost for insertion of vertex u between vertices i and j using the distance matrix. Does NOT
         consider time window restrictions, i.e. no feasibility check is done!
         """
         dist_i_u = self.distance_matrix.loc[i.id_, u.id_]

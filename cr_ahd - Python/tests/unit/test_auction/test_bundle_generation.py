@@ -1,5 +1,5 @@
 import src.cr_ahd.auction_module.bundle_generation as bg
-from src.cr_ahd.utility_module.utils import make_dist_matrix, Coordinates, flatten_dict_of_lists
+from src.cr_ahd.utility_module.utils import make_travel_dist_matrix, Coordinates, flatten_dict_of_lists
 
 
 # def test_AllBundles(submitted_requests_01):
@@ -9,14 +9,14 @@ from src.cr_ahd.utility_module.utils import make_dist_matrix, Coordinates, flatt
 
 def test_random_bundle_set_generation(submitted_requests_random_15):
     """cannot actually be tested since it's random"""
-    distance_matrix = make_dist_matrix(flatten_dict_of_lists(submitted_requests_random_15))
+    distance_matrix = make_travel_dist_matrix(flatten_dict_of_lists(submitted_requests_random_15))
     bundle_set = bg.RandomPartition(distance_matrix).execute(submitted_requests_random_15)
     assert len(bundle_set) <= len(submitted_requests_random_15)
 
 
 def test_k_means_bundle_set_generation(submitted_requests_a):
     """"""
-    distance_matrix = make_dist_matrix(flatten_dict_of_lists(submitted_requests_a))
+    distance_matrix = make_travel_dist_matrix(flatten_dict_of_lists(submitted_requests_a))
     bundle_set = bg.KMeansBundles(distance_matrix).execute(submitted_requests_a)
     bundle_0_ids = sorted([v.id_ for v in bundle_set[0]])
     assert bundle_0_ids == ['r0', 'r1', 'r2', 'r3']

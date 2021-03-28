@@ -43,11 +43,17 @@ class Carrier(Optimizable):
     def __str__(self):
         return f'Carrier (ID:{self.id_}, Depot:{self.depot.id_}, Vehicles:{len(self.vehicles)}, Requests:{len(self.requests)}, Unrouted:{len(self.unrouted_requests)})'
 
-    def sum_travel_durations(self):
+    def sum_travel_duration(self):
         sum_travel_durations = dt.timedelta()
         for v in self.vehicles:
-            sum_travel_durations += v.tour.sum_travel_durations
+            sum_travel_durations += v.tour.sum_travel_duration
         return sum_travel_durations
+
+    def sum_travel_distance(self):
+        sum_travel_distances = 0
+        for v in self.vehicles:
+            sum_travel_distances += v.tour.sum_travel_distance
+        return sum_travel_distances
 
     @property
     def requests(self):
@@ -88,7 +94,7 @@ class Carrier(Optimizable):
 
     @property
     def profit(self):
-        return self.revenue - self.sum_travel_durations()
+        return self.revenue - self.sum_travel_distance()
 
     @property
     def num_act_veh(self) -> int:
@@ -159,7 +165,7 @@ class Carrier(Optimizable):
         fig, ax = plt.subplots()
         ax.set_xlim(0, 100)
         ax.set_ylim(0, 100)
-        ax.set_title(f'carrier {self.id_} with cost of {self.sum_travel_durations(2)}')
+        ax.set_title(f'carrier {self.id_} with total distance of {self.sum_travel_distance}')
 
         # plot depot
         ax.plot(*self.depot.coords, marker='s', alpha=alpha, label=self.depot.id_, ls='')

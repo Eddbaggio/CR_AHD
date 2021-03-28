@@ -128,6 +128,6 @@ if __name__ == '__main__':
     # read_and_execute_all(Path("../../../data/Input/Custom/C201/C201_1_45_ass_#001.json"))  # single centralized
     grouped_evaluations = read_and_execute_all_parallel(n=5, which=solomon_list)  # multiple
 
-    plotly_bar_plot(solomon_list, attributes=['num_act_veh', 'cost', ])
+    plotly_bar_plot(solomon_list, attributes=['num_act_veh', 'distance', 'duration'])
     # bar_plot_with_errors(solomon_list, attributes=['num_act_veh', 'cost', ])
     logger.info('END')

@@ -1,11 +1,53 @@
-from typing import Union
-
+from typing import Union, List
+import pandas as pd
 import matplotlib.animation as ani
 import matplotlib.pyplot as plt
 from matplotlib.text import Annotation
+import plotly.express as px
 from src.cr_ahd.core_module.carrier import Carrier
 from src.cr_ahd.core_module.vehicle import Vehicle
+import src.cr_ahd.core_module.vertex as vx
 from src.cr_ahd.utility_module.utils import path_output
+
+
+def plot_vertices(vertices: List[vx.BaseVertex], edges: bool = False, show: bool = False):
+    df = pd.DataFrame([v.coords for v in vertices], columns=['x', 'y'])
+    df['id_'] = [v.id_ for v in vertices]
+    df['carrier_assignment'] = [str(v.carrier_assignment) for v in vertices]
+    fig = px.scatter(data_frame=df,
+                     x='x',
+                     y='y',
+                     text='id_',
+                     color='carrier_assignment',
+                     size=[2.5] * len(vertices),
+                     )
+    if edges:
+        for i in range(len(vertices) - 1):
+            arrow_tail = vertices[i].coords
+            arrow_head = vertices[i + 1].coords
+            fig.add_annotation(x=arrow_head.x,
+                               y=arrow_head.y,
+                               ax=arrow_tail.x,
+                               ay=arrow_tail.y,
+                               xref='x',
+                               yref='y',
+                               axref='x',
+                               ayref='y',
+                               text="",
+                               showarrow=True,
+                               arrowhead=2,
+                               arrowsize=2,
+                               arrowwidth=1,
+                               arrowcolor='black',
+                               standoff=10,
+                               startstandoff=10)
+    fig.update_yaxes(
+        scaleanchor="x",
+        scaleratio=1,
+    )
+    if show:
+        fig.show()
+    return fig
 
 
 class CarrierConstructionAnimation(object):
@@ -23,7 +65,7 @@ class CarrierConstructionAnimation(object):
         y = [r.coords.y for r in carrier.requests]
         self.requests_artist = self.ax.plot(x, y, marker='o', markersize=9, mfc='white', c='black', ls='')
         self.depot_artist = self.ax.plot(*carrier.depot.coords, marker='s', markersize=9, c='black', ls='',
-                                  label=carrier.depot.id_)
+                                         label=carrier.depot.id_)
         self.freeze_frames = [*self.requests_artist, *self.depot_artist]  # artists that are plotted each frame
         self.ims = []
 

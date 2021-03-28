@@ -67,8 +67,8 @@ class EarliestDueDate(TourInitializationBehavior):
     def initialize_carrier(self, carrier):
         vehicle = carrier.inactive_vehicles[0]
         assert len(vehicle.tour) == 2, 'Vehicle already has a tour'
+        # find request with earliest deadline and initialize pendulum tour
         if carrier.unrouted_requests:
-            # find request with earliest deadline and initialize pendulum tour
             seed = self.find_seed_request(carrier)
             vehicle.tour.insert_and_update(index=1, vertex=seed)
         # carrier.initializing_visitor = self

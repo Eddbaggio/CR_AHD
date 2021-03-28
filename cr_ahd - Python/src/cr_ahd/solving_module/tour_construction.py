@@ -49,27 +49,27 @@ class SequentialCheapestInsertion(TourConstructionBehavior):
 
         :param vertex: Vertex to be inserted
         :param carrier: carrier which shall insert the vertex into his routes
-        :return: triple (vehicle_best, position_best, cost_best) defining the cheapest vehicle/tour, index and
+        :return: triple (vehicle_best, position_best, distance_cost_best) defining the cheapest vehicle/tour, index and
         associated cost to insert the given vertex u
         """
         vehicle_best = None
-        cost_best = float('inf')
+        distance_cost_best = float('inf')
         position_best = None
-        # check all active vehicles and the first INACTIVE one for insertion cost
+        # check all active vehicles and the first INACTIVE one for distance insertion cost
         for vehicle in [*carrier.active_vehicles, carrier.inactive_vehicles[0]]:
             try:
                 # TODO: ugly solution to have a standalone function for this:
-                position, cost = find_cheapest_feasible_insertion(vehicle.tour, request=vertex)
+                position, distance_cost = find_cheapest_distance_feasible_insertion(vehicle.tour, request=vertex)
                 if self.verbose > 1:
-                    print(f'\t\tInsertion cost {vertex.id_} -> {vehicle.id_}: {cost}')
-                if cost < cost_best:  # a new cheapest insertion was found -> update the incumbents
+                    print(f'\t\tInsertion cost {vertex.id_} -> {vehicle.id_}: {distance_cost}')
+                if distance_cost < distance_cost_best:  # a new cheapest insertion was found -> update the incumbents
                     vehicle_best = vehicle
-                    cost_best = cost
+                    distance_cost_best = distance_cost
                     position_best = position
             except ut.InsertionError:
                 if self.verbose > 0:
                     print(f'x\t{vertex.id_} cannot be feasibly inserted into {vehicle.id_}')
-        return vehicle_best, position_best, cost_best
+        return vehicle_best, position_best, distance_cost_best
 
     def solve_instance(self, instance):
         """
@@ -163,24 +163,21 @@ class I1Insertion(TourConstructionBehavior):
                     print(f'\tInserting {vertex.id_} into {carrier.id_}.{vehicle.tour.id_}')
             else:
                 raise ut.InsertionError('', 'no feasible insertion exists for the vehicles that are active already')
-
-        if self.verbose > 0:
-            print(f'Total Route cost of carrier {carrier.id_}: {carrier.sum_travel_durations()}\n')
         pass
 
 
 # ===============================================================================
 
 
-def find_cheapest_feasible_insertion(tour, request, verbose=ut.opts['verbose']):
+def find_cheapest_distance_feasible_insertion(tour, request, verbose=ut.opts['verbose']):
     """
-    :return: Tuple (position, cost) of the best insertion position index and the associated (lowest) cost
+    :return: Tuple (position, distance_cost) of the best insertion position index and the associated (lowest) cost
     """
     assert request.routed is False, f'Trying to insert an already routed vertex! {request}'
     if verbose > 2:
         print(f'\n= Cheapest insertion of {request.id_} into {tour.id_}')
         print(tour)
-    min_insertion_cost = float('inf')
+    min_distance_insertion_cost = float('inf')
     i_best = None
     j_best = None
 
@@ -193,13 +190,13 @@ def find_cheapest_feasible_insertion(tour, request, verbose=ut.opts['verbose']):
         # if request.tw.e > j.tw.l:
         #     break
         if i.tw.e < request.tw.l and request.tw.e < j.tw.l:  # todo does not consider service times
-            insertion_cost = tour.insertion_cost_no_fc(i, j, request)
+            insertion_cost = tour.insertion_distance_cost_no_feasibility_check(i, j, request)
             if verbose > 2:
                 print(f'Between {i.id_} and {j.id_}: {insertion_cost}')
-            if insertion_cost < min_insertion_cost:
+            if insertion_cost < min_distance_insertion_cost:
                 try:
                     tour.insert_and_update(index=rho, vertex=request)  # may throw an InsertionError
-                    min_insertion_cost = insertion_cost
+                    min_distance_insertion_cost = insertion_cost
                     i_best = i
                     j_best = j
                     insertion_position = rho
@@ -209,8 +206,8 @@ def find_cheapest_feasible_insertion(tour, request, verbose=ut.opts['verbose']):
     # return the best found position and cost or raise an error if no feasible position was found
     if i_best:
         if verbose > 2:
-            print(f'== Best: between {i_best.id_} and {j_best.id_}: {min_insertion_cost}')
-        return insertion_position, min_insertion_cost
+            print(f'== Best: between {i_best.id_} and {j_best.id_}: {min_distance_insertion_cost}')
+        return insertion_position, min_distance_insertion_cost
     else:
         raise ut.InsertionError('', 'No feasible insertion position found')
 

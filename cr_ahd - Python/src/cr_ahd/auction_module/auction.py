@@ -19,16 +19,16 @@ class Auction(ABC):
 
 class Auction_a(Auction):
     """
-    Request Selection Behavior: Highest Marginal Insertion Cost
+    Request Selection Behavior: Highest Insertion Cost Distance
     Bundle Generation Behavior: Random Partition
-    Bidding Behavior: Marginal Insertion Cost
+    Bidding Behavior: I1 Travel Distance Increase
     Winner Determination Behavior: Lowest Bid
     """
 
     def _run_auction(self, instance):
-        submitted_requests = rs.HighestMarginalCost().execute(instance, opts['num_requests_to_submit'])
+        submitted_requests = rs.HighestInsertionCostDistance().execute(instance, opts['num_requests_to_submit'])
         bundle_set = bg.RandomPartition(instance.distance_matrix).execute(submitted_requests)
-        bids = bd.I1MarginalCostBidding().execute(bundle_set, instance.carriers)
+        bids = bd.I1TravelDistanceIncrease().execute(bundle_set, instance.carriers)
         wd.LowestBid().execute(bids)
 
 
@@ -36,27 +36,27 @@ class Auction_b(Auction):
     """
     Request Selection Behavior: Cluster (Gansterer & Hartl 2016)
     Bundle Generation Behavior: Random Partition
-    Bidding Behavior: Marginal Insertion Cost
+    Bidding Behavior: I1 Travel Distance Increase
     Winner Determination Behavior: Lowest Bid
     """
 
     def _run_auction(self, instance):
         submitted_requests = rs.Cluster().execute(instance, opts['num_requests_to_submit'])
         bundle_set = bg.RandomPartition(instance.distance_matrix).execute(submitted_requests)
-        bids = bd.I1MarginalCostBidding().execute(bundle_set, instance.carriers)
+        bids = bd.I1TravelDistanceIncrease().execute(bundle_set, instance.carriers)
         wd.LowestBid().execute(bids)
 
 
 class Auction_c(Auction):
     """
-    Request Selection Behavior: Highest Marginal Insertion Cost
+    Request Selection Behavior: Highest Insertion Cost Distance
     Bundle Generation Behavior: K-Means
-    Bidding Behavior: Marginal Insertion Cost
+    Bidding Behavior: I1 Travel Distance Increase
     Winner Determination Behavior: Lowest Bid
     """
 
     def _run_auction(self, instance):
-        submitted_requests = rs.HighestMarginalCost().execute(instance, opts['num_requests_to_submit'])
+        submitted_requests = rs.HighestInsertionCostDistance().execute(instance, opts['num_requests_to_submit'])
         bundle_set = bg.KMeansBundles(instance.distance_matrix).execute(submitted_requests)
-        bids = bd.I1MarginalCostBidding().execute(bundle_set, instance.carriers)
+        bids = bd.I1TravelDistanceIncrease().execute(bundle_set, instance.carriers)
         wd.LowestBid().execute(bids)

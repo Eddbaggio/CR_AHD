@@ -4,12 +4,14 @@ import multiprocessing
 import time
 from pathlib import Path
 from typing import List
-
+import datetime as dt
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from adjustText import adjust_text
 from tqdm import tqdm
+from src.cr_ahd.utility_module import istarmap
+from src.cr_ahd.utility_module.utils import DateTimeEncoder
 
 import src.cr_ahd.core_module.carrier as cr
 import src.cr_ahd.core_module.vehicle as vh
@@ -40,7 +42,7 @@ class Instance(Optimizable):
         if dist_matrix is not None:
             self._distance_matrix = dist_matrix
         else:
-            self._distance_matrix = ut.make_dist_matrix([*self.requests, *[c.depot for c in self.carriers]])
+            self._distance_matrix = ut.make_travel_dist_matrix([*self.requests, *[c.depot for c in self.carriers]])
         self.solution_algorithm = None
         # LOGGER.debug(f'{self.id_}: created')
         pass
@@ -78,13 +80,22 @@ class Instance(Optimizable):
         pass
 
     @property
-    def cost(self):
-        """The total routing costs over all carriers over all vehicles"""
-        total_cost = 0
+    def sum_travel_distance(self):
+        """The total routing distance over all carriers over all vehicles"""
+        total_distance = 0
         for c in self.carriers:
             for v in c.vehicles:
-                total_cost += v.tour.sum_travel_durations
-        return total_cost
+                total_distance += v.tour.sum_travel_distance
+        return total_distance
+
+    @property
+    def sum_travel_duration(self):
+        """The total routing duration over all carriers over all vehicles"""
+        total_duration = dt.timedelta()
+        for c in self.carriers:
+            for v in c.vehicles:
+                total_duration += v.tour.sum_travel_duration
+        return total_duration
 
     @property
     def revenue(self):
@@ -92,7 +103,7 @@ class Instance(Optimizable):
 
     @property
     def profit(self):
-        return self.revenue - self.cost
+        return self.revenue - self.sum_travel_distance
 
     @property
     def num_act_veh(self):
@@ -106,19 +117,23 @@ class Instance(Optimizable):
 
     @property
     def solution(self):
-        """The instance's current solution as a dictionary"""
+        """The instance's current solution as a python dictionary"""
         instance_solution = {}
         for c in self.carriers:
-            carrier_solution = {}
+            carrier_solution = {'travel_distance': c.sum_travel_distance(),
+                                'travel_duration': c.sum_travel_duration()}
+            v: vh.Vehicle
             for v in c.vehicles:
                 vehicle_solution = dict(sequence=[r.id_ for r in v.tour.routing_sequence],
                                         arrival=v.tour.arrival_schedule,
                                         service=v.tour.service_schedule,
-                                        cost=v.tour.sum_travel_durations)
+                                        travel_distance=v.tour.sum_travel_distance,
+                                        travel_duration=v.tour.sum_travel_duration,
+                                        )
                 carrier_solution[v.id_] = vehicle_solution
-                carrier_solution['cost'] = c.sum_travel_durations()
+
             instance_solution[c.id_] = carrier_solution
-            instance_solution['cost'] = self.cost
+        instance_solution['travel_duration'] = self.sum_travel_duration
         return instance_solution
 
     @property
@@ -136,11 +151,18 @@ class Instance(Optimizable):
         return num_requests_per_carrier
 
     @property
-    def cost_per_carrier(self):
-        cost_per_carrier = dict()
+    def travel_distance_per_carrier(self):
+        travel_distance_per_carrier = dict()
         for c in self.carriers:
-            cost_per_carrier[f'{c.id_}_cost'] = c.sum_travel_durations()
-        return cost_per_carrier
+            travel_distance_per_carrier[f'{c.id_}_travel_distance'] = c.sum_travel_distance()
+        return travel_distance_per_carrier
+
+    @property
+    def travel_duration_per_carrier(self):
+        travel_duration_per_carrier = dict()
+        for c in self.carriers:
+            travel_duration_per_carrier[f'{c.id_}_travel_duration'] = c.sum_travel_duration()
+        return travel_duration_per_carrier
 
     @property
     def revenue_per_carrier(self):
@@ -166,7 +188,8 @@ class Instance(Optimizable):
                     num_requests=self.num_requests,
                     num_vehicles=self.num_vehicles,
                     num_act_veh=self.num_act_veh,
-                    cost=self.cost,
+                    distance=self.sum_travel_distance,
+                    duration=self.sum_travel_duration,
                     revenue=self.revenue,
                     profit=self.profit,
                     # initializing_visitor=self.initializing_visitor.__class__.__name__,
@@ -179,7 +202,7 @@ class Instance(Optimizable):
                     # runtime=self._runtime,
                     **self.num_act_veh_per_carrier,
                     **self.num_requests_per_carrier,
-                    **self.cost_per_carrier,
+                    **self.travel_duration_per_carrier,
                     **self.revenue_per_carrier,
                     **self.profit_per_carrier, )
 
@@ -300,7 +323,7 @@ class Instance(Optimizable):
         file_name = ut.unique_path(file_name.parent, file_name.stem + '_#{:03d}' + '.json')
         file_name.parent.mkdir(parents=True, exist_ok=True)
         with open(file_name, mode='w') as write_file:
-            json.dump(self.to_dict(), write_file, indent=4)
+            json.dump(self.to_dict(), write_file, indent=4, cls=DateTimeEncoder)
         # LOGGER.debug(f'{self.id_}: wrote instance to json at {file_name}')
         return file_name
 
@@ -320,7 +343,7 @@ class Instance(Optimizable):
             # warnings.warn(f'Existing solution file at {file_path} is overwritten')
             None
         with open(file_path, mode='w') as write_file:
-            json.dump(self.solution, write_file, indent=4)
+            json.dump(self.solution, write_file, indent=4, cls=DateTimeEncoder)
         # LOGGER.debug(f'{self.id_}: wrote solution to {file_path}')
         return file_path
 
@@ -352,14 +375,16 @@ def read_solomon(name: str, num_carriers: int) -> Instance:
     cols = ['cust_no', 'x_coord', 'y_coord', 'demand', 'ready_time', 'due_date', 'service_duration']
     requests = pd.read_csv(file_name, skiprows=10, delim_whitespace=True, names=cols)
     requests = [
-        vx.Vertex('r' + str(row.cust_no - 1), row.x_coord, row.y_coord, row.demand, row.ready_time, row.due_date) for
-        row in requests.itertuples()]
+        vx.Vertex('r' + str(row.cust_no - 1), row.x_coord, row.y_coord, row.demand,
+                  dt.datetime.min + dt.timedelta(minutes=row.ready_time),
+                  dt.datetime.min + dt.timedelta(minutes=row.due_date))
+        for row in requests.itertuples()]
 
     # depots
     depot_df = pd.read_csv(file_name, skiprows=9, nrows=1, delim_whitespace=True, names=cols)
     depots = [vx.DepotVertex(f'd{i}', int(depot_df.x_coord[0]), int(depot_df.y_coord[0])) for i in range(num_carriers)]
 
-    distance_matrix = ut.make_dist_matrix([*requests, *depots])
+    distance_matrix = ut.make_travel_dist_matrix([*requests, *depots])
 
     # carriers
     carriers = []
@@ -489,10 +514,12 @@ def read_custom_json_instance(path: Path):
         carriers.append(c)
 
     requests = []
+    request_dict: dict
     for request_dict in json_data['requests']:
+        request_dict['tw_open'] = dt.datetime.fromisoformat(request_dict['tw_open'])
+        request_dict['tw_close'] = dt.datetime.fromisoformat(request_dict['tw_close'])
+        request_dict['service_duration'] = dt.datetime.fromisoformat(request_dict['service_duration']) - dt.datetime.min
         request = vx.Vertex(**request_dict)
-        # carrier = get_carrier_by_id(carriers, request_dict['carrier_assignment'])  # TODO this should happen later: it's different for static and dynamic cases
-        # carrier.assign_request(request)
         requests.append(request)
 
     inst = Instance(path.stem, requests, carriers, dist_matrix)

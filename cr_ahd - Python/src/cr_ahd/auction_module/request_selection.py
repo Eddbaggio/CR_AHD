@@ -3,7 +3,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import List
 import numpy as np
-from src.cr_ahd.solving_module.tour_construction import find_cheapest_feasible_insertion
+from src.cr_ahd.solving_module.tour_construction import find_cheapest_distance_feasible_insertion
 from src.cr_ahd.utility_module.utils import InsertionError
 
 logger = logging.getLogger(__name__)
@@ -55,17 +55,17 @@ class Random(RequestSelectionBehavior):
         return np.random.choice(carrier.unrouted_requests, num_requests, replace=False)
 
 
-class HighestMarginalCost(RequestSelectionBehavior):
-    """given the current set of routes, returns the n unrouted requests that has the HIGHEST marginal cost. NOTE:
-    since routes may not be final, the current highest-marginal-cost request might not have been chosen at an earlier
-    or later stage!"""
+class HighestInsertionCostDistance(RequestSelectionBehavior):
+    """given the current set of routes, returns the n unrouted requests that has the HIGHEST Insertion distance cost.
+     NOTE: since routes may not be final, the current highest-marginal-cost request might not have been chosen at an
+     earlier or later stage!"""
 
     def _select_requests(self, carrier, num_requests: int) -> List:
         selected_requests = []
         for unrouted in carrier.unrouted_requests:
-            mc = cost_of_cheapest_insertion(unrouted, carrier)
-            selected_requests.append((unrouted, mc))
-        selected_requests, marginal_costs = zip(*sorted(selected_requests, key=lambda x: x[1], reverse=True))
+            distance_cost = cheapest_insertion_distance(unrouted, carrier)
+            selected_requests.append((unrouted, distance_cost))
+        selected_requests, distance_insertion_costs = zip(*sorted(selected_requests, key=lambda x: x[1], reverse=True))
         return selected_requests[:num_requests]
 
 
@@ -102,17 +102,17 @@ class Cluster(RequestSelectionBehavior):
 # ======================================================================================================
 # ======================================================================================================
 
-def cost_of_cheapest_insertion(request, carrier):
+def cheapest_insertion_distance(request, carrier):
     lowest = float('inf')
     for vehicle in carrier.active_vehicles:
         try:
-            _, tour_min = find_cheapest_feasible_insertion(vehicle.tour, request)
+            _, tour_min = find_cheapest_distance_feasible_insertion(vehicle.tour, request)
             lowest = min(lowest, tour_min)
         except InsertionError:
             continue
     if lowest >= float('inf'):
         t = carrier.inactive_vehicles[0].tour
         t.insert_and_update(1, request)
-        lowest = t.sum_travel_durations
+        lowest = t.sum_travel_distance
         t.pop_and_update(1)
     return lowest
