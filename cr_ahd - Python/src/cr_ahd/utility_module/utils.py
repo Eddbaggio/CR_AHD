@@ -244,5 +244,5 @@ class DateTimeEncoder(json.JSONEncoder):
         if isinstance(o, dt.datetime):
             return o.isoformat()
         if isinstance(o, dt.timedelta):
-            return (dt.datetime.min + o).isoformat()
+            return o.total_seconds()
         return super().default(o)

@@ -118,7 +118,8 @@ class Instance(Optimizable):
     @property
     def solution(self):
         """The instance's current solution as a python dictionary"""
-        instance_solution = {}
+        instance_solution = {'travel_distance': self.sum_travel_distance,
+                             'travel_duration': self.sum_travel_duration}
         for c in self.carriers:
             carrier_solution = {'travel_distance': c.sum_travel_distance(),
                                 'travel_duration': c.sum_travel_duration()}
@@ -131,9 +132,7 @@ class Instance(Optimizable):
                                         travel_duration=v.tour.sum_travel_duration,
                                         )
                 carrier_solution[v.id_] = vehicle_solution
-
             instance_solution[c.id_] = carrier_solution
-        instance_solution['travel_duration'] = self.sum_travel_duration
         return instance_solution
 
     @property
@@ -202,6 +201,7 @@ class Instance(Optimizable):
                     # runtime=self._runtime,
                     **self.num_act_veh_per_carrier,
                     **self.num_requests_per_carrier,
+                    **self.travel_distance_per_carrier,
                     **self.travel_duration_per_carrier,
                     **self.revenue_per_carrier,
                     **self.profit_per_carrier, )
@@ -518,7 +518,7 @@ def read_custom_json_instance(path: Path):
     for request_dict in json_data['requests']:
         request_dict['tw_open'] = dt.datetime.fromisoformat(request_dict['tw_open'])
         request_dict['tw_close'] = dt.datetime.fromisoformat(request_dict['tw_close'])
-        request_dict['service_duration'] = dt.datetime.fromisoformat(request_dict['service_duration']) - dt.datetime.min
+        request_dict['service_duration'] = dt.timedelta(seconds=request_dict['service_duration'])
         request = vx.Vertex(**request_dict)
         requests.append(request)
 

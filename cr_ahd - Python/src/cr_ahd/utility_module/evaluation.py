@@ -65,9 +65,13 @@ def bokeh_plot(solomon_list: List, attributes: List[str]):
 
 def plotly_bar_plot(solomon_list: List, attributes: List[str], ):
     df: pd.DataFrame = combine_eval_files(solomon_list)[attributes]
+
     for attr in attributes:
-        attr_df = df[attr].unstack('solution_algorithm').reset_index('rand_copy', drop=True).groupby(level=[0, 1]).agg(
-            'mean')
+        attr_df = df[attr].unstack('solution_algorithm').reset_index('rand_copy', drop=True).groupby(level=[0, 1])
+        attr_df = attr_df.agg(lambda x: x.mean())  # workaround to aggregate also timedelta values
+        if attr == 'duration':
+            for col in attr_df:
+                attr_df[col] = attr_df[col] + pd.to_datetime('1970/01/01')
         fig = go.Figure()
         colors = itertools.cycle([univie_colors_100[0]]+univie_colors_100[2:])
         for col in attr_df.columns:
@@ -195,8 +199,12 @@ def combine_eval_files(solomon_list, save: bool = True):
         df = pd.read_csv(file_name)
         evaluation = evaluation.append(df)
     evaluation = evaluation.set_index(['solomon_base', 'rand_copy', 'solution_algorithm', 'num_carriers'])
+    duration_columns = [col for col in evaluation.columns if 'duration' in col]
+    for col in duration_columns:
+        evaluation[col] = pd.to_timedelta(evaluation[col], unit='seconds', errors='raise')
     if save:
         evaluation.to_csv(path_output_custom.joinpath('Evaluation').with_suffix('.csv'))
+        evaluation.to_excel(path_output_custom.joinpath('Evaluation').with_suffix('.xlsx'), merge_cells=False)
     return evaluation
 
 

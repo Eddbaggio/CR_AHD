@@ -3,6 +3,7 @@ import logging
 import multiprocessing
 from copy import deepcopy
 from pathlib import Path
+import datetime as dt
 from typing import List
 
 import pandas as pd
@@ -38,7 +39,7 @@ def execute_all(instance: it.Instance):
     :param instance: (custom) instance that will we (deep)copied for each algorithm
     :return: evaluation metrics (Instance.evaluation_metrics) of all the solutions obtained
     """
-    results = []
+    eval_metrics = []
 
     for solver in [
         # sl.StaticSequentialInsertion,
@@ -57,8 +58,8 @@ def execute_all(instance: it.Instance):
         logger.info(f'Solving {instance.id_} via {solver.__name__}')
         solver().execute(copy)
         copy.write_solution_to_json()
-        results.append(copy.evaluation_metrics)
-    return results
+        eval_metrics.append(copy.evaluation_metrics)
+    return eval_metrics
 
 
 def read_and_execute_all(path: Path):
@@ -83,22 +84,25 @@ def read_and_execute_all_parallel(n: int, which: List):
         results_collection = list(
             tqdm(pool.imap(read_and_execute_all, custom_files_paths), total=len(custom_files_paths)))
     flat_results_collection = [r for results in results_collection for r in results]
-    grouped = write_results(flat_results_collection)  # rename function; not clear what are the results?
+    grouped = write_eval_metrics(flat_results_collection)  # rename function; not clear what are the results?
     return grouped
 
 
-def write_results(result_collection: list):
+def write_eval_metrics(eval_metrics: list):
     """
     write the collected outputs of the execute_all function to csv files. One file is created for each solomon_base
 
-    :param result_collection:  (flat) list of single results of the execute_all function
+    :param eval_metrics: (flat) list of single results of the execute_all function
     :return: the solomon_base grouped dataframe of results
     """
-    performance = pd.DataFrame(result_collection)
+    performance = pd.DataFrame(eval_metrics)
+    for column in performance.select_dtypes(include=['timedelta64']):
+        performance[column] = performance[column].dt.total_seconds()
     performance = performance.set_index(
         ['solomon_base', 'rand_copy', 'solution_algorithm', 'num_carriers', 'num_vehicles'])
     grouped = performance.groupby('solomon_base')
     # write the results
+    group: pd.DataFrame
     for name, group in grouped:
         write_dir = ut.path_output_custom.joinpath(name)
         write_dir.mkdir(parents=True,
@@ -106,6 +110,7 @@ def write_results(result_collection: list):
         file_name = f'{name}_custom_eval.csv'
         write_path = write_dir.joinpath(file_name)
         group.to_csv(write_path)
+        group.to_excel(write_path.with_suffix('.xlsx'), merge_cells=False)
     return grouped
 
 
@@ -126,8 +131,8 @@ if __name__ == '__main__':
     solomon_list = ['C101', 'C201', 'R101', 'R201', 'RC101', 'RC201']
     # read_and_execute_all(Path("../../../data/Input/Custom/C101/C101_3_15_ass_#002.json"))  # single collaborative
     # read_and_execute_all(Path("../../../data/Input/Custom/C201/C201_1_45_ass_#001.json"))  # single centralized
-    grouped_evaluations = read_and_execute_all_parallel(n=5, which=solomon_list)  # multiple
+    # grouped_evaluations = read_and_execute_all_parallel(n=2, which=solomon_list)  # multiple
 
-    plotly_bar_plot(solomon_list, attributes=['num_act_veh', 'distance', 'duration'])
+    plotly_bar_plot(solomon_list, attributes=['num_act_veh', 'distance'])  #, 'duration'
     # bar_plot_with_errors(solomon_list, attributes=['num_act_veh', 'cost', ])
     logger.info('END')
