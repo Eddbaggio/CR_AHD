@@ -18,7 +18,8 @@ opts = {
     'plot_level': 1,
     'speed_kmh': 60,
     'start_time': dt.datetime.min,
-    'end_time': dt.datetime.max,
+    'end_time': dt.datetime.max,  # min + dt.timedelta(hours=10),
+    'max_tour_length': 850,  # pretty arbitrary for now
     'alpha_1': 0.5,
     'mu': 1,
     'lambda': 2,

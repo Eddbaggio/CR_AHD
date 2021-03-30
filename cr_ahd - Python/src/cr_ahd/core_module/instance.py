@@ -1,6 +1,7 @@
 import json
 import logging.config
 import multiprocessing
+import pickle
 import time
 from pathlib import Path
 from typing import List
@@ -45,7 +46,6 @@ class Instance(Optimizable):
             self._distance_matrix = ut.make_travel_dist_matrix([*self.requests, *[c.depot for c in self.carriers]])
         self.solution_algorithm = None
         # LOGGER.debug(f'{self.id_}: created')
-        pass
 
     def __str__(self):
         return f'Instance {self.id_} with {len(self.requests)} customers and {len(self.carriers)} carriers'
@@ -116,26 +116,6 @@ class Instance(Optimizable):
         return num_vehicles_in_use
 
     @property
-    def solution(self):
-        """The instance's current solution as a python dictionary"""
-        instance_solution = {'travel_distance': self.sum_travel_distance,
-                             'travel_duration': self.sum_travel_duration}
-        for c in self.carriers:
-            carrier_solution = {'travel_distance': c.sum_travel_distance(),
-                                'travel_duration': c.sum_travel_duration()}
-            v: vh.Vehicle
-            for v in c.vehicles:
-                vehicle_solution = dict(sequence=[r.id_ for r in v.tour.routing_sequence],
-                                        arrival=v.tour.arrival_schedule,
-                                        service=v.tour.service_schedule,
-                                        travel_distance=v.tour.sum_travel_distance,
-                                        travel_duration=v.tour.sum_travel_duration,
-                                        )
-                carrier_solution[v.id_] = vehicle_solution
-            instance_solution[c.id_] = carrier_solution
-        return instance_solution
-
-    @property
     def num_act_veh_per_carrier(self):
         num_act_veh_per_carrier = dict()
         for c in self.carriers:
@@ -150,11 +130,28 @@ class Instance(Optimizable):
         return num_requests_per_carrier
 
     @property
+    def num_requests_per_carrier_per_vehicle(self):
+        num_requests_per_carrier_per_vehicle = dict()
+        for c in self.carriers:
+            for v in c.active_vehicles:
+                num_requests_per_carrier_per_vehicle[f'{c.id_}_{v.tour.id_}_num_requests'] = len(v.tour)
+        return num_requests_per_carrier_per_vehicle
+
+    @property
     def travel_distance_per_carrier(self):
         travel_distance_per_carrier = dict()
         for c in self.carriers:
             travel_distance_per_carrier[f'{c.id_}_travel_distance'] = c.sum_travel_distance()
         return travel_distance_per_carrier
+
+    @property
+    def travel_distance_per_carrier_per_vehicle(self):
+        travel_distance_per_carrier_per_vehicle = dict()
+        for c in self.carriers:
+            for v in c.active_vehicles:
+                travel_distance_per_carrier_per_vehicle[
+                    f'{c.id_}_{v.tour.id_}_travel_distance'] = v.tour.sum_travel_distance
+        return travel_distance_per_carrier_per_vehicle
 
     @property
     def travel_duration_per_carrier(self):
@@ -164,11 +161,28 @@ class Instance(Optimizable):
         return travel_duration_per_carrier
 
     @property
+    def travel_duration_per_carrier_per_vehicle(self):
+        travel_duration_per_carrier_per_vehicle = dict()
+        for c in self.carriers:
+            for v in c.active_vehicles:
+                travel_duration_per_carrier_per_vehicle[
+                    f'{c.id_}_{v.tour.id_}_travel_duration'] = v.tour.sum_travel_duration
+        return travel_duration_per_carrier_per_vehicle
+
+    @property
     def revenue_per_carrier(self):
         revenue_per_carrier = dict()
         for c in self.carriers:
             revenue_per_carrier[f'{c.id_}_revenue'] = c.revenue
         return revenue_per_carrier
+
+    @property
+    def revenue_per_carrier_per_vehicle(self):
+        revenue_per_carrier_per_vehicle = dict()
+        for c in self.carriers:
+            for v in c.active_vehicles:
+                revenue_per_carrier_per_vehicle[f'{c.id_}_{v.tour.id_}_revenue'] = v.tour.revenue
+        return revenue_per_carrier_per_vehicle
 
     @property
     def profit_per_carrier(self):
@@ -178,8 +192,36 @@ class Instance(Optimizable):
         return profit_per_carrier
 
     @property
-    def evaluation_metrics(self):
-        # assert self.solved, f'{self} has not been solved yet'
+    def profit_per_carrier_per_vehicle(self):
+        profit_per_carrier_per_vehicle = dict()
+        for c in self.carriers:
+            for v in c.active_vehicles:
+                profit_per_carrier_per_vehicle[f'{c.id_}_{v.tour.id_}_profit'] = v.tour.profit
+        return profit_per_carrier_per_vehicle
+
+    @property
+    def solution(self):
+        """The instance's current solution as a python dictionary"""
+        instance_solution = {}
+        for c in self.carriers:
+            carrier_solution = {}
+            v: vh.Vehicle
+            for v in c.active_vehicles:
+                vehicle_solution = dict(
+                    routing_sequence=[r.id_ for r in v.tour.routing_sequence],
+                    distance_sequence=v.tour.travel_distance_sequence,
+                    distance_sequence_cumul=np.cumsum(v.tour.travel_distance_sequence).tolist(),
+                    duration_sequence=v.tour.travel_duration_sequence,
+                    duration_sequence_cumul=np.cumsum(v.tour.travel_duration_sequence).tolist(),
+                    arrival_schedule=v.tour.arrival_schedule,
+                    service_schedule=v.tour.service_schedule,
+                )
+                carrier_solution[v.id_] = vehicle_solution
+            instance_solution[c.id_] = carrier_solution
+        return instance_solution
+
+    @property
+    def solution_summary(self):
         return dict(id=self.id_,
                     rand_copy=self.id_.split('#')[-1],
                     solomon_base=self.solomon_base,
@@ -187,24 +229,23 @@ class Instance(Optimizable):
                     num_requests=self.num_requests,
                     num_vehicles=self.num_vehicles,
                     num_act_veh=self.num_act_veh,
-                    distance=self.sum_travel_distance,
-                    duration=self.sum_travel_duration,
+                    travel_distance=self.sum_travel_distance,
+                    travel_duration=self.sum_travel_duration,
                     revenue=self.revenue,
                     profit=self.profit,
-                    # initializing_visitor=self.initializing_visitor.__class__.__name__,
-                    # initialized=self._initialized,
-                    # routing_visitor=self._routing_visitor.__class__.__name__,
-                    # solved=self.solved,
-                    # finalizing_visitor=self._finalizing_visitor.__class__.__name__,
-                    # finalized=self._finalized,
                     solution_algorithm=self.solution_algorithm.__class__.__name__.replace('Solver', ''),
-                    # runtime=self._runtime,
                     **self.num_act_veh_per_carrier,
                     **self.num_requests_per_carrier,
+                    **self.num_requests_per_carrier_per_vehicle,
                     **self.travel_distance_per_carrier,
+                    **self.travel_distance_per_carrier_per_vehicle,
                     **self.travel_duration_per_carrier,
+                    **self.travel_duration_per_carrier_per_vehicle,
                     **self.revenue_per_carrier,
-                    **self.profit_per_carrier, )
+                    **self.revenue_per_carrier_per_vehicle,
+                    **self.profit_per_carrier,
+                    **self.profit_per_carrier_per_vehicle,
+                    )
 
     @property
     def unrouted_requests(self):
@@ -237,9 +278,6 @@ class Instance(Optimizable):
             'id_': self.id_,
             'requests': [r.to_dict() for r in self.requests],
             'carriers': [c.to_dict() for c in self.carriers],
-            # 'initialization_visitor': self.initializing_visitor.__class__.__name__,
-            # 'routing_visitor': self.routing_visitor.__class__.__name__,
-            # 'finalizing_visitor': self.finalizing_visitor.__class__.__name__,
             'dist_matrix': self._distance_matrix.to_dict()
         }
 
@@ -327,33 +365,21 @@ class Instance(Optimizable):
         # LOGGER.debug(f'{self.id_}: wrote instance to json at {file_name}')
         return file_name
 
-    def write_solution_to_json(self):
+    def write_solution_and_summary_to_json(self):
         """
         Write the instance's solution to a json file
         :return: the file path as a pathlib.Path object
         """
         # assert self.solved
-        file_name = f'{self.id_}_{self.solution_algorithm.__class__.__name__}_solution'
-        file_path = ut.path_output_custom.joinpath(self.solomon_base, file_name)
+        file_path = f'{self.id_}_{self.solution_algorithm.__class__.__name__}_solution'
+        file_path = ut.path_output_custom.joinpath(self.solomon_base, file_path)
         file_path = file_path.with_suffix('.json')
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
-        if file_path.exists():
-            # raise FileExistsError
-            # warnings.warn(f'Existing solution file at {file_path} is overwritten')
-            None
-        with open(file_path, mode='w') as write_file:
-            json.dump(self.solution, write_file, indent=4, cls=DateTimeEncoder)
+        with open(file_path, mode='w') as f:
+            json.dump({'summary': self.solution_summary, 'solution': self.solution, }, f, indent=4, cls=DateTimeEncoder)
         # LOGGER.debug(f'{self.id_}: wrote solution to {file_path}')
         return file_path
-
-    # def write_evaluation_metrics_to_csv(self):
-    #     assert self.solved
-    #     file_name =
-    #     f'../data/Output/Custom/{self.solomon_base}/{self.id_}_{self.routing_strategy}_eval.csv'
-    #     df = pd.Series(self.evaluation_metrics)
-    #     df.to_csv(file_name)
-    #     return file_name
 
 
 def read_solomon(name: str, num_carriers: int) -> Instance:

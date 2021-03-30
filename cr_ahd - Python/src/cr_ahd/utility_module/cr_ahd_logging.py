@@ -1,10 +1,12 @@
 import logging
 from typing import Union
 import os
+import pathlib
 
 
 def add_file_handler(logger: logging.Logger, path: Union[str, bytes, os.PathLike], mode='w', level=logging.DEBUG,
                      log_format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'):
+    pathlib.Path(path).parent.mkdir(parents=True, exist_ok=True)
     f_handler = logging.FileHandler(path, mode)
     f_format = logging.Formatter(log_format)
     f_handler.setFormatter(f_format)

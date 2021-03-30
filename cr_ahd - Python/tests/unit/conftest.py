@@ -78,8 +78,7 @@ def request_vertices_c():
     """used to test whether tour.reverse_section() handles InsertionError correctly by going back to the original"""
     return [
         Vertex('r0', 0, 10, 0, dt.datetime.min, dt.datetime.max - dt.timedelta(microseconds=1)),
-        Vertex('r1', 10, 20, 0, dt.datetime(year=1, month=1, day=1, minute=48),
-               dt.datetime(year=1, month=1, day=1, hour=2, minute=12)),
+        Vertex('r1', 10, 20, 0, dt.datetime.min,dt.datetime(year=1, month=1, day=1, hour=0, minute=46)),
         # infeasible if positioned at routing_sequence[5]
         Vertex('r2', 20, 20, 0, dt.datetime.min, dt.datetime.max - dt.timedelta(microseconds=1)),
         Vertex('r3', 20, 10, 0, dt.datetime.min, dt.datetime.max - dt.timedelta(microseconds=1)),

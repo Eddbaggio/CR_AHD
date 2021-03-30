@@ -1,3 +1,7 @@
+from pathlib import Path
+import json
+
+
 class Solution(object):
     def __init__(self):
         self.carriers = None
@@ -9,12 +13,11 @@ class Solution(object):
     def write_to_json(self):
         pass
 
-    def read_from_json(self):
-        pass
-
     def plot(self):
         pass
 
-    def metrics(self):
-        """dict of all the features of the solution, incl. total duration & distance, number of active vehicles, ..."""
-        pass
+
+def read_solution_and_summary_from_json(path: Path):
+    with open(path, mode='r') as f:
+        solution, summary = json.load(f).values()
+    return solution, summary

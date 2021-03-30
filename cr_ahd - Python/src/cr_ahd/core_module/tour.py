@@ -17,11 +17,10 @@ class Tour(Optimizable):
         self.depot = depot
         self._distance_matrix = distance_matrix
         self._routing_sequence = []  # sequence of vertices
-        self._travel_dist_sequence: List[float] = []  # sequence of arc distance costs
+        self._travel_distance_sequence: List[float] = []  # sequence of arc distance costs
         self._travel_duration_sequence: List[dt.timedelta] = []  # sequence of arc duration costs
-        self._sum_travel_times = 0
-        self.arrival_schedule: List[dt.datetime] = []  # arrival times
-        self.service_schedule: List[dt.datetime] = []  # start of service times
+        self._arrival_schedule: List[dt.datetime] = []  # arrival times
+        self._service_schedule: List[dt.datetime] = []  # start of service times
 
         self.insert_and_update(0, depot)
         self.insert_and_update(1, depot)
@@ -51,12 +50,28 @@ class Tour(Optimizable):
         return tuple(self._routing_sequence)
 
     @property
+    def travel_distance_sequence(self):
+        return tuple(self._travel_distance_sequence)
+
+    @property
+    def travel_duration_sequence(self):
+        return tuple(self._travel_duration_sequence)
+
+    @property
+    def arrival_schedule(self):
+        return tuple(self._arrival_schedule)
+
+    @property
+    def service_schedule(self):
+        return tuple(self._service_schedule)
+
+    @property
     def revenue(self):
         return sum([request.demand for request in self.routing_sequence])
 
     @property
     def profit(self):
-        return self.revenue - self.sum_travel_duration
+        return self.revenue - self.sum_travel_distance
 
     @property  # why exactly is this a property and not just a member attribute?
     def distance_matrix(self):
@@ -72,7 +87,7 @@ class Tour(Optimizable):
 
     @property
     def sum_travel_distance(self) -> float:
-        return sum(self._travel_dist_sequence)
+        return sum(self._travel_distance_sequence)
 
     def _insert_no_update(self, index: int, vertex: vx.BaseVertex):
         """highly discouraged to use this as it does not ensure feasibility of the route! use insert_and_update instead.
@@ -83,14 +98,14 @@ class Tour(Optimizable):
         vertex.routed = [self, index]
         if len(self) <= 1:
             self._travel_duration_sequence.insert(index, dt.timedelta(0))
-            self._travel_dist_sequence.insert(index, 0)
-            self.arrival_schedule.insert(index, ut.opts['start_time'])
-            self.service_schedule.insert(index, ut.opts['start_time'])
+            self._travel_distance_sequence.insert(index, 0)
+            self._arrival_schedule.insert(index, ut.opts['start_time'])
+            self._service_schedule.insert(index, ut.opts['start_time'])
         else:
             self._travel_duration_sequence.insert(index, dt.timedelta(0))
-            self._travel_dist_sequence.insert(index, 0)
-            self.arrival_schedule.insert(index, None)
-            self.service_schedule.insert(index, None)
+            self._travel_distance_sequence.insert(index, 0)
+            self._arrival_schedule.insert(index, None)
+            self._service_schedule.insert(index, None)
         logger.debug(f'{vertex.id_} inserted into {self.id_} at index {index}')
         pass
 
@@ -116,9 +131,9 @@ class Tour(Optimizable):
         allow infeasible states such as for reversing a section! use pop_and_update instead"""
         popped = self._routing_sequence.pop(index)
         self._travel_duration_sequence.pop(index)
-        self._travel_dist_sequence.pop(index)
-        self.arrival_schedule.pop(index)
-        self.service_schedule.pop(index)
+        self._travel_distance_sequence.pop(index)
+        self._arrival_schedule.pop(index)
+        self._service_schedule.pop(index)
         popped.routed = False
         logger.debug(f'{popped.id_} popped from {self.id_} at index {index}')
         return popped
@@ -137,15 +152,17 @@ class Tour(Optimizable):
             j: vx.Vertex = self.routing_sequence[rho]
             i.routed[1] = rho - 1  # update the stored index position
             dist = self.distance_matrix.loc[i.id_, j.id_]
-            self._travel_dist_sequence[rho] = dist
+            self._travel_distance_sequence[rho] = dist
             self._travel_duration_sequence[rho] = ut.travel_time(dist)
             arrival = self.service_schedule[rho - 1] + i.service_duration + ut.travel_time(dist)
             try:
                 assert arrival <= j.tw.l, f'Arrival at {arrival} is too late for {j}'
-                self.arrival_schedule[rho] = arrival
-                self.service_schedule[rho] = max(arrival, j.tw.e)
+                # assert self.sum_travel_distance <= ut.opts['max_tour_length']
+                self._arrival_schedule[rho] = arrival
+                self._service_schedule[rho] = max(arrival, j.tw.e)
             except AssertionError:
-                logger.debug(f'{self.id_} update from index {index} failed: arrival:{arrival} > j.tw.l.:{j.tw.l}')
+                logger.debug(f'{self.id_} update from index {index} failed: arrival:{arrival}; j.tw.l.:{j.tw.l}; max '
+                             f'tour length: {ut.opts["max_tour_length"]}')
                 raise ut.InsertionError(f'{arrival} <= {j.tw.l}', f'cannot arrive at {j} after time window has closed')
             # TODO "You shouldn't throw exceptions for things that happen all the time. Then they'd be "ordinaries"."
             #  https://softwareengineering.stackexchange.com/questions/139171/check-first-vs-exception-handling

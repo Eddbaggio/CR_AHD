@@ -29,7 +29,7 @@ class Test:
 
     def test_make_travel_time_matrix(self, request_vertices_f):
         tt_matrix = ut.make_travel_duration_matrix(request_vertices_f)
-        speed = ut.opts['speed']  # km/h
+        speed = ut.opts['speed_kmh']  # km/h
         result = {
             'd0': [dt.timedelta(0), dt.timedelta(hours=10/speed), dt.timedelta(hours=math.sqrt(200)/speed), dt.timedelta(hours=math.sqrt(200)/speed), dt.timedelta(hours=math.sqrt(200) / speed),  dt.timedelta(hours=20/speed)],
             'r0': [dt.timedelta(hours=10/speed), dt.timedelta(0), dt.timedelta(hours=10/speed), dt.timedelta(hours=math.sqrt(500)/speed), dt.timedelta(hours=math.sqrt(500)/speed), dt.timedelta(hours=math.sqrt(500)/speed)],

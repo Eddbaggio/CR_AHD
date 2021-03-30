@@ -1,6 +1,8 @@
 import itertools
+from contextlib import suppress
 from typing import List
-
+from pathlib import Path
+import json
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -11,13 +13,13 @@ from bokeh.models import ColumnDataSource, FactorRange
 from matplotlib.ticker import AutoMinorLocator
 from bokeh.plotting import figure, show, output_file
 
-from src.cr_ahd.utility_module.utils import univie_cmap, path_output_custom, univie_colors_100
+import src.cr_ahd.utility_module.utils as ut
 
 labels = {
     'num_carriers': 'Number of Carriers',
     'solomon_base': 'Instance',
-    'distance': 'Routing Distance',
-    'duration': 'Routing Duration',
+    'travel_distance': 'Travel Distance',
+    'travel_duration': 'Travel Duration',
     'num_act_veh': 'Number of Vehicles',
     'StaticI1Insertion': 'Static, no collaboration',
     'StaticI1InsertionWithAuction': 'Static, with collaboration',
@@ -53,7 +55,7 @@ def bokeh_plot(solomon_list: List, attributes: List[str]):
                    )
             subplots.append(p)
 
-        path = path_output_custom.joinpath(f'bokeh_{col}.html')
+        path = ut.path_output_custom.joinpath(f'bokeh_{col}.html')
         output_file(str(path), f'bokeh_{col}')
         show(column(*subplots))
     pass
@@ -73,7 +75,7 @@ def plotly_bar_plot(solomon_list: List, attributes: List[str], ):
             for col in attr_df:
                 attr_df[col] = attr_df[col] + pd.to_datetime('1970/01/01')
         fig = go.Figure()
-        colors = itertools.cycle([univie_colors_100[0]]+univie_colors_100[2:])
+        colors = itertools.cycle([ut.univie_colors_100[0]] + ut.univie_colors_100[2:])
         for col in attr_df.columns:
             fig.add_bar(x=list(zip(*attr_df.index)),
                         y=attr_df[col],
@@ -85,19 +87,20 @@ def plotly_bar_plot(solomon_list: List, attributes: List[str], ):
                         textangle=-90,
                         textfont_size=14
                         )
-        for v_line_x in np.arange(1.5, 10.5, 2):
+        for v_line_x in np.arange(-0.5, 2+len(solomon_list), 2):
             fig.add_vline(x=v_line_x, line_width=1, line_color="grey")
         fig.update_layout(title=f'Mean {labels[attr]}',
                           xaxis_title=f'{labels["num_carriers"]} // {labels["solomon_base"]}',
+                          yaxis_title=f'{labels[attr]}',
                           # line break with <br>, but then its outside the plot, needed to adjust margins then
                           template='plotly_white',
                           uniformtext_minsize=14, uniformtext_mode='show')
 
         # multicategory axis not supported by plotly express
         # fig = px.bar(attr_df, x=attr_df.index.names, y=attr_df.columns)
-        path = path_output_custom.joinpath(f'plotly_bar_plot_{attr}.html')
+        path = ut.path_output_custom.joinpath(f'plotly_bar_plot_{attr}.html')
         fig.write_html(str(path), auto_open=True)
-        # path = path_output_custom.joinpath(f'plotly_bar_plot_{attr}.svg')
+        # path = ut.path_output_custom.joinpath(f'plotly_bar_plot_{attr}.svg')
         # fig.write_image(str(path))
     pass
 
@@ -130,7 +133,7 @@ def bar_plot_with_errors(solomon_list: list, attributes: List[str], filter_condi
         n_filtered_groups = grouped.ngroups if filter_conditions == [] else len(filter_conditions)
         width = 1 / (n_filtered_groups + 2)
         ind = np.arange(len(solomon_list))
-        cmap = univie_cmap  # univie_cmap_paired
+        cmap = ut.univie_cmap  # univie_cmap_paired
         fig: plt.Figure
         ax: plt.Axes
         fig, ax = plt.subplots()
@@ -180,14 +183,14 @@ def bar_plot_with_errors(solomon_list: list, attributes: List[str], filter_condi
         )
         ax.set_title(f'Mean + Std of {col} per algorithm ')
         fig.set_size_inches(fig_size)
-        fig.savefig(path_output_custom.joinpath(f'matplotlib_bar_plot_{col}.pdf'), bbox_inches='tight')
-        fig.savefig(path_output_custom.joinpath(f'matplotlib_bar_plot_{col}.png'), bbox_inches='tight')
+        fig.savefig(ut.path_output_custom.joinpath(f'matplotlib_bar_plot_{col}.pdf'), bbox_inches='tight')
+        fig.savefig(ut.path_output_custom.joinpath(f'matplotlib_bar_plot_{col}.png'), bbox_inches='tight')
         # plt.show()
 
 
 def combine_eval_files(solomon_list, save: bool = True):
     """
-    iterates through the dir
+    iterates through the dir of the instances specified by the solomon_list
 
     :param solomon_list:
     :param save:
@@ -195,7 +198,7 @@ def combine_eval_files(solomon_list, save: bool = True):
     """
     evaluation = pd.DataFrame()
     for solomon in solomon_list:
-        file_name = next(path_output_custom.joinpath(solomon).glob('*eval.csv'))  # there should only be one eval file
+        file_name = next(ut.path_output_custom.joinpath(solomon).glob('*_eval.csv'))
         df = pd.read_csv(file_name)
         evaluation = evaluation.append(df)
     evaluation = evaluation.set_index(['solomon_base', 'rand_copy', 'solution_algorithm', 'num_carriers'])
@@ -203,8 +206,8 @@ def combine_eval_files(solomon_list, save: bool = True):
     for col in duration_columns:
         evaluation[col] = pd.to_timedelta(evaluation[col], unit='seconds', errors='raise')
     if save:
-        evaluation.to_csv(path_output_custom.joinpath('Evaluation').with_suffix('.csv'))
-        evaluation.to_excel(path_output_custom.joinpath('Evaluation').with_suffix('.xlsx'), merge_cells=False)
+        evaluation.to_csv(ut.path_output_custom.joinpath('Evaluation').with_suffix('.csv'))
+        evaluation.to_excel(ut.path_output_custom.joinpath('Evaluation').with_suffix('.xlsx'), merge_cells=False)
     return evaluation
 
 

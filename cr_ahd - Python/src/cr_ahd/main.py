@@ -1,6 +1,7 @@
 import logging.config
 import logging
 import multiprocessing
+import pickle
 from copy import deepcopy
 from pathlib import Path
 import datetime as dt
@@ -39,7 +40,7 @@ def execute_all(instance: it.Instance):
     :param instance: (custom) instance that will we (deep)copied for each algorithm
     :return: evaluation metrics (Instance.evaluation_metrics) of all the solutions obtained
     """
-    eval_metrics = []
+    solution_summaries = []
 
     for solver in [
         # sl.StaticSequentialInsertion,
@@ -47,8 +48,8 @@ def execute_all(instance: it.Instance):
         # sl.StaticI1InsertionWithAuction,
         # sl.DynamicSequentialInsertion,
         sl.DynamicI1Insertion,
-        sl.DynamicI1InsertionWithAuctionA,
-        sl.DynamicI1InsertionWithAuctionB,
+        # sl.DynamicI1InsertionWithAuctionA,
+        # sl.DynamicI1InsertionWithAuctionB,
         sl.DynamicI1InsertionWithAuctionC,
     ]:
         # print(f'Solving {base_instance.id_} with {solver.__name__}...')
@@ -57,18 +58,19 @@ def execute_all(instance: it.Instance):
             continue  # skip auction solvers for centralized instances
         logger.info(f'Solving {instance.id_} via {solver.__name__}')
         solver().execute(copy)
-        copy.write_solution_to_json()
-        eval_metrics.append(copy.evaluation_metrics)
-    return eval_metrics
+        copy.write_solution_and_summary_to_json()
+        solution_summaries.append(copy.solution_summary)
+    return solution_summaries
 
 
 def read_and_execute_all(path: Path):
     """reads CUSTOM instance from a given path before executing all available visitors"""
     log.remove_all_file_handlers(logging.getLogger())
-    log.add_file_handler(logging.getLogger(), f'../../../data/Output/{path.name}_log.log', )
+    log_file_path = ut.path_output_custom.joinpath(path.name.split('_')[0], f'{path.name}_log.log' )
+    log.add_file_handler(logging.getLogger(), str(log_file_path))
     instance = it.read_custom_json_instance(path)
-    results = execute_all(instance)
-    return results
+    solution_summaries = execute_all(instance)
+    return solution_summaries
 
 
 def read_and_execute_all_parallel(n: int, which: List):
@@ -80,37 +82,36 @@ def read_and_execute_all_parallel(n: int, which: List):
     """
     custom_files_paths = get_custom_instance_paths(n, which)
 
-    with multiprocessing.Pool() as pool:
-        results_collection = list(
+    with multiprocessing.Pool(8) as pool:
+        solution_summaries_collection = list(
             tqdm(pool.imap(read_and_execute_all, custom_files_paths), total=len(custom_files_paths)))
-    flat_results_collection = [r for results in results_collection for r in results]
-    grouped = write_eval_metrics(flat_results_collection)  # rename function; not clear what are the results?
+    flat_solution_summaries_collection = [r for results in solution_summaries_collection for r in results]
+    grouped = write_solution_summaries_df(flat_solution_summaries_collection)  # rename function; not clear what are the results?
     return grouped
 
 
-def write_eval_metrics(eval_metrics: list):
+def write_solution_summaries_df(solution_summaries: list):
     """
     write the collected outputs of the execute_all function to csv files. One file is created for each solomon_base
 
-    :param eval_metrics: (flat) list of single results of the execute_all function
+    :param solution_summaries: (flat) list of single results (i.e. the evaluation metrics) of the execute_all function
     :return: the solomon_base grouped dataframe of results
     """
-    performance = pd.DataFrame(eval_metrics)
+    performance = pd.DataFrame(solution_summaries)
     for column in performance.select_dtypes(include=['timedelta64']):
         performance[column] = performance[column].dt.total_seconds()
     performance = performance.set_index(
         ['solomon_base', 'rand_copy', 'solution_algorithm', 'num_carriers', 'num_vehicles'])
     grouped = performance.groupby('solomon_base')
-    # write the results
-    group: pd.DataFrame
+
     for name, group in grouped:
         write_dir = ut.path_output_custom.joinpath(name)
-        write_dir.mkdir(parents=True,
-                        exist_ok=True)  # TODO All the directory creation should happen in the beginning somewhere once
+        write_dir.mkdir(parents=True, exist_ok=True)
         file_name = f'{name}_custom_eval.csv'
         write_path = write_dir.joinpath(file_name)
         group.to_csv(write_path)
         group.to_excel(write_path.with_suffix('.xlsx'), merge_cells=False)
+
     return grouped
 
 
@@ -128,11 +129,12 @@ def get_custom_instance_paths(n, which: List):
 
 if __name__ == '__main__':
     logger.info('START')
-    solomon_list = ['C101', 'C201', 'R101', 'R201', 'RC101', 'RC201']
+    solomon_list = ['C101', 'C201']  #, 'R101', 'R201', 'RC101', 'RC201']
+    # solomon_list = ut.Solomon_Instances
     # read_and_execute_all(Path("../../../data/Input/Custom/C101/C101_3_15_ass_#002.json"))  # single collaborative
     # read_and_execute_all(Path("../../../data/Input/Custom/C201/C201_1_45_ass_#001.json"))  # single centralized
-    # grouped_evaluations = read_and_execute_all_parallel(n=2, which=solomon_list)  # multiple
+    grouped_evaluations = read_and_execute_all_parallel(n=2, which=solomon_list)  # multiple
 
-    plotly_bar_plot(solomon_list, attributes=['num_act_veh', 'distance'])  #, 'duration'
+    plotly_bar_plot(solomon_list, attributes=['num_act_veh', 'travel_distance'])  #, 'duration'
     # bar_plot_with_errors(solomon_list, attributes=['num_act_veh', 'cost', ])
     logger.info('END')

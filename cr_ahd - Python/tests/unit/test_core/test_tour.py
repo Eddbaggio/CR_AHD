@@ -25,7 +25,8 @@ def test_sum_travel_duration(small_criss_cross_tour: Tour):
 
 def test_TwoOpt_duration_cost(small_criss_cross_tour: Tour):
     TwoOpt().improve_tour(small_criss_cross_tour)
-    assert small_criss_cross_tour.sum_travel_duration == pytest.approx(ut.travel_time(40 + 2 * np.sqrt(200)))
+    assert small_criss_cross_tour.sum_travel_duration.total_seconds() == pytest.approx(
+        ut.travel_time(40 + 2 * np.sqrt(200)).total_seconds())
 
 
 def test_reverse(small_tour: Tour):

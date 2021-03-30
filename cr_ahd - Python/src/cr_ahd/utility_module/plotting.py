@@ -10,17 +10,28 @@ import src.cr_ahd.core_module.vertex as vx
 from src.cr_ahd.utility_module.utils import path_output
 
 
-def plot_vertices(vertices: List[vx.BaseVertex], edges: bool = False, show: bool = False):
+def plot_vertices(vertices: List[vx.BaseVertex], title: str, edges: bool = False, show: bool = False):
     df = pd.DataFrame([v.coords for v in vertices], columns=['x', 'y'])
     df['id_'] = [v.id_ for v in vertices]
     df['carrier_assignment'] = [str(v.carrier_assignment) for v in vertices]
+    df['tw_open'] = [v.tw.e for v in vertices]
+    df['tw_close'] = [v.tw.l for v in vertices]
     fig = px.scatter(data_frame=df,
                      x='x',
                      y='y',
                      text='id_',
+                     hover_name='id_',
+                     hover_data=['x', 'y', 'tw_open', 'tw_close'],
                      color='carrier_assignment',
                      size=[2.5] * len(vertices),
+                     title=title
                      )
+    for v in vertices:
+        tw_format = "Day %d %H:%M:%S"
+        fig.add_annotation(x=v.coords.x, y=v.coords.y,
+                           text=f'[{v.tw.e.strftime(tw_format)} - {v.tw.l.strftime(tw_format)}]',
+                           clicktoshow='onoff',
+                           yshift=-25, showarrow=False)
     if edges:
         for i in range(len(vertices) - 1):
             arrow_tail = vertices[i].coords
