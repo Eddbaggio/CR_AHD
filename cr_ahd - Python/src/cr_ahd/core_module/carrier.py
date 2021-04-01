@@ -1,11 +1,14 @@
 from typing import List, Iterable
 import datetime as dt
 import matplotlib.pyplot as plt
+import logging
 
 import src.cr_ahd.core_module.vehicle as vh
 import src.cr_ahd.core_module.vertex as vx
 from src.cr_ahd.core_module.optimizable import Optimizable
 from src.cr_ahd.core_module.tour import Tour
+
+logger = logging.getLogger(__name__)
 
 
 class Carrier(Optimizable):
@@ -131,6 +134,7 @@ class Carrier(Optimizable):
         :return:
         """
         for r in requests:
+            logger.debug(f'{r.id_} assigned to {self.id_}')
             self._requests.append(r)
             self._unrouted.append(r)
             r.carrier_assignment = self.id_

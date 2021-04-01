@@ -47,10 +47,11 @@ def execute_all(instance: it.Instance):
         # sl.StaticI1Insertion,
         # sl.StaticI1InsertionWithAuction,
         # sl.DynamicSequentialInsertion,
-        sl.DynamicI1Insertion,
+        # sl.DynamicI1Insertion,
         # sl.DynamicI1InsertionWithAuctionA,
         # sl.DynamicI1InsertionWithAuctionB,
-        sl.DynamicI1InsertionWithAuctionC,
+        # sl.DynamicI1InsertionWithAuctionC,
+        sl.DynamicCollaborativeAHD,
     ]:
         # print(f'Solving {base_instance.id_} with {solver.__name__}...')
         copy = deepcopy(instance)
@@ -131,10 +132,10 @@ if __name__ == '__main__':
     logger.info('START')
     solomon_list = ['C101', 'C201']  #, 'R101', 'R201', 'RC101', 'RC201']
     # solomon_list = ut.Solomon_Instances
-    # read_and_execute_all(Path("../../../data/Input/Custom/C101/C101_3_15_ass_#002.json"))  # single collaborative
+    read_and_execute_all(Path("../../../data/Input/Custom/C101/C101_3_15_ass_#002.json"))  # single collaborative
     # read_and_execute_all(Path("../../../data/Input/Custom/C201/C201_1_45_ass_#001.json"))  # single centralized
-    grouped_evaluations = read_and_execute_all_parallel(n=2, which=solomon_list)  # multiple
+    # grouped_evaluations = read_and_execute_all_parallel(n=2, which=solomon_list)  # multiple
 
-    plotly_bar_plot(solomon_list, attributes=['num_act_veh', 'travel_distance'])  #, 'duration'
+    # plotly_bar_plot(solomon_list, attributes=['num_act_veh', 'travel_distance'])  #, 'duration'
     # bar_plot_with_errors(solomon_list, attributes=['num_act_veh', 'cost', ])
     logger.info('END')

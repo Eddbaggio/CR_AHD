@@ -3,7 +3,8 @@ import src.cr_ahd.auction_module.request_selection as rs
 import src.cr_ahd.auction_module.bundle_generation as bg
 import src.cr_ahd.auction_module.bidding as bd
 import src.cr_ahd.auction_module.winner_determination as wd
-from src.cr_ahd.utility_module.utils import opts
+import src.cr_ahd.utility_module.utils
+import src.cr_ahd.utility_module.utils as ut
 
 
 class Auction(ABC):
@@ -26,7 +27,8 @@ class Auction_a(Auction):
     """
 
     def _run_auction(self, instance):
-        submitted_requests = rs.HighestInsertionCostDistance().execute(instance, opts['num_requests_to_submit'])
+        submitted_requests = rs.HighestInsertionCostDistance().execute(instance,
+                                                                       src.cr_ahd.utility_module.utils.NUM_REQUESTS_TO_SUBMIT)
         bundle_set = bg.RandomPartition(instance.distance_matrix).execute(submitted_requests)
         bids = bd.I1TravelDistanceIncrease().execute(bundle_set, instance.carriers)
         wd.LowestBid().execute(bids)
@@ -41,7 +43,7 @@ class Auction_b(Auction):
     """
 
     def _run_auction(self, instance):
-        submitted_requests = rs.Cluster().execute(instance, opts['num_requests_to_submit'])
+        submitted_requests = rs.Cluster().execute(instance, src.cr_ahd.utility_module.utils.NUM_REQUESTS_TO_SUBMIT)
         bundle_set = bg.RandomPartition(instance.distance_matrix).execute(submitted_requests)
         bids = bd.I1TravelDistanceIncrease().execute(bundle_set, instance.carriers)
         wd.LowestBid().execute(bids)
@@ -56,7 +58,8 @@ class Auction_c(Auction):
     """
 
     def _run_auction(self, instance):
-        submitted_requests = rs.HighestInsertionCostDistance().execute(instance, opts['num_requests_to_submit'])
+        submitted_requests = rs.HighestInsertionCostDistance().execute(instance,
+                                                                       src.cr_ahd.utility_module.utils.NUM_REQUESTS_TO_SUBMIT)
         bundle_set = bg.KMeansBundles(instance.distance_matrix).execute(submitted_requests)
         bids = bd.I1TravelDistanceIncrease().execute(bundle_set, instance.carriers)
         wd.LowestBid().execute(bids)

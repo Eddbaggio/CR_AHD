@@ -7,6 +7,7 @@ import src.cr_ahd.auction_module.bidding as bd
 import src.cr_ahd.auction_module.bundle_generation as bg
 import src.cr_ahd.auction_module.request_selection as rs
 import src.cr_ahd.auction_module.winner_determination as wd
+import src.cr_ahd.tw_management_module.tw_management as twm
 import src.cr_ahd.utility_module.utils as ut
 from src.cr_ahd.core_module import instance as it
 from src.cr_ahd.solving_module.tour_construction import SequentialCheapestInsertion, I1Insertion
@@ -138,7 +139,7 @@ class DynamicSolver(Solver):
     @final
     def _solve(self, instance: it.Instance):
         while instance.unrouted_requests:
-            self.assign_n_requests(instance, ut.opts['dynamic_cycle_time'])
+            self.assign_n_requests(instance, ut.DYNAMIC_CYCLE_TIME)
             self._solve_cycle(instance)
         self.finalize_with_local_search(instance)
 
@@ -243,6 +244,55 @@ class DynamicI1InsertionWithAuctionC(DynamicSolver):
     """
     ADD DOCSTRING!!
     """
+
+    def _solve_cycle(self, instance):
+        if instance.num_carriers > 1:
+            self.run_auction(instance)
+        carrier = True
+        while carrier:
+            carrier = self.build_routes(instance)
+            if carrier:
+                self.initialize_another_tour(carrier)
+
+    def run_auction(self, instance):
+        au.Auction_c().execute(instance)
+
+    def initialize_another_tour(self, carrier):
+        EarliestDueDate().initialize_carrier(carrier)
+
+    def build_routes(self, instance):
+        carrier = I1Insertion().solve_instance(instance)
+        return carrier
+
+
+class DynamicCollaborativeAHD(Solver):
+    """
+    The full program: Dynamic TW Management and auction-based Collaboration. Uses Auction type C
+    """
+    # TODO refactoring and tidy up required! Can I create a meaningful superclass?
+
+    @final
+    def _solve(self, instance: it.Instance):
+        while instance.unrouted_requests:
+            self.assign_n_requests(instance, ut.DYNAMIC_CYCLE_TIME)
+            self._solve_cycle(instance)
+        self.finalize_with_local_search(instance)
+
+    @final
+    def assign_n_requests(self, instance, n):
+        """from the unrouted requests present in the instance, assign n requests to their corresponding carrier as
+        defined by the Vertex.carrier_assignment attribute"""
+        logger.debug(f'Assigning {n} requests to carriers')
+        for request in instance.unassigned_requests()[:n]:
+            request._tw = ut.TIME_HORIZON  # reset the time window that is defined by the solomon instance
+            carrier = ut.get_carrier_by_id(instance.carriers, request.carrier_assignment)
+            carrier.assign_requests([request])
+            twm.TWManagement1().execute(carrier, request)
+
+    @final
+    def finalize_with_local_search(self, instance):
+        TwoOpt().improve_instance(instance)
+        pass
 
     def _solve_cycle(self, instance):
         if instance.num_carriers > 1:

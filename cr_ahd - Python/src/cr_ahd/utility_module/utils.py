@@ -13,23 +13,21 @@ import numpy as np
 import pandas as pd
 from matplotlib.colors import LinearSegmentedColormap
 
+Coordinates = namedtuple('Coords', ['x', 'y'])
+TimeWindow = namedtuple('TimeWindow', ['e', 'l'])
+
 opts = {
     'verbose': 0,
     'plot_level': 1,
-    'speed_kmh': 60,
-    'start_time': dt.datetime.min,
-    'end_time': dt.datetime.max,  # min + dt.timedelta(hours=10),
     'max_tour_length': 850,  # pretty arbitrary for now
     'alpha_1': 0.5,
     'mu': 1,
     'lambda': 2,
     'ccycler': plt.cycler(color=plt.get_cmap('Set1').colors)(),
-    'dynamic_cycle_time': 25,  # does not actually represent time but the number of requests being assigned each cycle
-    'num_requests_to_submit': 0.5  # has to be either relative [0, 1] or absolute
 }
 
-Coordinates = namedtuple('Coords', ['x', 'y'])
-TimeWindow = namedtuple('TimeWindow', ['e', 'l'])
+
+
 # Solomon_Instances = [file[:-4] for file in os.listdir('..\\data\\Input\\Solomon')]
 path_project = Path(
     'C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home Deliveries/01_Code')
@@ -110,7 +108,7 @@ def make_travel_duration_matrix(vertices: List):
 
 
 def travel_time(dist):
-    return dt.timedelta(hours=dist / opts['speed_kmh'])  # compute timedelta
+    return dt.timedelta(hours=dist / SPEED_KMH)  # compute timedelta
 
 
 class InsertionError(Exception):
@@ -247,3 +245,22 @@ class DateTimeEncoder(json.JSONEncoder):
         if isinstance(o, dt.timedelta):
             return o.total_seconds()
         return super().default(o)
+
+
+def datetime_range(start: dt.datetime, end: dt.datetime, freq: dt.timedelta, include_end=True):
+    """
+    returns a generator object that yields datetime objects in the range from start to end in steps of freq.
+    :param include_end: determines whether the specified end is included in the range
+    :return:
+    """
+    return (start + x * freq for x in range(((end - start) // freq) + include_end))
+
+
+START_TIME = dt.datetime.min
+END_TIME = dt.datetime.min + dt.timedelta(minutes=3390)
+TIME_HORIZON = TimeWindow(START_TIME, END_TIME)
+TW_LENGTH = dt.timedelta(hours=2)
+ALL_TW = [TimeWindow(e, e + TW_LENGTH) for e in datetime_range(START_TIME, END_TIME, freq=TW_LENGTH)]
+SPEED_KMH = 60
+DYNAMIC_CYCLE_TIME = 25  # does not actually represent time but the number of requests being assigned each cycle
+NUM_REQUESTS_TO_SUBMIT = 0.5  # has to be either relative [0, 1] or absolute

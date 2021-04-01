@@ -21,7 +21,7 @@ class DepotVertex(BaseVertex):
                  carrier_assignment: str = None):
         super().__init__(id_, x_coord, y_coord)
         self.carrier_assignment = carrier_assignment
-        self.tw = ut.TimeWindow(ut.opts['start_time'], ut.opts['end_time'])
+        self.tw = ut.TIME_HORIZON
         self.service_duration = dt.timedelta(0)
         self.demand = 0
         self.assigned = False
@@ -53,7 +53,7 @@ class Vertex(BaseVertex):
                  ):
         super().__init__(id_, x_coord, y_coord)
         self.demand = demand
-        self.tw = ut.TimeWindow(tw_open, tw_close)  # time windows opening and closing
+        self._tw = ut.TimeWindow(tw_open, tw_close)  # time windows opening and closing
         self.service_duration = service_duration
         self._carrier_assignment = carrier_assignment
         self._assigned = False
@@ -84,6 +84,15 @@ class Vertex(BaseVertex):
         assert not self.assigned, f'vertex {self} has already been assigned to carrier {self.carrier_assignment}! Must' \
                                   f'retract before re-assigning'
         self._carrier_assignment = carrier_id
+
+    @property
+    def tw(self):
+        return self._tw
+
+    @tw.setter
+    def tw(self, new_tw):
+        assert self.tw == ut.TIME_HORIZON, f'Cannot override an already agreed-upon time window'
+        self._tw = new_tw
 
     @property
     def assigned(self):

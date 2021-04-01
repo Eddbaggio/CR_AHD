@@ -99,8 +99,8 @@ class Tour(Optimizable):
         if len(self) <= 1:
             self._travel_duration_sequence.insert(index, dt.timedelta(0))
             self._travel_distance_sequence.insert(index, 0)
-            self._arrival_schedule.insert(index, ut.opts['start_time'])
-            self._service_schedule.insert(index, ut.opts['start_time'])
+            self._arrival_schedule.insert(index, ut.START_TIME)
+            self._service_schedule.insert(index, ut.START_TIME)
         else:
             self._travel_duration_sequence.insert(index, dt.timedelta(0))
             self._travel_distance_sequence.insert(index, 0)

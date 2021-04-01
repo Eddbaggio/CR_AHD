@@ -61,6 +61,25 @@ def plot_vertices(vertices: List[vx.BaseVertex], title: str, edges: bool = False
     return fig
 
 
+def plot_tour(tour, title, show_arrival: bool, show_service: bool, show: bool = False):
+    fig = plot_vertices(tour.routing_sequence, title, edges=True)
+    if show_service or show_arrival:
+        for index, vertex in enumerate(tour.routing_sequence):
+            time_format = "Day %d %H:%M:%S"
+            text = ''
+            if show_arrival:
+                text += f'Arrival: {tour.arrival_schedule[index].strftime(time_format)}'
+            if show_service:
+                text += f'<br>Service: {tour.service_schedule[index].strftime(time_format)}'
+                fig.add_annotation(x=vertex.coords.x, y=vertex.coords.y,
+                                   text=text,
+                                   clicktoshow='onoff',
+                                   yshift=-50, showarrow=False)
+    if show:
+        fig.show()
+    return fig
+
+
 class CarrierConstructionAnimation(object):
     def __init__(self, carrier: Carrier, title=None):
         self.carrier = carrier
