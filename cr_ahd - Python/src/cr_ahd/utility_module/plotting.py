@@ -4,80 +4,120 @@ import matplotlib.animation as ani
 import matplotlib.pyplot as plt
 from matplotlib.text import Annotation
 import plotly.express as px
+import plotly.graph_objects as go
 from src.cr_ahd.core_module.carrier import Carrier
 from src.cr_ahd.core_module.vehicle import Vehicle
 import src.cr_ahd.core_module.vertex as vx
 from src.cr_ahd.utility_module.utils import path_output
 
 
-def plot_vertices(vertices: List[vx.BaseVertex], title: str, edges: bool = False, show: bool = False):
+def _vertex_figure(vertices: List[vx.BaseVertex], title: str = 'Scatter Plot - Vertices'):
     df = pd.DataFrame([v.coords for v in vertices], columns=['x', 'y'])
     df['id_'] = [v.id_ for v in vertices]
     df['carrier_assignment'] = [str(v.carrier_assignment) for v in vertices]
     df['tw_open'] = [v.tw.e for v in vertices]
     df['tw_close'] = [v.tw.l for v in vertices]
-    fig = px.scatter(data_frame=df,
-                     x='x',
-                     y='y',
-                     text='id_',
-                     hover_name='id_',
-                     hover_data=['x', 'y', 'tw_open', 'tw_close'],
-                     color='carrier_assignment',
-                     size=[2.5] * len(vertices),
-                     title=title
-                     )
+    fig = px.scatter(
+        data_frame=df,
+        x='x',
+        y='y',
+        text='id_',
+        hover_name='id_',
+        hover_data=['x', 'y', 'tw_open', 'tw_close'],
+        color='carrier_assignment',
+        size=[2.5] * len(vertices),
+        title=title
+    )
+    return fig
+
+
+def _add_vertex_annotations(fig: go.Figure, vertices: List[vx.BaseVertex]):
+    """creates annotations for the time window of each vertex"""
     for v in vertices:
-        tw_format = "Day %d %H:%M:%S"
+        time_format = "Day %d %H:%M:%S"
         fig.add_annotation(x=v.coords.x, y=v.coords.y,
-                           text=f'[{v.tw.e.strftime(tw_format)} - {v.tw.l.strftime(tw_format)}]',
+                           text=f'[{v.tw.e.strftime(time_format)} - {v.tw.l.strftime(time_format)}]',
                            clicktoshow='onoff',
                            yshift=-25, showarrow=False)
+    pass
+
+
+def _add_tour_annotations(fig: go.Figure, tour, arrival_time=True, service_time=True):
+    for index, vertex in enumerate(tour.routing_sequence):
+        time_format = "Day %d %H:%M:%S"
+        text = ''
+        if arrival_time:
+            text += f'Arrival: {tour.arrival_schedule[index].strftime(time_format)}'
+        if service_time:
+            text += f'<br>Service: {tour.service_schedule[index].strftime(time_format)}'
+            fig.add_annotation(x=vertex.coords.x, y=vertex.coords.y,
+                               text=text,
+                               clicktoshow='onoff',
+                               yshift=-50, showarrow=False)
+    pass
+
+
+def _add_edge_traces(fig: go.Figure, vertices: List[vx.BaseVertex]):
+    for i in range(len(vertices) - 1):
+        arrow_tail = vertices[i].coords
+        arrow_head = vertices[i + 1].coords
+        fig.add_annotation(x=arrow_head.x,
+                           y=arrow_head.y,
+                           ax=arrow_tail.x,
+                           ay=arrow_tail.y,
+                           xref='x',
+                           yref='y',
+                           axref='x',
+                           ayref='y',
+                           text="",
+                           showarrow=True,
+                           arrowhead=2,
+                           arrowsize=2,
+                           arrowwidth=1,
+                           arrowcolor='black',
+                           standoff=10,
+                           startstandoff=10)
+    pass
+
+
+def plot_vertices(vertices: List[vx.BaseVertex], title: str, annotations=False, edges: bool = False,
+                  show: bool = False):
+    fig = _vertex_figure(vertices, title)
+    if annotations:
+        _add_vertex_annotations(fig, vertices)
     if edges:
-        for i in range(len(vertices) - 1):
-            arrow_tail = vertices[i].coords
-            arrow_head = vertices[i + 1].coords
-            fig.add_annotation(x=arrow_head.x,
-                               y=arrow_head.y,
-                               ax=arrow_tail.x,
-                               ay=arrow_tail.y,
-                               xref='x',
-                               yref='y',
-                               axref='x',
-                               ayref='y',
-                               text="",
-                               showarrow=True,
-                               arrowhead=2,
-                               arrowsize=2,
-                               arrowwidth=1,
-                               arrowcolor='black',
-                               standoff=10,
-                               startstandoff=10)
-    fig.update_yaxes(
-        scaleanchor="x",
-        scaleratio=1,
-    )
+        _add_edge_traces(fig, vertices)
     if show:
         fig.show()
     return fig
 
 
-def plot_tour(tour, title, show_arrival: bool, show_service: bool, show: bool = False):
-    fig = plot_vertices(tour.routing_sequence, title, edges=True)
-    if show_service or show_arrival:
-        for index, vertex in enumerate(tour.routing_sequence):
-            time_format = "Day %d %H:%M:%S"
-            text = ''
-            if show_arrival:
-                text += f'Arrival: {tour.arrival_schedule[index].strftime(time_format)}'
-            if show_service:
-                text += f'<br>Service: {tour.service_schedule[index].strftime(time_format)}'
-                fig.add_annotation(x=vertex.coords.x, y=vertex.coords.y,
-                                   text=text,
-                                   clicktoshow='onoff',
-                                   yshift=-50, showarrow=False)
+def plot_tour(tour, title, time_windows: bool = True, arrival_times: bool = True, service_times: bool = True,
+              show: bool = False):
+    fig = _vertex_figure(tour.routing_sequence, title)
+    _add_edge_traces(fig, tour.routing_sequence)
+    if time_windows:
+        _add_vertex_annotations(fig, tour.routing_sequence)
+    if arrival_times or service_times:
+        _add_tour_annotations(fig, tour, arrival_times, service_times)
     if show:
         fig.show()
     return fig
+
+
+def plot_carrier(carrier, title, tours: bool = True, time_windows: bool = True, arrival_times: bool = True,
+                 service_times: bool = True, show: bool = False):
+    fig = _vertex_figure([carrier.depot, *carrier.requests], title)
+    if tours:
+        for vehicle in carrier.active_vehicles:
+            _add_edge_traces(fig, vehicle.tour.routing_sequence)
+    if time_windows:
+        _add_vertex_annotations(fig, carrier.requests)
+    if arrival_times or service_times:
+        for vehicle in carrier.active_vehicles:
+            _add_tour_annotations(fig, vehicle.tour, arrival_times, service_times)
+    if show:
+        fig.show()
 
 
 class CarrierConstructionAnimation(object):

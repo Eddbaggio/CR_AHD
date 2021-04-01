@@ -256,13 +256,14 @@ def carrier_c(depot_vertex, vehicles_capacity_0, request_vertices_g):
 
 @pytest.fixture()
 def carrier_spiral_partially_routed(depot_vertex, request_vertices_spiral, vehicles_capacity_0):
-    def _carrier_spiral_partially_routed(request_spiral_size, num_vehicles, num_routed_requests):
+    def _carrier_spiral_partially_routed(request_spiral_size: int, num_vehicles: int, num_routed_requests: int):
         requests = request_vertices_spiral(request_spiral_size, request_spiral_size)
         dist_matrix = ut.make_travel_dist_matrix([*requests, depot_vertex])
         carrier = Carrier('c0', depot_vertex, vehicles_capacity_0(num_vehicles), requests, dist_matrix)
         tour = carrier.vehicles[0].tour
-        for i in num_routed_requests:
+        for i in range(num_routed_requests):
             tour.insert_and_update(i + 1, carrier.unrouted_requests[0])
+        return carrier
 
     return _carrier_spiral_partially_routed
 
