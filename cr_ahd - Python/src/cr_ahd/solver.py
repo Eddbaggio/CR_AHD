@@ -10,9 +10,9 @@ import src.cr_ahd.auction_module.winner_determination as wd
 import src.cr_ahd.tw_management_module.tw_management as twm
 import src.cr_ahd.utility_module.utils as ut
 from src.cr_ahd.core_module import instance as it
-from src.cr_ahd.solving_module.tour_construction import SequentialCheapestInsertion, I1Insertion
-from src.cr_ahd.solving_module.tour_improvement import TwoOpt
-from src.cr_ahd.solving_module.tour_initialization import EarliestDueDate
+from src.cr_ahd.routing_module.tour_construction import SequentialCheapestInsertion, I1Insertion
+from src.cr_ahd.routing_module.tour_improvement import TwoOpt
+from src.cr_ahd.routing_module.tour_initialization import EarliestDueDate
 
 logger = logging.getLogger(__name__)
 

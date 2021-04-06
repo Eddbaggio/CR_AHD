@@ -8,8 +8,8 @@ from sklearn.cluster import KMeans
 from src.cr_ahd.core_module.carrier import Carrier
 from src.cr_ahd.core_module.vehicle import Vehicle
 from src.cr_ahd.core_module.vertex import midpoint, Vertex
-from src.cr_ahd.solving_module.tour_construction import I1Insertion
-from src.cr_ahd.solving_module.tour_initialization import EarliestDueDate
+from src.cr_ahd.routing_module.tour_construction import I1Insertion
+from src.cr_ahd.routing_module.tour_initialization import EarliestDueDate
 from src.cr_ahd.utility_module.utils import Coordinates, flatten_dict_of_lists, euclidean_distance, \
     InsertionError, random_max_k_partition
 

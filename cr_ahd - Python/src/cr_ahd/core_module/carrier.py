@@ -3,8 +3,7 @@ import datetime as dt
 import matplotlib.pyplot as plt
 import logging
 
-import src.cr_ahd.core_module.vehicle as vh
-import src.cr_ahd.core_module.vertex as vx
+from src.cr_ahd.core_module import vehicle as vh, vertex as vx, request as rq
 from src.cr_ahd.core_module.optimizable import Optimizable
 from src.cr_ahd.core_module.tour import Tour
 
@@ -16,7 +15,7 @@ class Carrier(Optimizable):
                  id_: str,
                  depot: vx.DepotVertex,
                  vehicles: List[vh.Vehicle],
-                 requests=None,
+                 requests: List[rq.Request] = None,
                  dist_matrix=None):
         """
         Class that represents carriers in the auction-based collaborative transportation network
@@ -24,9 +23,7 @@ class Carrier(Optimizable):
         :param id_: unique identifier (usually c0, c1, c2, ...)
         :param depot: Vertex that is the depot of the carrier
         :param vehicles: List of vehicles (of class vh.Vehicle) that belong to this carrier
-        :param requests: List of requests that are assigned to this carrier
-        :param unrouted: List of this carrier's requests that are still unrouted (usually all requests upon
-        instantiation of the carrier)
+        :param requests: List of requests that belong to this carrier (not yet assigned)
         """
 
         self.id_ = id_
@@ -57,6 +54,12 @@ class Carrier(Optimizable):
         for v in self.vehicles:
             sum_travel_distances += v.tour.sum_travel_distance
         return sum_travel_distances
+
+    def vertices(self):
+        vertices = []
+        for r in self.requests:
+            vertices.extend(r.vertices)
+        return tuple(vertices)
 
     @property
     def requests(self):

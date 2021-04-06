@@ -1,16 +1,14 @@
 import logging.config
 import logging
 import multiprocessing
-import pickle
 from copy import deepcopy
 from pathlib import Path
-import datetime as dt
 from typing import List
 
 import pandas as pd
 from tqdm import tqdm
 
-import src.cr_ahd.solving_module.solver as sl
+import src.cr_ahd.solver as sl
 import src.cr_ahd.utility_module.utils as ut
 import src.cr_ahd.utility_module.cr_ahd_logging as log
 from src.cr_ahd.core_module import instance as it
@@ -29,7 +27,6 @@ from src.cr_ahd.core_module import instance as it
 #  re-reverting the attempt. maybe simply taking an old snapshot is less costly
 
 # TODO two-opt: best improvement vs. first improvement!!
-from src.cr_ahd.utility_module.evaluation import plotly_bar_plot
 
 logging.config.dictConfig(log.LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
@@ -47,10 +44,10 @@ def execute_all(instance: it.Instance):
         # sl.StaticI1Insertion,
         # sl.StaticI1InsertionWithAuction,
         # sl.DynamicSequentialInsertion,
-        # sl.DynamicI1Insertion,
+        sl.DynamicI1Insertion,
         # sl.DynamicI1InsertionWithAuctionA,
         # sl.DynamicI1InsertionWithAuctionB,
-        # sl.DynamicI1InsertionWithAuctionC,
+        sl.DynamicI1InsertionWithAuctionC,
         sl.DynamicCollaborativeAHD,
     ]:
         # print(f'Solving {base_instance.id_} with {solver.__name__}...')
@@ -69,7 +66,10 @@ def read_and_execute_all(path: Path):
     log.remove_all_file_handlers(logging.getLogger())
     log_file_path = ut.path_output_custom.joinpath(path.name.split('_')[0], f'{path.name}_log.log' )
     log.add_file_handler(logging.getLogger(), str(log_file_path))
-    instance = it.read_custom_json_instance(path)
+    if 'gansterer' in str(path):
+        instance = it.read_gansterer_hartl_mv(path)
+    else:
+        instance = it.read_custom_json_instance(path)
     solution_summaries = execute_all(instance)
     return solution_summaries
 
@@ -132,8 +132,9 @@ if __name__ == '__main__':
     logger.info('START')
     solomon_list = ['C101', 'C201']  #, 'R101', 'R201', 'RC101', 'RC201']
     # solomon_list = ut.Solomon_Instances
-    read_and_execute_all(Path("../../../data/Input/Custom/C101/C101_3_15_ass_#002.json"))  # single collaborative
+    # read_and_execute_all(Path("../../../data/Input/Custom/C101/C101_3_15_ass_#002.json"))  # single collaborative
     # read_and_execute_all(Path("../../../data/Input/Custom/C201/C201_1_45_ass_#001.json"))  # single centralized
+    read_and_execute_all(Path("../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/run=0+dist=200+rad=150+n=10.dat"))  # single collaborative
     # grouped_evaluations = read_and_execute_all_parallel(n=2, which=solomon_list)  # multiple
 
     # plotly_bar_plot(solomon_list, attributes=['num_act_veh', 'travel_distance'])  #, 'duration'

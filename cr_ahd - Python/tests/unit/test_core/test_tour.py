@@ -1,5 +1,5 @@
 from src.cr_ahd.core_module.tour import Tour
-from src.cr_ahd.solving_module.tour_improvement import TwoOpt
+from src.cr_ahd.routing_module.tour_improvement import TwoOpt
 import src.cr_ahd.utility_module.utils as ut
 import pytest
 import numpy as np

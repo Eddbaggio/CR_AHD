@@ -33,7 +33,7 @@ class TourImprovementBehavior(ABC):
 class TwoOpt(TourImprovementBehavior):
     """
     Improve the current solution with a 2-opt local search as in
-    G. A. Croes, A method for solving_module traveling salesman problems. Operations Res. 6 (1958)
+    G. A. Croes, A method for routing_module traveling salesman problems. Operations Res. 6 (1958)
     """
 
     def improve_instance(self, instance):

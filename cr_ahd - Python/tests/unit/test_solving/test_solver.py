@@ -1,4 +1,4 @@
-import src.cr_ahd.solving_module.solver as sl
+import src.cr_ahd.solver as sl
 
 
 def test_DynamicI1InsertionWithAuctionSolver(instance_a):

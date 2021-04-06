@@ -6,8 +6,8 @@ from abc import ABC, abstractmethod
 
 class BaseVertex(ABC):
     def __init__(self, id_: str, x_coord: float, y_coord: float):
-        self.id_ = id_  # unique identifier TODO: assert that the id is unique?
-        self.coords = ut.Coordinates(x_coord, y_coord)  # Location in a 2D plane
+        self.id_ = id_
+        self.coords = ut.Coordinates(x_coord, y_coord)
 
     @abstractmethod
     def to_dict(self):
@@ -44,46 +44,26 @@ class Vertex(BaseVertex):
                  id_: str,
                  x_coord: float,
                  y_coord: float,
-                 demand: float,
                  tw_open: dt.datetime,
                  tw_close: dt.datetime,
-                 service_duration: dt.timedelta = dt.timedelta(0),
-                 carrier_assignment: str = None,
                  **kwargs
                  ):
         super().__init__(id_, x_coord, y_coord)
-        self.demand = demand
         self._tw = ut.TimeWindow(tw_open, tw_close)  # time windows opening and closing
-        self.service_duration = service_duration
-        self._carrier_assignment = carrier_assignment
-        self._assigned = False
-        self._routed = False
+        # self._assigned = False
+        # self._routed = False
 
     def __str__(self):
-        return f'Vertex (ID={self.id_}, {self.coords}, {self.tw}, Demand={self.demand}, Carrier={self.carrier_assignment}, routed={self.routed}, assigned={self.assigned})'
+        return f'Vertex (ID={self.id_}, {self.coords}, {self.tw}, assigned={self.assigned}, routed={self.routed})'
 
     def to_dict(self):
         return {
             'id_': self.id_,
             'x_coord': self.coords.x,
             'y_coord': self.coords.y,
-            'demand': self.demand,
             'tw_open': self.tw.e,
             'tw_close': self.tw.l,
-            'service_duration': self.service_duration,
-            'carrier_assignment': self.carrier_assignment,
-            'assigned': self.assigned,
         }
-
-    @property
-    def carrier_assignment(self):
-        return self._carrier_assignment
-
-    @carrier_assignment.setter
-    def carrier_assignment(self, carrier_id):
-        assert not self.assigned, f'vertex {self} has already been assigned to carrier {self.carrier_assignment}! Must' \
-                                  f'retract before re-assigning'
-        self._carrier_assignment = carrier_id
 
     @property
     def tw(self):
@@ -94,26 +74,16 @@ class Vertex(BaseVertex):
         assert self.tw == ut.TIME_HORIZON, f'Cannot override an already agreed-upon time window'
         self._tw = new_tw
 
-    @property
-    def assigned(self):
-        return self._assigned
-
-    @assigned.setter
-    def assigned(self, assigned: bool):
-        # XOR can only set from true to false or vice versa
-        assert self.assigned ^ assigned
-        self._assigned = assigned
-
-    @property
-    def routed(self):
-        return self._routed
-
-    @routed.setter
-    def routed(self, routed: bool):
-        # XOR: can only set from True to False or vice versa
-        assert bool(routed) ^ bool(
-            self.routed), f'routed attribute of {self} can only set from True to False or vice versa'
-        self._routed = routed
+    # @property
+    # def routed(self):
+    #     return self._routed
+    #
+    # @routed.setter
+    # def routed(self, routed: bool):
+    #     # XOR: can only set from True to False or vice versa
+    #     assert bool(routed) ^ bool(
+    #         self.routed), f'routed attribute of {self} can only set from True to False or vice versa'
+    #     self._routed = routed
 
 
 def midpoint(vertex_A: BaseVertex, vertex_B: BaseVertex):

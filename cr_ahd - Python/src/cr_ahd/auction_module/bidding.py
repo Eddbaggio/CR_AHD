@@ -2,8 +2,8 @@ from abc import ABC, abstractmethod
 from typing import Dict, Tuple
 
 from src.cr_ahd.core_module.vertex import Vertex
-from src.cr_ahd.solving_module.tour_construction import I1Insertion
-from src.cr_ahd.solving_module.tour_initialization import EarliestDueDate
+from src.cr_ahd.routing_module.tour_construction import I1Insertion
+from src.cr_ahd.routing_module.tour_initialization import EarliestDueDate
 from src.cr_ahd.utility_module.utils import InsertionError
 
 

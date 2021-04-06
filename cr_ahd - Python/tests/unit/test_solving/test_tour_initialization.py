@@ -1,4 +1,4 @@
-from src.cr_ahd.solving_module.tour_initialization import EarliestDueDate
+from src.cr_ahd.routing_module.tour_initialization import EarliestDueDate
 
 
 class TestEarliestDueDate:

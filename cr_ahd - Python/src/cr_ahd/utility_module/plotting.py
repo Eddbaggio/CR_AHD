@@ -10,11 +10,11 @@ from src.cr_ahd.core_module.vehicle import Vehicle
 import src.cr_ahd.core_module.vertex as vx
 from src.cr_ahd.utility_module.utils import path_output
 
+config = dict({'scrollZoom': True})
 
 def _vertex_figure(vertices: List[vx.BaseVertex], title: str = 'Scatter Plot - Vertices'):
     df = pd.DataFrame([v.coords for v in vertices], columns=['x', 'y'])
     df['id_'] = [v.id_ for v in vertices]
-    df['carrier_assignment'] = [str(v.carrier_assignment) for v in vertices]
     df['tw_open'] = [v.tw.e for v in vertices]
     df['tw_close'] = [v.tw.l for v in vertices]
     fig = px.scatter(
@@ -24,7 +24,6 @@ def _vertex_figure(vertices: List[vx.BaseVertex], title: str = 'Scatter Plot - V
         text='id_',
         hover_name='id_',
         hover_data=['x', 'y', 'tw_open', 'tw_close'],
-        color='carrier_assignment',
         size=[2.5] * len(vertices),
         title=title
     )
@@ -88,7 +87,7 @@ def plot_vertices(vertices: List[vx.BaseVertex], title: str, annotations=False, 
     if edges:
         _add_edge_traces(fig, vertices)
     if show:
-        fig.show()
+        fig.show(config=config)
     return fig
 
 
@@ -101,23 +100,23 @@ def plot_tour(tour, title, time_windows: bool = True, arrival_times: bool = True
     if arrival_times or service_times:
         _add_tour_annotations(fig, tour, arrival_times, service_times)
     if show:
-        fig.show()
+        fig.show(config=config)
     return fig
 
 
-def plot_carrier(carrier, title, tours: bool = True, time_windows: bool = True, arrival_times: bool = True,
+def plot_carrier(carrier, title='', tours: bool = True, time_windows: bool = True, arrival_times: bool = True,
                  service_times: bool = True, show: bool = False):
-    fig = _vertex_figure([carrier.depot, *carrier.requests], title)
+    fig = _vertex_figure([carrier.depot, *carrier.vertices()], title)
     if tours:
         for vehicle in carrier.active_vehicles:
             _add_edge_traces(fig, vehicle.tour.routing_sequence)
     if time_windows:
-        _add_vertex_annotations(fig, carrier.requests)
+        _add_vertex_annotations(fig, carrier.vertices())
     if arrival_times or service_times:
         for vehicle in carrier.active_vehicles:
             _add_tour_annotations(fig, vehicle.tour, arrival_times, service_times)
     if show:
-        fig.show()
+        fig.show(config=config)
 
 
 class CarrierConstructionAnimation(object):

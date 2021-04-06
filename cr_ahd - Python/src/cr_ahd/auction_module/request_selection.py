@@ -3,7 +3,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import List
 import numpy as np
-from src.cr_ahd.solving_module.tour_construction import find_cheapest_distance_feasible_insertion
+from src.cr_ahd.routing_module.tour_construction import find_cheapest_distance_feasible_insertion
 from src.cr_ahd.utility_module.utils import InsertionError
 
 logger = logging.getLogger(__name__)

@@ -1,7 +1,6 @@
 import json
 import logging.config
 import multiprocessing
-import time
 from pathlib import Path
 from typing import List
 import datetime as dt
@@ -11,19 +10,16 @@ import pandas as pd
 from adjustText import adjust_text
 from tqdm import tqdm
 from src.cr_ahd.utility_module import istarmap
-from src.cr_ahd.utility_module.utils import DateTimeEncoder
 
-import src.cr_ahd.core_module.carrier as cr
-import src.cr_ahd.core_module.vehicle as vh
-import src.cr_ahd.core_module.vertex as vx
-import src.cr_ahd.utility_module.utils as ut
+from src.cr_ahd.core_module import carrier as cr, vehicle as vh, vertex as vx, request as rq
 from src.cr_ahd.core_module.optimizable import Optimizable
+import src.cr_ahd.utility_module.utils as ut
 
 logger = logging.getLogger(__name__)
 
 
 class Instance(Optimizable):
-    def __init__(self, id_: str, requests: List[vx.Vertex], carriers: List[cr.Carrier],
+    def __init__(self, id_: str, requests: List[rq.Request], carriers: List[cr.Carrier],
                  dist_matrix: pd.DataFrame = None):
         """
         Create an instance (requests, carriers (,distance matrix) for the collaborative transportation network for
@@ -44,7 +40,7 @@ class Instance(Optimizable):
         else:
             self._distance_matrix = ut.make_travel_dist_matrix([*self.requests, *[c.depot for c in self.carriers]])
         self.solution_algorithm = None
-        # LOGGER.debug(f'{self.id_}: created')
+        logger.debug(f'{self.id_}: created')
 
     def __str__(self):
         return f'Instance {self.id_} with {len(self.requests)} customers and {len(self.carriers)} carriers'
@@ -57,7 +53,7 @@ class Instance(Optimizable):
     def distance_matrix(self, dist_matrix):
         self._distance_matrix = dist_matrix
 
-    @property
+    @property  # TODO: not compatible with other types such as gansterer hartl instances, need some other id
     def solomon_base(self):
         """The Solomon Instance's name on which self is based on"""
         return self.id_.split('_')[0]
@@ -360,7 +356,7 @@ class Instance(Optimizable):
         file_name = ut.unique_path(file_name.parent, file_name.stem + '_#{:03d}' + '.json')
         file_name.parent.mkdir(parents=True, exist_ok=True)
         with open(file_name, mode='w') as write_file:
-            json.dump(self.to_dict(), write_file, indent=4, cls=DateTimeEncoder)
+            json.dump(self.to_dict(), write_file, indent=4, cls=ut.DateTimeEncoder)
         # LOGGER.debug(f'{self.id_}: wrote instance to json at {file_name}')
         return file_name
 
@@ -376,7 +372,7 @@ class Instance(Optimizable):
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
         with open(file_path, mode='w') as f:
-            json.dump({'summary': self.solution_summary, 'solution': self.solution, }, f, indent=4, cls=DateTimeEncoder)
+            json.dump({'summary': self.solution_summary, 'solution': self.solution, }, f, indent=4, cls=ut.DateTimeEncoder)
         # LOGGER.debug(f'{self.id_}: wrote solution to {file_path}')
         return file_path
 
@@ -393,16 +389,21 @@ def read_solomon(name: str, num_carriers: int) -> Instance:
 
     # vehicles
     vehicles = pd.read_csv(file_name, skiprows=4, nrows=1, delim_whitespace=True, names=['number', 'capacity'])
-    vehicles = [vh.Vehicle('v' + str(i), vehicles.capacity[0]) for i in range(vehicles.number[0])]
+    vehicles = [vh.Vehicle('v' + str(i), vehicles.load_capacity[0], vehicles.load_capacity[0]) for i in
+                range(vehicles.number[0])]
     vehicles = ut.split_iterable(vehicles, num_carriers)
 
     # requests
     cols = ['cust_no', 'x_coord', 'y_coord', 'demand', 'ready_time', 'due_date', 'service_duration']
     requests = pd.read_csv(file_name, skiprows=10, delim_whitespace=True, names=cols)
     requests = [
-        vx.Vertex('r' + str(row.cust_no - 1), row.x_coord, row.y_coord, row.demand,
-                  dt.datetime.min + dt.timedelta(minutes=row.ready_time),
-                  dt.datetime.min + dt.timedelta(minutes=row.due_date))
+        rq.DeliveryRequest('r' + str(row.cust_no - 1), row.x_coord, row.y_coord,
+                           tw_open=dt.datetime.min + dt.timedelta(minutes=row.ready_time),
+                           tw_close=dt.datetime.min + dt.timedelta(minutes=row.due_date),
+                           carrier_assignment=None,
+                           revenue=0,
+                           load=row.demand,
+                           )
         for row in requests.itertuples()]
 
     # depots
@@ -421,6 +422,34 @@ def read_solomon(name: str, num_carriers: int) -> Instance:
         print(f'Successfully read Solomon {name} with {num_carriers} carriers.')
         print(inst)
     return inst
+
+
+def read_gansterer_hartl_mv(path: Path) -> Instance:
+    # requests
+    cols = ['carrier_index', 'pickup_x', 'pickup_y', 'delivery_x', 'delivery_y', 'revenue', 'load']
+    requests = pd.read_csv(path, skiprows=13, delim_whitespace=True, names=cols, index_col=False,
+                           float_precision='round_trip')
+    requests = [rq.PickupAndDeliveryRequest(
+        id_=f'r{int(index)}',
+        pickup_x=row.pickup_x, pickup_y=row.pickup_y, delivery_x=row.delivery_x, delivery_y=row.delivery_y,
+        delivery_tw_open=ut.START_TIME, delivery_tw_close=ut.END_TIME,
+        carrier_assignment=f'c{int(row.carrier_index)}', revenue=row.revenue, load=row.load
+    ) for index, row in requests.iterrows()]
+    request_vertices = [*[r.pickup_vertex for r in requests], *[r.delivery_vertex for r in requests]]
+    # depots
+    depots = pd.read_csv(path, skiprows=7, nrows=3, delim_whitespace=True, header=None, index_col=False,
+                         usecols=[1, 2], names=['x', 'y'])
+    depots = [vx.DepotVertex(f'd{index}', row.x, row.y, f'c{index}') for index, row in depots.iterrows()]
+    # global distance matrix
+    distance_matrix = ut.make_travel_dist_matrix([*depots, *request_vertices])
+    # carriers + vehicles
+    vehicles = pd.read_csv(path, skiprows=1, nrows=3, delim_whitespace=True, header=None, squeeze=True, index_col=0)
+    carriers = []
+    for i, depot in enumerate(depots):
+        c_vehicles = [vh.Vehicle(f'v{str(j + vehicles.V * i)}', vehicles.L, vehicles.T) for j in range(vehicles.V)]
+        c_requests = [r for r in requests if r.carrier_assignment == f'c{i}']
+        carriers.append(cr.Carrier(f'c{i}', depot, c_vehicles, c_requests, distance_matrix))
+    return Instance(path.stem, requests, carriers, distance_matrix)
 
 
 def make_custom_from_solomon(solomon: Instance, custom_name: str, num_carriers: int, num_vehicles_per_carrier: int,
@@ -590,6 +619,7 @@ def make_and_write_custom_instances_parallel(num_carriers, num_vehicles, num_new
 
 
 if __name__ == '__main__':
+    """
     # If you need to re-create the custom instances run the following:
     start_time = time.time()
     # make_and_write_custom_instances('C101', 3, 15, 3)  # single, for testing
@@ -599,4 +629,9 @@ if __name__ == '__main__':
                                              include_central_instances=True)  # all
     duration = time.time() - start_time
     print(f"Duration: {duration} seconds")
+    pass
+    """
+    p = Path("C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home Deliveries/01_Code/"
+             "data/Input/Gansterer_Hartl/1carrier/MV_instances/run=0+dist=200+rad=150+n=10.dat")
+    inst = read_gansterer_hartl_mv(p)
     pass

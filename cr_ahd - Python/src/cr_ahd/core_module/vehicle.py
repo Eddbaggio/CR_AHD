@@ -5,14 +5,15 @@ from src.cr_ahd.utility_module.utils import opts
 class Vehicle(object):
     """docstring for Vehicle"""
 
-    def __init__(self, id_: str, capacity):
+    def __init__(self, id_: str, load_capacity, distance_capacity):
         self.id_ = id_
-        self.capacity = capacity
+        self.load_capacity = load_capacity
+        self.distance_capacity = distance_capacity
         self.tour: Tour = None
         self.color = next(opts['ccycler'])['color']
 
     def __str__(self):
-        return f'Vehicle (ID={self.id_}, capacity={self.capacity})'
+        return f'Vehicle (ID={self.id_}, capacity={self.load_capacity})'
 
     @property
     def is_active(self):
@@ -21,5 +22,5 @@ class Vehicle(object):
     def to_dict(self):
         return {
             'id_': self.id_,
-            'capacity': self.capacity
+            'capacity': self.load_capacity
         }
