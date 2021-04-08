@@ -8,10 +8,10 @@ from typing import List
 import pandas as pd
 from tqdm import tqdm
 
-import src.cr_ahd.solver as sl
+import src.cr_ahd.solver as slv
 import src.cr_ahd.utility_module.utils as ut
 import src.cr_ahd.utility_module.cr_ahd_logging as log
-from src.cr_ahd.core_module import instance as it
+from src.cr_ahd.core_module import instance as it, solution as slt
 
 # TODO write pseudo codes for ALL the stuff that's happening
 
@@ -32,7 +32,7 @@ logging.config.dictConfig(log.LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
 
 
-def execute_all(instance: it.Instance):
+def execute_all(instance: it.PDPInstance):
     """
     :param instance: (custom) instance that will we (deep)copied for each algorithm
     :return: evaluation metrics (Instance.evaluation_metrics) of all the solutions obtained
@@ -44,29 +44,29 @@ def execute_all(instance: it.Instance):
         # sl.StaticI1Insertion,
         # sl.StaticI1InsertionWithAuction,
         # sl.DynamicSequentialInsertion,
-        sl.DynamicI1Insertion,
+        # slv.DynamicI1Insertion,
+        slv.DynamicCheapestInsertion,
         # sl.DynamicI1InsertionWithAuctionA,
         # sl.DynamicI1InsertionWithAuctionB,
-        sl.DynamicI1InsertionWithAuctionC,
-        sl.DynamicCollaborativeAHD,
+        # slv.DynamicI1InsertionWithAuctionC,
+        # slv.DynamicCollaborativeAHD,
     ]:
-        # print(f'Solving {base_instance.id_} with {solver.__name__}...')
-        copy = deepcopy(instance)
+        solution = slt.GlobalSolution(instance)
         if instance.num_carriers == 1 and 'Auction' in solver.__name__:
             continue  # skip auction solvers for centralized instances
         logger.info(f'Solving {instance.id_} via {solver.__name__}')
-        solver().execute(copy)
-        copy.write_solution_and_summary_to_json()
-        solution_summaries.append(copy.solution_summary)
+        solver().execute(instance, solution)
+        solution.write_to_json()
+        solution_summaries.append(solution.summary())
     return solution_summaries
 
 
 def read_and_execute_all(path: Path):
     """reads CUSTOM instance from a given path before executing all available visitors"""
     log.remove_all_file_handlers(logging.getLogger())
-    log_file_path = ut.path_output_custom.joinpath(path.name.split('_')[0], f'{path.name}_log.log' )
+    log_file_path = ut.path_output_gansterer.joinpath(f'{path.stem}_log.log' )
     log.add_file_handler(logging.getLogger(), str(log_file_path))
-    if 'gansterer' in str(path):
+    if 'gansterer' in str(path).lower():
         instance = it.read_gansterer_hartl_mv(path)
     else:
         instance = it.read_custom_json_instance(path)

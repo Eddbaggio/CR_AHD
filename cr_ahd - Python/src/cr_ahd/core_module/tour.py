@@ -1,32 +1,29 @@
 import datetime as dt
 import logging.config
 from typing import List
+import numpy as np
 
-import matplotlib.pyplot as plt
-
-import src.cr_ahd.core_module.vertex as vx
-from src.cr_ahd.core_module.optimizable import Optimizable
 import src.cr_ahd.utility_module.utils as ut
 
 logger = logging.getLogger(__name__)
 
 
-class Tour(Optimizable):
-    def __init__(self, id_: str, depot: vx.DepotVertex, distance_matrix):
+class Tour:
+    def __init__(self, id_, instance, solution):
         self.id_ = id_
-        self.depot = depot
-        self._distance_matrix = distance_matrix
         self._routing_sequence = []  # sequence of vertices
         self._travel_distance_sequence: List[float] = []  # sequence of arc distance costs
         self._travel_duration_sequence: List[dt.timedelta] = []  # sequence of arc duration costs
-        self._arrival_schedule: List[dt.datetime] = []  # arrival times
-        self._service_schedule: List[dt.datetime] = []  # start of service times
+        self._load_sequence: List[float] = []  # the delta of the fill level of the vehicle (positive or negative)
+        self._revenue_sequence: List[float] = []  # the collected revenue
+        self._arrival_schedule: List[dt.datetime] = []  # arrival time at each stop
+        self._service_schedule: List[dt.datetime] = []  # start of service time at each stop
 
-        self.insert_and_update(0, depot)
-        self.insert_and_update(1, depot)
+        # initialize depot to depot tour
+        self.insert_and_update(instance, solution, [0], [0])
+        self.insert_and_update(instance, solution, [1], [0])
 
     def __str__(self):
-        sequence = [vertex.id_ for vertex in self.routing_sequence]
         arrival_schedule = []
         service_schedule = []
         for i in range(len(self)):
@@ -37,9 +34,8 @@ class Tour(Optimizable):
                 arrival_schedule.append(self.arrival_schedule[i])
                 service_schedule.append(self.service_schedule[i])
         distance = round(self.sum_travel_distance, 2)
-        duration = self.sum_travel_duration
-        return f'ID:\t\t\t{self.id_}\nSequence:\t{sequence}\nArrival:\t{arrival_schedule}\n' \
-               f'Service:\t{service_schedule}\nDistance:\t\t{distance}\nDuration:\t\t{duration} '
+        return f'ID:\t\t\t{self.id_}\nSequence:\t{self.routing_sequence}\nArrival:\t{arrival_schedule}\n' \
+               f'Service:\t{service_schedule}\nDistance:\t\t{distance}\nDuration:\t\t{self.sum_travel_duration} '
 
     def __len__(self):
         return len(self.routing_sequence)
@@ -50,12 +46,56 @@ class Tour(Optimizable):
         return tuple(self._routing_sequence)
 
     @property
+    def num_routing_stops(self):
+        return len(self)
+
+    @property
     def travel_distance_sequence(self):
         return tuple(self._travel_distance_sequence)
 
     @property
+    def sum_travel_distance(self) -> float:
+        return sum(self._travel_distance_sequence)
+
+    @property
+    def cumsum_travel_distance(self):
+        return np.cumsum(self.travel_distance_sequence)
+
+    @property
     def travel_duration_sequence(self):
         return tuple(self._travel_duration_sequence)
+
+    @property
+    def sum_travel_duration(self) -> dt.timedelta:
+        return sum(self._travel_duration_sequence, dt.timedelta())
+
+    @property
+    def cumsum_travel_duration(self):
+        return np.cumsum(self.travel_duration_sequence)
+
+    @property
+    def load_sequence(self):
+        return tuple(self._load_sequence)
+
+    @property
+    def sum_load(self):
+        return sum(self.load_sequence)
+
+    @property
+    def cumsum_load(self):
+        return np.cumsum(self.load_sequence)
+
+    @property
+    def revenue_sequence(self):
+        return self._revenue_sequence
+
+    @property
+    def sum_revenue(self):
+        return sum(self.revenue_sequence)
+
+    @property
+    def cumsum_revenue(self):
+        return np.cumsum(self.revenue_sequence)
 
     @property
     def arrival_schedule(self):
@@ -65,64 +105,65 @@ class Tour(Optimizable):
     def service_schedule(self):
         return tuple(self._service_schedule)
 
-    @property
-    def revenue(self):
-        return sum([request.demand for request in self.routing_sequence])
+    def as_dict(self):
+        return {
+            'routing_sequence': self.routing_sequence,
+            'travel_distance_sequence': self.travel_distance_sequence,
+            'travel_duration_sequence': self.travel_duration_sequence,
+            'arrival_schedule': self.arrival_schedule,
+            'service_schedule': self.service_schedule,
+            'load_schedule': self.load_sequence,
+            'revenue_schedule': self.revenue_sequence,
+        }
 
-    @property
-    def profit(self):
-        return self.revenue - self.sum_travel_distance
+    def summary(self):
+        return {
+            # 'id_': self.id_,
+            'num_routing_stops': self.num_routing_stops,
+            'sum_travel_distance': self.sum_travel_distance,
+            'sum_travel_duration': self.sum_travel_duration,
+            'sum_load': self.sum_load,  # should always be 0
+            'sum_revenue': self.sum_revenue,
+        }
 
-    @property  # why exactly is this a property and not just a member attribute?
-    def distance_matrix(self):
-        return self._distance_matrix
-
-    @distance_matrix.setter
-    def distance_matrix(self, distance_matrix):
-        self._distance_matrix = distance_matrix
-
-    @property
-    def sum_travel_duration(self) -> dt.timedelta:
-        return sum(self._travel_duration_sequence, dt.timedelta())
-
-    @property
-    def sum_travel_distance(self) -> float:
-        return sum(self._travel_distance_sequence)
-
-    def _insert_no_update(self, index: int, vertex: vx.BaseVertex):
+    def _insert_no_update(self, indices: List[int], vertices: List[int]):
         """highly discouraged to use this as it does not ensure feasibility of the route! use insert_and_update instead.
         use this only if infeasible route is acceptable, as e.g. reversing a section where intermediate states of the
         reversal may be infeasible"""
-        assert isinstance(vertex, vx.BaseVertex)
-        self._routing_sequence.insert(index, vertex)
-        vertex.routed = [self, index]
-        if len(self) <= 1:
+        for index, vertex in zip(indices, vertices):
+            self._routing_sequence.insert(index, vertex)
             self._travel_duration_sequence.insert(index, dt.timedelta(0))
             self._travel_distance_sequence.insert(index, 0)
-            self._arrival_schedule.insert(index, ut.START_TIME)
-            self._service_schedule.insert(index, ut.START_TIME)
-        else:
-            self._travel_duration_sequence.insert(index, dt.timedelta(0))
-            self._travel_distance_sequence.insert(index, 0)
-            self._arrival_schedule.insert(index, None)
-            self._service_schedule.insert(index, None)
-        logger.debug(f'{vertex.id_} inserted into {self.id_} at index {index}')
+            if len(self) <= 1:
+                self._arrival_schedule.insert(index, ut.START_TIME)
+                self._service_schedule.insert(index, ut.START_TIME)
+                self._load_sequence.insert(index, 0)
+            else:
+                self._arrival_schedule.insert(index, None)
+                self._service_schedule.insert(index, None)
+                self._load_sequence.insert(index, None)
+            logger.debug(f'{vertex} inserted into {self.id_} at index {index}')
         pass
 
-    def insert_and_update(self, index: int, vertex: vx.BaseVertex):
+    def insert_and_update(self, instance, solution,
+                          indices: List[int], vertices: List[int]):
         """
          inserts a vertex BEFORE the specified index and resets/deletes all cost and schedules. If insertion is
          infeasible due to time window constraints, it will undo the insertion and raise InsertionError
 
-        :param index: index before which the given vertex/request is to be inserted
-        :param vertex: vertex to insert into the tour
+        :param solution:
+        :param instance:
+        :param indices: index before which the given vertex/request is to be inserted
+        :param vertices: vertex to insert into the tour
         """
+        assert all(indices[i] <= indices[i + 1] for i in range(len(indices) - 1))  # assure that indices are sorted
+
         try:
-            self._insert_no_update(index, vertex)
+            self._insert_no_update(indices, vertices)
             if len(self) > 1:
-                self.update_cost_and_schedules_from(index)
+                self.update_cost_and_schedules_from(instance, solution, indices[0])
         except ut.InsertionError as e:
-            self.pop_and_update(index)
+            self.pop_and_update(instance, solution, indices)
             raise e
         pass
 
@@ -134,42 +175,52 @@ class Tour(Optimizable):
         self._travel_distance_sequence.pop(index)
         self._arrival_schedule.pop(index)
         self._service_schedule.pop(index)
-        popped.routed = False
-        logger.debug(f'{popped.id_} popped from {self.id_} at index {index}')
+        self._load_sequence.pop(index)
+        logger.debug(f'{popped} popped from {self.id_} at index {index}')
         return popped
 
-    def pop_and_update(self, index: int):
+    def pop_and_update(self, instance, solution, indices: List[int]):
         """removes the vertex at the index position from the tour and resets all cost and schedules"""
-        popped = self._pop_no_update(index)
-        self.update_cost_and_schedules_from(index)
+        popped = []
+        for index in indices:
+            popped.append(self._pop_no_update(index))
+        self.update_cost_and_schedules_from(instance, solution, indices[0])
         return popped
 
-    def update_cost_and_schedules_from(self, index: int = 1):
+    def update_cost_and_schedules_from(self, instance,
+                                       solution,
+                                       index: int = 1):
         """update schedules from given index to end of routing sequence. index should be the same as the insertion
         or removal index. """
-        for rho in range(index, len(self)):
-            i: vx.Vertex = self.routing_sequence[rho - 1]
-            j: vx.Vertex = self.routing_sequence[rho]
-            i.routed[1] = rho - 1  # update the stored index position
-            dist = self.distance_matrix.loc[i.id_, j.id_]
-            self._travel_distance_sequence[rho] = dist
-            self._travel_duration_sequence[rho] = ut.travel_time(dist)
-            arrival = self.service_schedule[rho - 1] + i.service_duration + ut.travel_time(dist)
+        for pos in range(index, len(self)):
+            vertex: int = self.routing_sequence[pos]
+            predecessor_vertex: int = self.routing_sequence[pos - 1]
+            travel_dist = instance.distance(predecessor_vertex, vertex)
+            cumul_travel_dist = sum(self.travel_distance_sequence[:pos]) + travel_dist
+            arrival = self.service_schedule[pos - 1] + ut.travel_time(travel_dist)
+            cumul_load = sum(self.load_sequence[:pos]) + instance.load[vertex]
             try:
-                assert arrival <= j.tw.l, f'Arrival at {arrival} is too late for {j}'
-                # assert self.sum_travel_distance <= ut.opts['max_tour_length']
-                self._arrival_schedule[rho] = arrival
-                self._service_schedule[rho] = max(arrival, j.tw.e)
+                # check the feasibility constraints
+                assert cumul_travel_dist < instance.vehicles_max_travel_distance, f'{cumul_travel_dist} too long'
+                assert arrival <= solution.tw_close[vertex], f'{arrival} too late'
+                assert cumul_load <= instance.vehicles_max_load, f'{cumul_load} to high'
+                self._travel_distance_sequence[pos] = travel_dist
+                self._travel_duration_sequence[pos] = ut.travel_time(travel_dist)
+                self._arrival_schedule[pos] = arrival
+                self._service_schedule[pos] = max(arrival, solution.tw_open[vertex])
+                self._load_sequence[pos] = instance.load[vertex]
             except AssertionError:
-                logger.debug(f'{self.id_} update from index {index} failed: arrival:{arrival}; j.tw.l.:{j.tw.l}; max '
-                             f'tour length: {ut.opts["max_tour_length"]}')
-                raise ut.InsertionError(f'{arrival} <= {j.tw.l}', f'cannot arrive at {j} after time window has closed')
-            # TODO "You shouldn't throw exceptions for things that happen all the time. Then they'd be "ordinaries"."
-            #  https://softwareengineering.stackexchange.com/questions/139171/check-first-vs-exception-handling
+                logger.debug(f'{self.id_} update from index {index} failed at position {pos} with vertex {vertex}: '
+                             f'cumul_travel_dist: {cumul_travel_dist}, max cumul_travel_dist: {instance.vehicles_max_travel_distance} '
+                             f'arrival: {arrival}, tw_close: {solution.tw_close[vertex]}; '
+                             f'cumul_load: {cumul_load}, max vehicle cumul_load: {instance.vehicles_max_load} '
+                             )
+                raise ut.InsertionError('One of the feasibility constraints is not satisfied. Check feasibility before '
+                                        'insertion using Tour.insertion_feasibility_check()', '')
         logger.debug(f'{self.id_} updated from index {index}')
         pass
 
-    def reverse_section(self, i, j):
+    def reverse_section(self, instance, solution, i, j):
         """
         reverses a section of the route from index i to index j-1. If reversal is infeasible, will raise InsertionError
         (and undoes the attempted reversal)
@@ -184,72 +235,72 @@ class Tour(Optimizable):
             popped = self._pop_no_update(i)
             self._insert_no_update(j - k, popped)
         try:
-            self.update_cost_and_schedules_from(i)  # maybe the new routing sequence is infeasible
+            self.update_cost_and_schedules_from(instance, solution, i)  # maybe the new routing sequence is infeasible
         except ut.InsertionError as e:
-            self.reverse_section(i, j)  # undo all the reversal
+            self.reverse_section(instance, solution, i, j)  # undo all the reversal
             raise e
 
-    def insertion_distance_cost_no_feasibility_check(self, i: vx.Vertex, j: vx.Vertex,
-                                                     u: vx.Vertex):  # TODO what about Time Windows?
+    def insertion_distance_cost(self, instance, insertion_positions: List[int],
+                                insertion_vertices: List[int]):
         """
-        compute distance cost for insertion of vertex u between vertices i and j using the distance matrix. Does NOT
-        consider time window restrictions, i.e. no feasibility check is done!
+        Does NOT perform a feasibility check!
+
+        :param instance:
+        :param insertion_positions:
+        :param insertion_vertices:
+        :return:
         """
-        dist_i_u = self.distance_matrix.loc[i.id_, u.id_]
-        dist_u_j = self.distance_matrix.loc[u.id_, j.id_]
-        dist_i_j = self.distance_matrix.loc[i.id_, j.id_]
-        insertion_cost = dist_i_u + dist_u_j - dist_i_j
-        return insertion_cost
+        tmp_routing_sequence = list(self.routing_sequence)
+        delta = 0
+        for pos, vertex in zip(insertion_positions, insertion_vertices):
+            predecessor_vertex = tmp_routing_sequence[pos - 1]
+            successor_vertex = tmp_routing_sequence[pos]
+            tmp_routing_sequence.insert(pos, vertex)
+            delta += instance.distance(predecessor_vertex, vertex) + \
+                     instance.distance(vertex, successor_vertex) - \
+                     instance.distance(predecessor_vertex, successor_vertex)
 
-    def plot(self,
-             plot_depot: bool = True,
-             annotate: bool = True,
-             alpha: float = 1,
-             color: str = 'black') -> List:
+        return delta
 
+    def insertion_feasibility_check(self, instance,
+                                    solution,
+                                    insertion_positions: List[int],
+                                    insertion_vertices: List[int]):
         """
-        :return: List of artists to be drawn. Use for ANIMATED plotting
+        check Time Window, Maximum Tour Length and Maximum Vehicle Load constraints for the route IF the
+        insertion_vertices were inserted at the insertion_positions. Insertion is not actually performed!
+
+        :param instance:
+        :param solution:
+        :param insertion_positions:
+        :param insertion_vertices:
+        :return: True if all constraints are satisfied given the insertion; False otherwise
         """
-        artists = []  # list of artists to be plotted
+        assert all(insertion_positions[i] <= insertion_positions[i + 1] for i in range(len(insertion_positions) - 1))
+        # create a temporary routing sequence to loop over that contains the new vertices
+        tmp_routing_sequence = list(self.routing_sequence)
+        for pos, vertex in zip(insertion_positions, insertion_vertices):
+            tmp_routing_sequence.insert(pos, vertex)
+        tour_length = sum(self.travel_distance_sequence[:insertion_positions[0]])
+        arrival_time = self.arrival_schedule[insertion_positions[0] - 1]
+        load = self.load_sequence[insertion_positions[0] - 1]
 
-        # plot depot
-        if plot_depot:
-            depot, = plt.plot(*self.depot.coords,
-                              marker='s',
-                              markersize='9',
-                              mfc=color,
-                              mec='black',
-                              mew=1,
-                              alpha=alpha,
-                              label=self.depot.id_,
-                              linestyle='')
-            artists.append(depot)
+        # iterate over the temporary tour and check all constraints
+        for pos in range(insertion_positions[0], len(tmp_routing_sequence)):
+            vertex: int = tmp_routing_sequence[pos]
+            predecessor_vertex: int = tmp_routing_sequence[pos - 1]
+            travel_distance = instance.distance(predecessor_vertex, vertex)
+            # check max tour distance
+            tour_length += travel_distance
+            if tour_length > instance.vehicles_max_travel_distance:
+                return False
+            # check time windows
+            arrival_time = arrival_time + instance.service_time[predecessor_vertex] + ut.travel_time(travel_distance)
+            if arrival_time > solution.tw_close[vertex]:
+                return False
+            # check max vehicle load
+            load += instance.load[vertex]
+            if load > instance.vehicles_max_load:
+                return False
 
-        # plot requests locations
-        x = [r.coords.x for r in self.routing_sequence[1:-1]]
-        y = [r.coords.y for r in self.routing_sequence[1:-1]]
-        requests, = plt.plot(x, y, marker='o', c=color, alpha=alpha, label=self.id_, linestyle='')
-        artists.append(requests)
-
-        # plot arrows and annotations
-        for i in range(1, len(self)):
-            start = self.routing_sequence[i - 1]
-            end = self.routing_sequence[i]
-            arrows = plt.annotate('',
-                                  xy=(end.coords.x, end.coords.y),
-                                  xytext=(start.coords.x, start.coords.y),
-                                  c=color,
-                                  arrowprops=dict(arrowstyle="-|>",
-                                                  alpha=alpha,
-                                                  color=requests.get_color(),
-                                                  ),
-                                  )
-            artists.append(arrows)
-
-            if annotate:
-                annotations = plt.annotate(f'{end.id_}',
-                                           xy=(end.coords.x, end.coords.y + 1),
-                                           alpha=alpha
-                                           )
-                artists.append(annotations)
-        return artists
+        return True

@@ -26,8 +26,6 @@ opts = {
     'ccycler': plt.cycler(color=plt.get_cmap('Set1').colors)(),
 }
 
-
-
 # Solomon_Instances = [file[:-4] for file in os.listdir('..\\data\\Input\\Solomon')]
 path_project = Path(
     'C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home Deliveries/01_Code')
@@ -37,6 +35,7 @@ path_input_solomon = path_input.joinpath('Solomon')
 Solomon_Instances = [file.stem for file in path_input_solomon.iterdir()]
 path_output = path_project.joinpath('data', 'Output')
 path_output_custom = path_output.joinpath('Custom')
+path_output_gansterer = path_output.joinpath('Gansterer_Hartl')
 
 # alpha 100%
 univie_colors_100 = [
@@ -77,9 +76,9 @@ def euclidean_distance(a: Coordinates, b: Coordinates):
     return np.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 
 
-def make_travel_dist_matrix(vertices: List):
+def make_travel_dist_matrix(coordinates: pd.DataFrame):
     """
-    :param vertices: List of vertices each of class Vertex
+    :param coordinates: x, y DataFrame
     :return: pd.DataFrame distance matrix
     """
     index = [i.id_ for i in vertices]
@@ -90,6 +89,21 @@ def make_travel_dist_matrix(vertices: List):
             dist_matrix.loc[i.id_, j.id_] = euclidean_distance(i.coords, j.coords)
     assert dist_matrix.index.is_unique, f"Distance matrix must have unique row id's"
     return dist_matrix
+
+
+# def make_travel_dist_matrix(vertices: List):
+#     """
+#     :param vertices: List of vertices each of class Vertex
+#     :return: pd.DataFrame distance matrix
+#     """
+#     index = [i.id_ for i in vertices]
+#     dist_matrix: pd.DataFrame = pd.DataFrame(index=index, columns=index, dtype='float64')
+#
+#     for i in vertices:
+#         for j in vertices:
+#             dist_matrix.loc[i.id_, j.id_] = euclidean_distance(i.coords, j.coords)
+#     assert dist_matrix.index.is_unique, f"Distance matrix must have unique row id's"
+#     return dist_matrix
 
 
 def make_travel_duration_matrix(vertices: List):
@@ -238,13 +252,20 @@ def random_max_k_partition(ls, max_k) -> Dict[int, Tuple[Any, ...]]:
     return partitions
 
 
-class DateTimeEncoder(json.JSONEncoder):
-    def default(self, o):
-        if isinstance(o, dt.datetime):
-            return o.isoformat()
-        if isinstance(o, dt.timedelta):
-            return o.total_seconds()
-        return super().default(o)
+class MyJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, dt.datetime):
+            return obj.isoformat()
+        if isinstance(obj, dt.timedelta):
+            return obj.total_seconds()
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        else:
+            return super().default(obj)
 
 
 def datetime_range(start: dt.datetime, end: dt.datetime, freq: dt.timedelta, include_end=True):
@@ -262,5 +283,5 @@ TIME_HORIZON = TimeWindow(START_TIME, END_TIME)
 TW_LENGTH = dt.timedelta(hours=2)
 ALL_TW = [TimeWindow(e, e + TW_LENGTH) for e in datetime_range(START_TIME, END_TIME, freq=TW_LENGTH)]
 SPEED_KMH = 60
-DYNAMIC_CYCLE_TIME = 25  # does not actually represent time but the number of requests being assigned each cycle
+DYNAMIC_CYCLE_TIME = 2  # does not actually represent time but the number of requests being assigned each cycle
 NUM_REQUESTS_TO_SUBMIT = 0.5  # has to be either relative [0, 1] or absolute

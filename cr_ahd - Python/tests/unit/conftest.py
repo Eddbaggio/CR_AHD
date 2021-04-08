@@ -6,7 +6,7 @@ import random
 
 import src.cr_ahd.utility_module.utils as ut
 from src.cr_ahd.core_module.carrier import Carrier
-from src.cr_ahd.core_module.instance import Instance
+from src.cr_ahd.core_module.instance import PDPInstance
 from src.cr_ahd.core_module.tour import Tour
 from src.cr_ahd.core_module.vehicle import Vehicle
 from src.cr_ahd.core_module.vertex import DepotVertex, Vertex
@@ -343,7 +343,7 @@ def instance_a(depot_vertex, carriers_and_unassigned_requests_3_6):
     carriers, requests = carriers_and_unassigned_requests_3_6
     for i, r in enumerate(requests):
         r.carrier_assignment = carriers[int(i / 2)].id_
-    return Instance('instance_a', requests, carriers, carriers[0].distance_matrix)
+    return PDPInstance('instance_a', requests, carriers, carriers[0].distance_matrix)
 
 
 # ==========

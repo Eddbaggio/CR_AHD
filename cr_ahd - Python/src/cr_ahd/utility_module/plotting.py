@@ -7,13 +7,16 @@ import plotly.express as px
 import plotly.graph_objects as go
 from src.cr_ahd.core_module.carrier import Carrier
 from src.cr_ahd.core_module.vehicle import Vehicle
-import src.cr_ahd.core_module.vertex as vx
+from src.cr_ahd.core_module import instance as it
 from src.cr_ahd.utility_module.utils import path_output
 
 config = dict({'scrollZoom': True})
 
-def _vertex_figure(vertices: List[vx.BaseVertex], title: str = 'Scatter Plot - Vertices'):
-    df = pd.DataFrame([v.coords for v in vertices], columns=['x', 'y'])
+
+def _vertex_figure(instance: it.PDPInstance, vertices: List[int], title: str = 'Scatter Plot - Vertices'):
+    df = pd.DataFrame({'x': [instance.x_coords[v] for v in vertices],
+                       'y': [instance.y_coords[v] for v in vertices]},
+                      )
     df['id_'] = [v.id_ for v in vertices]
     df['tw_open'] = [v.tw.e for v in vertices]
     df['tw_close'] = [v.tw.l for v in vertices]

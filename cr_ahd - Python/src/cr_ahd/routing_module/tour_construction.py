@@ -1,7 +1,10 @@
 import datetime as dt
 from abc import ABC, abstractmethod
-from src.cr_ahd.utility_module.profiling import Timer
 import src.cr_ahd.utility_module.utils as ut
+from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class TourConstructionBehavior(ABC):
@@ -23,22 +26,22 @@ class TourConstructionBehavior(ABC):
 
     # could these solve methods be templates? there are many steps that are identical, e.g. setting instance.solved=True
     @abstractmethod
-    def solve_instance(self, instance):
+    def solve(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         pass
 
-    @abstractmethod
-    def solve_carrier(self, carrier):
-        pass
+    # @abstractmethod
+    # def solve_carrier(self, carrier):
+    #     pass
 
     # @abstractmethod
     # def find_insertion(self, carrier, vertex=None):
     #     pass
 
 
-class SequentialCheapestInsertion(TourConstructionBehavior):
+class SequentialInsertion(TourConstructionBehavior):
     """
-    For one customer at a time, will iterate over requests in their order of assignment and finds their cheapest
-    insertion based on the route built so far.
+    For one request at a time, will find its cheapest insertion position based on the routes built so far. Does not
+    consider the other request ( != Cheapest Insertion)
 
     """
 
@@ -71,92 +74,136 @@ class SequentialCheapestInsertion(TourConstructionBehavior):
                     print(f'x\t{vertex.id_} cannot be feasibly inserted into {vehicle.id_}')
         return vehicle_best, position_best, distance_cost_best
 
-    def solve_instance(self, instance):
+    def solve(self, instance):
         """
         Use a static construction method to build tours for all carriers via SEQUENTIAL CHEAPEST INSERTION.
         (Can also be used for dynamic route construction if the request-to-carrier assignment is known.)
         """
-        # assert not instance.solved, f'Instance {instance} has already been solved'
 
-        if self.verbose > 0:
-            print(f'Cheapest Insertion Construction for {instance}:')
-        timer = Timer()
-        timer.start()
-
+        logger.debug(f'Cheapest Insertion Construction for {instance}:')
         while any(instance.assigned_unrouted_requests()):
             vertex = instance.assigned_unrouted_requests()[0]
             carrier = ut.get_carrier_by_id(instance.carriers, vertex.carrier_assignment)
             vehicle, position, _ = self.find_insertion(carrier, vertex)
             vehicle.tour.insert_and_update(index=position, vertex=vertex)
-
-        timer.stop()
-        self._runtime = timer.duration
-        # instance.routing_visitor = self
-        # instance.solved = True
         pass
 
     def solve_carrier(self, carrier):
         pass
 
 
+class CheapestInsertion(TourConstructionBehavior):
+    """
+    For each REQUEST, identify its cheapest insertion. Compare the collected insertion costs and insert the cheapest
+    over all requests.
+    """
+
+    def solve(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        for carrier in range(instance.num_carriers):
+            logger.debug(f'Cheapest Insertion tour construction for carrier {carrier}:')
+            self._solve_carrier(instance, solution, carrier)
+        pass
+
+    def _solve_carrier(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
+        cs = solution.carrier_solutions[carrier]
+        while cs.unrouted_requests:
+            best_delta = float('inf')
+            best_request = best_pickup_position = best_delivery_position = best_tour = None
+            start_over = False
+            for r in cs.unrouted_requests:
+                best_delta_for_r = float('inf')
+                for t in range(len(cs.tours)):
+                    # cheapest way to fit r into t
+                    delta, pickup_position, delivery_position = self._solve_tour(instance, solution, carrier, t, r)
+                    if delta < best_delta:
+                        best_delta = delta
+                        best_request = r
+                        best_pickup_position = pickup_position
+                        best_delivery_position = delivery_position
+                        best_tour = t
+                    if delta < best_delta_for_r:
+                        best_delta_for_r = delta
+                # if no feasible insertion for the current request was found
+                if best_delta_for_r == float('inf'):
+                    rtmp = tr.Tour(len(cs.tours), instance, solution)
+                    rtmp.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(r))
+                    cs.tours.append(rtmp)
+                    cs.unrouted_requests.remove(r)
+                    start_over = True
+                    break
+            if not start_over:
+                cs.tours[best_tour].insert_and_update(instance, solution,
+                                                      [best_pickup_position, best_delivery_position],
+                                                      instance.pickup_delivery_pair(best_request))
+                cs.unrouted_requests.remove(best_request)
+        pass
+
+    def _solve_tour(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, tour: int,
+                    unrouted_request: int):
+        """Find the cheapest insertions for pickup and delivery for a given tour"""
+        t: tr.Tour = solution.carrier_solutions[carrier].tours[tour]
+
+        best_delta = float('inf')
+        best_pickup_position = None
+        best_delivery_position = None
+
+        pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(unrouted_request)
+
+        for pickup_pos in range(1, len(t)):
+            for delivery_pos in range(pickup_pos + 1, len(t)+1):
+                delta = t.insertion_distance_cost(instance, [pickup_pos, delivery_pos], [pickup_vertex, delivery_vertex])
+                if not t.insertion_feasibility_check(instance, solution, [pickup_pos, delivery_pos],
+                                                     [pickup_vertex, delivery_vertex]):
+                    continue
+                if delta < best_delta:
+                    best_delta = delta
+                    best_pickup_position = pickup_pos
+                    best_delivery_position = delivery_pos
+        return best_delta, best_pickup_position, best_delivery_position
+
+
 class I1Insertion(TourConstructionBehavior):
-    def find_insertion(self, carrier):
+    def find_insertion(self, instance: it.PDPInstance, carrier_solution: slt.PDPSolution):
         """
         Find the next optimal Vertex and its optimal insertion position based on the I1 insertion scheme.
-        :return: Tuple(u_best, vehicle_best, rho_best, max_c2)
+        :return: Tuple(u_best, tour_best, rho_best, max_c2)
         """
 
-        vehicle_best = None
+        tour_best = None
         rho_best = None
         u_best = None
         max_c2 = dt.timedelta.min
 
-        for unrouted in carrier.unrouted_requests:  # take the unrouted requests
-            # check first the vehicles that are active (to avoid small tours), if infeasible -> caller must take care!
-            for vehicle in carrier.active_vehicles:
-                rho, c2 = find_best_feasible_I1_insertion(vehicle.tour, unrouted)
+        for unrouted in carrier_solution.unrouted_requests:
+            # check first the tours that are active (to avoid small tours), if infeasible -> caller must take care!
+            for tour in carrier_solution.tours:
+                rho, c2 = find_best_feasible_I1_insertion(instance, tour, unrouted)
                 if c2 > max_c2:
                     if self.verbose > 1:
                         print(f'^ is the new best c2')
-                    vehicle_best = vehicle
+                    tour_best = vehicle
                     rho_best = rho
                     u_best = unrouted
                     max_c2 = c2
 
-        return u_best, vehicle_best, rho_best, max_c2
+        return u_best, tour_best, rho_best, max_c2
 
-    def solve_instance(self, instance):
+    def solve(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         """
         Use the I1 construction method (Solomon 1987) to build tours for all carriers. If a carrier requires tour
         initialization, it will 'interrupt' and return the corresponding carrier
         """
 
-        if self.verbose > 0:
-            print(f'I1 Construction for {instance}:')
-        timer = Timer()
-        timer.start()
+        logger.debug(f'I1 Construction for {instance}:')
+        for carrier_solution in solution.carriers:
+            self.solve_carrier(instance, carrier_solution)
 
-        for carrier in instance.carriers:
-            # if self.plot_level > 1:
-            #     ani = CarrierConstructionAnimation(
-            #         carrier,
-            #         f"{instance.id_}{' centralized' if instance.num_carriers == 0 else ''}:" \
-            #         f" Solomon's I1 construction: {carrier.id_}")
-            try:
-                self.solve_carrier(carrier)
-            except ut.InsertionError:
-                timer.stop()
-                self._runtime = timer.duration
-                return carrier
-
-        timer.stop()
-        self._runtime = timer.duration
         return None
 
-    def solve_carrier(self, carrier):
+    def solve_carrier(self, instance: it.PDPInstance, carrier_solution: slt.PDPSolution):
         # construction loop
-        while carrier.unrouted_requests:
-            vertex, vehicle, position, _ = self.find_insertion(carrier)
+        while carrier_solution.unrouted_requests:
+            vertex, vehicle, position, _ = self.find_insertion(instance, carrier_solution)
             if position:  # insert
                 vehicle.tour.insert_and_update(index=position, vertex=vertex)
                 if self.verbose > 0:
@@ -259,19 +306,19 @@ def _c2(tour, u, c1: float, lambda_: float = ut.opts['lambda'], ):
     return lambda_ * ut.travel_time(tour.distance_matrix.loc[tour.depot.id_, u.id_]) - c1
 
 
-def find_best_feasible_I1_insertion(tour, u, verbose=ut.opts['verbose']):
+def find_best_feasible_I1_insertion(instance: it.PDPInstance, tour: tr.Tour, u: int):
     """
     returns float('-inf') if no feasible insertion position was found
+    :param instance:
     :param tour:
     :param u:
-    :param verbose:
     :return:
     """
-    rho_best = None
+    position_best = None
     max_c2 = dt.timedelta.min
-    for rho in range(1, len(tour)):
-        i = tour.routing_sequence[rho - 1]
-        j = tour.routing_sequence[rho]
+    for position in range(1, len(tour)):
+        i = tour.routing_sequence[position - 1]
+        j = tour.routing_sequence[position]
 
         # trivial feasibility check
         if i.tw.e < u.tw.l and u.tw.e < j.tw.l:
@@ -279,20 +326,16 @@ def find_best_feasible_I1_insertion(tour, u, verbose=ut.opts['verbose']):
             # compute c1(=best feasible insertion cost) and c2(=best request) and update their best values
             try:
                 c1 = _c1(tour,
-                         i_index=rho - 1,
+                         i_index=position - 1,
                          u=u,
-                         j_index=rho,
+                         j_index=position,
                          alpha_1=ut.opts['alpha_1'],
                          mu=ut.opts['mu'],
                          )
             except ut.InsertionError:
                 continue
-            if verbose > 1:
-                print(f'c1({u.id_}->{tour.id_}): {c1}')
             c2 = _c2(tour=tour, u=u, lambda_=ut.opts['lambda'], c1=c1)
-            if verbose > 1:
-                print(f'c2({u.id_}->{tour.id_}): {c2}')
             if c2 > max_c2:
                 max_c2 = c2
-                rho_best = rho
-    return rho_best, max_c2
+                position_best = position
+    return position_best, max_c2

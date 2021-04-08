@@ -10,79 +10,94 @@ import pandas as pd
 from adjustText import adjust_text
 from tqdm import tqdm
 from src.cr_ahd.utility_module import istarmap
+from scipy.spatial.distance import pdist, squareform
 
 from src.cr_ahd.core_module import carrier as cr, vehicle as vh, vertex as vx, request as rq
-from src.cr_ahd.core_module.optimizable import Optimizable
 import src.cr_ahd.utility_module.utils as ut
 
 logger = logging.getLogger(__name__)
 
 
-class Instance(Optimizable):
-    def __init__(self, id_: str, requests: List[rq.Request], carriers: List[cr.Carrier],
-                 dist_matrix: pd.DataFrame = None):
+class PDPInstance:
+    def __init__(self, id_: str,
+                 requests: pd.DataFrame,
+                 carrier_depots: pd.DataFrame,
+                 carriers_max_num_vehicles: int,
+                 vehicles_max_load: float,
+                 vehicles_max_tour_length: float):
         """
-        Create an instance (requests, carriers (,distance matrix) for the collaborative transportation network for
-        attended home delivery
+        Create an instance for the collaborative transportation network for attended home delivery
 
-        :param id_: unique identifier (commonly contains info about solomon base instance, number of carriers and number
-         etc.
-        :param requests: the requests that belong to the instance, i.e. all Vertices that mus be visited (excluding
-        depots) in a list of type vx.Vertex elements
-        :param carriers: the participating carriers (of class cr.Carrier) of this instance's transportation network
-        :param dist_matrix: The distance matrix specifying distances between all request- and depot-vertices
+        :param id_: unique identifier
         """
-        self.id_ = id_
-        self.requests = requests
-        self.carriers = carriers
-        if dist_matrix is not None:
-            self._distance_matrix = dist_matrix
-        else:
-            self._distance_matrix = ut.make_travel_dist_matrix([*self.requests, *[c.depot for c in self.carriers]])
-        self.solution_algorithm = None
-        logger.debug(f'{self.id_}: created')
+        self._id_ = id_
+        self.vehicles_max_load = vehicles_max_load
+        self.vehicles_max_travel_distance = vehicles_max_tour_length
+        self.carrier_depots = carrier_depots
+        self.carriers_max_num_vehicles = carriers_max_num_vehicles
+        self.requests: np.ndarray = requests.index.values
+        self.x_coords: np.ndarray = np.concatenate([carrier_depots['x'], requests['pickup_x'], requests['delivery_x']])
+        self.y_coords: np.ndarray = np.concatenate([carrier_depots['y'], requests['pickup_y'], requests['delivery_y']])
+        self.request_to_carrier_assignment = requests['carrier_index']
+        self.revenue = np.concatenate(
+            [np.zeros(self.num_carriers), np.zeros_like(requests['revenue']), requests['revenue']])
+        self.load = np.concatenate(
+            [np.zeros(self.num_carriers), requests['load'], -requests['load']])
+        self.service_time = tuple(
+            [*pd.Series([pd.Timedelta(0)]*self.num_carriers), *requests['service_time'], *requests['service_time']])
+
+        # compute the distance matrix
+        request_coordinates = pd.concat([
+            requests[['pickup_x', 'pickup_y']].rename(columns={'pickup_x': 'x', 'pickup_y': 'y'}),
+            requests[['delivery_x', 'delivery_y']].rename(columns={'delivery_x': 'x', 'delivery_y': 'y'})],
+            keys=['pickup', 'delivery']
+        ).swaplevel()
+        self._distance_matrix = squareform(pdist(np.concatenate([carrier_depots, request_coordinates]), 'euclidean'))
+        self.df = requests  # store the data as pd.DataFrame as well
+        logger.debug(f'{id_}: created')
 
     def __str__(self):
-        return f'Instance {self.id_} with {len(self.requests)} customers and {len(self.carriers)} carriers'
+        return f'Instance {self.id_} with {len(self.requests)} customers and {len(self.carrier_depots)} carriers'
 
     @property
-    def distance_matrix(self):
-        return self._distance_matrix
-
-    @distance_matrix.setter
-    def distance_matrix(self, dist_matrix):
-        self._distance_matrix = dist_matrix
-
-    @property  # TODO: not compatible with other types such as gansterer hartl instances, need some other id
-    def solomon_base(self):
-        """The Solomon Instance's name on which self is based on"""
-        return self.id_.split('_')[0]
+    def id_(self):
+        return self._id_
 
     @property
     def num_carriers(self):
         """The number of carriers in the Instance"""
-        return len(self.carriers)
-
-    @property
-    def num_vehicles(self):
-        """The TOTAL  number of vehicles in the instance"""
-        return sum([c.num_vehicles for c in self.carriers])
+        return len(self.carrier_depots)
 
     @property
     def num_requests(self):
         """The number of requests"""
         return len(self.requests)
-        pass
 
-    @property
-    def sum_travel_distance(self):
-        """The total routing distance over all carriers over all vehicles"""
-        total_distance = 0
-        for c in self.carriers:
-            for v in c.vehicles:
-                total_distance += v.tour.sum_travel_distance
-        return total_distance
+    def distance(self, i, j):
+        return self._distance_matrix[i, j]
 
+    def pickup(self, request: int):
+        """returns the pickup vertex index for the given request"""
+        return self.num_carriers + request
+
+    def delivery(self, request: int):
+        """returns the delivery vertex index for the given request"""
+        return self.num_carriers + self.num_requests + request
+
+    def pickup_delivery_pair(self, request: int):
+        """returns a tuple of pickup & delivery vertex indices for the given request"""
+        return self.pickup(request), self.delivery(request)
+
+    # @property
+    # def sum_travel_distance(self):
+    #     """The total routing distance over all carriers over all vehicles"""
+    #     total_distance = 0
+    #     for c in self.carriers:
+    #         for v in c.vehicles:
+    #             total_distance += v.tour.sum_travel_distance
+    #     return total_distance
+
+    '''
     @property
     def sum_travel_duration(self):
         """The total routing duration over all carriers over all vehicles"""
@@ -299,6 +314,7 @@ class Instance(Optimizable):
             c.assign_requests([r])
         # LOGGER.debug(f'{self.id_}: assigned all requests randomly')
         pass
+    '''
 
     def to_centralized(self, depot_xy: tuple):
         """
@@ -313,35 +329,9 @@ class Instance(Optimizable):
         for c in self.carriers:
             central_vehicles.extend(c.vehicles)
         central_carrier = cr.Carrier('c0', central_depot, central_vehicles)
-        centralized = Instance(self.id_, self.requests, [central_carrier])
+        centralized = PDPInstance(self.id_, self.requests, [central_carrier])
         centralized.carriers[0].assign_requests(centralized.requests)
         return centralized
-
-    def plot(self, annotate: bool = True, alpha: float = 1):
-        """
-        Create a matplotlib plot of the instance, showing the carriers's depots and requests
-
-        :param annotate: whether depots are annotated with their id
-        :param alpha:
-        :return:
-        """
-        for c in self.carriers:
-            plt.plot(*c.depot.coords, marker='s', alpha=alpha, linestyle='', c='black')  # depots
-            r_x_coords = [r.coords.x for r in c.requests]
-            r_y_coords = [r.coords.y for r in c.requests]
-            plt.plot(r_x_coords, r_y_coords, marker='o', alpha=alpha, label=c.id_, ls='')  # requests
-
-        if annotate:
-            texts = [plt.text(*c.depot.coords, s=c.depot.id_) for c in self.carriers]
-            adjust_text(texts)
-
-        plt.gca().legend()
-        plt.grid()
-        plt.xlim(0, 100)
-        plt.ylim(0, 100)
-        plt.title(f'Instance {self.id_}')
-
-        return
 
     def write_instance_to_json(self):
         """
@@ -356,28 +346,12 @@ class Instance(Optimizable):
         file_name = ut.unique_path(file_name.parent, file_name.stem + '_#{:03d}' + '.json')
         file_name.parent.mkdir(parents=True, exist_ok=True)
         with open(file_name, mode='w') as write_file:
-            json.dump(self.to_dict(), write_file, indent=4, cls=ut.DateTimeEncoder)
+            json.dump(self.to_dict(), write_file, indent=4, cls=ut.MyJSONEncoder)
         # LOGGER.debug(f'{self.id_}: wrote instance to json at {file_name}')
         return file_name
 
-    def write_solution_and_summary_to_json(self):
-        """
-        Write the instance's solution to a json file
-        :return: the file path as a pathlib.Path object
-        """
-        # assert self.solved
-        file_path = f'{self.id_}_{self.solution_algorithm.__class__.__name__}_solution'
-        file_path = ut.path_output_custom.joinpath(self.solomon_base, file_path)
-        file_path = file_path.with_suffix('.json')
-        file_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(file_path, mode='w') as f:
-            json.dump({'summary': self.solution_summary, 'solution': self.solution, }, f, indent=4, cls=ut.DateTimeEncoder)
-        # LOGGER.debug(f'{self.id_}: wrote solution to {file_path}')
-        return file_path
-
-
-def read_solomon(name: str, num_carriers: int) -> Instance:
+def read_solomon(name: str, num_carriers: int) -> PDPInstance:
     """
     Read in a specified Solomon instance and add a specified number of carriers to it.
 
@@ -417,42 +391,57 @@ def read_solomon(name: str, num_carriers: int) -> Instance:
     for i in range(num_carriers):
         c = cr.Carrier(f'c{i}', depots[i], next(vehicles), dist_matrix=distance_matrix)
         carriers.append(c)
-    inst = Instance(name, requests, carriers)
+    inst = PDPInstance(name, requests, carriers)
     if ut.opts['verbose'] > 0:
         print(f'Successfully read Solomon {name} with {num_carriers} carriers.')
         print(inst)
     return inst
 
 
-def read_gansterer_hartl_mv(path: Path) -> Instance:
-    # requests
+def read_gansterer_hartl_mv(path: Path) -> PDPInstance:
+    """read an instance file as used in (Gansterer,M., & Hartl,R.F. (2016). Request evaluation strategies
+    for carriers in auction-based collaborations. https://doi.org/10.1007/s00291-015-0411-1).
+    multiplies the max vehicle load by 10!
+    """
+    vrp_params = pd.read_csv(path, skiprows=1, nrows=3, delim_whitespace=True, header=None, squeeze=True, index_col=0)
+    depots = pd.read_csv(path, skiprows=7, nrows=3, delim_whitespace=True, header=None, index_col=False,
+                         usecols=[1, 2], names=['x', 'y'])
     cols = ['carrier_index', 'pickup_x', 'pickup_y', 'delivery_x', 'delivery_y', 'revenue', 'load']
     requests = pd.read_csv(path, skiprows=13, delim_whitespace=True, names=cols, index_col=False,
                            float_precision='round_trip')
-    requests = [rq.PickupAndDeliveryRequest(
-        id_=f'r{int(index)}',
-        pickup_x=row.pickup_x, pickup_y=row.pickup_y, delivery_x=row.delivery_x, delivery_y=row.delivery_y,
-        delivery_tw_open=ut.START_TIME, delivery_tw_close=ut.END_TIME,
-        carrier_assignment=f'c{int(row.carrier_index)}', revenue=row.revenue, load=row.load
-    ) for index, row in requests.iterrows()]
-    request_vertices = [*[r.pickup_vertex for r in requests], *[r.delivery_vertex for r in requests]]
-    # depots
-    depots = pd.read_csv(path, skiprows=7, nrows=3, delim_whitespace=True, header=None, index_col=False,
-                         usecols=[1, 2], names=['x', 'y'])
-    depots = [vx.DepotVertex(f'd{index}', row.x, row.y, f'c{index}') for index, row in depots.iterrows()]
-    # global distance matrix
-    distance_matrix = ut.make_travel_dist_matrix([*depots, *request_vertices])
-    # carriers + vehicles
-    vehicles = pd.read_csv(path, skiprows=1, nrows=3, delim_whitespace=True, header=None, squeeze=True, index_col=0)
-    carriers = []
-    for i, depot in enumerate(depots):
-        c_vehicles = [vh.Vehicle(f'v{str(j + vehicles.V * i)}', vehicles.L, vehicles.T) for j in range(vehicles.V)]
-        c_requests = [r for r in requests if r.carrier_assignment == f'c{i}']
-        carriers.append(cr.Carrier(f'c{i}', depot, c_vehicles, c_requests, distance_matrix))
-    return Instance(path.stem, requests, carriers, distance_matrix)
+    requests['service_time'] = dt.timedelta(0)
+    return PDPInstance(path.stem, requests, depots, vrp_params['V'], vrp_params['L']*10, vrp_params['T'])
 
 
-def make_custom_from_solomon(solomon: Instance, custom_name: str, num_carriers: int, num_vehicles_per_carrier: int,
+# def read_gansterer_hartl_mv(path: Path) -> Instance:
+#     # requests
+#     cols = ['carrier_index', 'pickup_x', 'pickup_y', 'delivery_x', 'delivery_y', 'revenue', 'load']
+#     requests = pd.read_csv(path, skiprows=13, delim_whitespace=True, names=cols, index_col=False,
+#                            float_precision='round_trip')
+#     requests = [rq.PickupAndDeliveryRequest(
+#         id_=f'r{int(index)}',
+#         pickup_x=row.pickup_x, pickup_y=row.pickup_y, delivery_x=row.delivery_x, delivery_y=row.delivery_y,
+#         delivery_tw_open=ut.START_TIME, delivery_tw_close=ut.END_TIME,
+#         carrier_assignment=f'c{int(row.carrier_index)}', revenue=row.revenue, load=row.load
+#     ) for index, row in requests.iterrows()]
+#     request_vertices = [*[r.pickup_vertex for r in requests], *[r.delivery_vertex for r in requests]]
+#     # depots
+#     depots = pd.read_csv(path, skiprows=7, nrows=3, delim_whitespace=True, header=None, index_col=False,
+#                          usecols=[1, 2], names=['x', 'y'])
+#     depots = [vx.DepotVertex(f'd{index}', row.x, row.y, f'c{index}') for index, row in depots.iterrows()]
+#     # global distance matrix
+#     distance_matrix = ut.make_travel_dist_matrix([*depots, *request_vertices])
+#     # carriers + vehicles
+#     vehicles = pd.read_csv(path, skiprows=1, nrows=3, delim_whitespace=True, header=None, squeeze=True, index_col=0)
+#     carriers = []
+#     for i, depot in enumerate(depots):
+#         c_vehicles = [vh.Vehicle(f'v{str(j + vehicles.V * i)}', vehicles.L, vehicles.T) for j in range(vehicles.V)]
+#         c_requests = [r for r in requests if r.carrier_assignment == f'c{i}']
+#         carriers.append(cr.Carrier(f'c{i}', depot, c_vehicles, c_requests, distance_matrix))
+#     return Instance(path.stem, requests, carriers, distance_matrix)
+
+
+def make_custom_from_solomon(solomon: PDPInstance, custom_name: str, num_carriers: int, num_vehicles_per_carrier: int,
                              vehicle_capacity: int, verbose: int = ut.opts['verbose']):
     """
     Create a customized instance for the collaborative transportation network from a Solomon instance with the given
@@ -479,7 +468,7 @@ def make_custom_from_solomon(solomon: Instance, custom_name: str, num_carriers: 
                              vehicles=vehicles,
                              dist_matrix=solomon.distance_matrix)
         carriers.append(carrier)
-    inst = Instance(custom_name, solomon.requests, carriers, solomon.distance_matrix)
+    inst = PDPInstance(custom_name, solomon.requests, carriers, solomon.distance_matrix)
     if verbose > 0:
         print(f'Created custom instance {inst}')
     return inst
@@ -576,7 +565,7 @@ def read_custom_json_instance(path: Path):
         request = vx.Vertex(**request_dict)
         requests.append(request)
 
-    inst = Instance(path.stem, requests, carriers, dist_matrix)
+    inst = PDPInstance(path.stem, requests, carriers, dist_matrix)
     return inst
 
 
@@ -632,6 +621,6 @@ if __name__ == '__main__':
     pass
     """
     p = Path("C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home Deliveries/01_Code/"
-             "data/Input/Gansterer_Hartl/1carrier/MV_instances/run=0+dist=200+rad=150+n=10.dat")
+             "data/Input/Gansterer_Hartl/3carriers/MV_instances/run=0+dist=200+rad=150+n=10.dat")
     inst = read_gansterer_hartl_mv(p)
     pass
