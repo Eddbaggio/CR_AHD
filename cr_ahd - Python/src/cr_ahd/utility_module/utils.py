@@ -284,4 +284,10 @@ TW_LENGTH = dt.timedelta(hours=2)
 ALL_TW = [TimeWindow(e, e + TW_LENGTH) for e in datetime_range(START_TIME, END_TIME, freq=TW_LENGTH)]
 SPEED_KMH = 60
 DYNAMIC_CYCLE_TIME = 2  # does not actually represent time but the number of requests being assigned each cycle
-NUM_REQUESTS_TO_SUBMIT = 0.5  # has to be either relative [0, 1] or absolute
+NUM_REQUESTS_TO_SUBMIT = 0.5  # either relative (between 0 and 1) or an absolute number lower than DYNAMIC_CYCLE_TIME
+
+
+def midpoint(instance, pickup_vertex, delivery_vertex):
+    pickup_x, pickup_y = instance.x_coords[pickup_vertex], instance.y_coords[delivery_vertex]
+    delivery_x, delivery_y = instance.x_coords[pickup_vertex], instance.y_coords[delivery_vertex]
+    return (pickup_x + delivery_x) / 2, (pickup_y + delivery_y) / 2

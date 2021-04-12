@@ -2,7 +2,7 @@ import json
 import logging.config
 import multiprocessing
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 import datetime as dt
 import matplotlib.pyplot as plt
 import numpy as np
@@ -44,7 +44,7 @@ class PDPInstance:
         self.load = np.concatenate(
             [np.zeros(self.num_carriers), requests['load'], -requests['load']])
         self.service_time = tuple(
-            [*pd.Series([pd.Timedelta(0)]*self.num_carriers), *requests['service_time'], *requests['service_time']])
+            [*pd.Series([pd.Timedelta(0)] * self.num_carriers), *requests['service_time'], *requests['service_time']])
 
         # compute the distance matrix
         request_coordinates = pd.concat([
@@ -53,7 +53,7 @@ class PDPInstance:
             keys=['pickup', 'delivery']
         ).swaplevel()
         self._distance_matrix = squareform(pdist(np.concatenate([carrier_depots, request_coordinates]), 'euclidean'))
-        self.df = requests  # store the data as pd.DataFrame as well
+        # self.df = requests  # store the data as pd.DataFrame as well?
         logger.debug(f'{id_}: created')
 
     def __str__(self):
@@ -73,20 +73,23 @@ class PDPInstance:
         """The number of requests"""
         return len(self.requests)
 
-    def distance(self, i, j):
-        return self._distance_matrix[i, j]
+    def distance(self, i: List[int], j: List[int]):
+        d = 0
+        for ii in i:
+            for jj in j:
+                d += self._distance_matrix[ii, jj]
+        return d
 
-    def pickup(self, request: int):
-        """returns the pickup vertex index for the given request"""
-        return self.num_carriers + request
-
-    def delivery(self, request: int):
-        """returns the delivery vertex index for the given request"""
-        return self.num_carriers + self.num_requests + request
-
-    def pickup_delivery_pair(self, request: int):
+    def pickup_delivery_pair(self, request: int) -> Tuple[int, int]:
         """returns a tuple of pickup & delivery vertex indices for the given request"""
-        return self.pickup(request), self.delivery(request)
+        return self.num_carriers + request, self.num_carriers + self.num_requests + request
+
+    def request_from_vertex(self, vertex: int):
+        assert vertex >= self.num_carriers, f'vertex {vertex} does not belong to a request but is a depot vertex'
+        if vertex <= self.num_carriers + self.num_requests - 1:  # pickup vertex
+            return vertex - self.num_carriers
+        else:  # delivery vertex
+            return vertex - self.num_carriers - self.num_requests
 
     # @property
     # def sum_travel_distance(self):
@@ -410,7 +413,7 @@ def read_gansterer_hartl_mv(path: Path) -> PDPInstance:
     requests = pd.read_csv(path, skiprows=13, delim_whitespace=True, names=cols, index_col=False,
                            float_precision='round_trip')
     requests['service_time'] = dt.timedelta(0)
-    return PDPInstance(path.stem, requests, depots, vrp_params['V'], vrp_params['L']*10, vrp_params['T'])
+    return PDPInstance(path.stem, requests, depots, vrp_params['V'], vrp_params['L'] * 10, vrp_params['T'])
 
 
 # def read_gansterer_hartl_mv(path: Path) -> Instance:

@@ -149,7 +149,7 @@ class DynamicSolver(Solver):
         Does not work on a vertex level but on a request level!
         """
         logger.debug(f'Assigning {n} requests to each carrier')
-        # TODO assumes equal num_requests for all carriers! Does not work otherwise!
+        # assumes equal num_requests for all carriers! Does not work otherwise!
         assert len(solution.unassigned_requests) % instance.num_carriers == 0
         k: int = len(solution.unassigned_requests) // instance.num_carriers
         requests = []
@@ -225,7 +225,7 @@ class DynamicI1InsertionWithAuctionA(DynamicSolver):
                 self.initialize_another_tour(carrier)
 
     def run_auction(self, instance):
-        au.Auction_a().execute(instance)
+        au.AuctionA().execute(instance)
 
     def initialize_another_tour(self, carrier):
         ini.EarliestDueDate().initialize_carrier(carrier)
@@ -250,7 +250,7 @@ class DynamicI1InsertionWithAuctionB(DynamicSolver):
                 self.initialize_another_tour(carrier)
 
     def run_auction(self, instance):
-        au.Auction_b().execute(instance)
+        au.AuctionB().execute(instance)
 
     def initialize_another_tour(self, carrier):
         ini.EarliestDueDate().initialize_carrier(carrier)
@@ -275,7 +275,7 @@ class DynamicI1InsertionWithAuctionC(DynamicSolver):
                 self.initialize_another_tour(carrier)
 
     def run_auction(self, instance):
-        au.Auction_c().execute(instance)
+        au.AuctionC().execute(instance)
 
     def initialize_another_tour(self, carrier):
         ini.EarliestDueDate().initialize_carrier(carrier)
@@ -294,42 +294,45 @@ class DynamicCollaborativeAHD(Solver):
 
     @final
     def _solve(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
-        while instance.unrouted_requests:
-            self.assign_n_requests(instance, ut.DYNAMIC_CYCLE_TIME)
-            self._solve_cycle(instance)
-        self.finalize_with_local_search(instance)
+        while solution.unassigned_requests:
+            self.assign_n_requests(instance, solution, ut.DYNAMIC_CYCLE_TIME)
+            self._solve_cycle(instance, solution)
+        self.finalize_with_local_search(instance, solution)
 
     @final
-    def assign_n_requests(self, instance, n):
-        """from the unrouted requests present in the instance, assign n requests to their corresponding carrier as
-        defined by the Vertex.carrier_assignment attribute"""
-        logger.debug(f'Assigning {n} requests to carriers')
-        for request in instance.unassigned_requests()[:n]:
-            request._tw = ut.TIME_HORIZON  # reset the time window that is defined by the solomon instance
-            carrier = ut.get_carrier_by_id(instance.carriers, request.carrier_assignment)
-            carrier.assign_requests([request])
-            twm.TWManagement1().execute(carrier, request)
-
-    @final
-    def finalize_with_local_search(self, instance):
-        imp.TwoOpt().improve_instance(instance)
+    def assign_n_requests(self, instance: it.PDPInstance, solution: slt.GlobalSolution, n):
+        """Assigns n REQUESTS to their corresponding carrier, following the data stored in the instance.
+        Assumes that each carrier has the same num_request!
+        Does not work on a vertex level but on a request level!
+        """
+        logger.debug(f'Assigning {n} requests to each carrier')
+        # assumes equal num_requests for all carriers! Does not work otherwise!
+        assert len(solution.unassigned_requests) % instance.num_carriers == 0
+        k: int = len(solution.unassigned_requests) // instance.num_carriers
+        requests = []
+        for c in range(instance.num_carriers):
+            for i in range(n):
+                requests.append(solution.unassigned_requests[c * k + i])
+        carriers = [instance.request_to_carrier_assignment[i] for i in requests]
+        # TODO insert TW Management here!
+        solution.assign_requests_to_carriers(requests, carriers)
         pass
 
-    def _solve_cycle(self, instance):
-        if instance.num_carriers > 1:
-            self.run_auction(instance)
-        carrier = True
-        while carrier:
-            carrier = self.build_routes(instance)
-            if carrier:
-                self.initialize_another_tour(carrier)
+    @final
+    def finalize_with_local_search(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        imp.PDPExchange().improve_instance(instance, solution)
+        pass
 
-    def run_auction(self, instance):
-        au.Auction_c().execute(instance)
+    def _solve_cycle(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        if instance.num_carriers > 1:  # not for centralized instances
+            self.run_auction(instance, solution)
+        # build tours with the re-allocated requests
+        self.build_tours(instance, solution)
 
-    def initialize_another_tour(self, carrier):
-        ini.EarliestDueDate().initialize_carrier(carrier)
+    def run_auction(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        au.AuctionC().execute(instance, solution)
+        pass
 
-    def build_routes(self, instance):
-        carrier = cns.I1Insertion().solve(instance)
-        return carrier
+    def build_tours(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        cns.CheapestInsertion().solve(instance, solution)
+        pass

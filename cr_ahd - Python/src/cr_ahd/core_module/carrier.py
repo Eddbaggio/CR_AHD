@@ -4,41 +4,26 @@ import matplotlib.pyplot as plt
 import logging
 
 from src.cr_ahd.core_module import vehicle as vh, vertex as vx, request as rq
-from src.cr_ahd.core_module.optimizable import Optimizable
 from src.cr_ahd.core_module.tour import Tour
 
 logger = logging.getLogger(__name__)
 
 
-class Carrier(Optimizable):
-    def __init__(self,
-                 id_: str,
-                 depot: vx.DepotVertex,
-                 vehicles: List[vh.Vehicle],
-                 requests: List[rq.Request] = None,
-                 dist_matrix=None):
+class Carrier():
+    def __init__(self, id_: str, requests: List[rq.Request]):
         """
         Class that represents carriers in the auction-based collaborative transportation network
 
         :param id_: unique identifier (usually c0, c1, c2, ...)
-        :param depot: Vertex that is the depot of the carrier
-        :param vehicles: List of vehicles (of class vh.Vehicle) that belong to this carrier
         :param requests: List of requests that belong to this carrier (not yet assigned)
         """
 
         self.id_ = id_
-        self.depot = depot
-        self.vehicles = vehicles
-        self.num_vehicles = len(self.vehicles)
 
-        self._requests = []
-        self._unrouted = []
-        if requests is None:
-            requests = []
+        self._requests = requests[:]
+        self._unrouted = requests[:]
         self.assign_requests(requests)
-        self._distance_matrix = dist_matrix
-        for v in vehicles:
-            v.tour = Tour(id_=v.id_, depot=depot, distance_matrix=dist_matrix)
+
 
     def __str__(self):
         return f'Carrier (ID:{self.id_}, Depot:{self.depot.id_}, Vehicles:{len(self.vehicles)}, Requests:{len(self.requests)}, Unrouted:{len(self.unrouted_requests)})'

@@ -1,37 +1,25 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Dict, List, Iterable
+from typing import Iterable
 
 import numpy as np
 from sklearn.cluster import KMeans
 
-from src.cr_ahd.core_module.carrier import Carrier
-from src.cr_ahd.core_module.vehicle import Vehicle
-from src.cr_ahd.core_module.vertex import midpoint, Vertex
-from src.cr_ahd.routing_module.tour_construction import I1Insertion
-from src.cr_ahd.routing_module.tour_initialization import EarliestDueDate
-from src.cr_ahd.utility_module.utils import Coordinates, flatten_dict_of_lists, euclidean_distance, \
-    InsertionError, random_max_k_partition
+from src.cr_ahd.core_module import instance as it, solution as slt
+from src.cr_ahd.utility_module import utils as ut
 
 logger = logging.getLogger(__name__)
 
 
 class BundleSetGenerationBehavior(ABC):
-    def __init__(self, distance_matrix):
-        self.distance_matrix = distance_matrix
-
-    def execute(self, submitted_requests: Dict[Carrier, List[Vertex]]):
-        """
-
-        :param submitted_requests:
-        :return: Dict[int, List[Vertex]]
-        """
-        bundle_set = self._generate_bundle_set(submitted_requests)
-        # solution.bundle_generation = self.__class__.__name__
+    def execute(self, instance: it.PDPInstance, solution: slt.GlobalSolution, submitted_requests: Iterable):
+        bundle_set = self._generate_bundle_set(instance, solution, submitted_requests)
+        solution.bundle_generation = self.__class__.__name__
         return bundle_set
 
     @abstractmethod
-    def _generate_bundle_set(self, submitted_requests: Dict[Carrier, List[Vertex]]) -> Dict[int, Iterable[Vertex]]:
+    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution,
+                             submitted_requests: Iterable):
         pass
 
 
@@ -52,37 +40,37 @@ class AllBundles(BundleGenerationBehavior):
 
 class RandomPartition(BundleSetGenerationBehavior):
     """
-    creates a random partition of the submitted bundles with AT MOST number_of_carriers subsets
+    creates a random partition of the submitted bundles with AT MOST as many subsets as there are carriers
     """
 
-    def _generate_bundle_set(self, submitted_requests: Dict[Carrier, List[Vertex]]) -> Dict[int, Iterable[Vertex]]:
-        pool = flatten_dict_of_lists(submitted_requests)
-        num_carriers = len(submitted_requests)
-        bundle_set = random_max_k_partition(pool, max_k=num_carriers)
-        return bundle_set
+    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution,
+                             submitted_requests: Iterable):
+        bundles = ut.random_max_k_partition(submitted_requests, max_k=instance.num_carriers)
+        return bundles
 
 
 class KMeansBundles(BundleSetGenerationBehavior):
     """
-    creates a k-means partitions of the submitted requests with len(submitted_requests) locally clustered subsets
+    creates a k-means partitions of the submitted requests. generates exactly as many clusters as there are carriers.
+
+    :return a List of lists, where each sublist contains the cluster members of a cluster
     """
 
-    def _generate_bundle_set(self, submitted_requests: Dict[Carrier, List[Vertex]]) -> Dict[int, Iterable[Vertex]]:
-        flattened = flatten_dict_of_lists(submitted_requests)
-        X = [x.coords for x in flattened]
-        k = len(submitted_requests)
-        k_means = KMeans(n_clusters=k, random_state=0).fit(X)
-        bundle_set = {i: tuple(flattened[j] for j in range(len(flattened)) if i == k_means.labels_[j]) for i in
-                      range(k)}
-        return bundle_set
+    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution,
+                             submitted_requests: Iterable):
+        request_midpoints = [ut.midpoint(instance, *instance.pickup_delivery_pair(sr)) for sr in submitted_requests]
+        k_means = KMeans(n_clusters=instance.num_carriers, random_state=0).fit(request_midpoints)
+        bundles = [np.take(submitted_requests, np.nonzero(k_means.labels_ == b)[0]) for b in range(k_means.n_clusters)]
+        return bundles
 
 
+'''
 class GanstererProxyBundles(BundleSetGenerationBehavior):
-    def _generate_bundle_set(self, submitted_requests: Dict[Carrier, List[Vertex]]) -> Dict[int, Iterable[Vertex]]:
+    def _generate_bundle_set(self, submitted_requests):
 
         pass
 
-    def bundle_centroid(self, bundle, depot) -> Coordinates:
+    def bundle_centroid(self, bundle, depot):
         """centroid of the request’s centers, where the center of request is the midpoint between pickup and delivery
          location. centers are weighted with the length of their request, which is the direct travel distance between
           pickup and delivery of request"""
@@ -143,3 +131,4 @@ class GanstererProxyBundles(BundleSetGenerationBehavior):
         tour_length = carrier.sum_travel_duration()
         carrier.retract_requests_and_update_routes(carrier.requests)
         return tour_length
+'''

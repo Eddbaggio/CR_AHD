@@ -1,33 +1,44 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Tuple
+from copy import deepcopy
+from typing import List
 
-from src.cr_ahd.core_module.vertex import Vertex
-from src.cr_ahd.routing_module.tour_construction import I1Insertion
+from src.cr_ahd.routing_module import tour_construction as cns
 from src.cr_ahd.routing_module.tour_initialization import EarliestDueDate
 from src.cr_ahd.utility_module.utils import InsertionError
+from src.cr_ahd.core_module import instance as it, solution as slt
 
 
 class BiddingBehavior(ABC):
-    def execute(self, bundle_set: Dict[int, Tuple[Vertex]], carriers):
+    def execute(self, instance: it.PDPInstance, solution: slt.GlobalSolution, bundles) -> List[List[float]]:
         """
+        returns a nested list of bids. the first axis is the bundles, the second axis (inner lists) contain the carrier
+        bids on that bundle:
 
-        :param bundle_set: dictionary of bundles where the key is simply a bundle index
-        :param carriers:
-        :return: dict of bids per bundle per carrier: {bundleA: {carrier1: bid, carrier2: bid}, bundleB: {carrier1: bid,
-        carrier2: bid} Dict[Tuple[Vertex], Dict[Carrier, float]]
         """
-        bundle_bids = dict()
-        for _, bundle in bundle_set.items():
-            carrier_bundle_bids = dict()
-            for carrier in carriers:
-                carrier_bundle_bids[carrier] = self._generate_bid(bundle, carrier)
-            bundle_bids[bundle] = carrier_bundle_bids
-        # solution.bidding_behavior = self.__class__.__name__
+        bundle_bids = []
+        for b in range(len(bundles)):
+            carrier_bundle_bids = []
+            for c in range(instance.num_carriers):
+                carrier_bundle_bids.append(self._generate_bid(instance, solution, bundles[b], c))
+            bundle_bids.append(carrier_bundle_bids)
+        solution.bidding_behavior = self.__class__.__name__
         return bundle_bids
 
     @abstractmethod
-    def _generate_bid(self, bundle, carrier):
+    def _generate_bid(self, instance: it.PDPInstance, solution: slt.GlobalSolution, bundle: List[int], carrier: int):
         pass
+
+
+class CheapestInsertionDistanceIncrease(BiddingBehavior):
+    def _generate_bid(self, instance: it.PDPInstance, solution: slt.GlobalSolution, bundle: List[int], carrier: int):
+        before = solution.carrier_solutions[carrier].sum_travel_distance()
+        cs_copy = deepcopy(solution.carrier_solutions[carrier])  # create a temporary copy
+        cs_copy.unrouted_requests.extend(bundle)
+        solution.carrier_solutions.append(cs_copy)
+        cns.CheapestInsertion()._solve_carrier(instance, solution, instance.num_carriers)
+        after = cs_copy.sum_travel_distance()
+        solution.carrier_solutions.pop()  # del the temporary copy
+        return after - before
 
 
 class I1TravelDistanceIncrease(BiddingBehavior):

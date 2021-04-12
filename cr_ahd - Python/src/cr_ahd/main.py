@@ -1,7 +1,6 @@
-import logging.config
 import logging
+import logging.config
 import multiprocessing
-from copy import deepcopy
 from pathlib import Path
 from typing import List
 
@@ -9,8 +8,8 @@ import pandas as pd
 from tqdm import tqdm
 
 import src.cr_ahd.solver as slv
-import src.cr_ahd.utility_module.utils as ut
 import src.cr_ahd.utility_module.cr_ahd_logging as log
+from src.cr_ahd.utility_module import utils as ut, plotting as pl
 from src.cr_ahd.core_module import instance as it, solution as slt
 
 # TODO write pseudo codes for ALL the stuff that's happening
@@ -40,16 +39,16 @@ def execute_all(instance: it.PDPInstance):
     solution_summaries = []
 
     for solver in [
-        # sl.StaticSequentialInsertion,
-        # sl.StaticI1Insertion,
-        # sl.StaticI1InsertionWithAuction,
-        # sl.DynamicSequentialInsertion,
+        # slv.StaticSequentialInsertion,
+        # slv.StaticI1Insertion,
+        # slv.StaticI1InsertionWithAuction,
+        # slv.DynamicSequentialInsertion,
         # slv.DynamicI1Insertion,
-        slv.DynamicCheapestInsertion,
-        # sl.DynamicI1InsertionWithAuctionA,
-        # sl.DynamicI1InsertionWithAuctionB,
+        # slv.DynamicCheapestInsertion,
+        # slv.DynamicI1InsertionWithAuctionA,
+        # slv.DynamicI1InsertionWithAuctionB,
         # slv.DynamicI1InsertionWithAuctionC,
-        # slv.DynamicCollaborativeAHD,
+        slv.DynamicCollaborativeAHD,
     ]:
         solution = slt.GlobalSolution(instance)
         if instance.num_carriers == 1 and 'Auction' in solver.__name__:
@@ -58,13 +57,14 @@ def execute_all(instance: it.PDPInstance):
         solver().execute(instance, solution)
         solution.write_to_json()
         solution_summaries.append(solution.summary())
+        pl.plot_solution_2(instance, solution, show=True)
     return solution_summaries
 
 
 def read_and_execute_all(path: Path):
     """reads CUSTOM instance from a given path before executing all available visitors"""
     log.remove_all_file_handlers(logging.getLogger())
-    log_file_path = ut.path_output_gansterer.joinpath(f'{path.stem}_log.log' )
+    log_file_path = ut.path_output_gansterer.joinpath(f'{path.stem}_log.log')
     log.add_file_handler(logging.getLogger(), str(log_file_path))
     if 'gansterer' in str(path).lower():
         instance = it.read_gansterer_hartl_mv(path)
@@ -87,7 +87,8 @@ def read_and_execute_all_parallel(n: int, which: List):
         solution_summaries_collection = list(
             tqdm(pool.imap(read_and_execute_all, custom_files_paths), total=len(custom_files_paths)))
     flat_solution_summaries_collection = [r for results in solution_summaries_collection for r in results]
-    grouped = write_solution_summaries_df(flat_solution_summaries_collection)  # rename function; not clear what are the results?
+    grouped = write_solution_summaries_df(
+        flat_solution_summaries_collection)  # rename function; not clear what are the results?
     return grouped
 
 
@@ -130,11 +131,12 @@ def get_custom_instance_paths(n, which: List):
 
 if __name__ == '__main__':
     logger.info('START')
-    solomon_list = ['C101', 'C201']  #, 'R101', 'R201', 'RC101', 'RC201']
+    solomon_list = ['C101', 'C201']  # , 'R101', 'R201', 'RC101', 'RC201']
     # solomon_list = ut.Solomon_Instances
     # read_and_execute_all(Path("../../../data/Input/Custom/C101/C101_3_15_ass_#002.json"))  # single collaborative
     # read_and_execute_all(Path("../../../data/Input/Custom/C201/C201_1_45_ass_#001.json"))  # single centralized
-    read_and_execute_all(Path("../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/run=0+dist=200+rad=150+n=10.dat"))  # single collaborative
+    read_and_execute_all(Path(
+        "../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/run=0+dist=200+rad=150+n=10.dat"))  # single collaborative
     # grouped_evaluations = read_and_execute_all_parallel(n=2, which=solomon_list)  # multiple
 
     # plotly_bar_plot(solomon_list, attributes=['num_act_veh', 'travel_distance'])  #, 'duration'

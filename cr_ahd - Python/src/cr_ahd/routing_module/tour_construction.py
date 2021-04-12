@@ -112,7 +112,7 @@ class CheapestInsertion(TourConstructionBehavior):
             start_over = False
             for r in cs.unrouted_requests:
                 best_delta_for_r = float('inf')
-                for t in range(len(cs.tours)):
+                for t in range(cs.num_tours()):
                     # cheapest way to fit r into t
                     delta, pickup_position, delivery_position = self._solve_tour(instance, solution, carrier, t, r)
                     if delta < best_delta:
@@ -123,9 +123,10 @@ class CheapestInsertion(TourConstructionBehavior):
                         best_tour = t
                     if delta < best_delta_for_r:
                         best_delta_for_r = delta
-                # if no feasible insertion for the current request was found
+                # if no feasible insertion for the current request was found, create a new tour
                 if best_delta_for_r == float('inf'):
-                    rtmp = tr.Tour(len(cs.tours), instance, solution)
+                    assert cs.num_tours() < instance.carriers_max_num_vehicles
+                    rtmp = tr.Tour(len(cs.tours), instance, solution, cs.id_)
                     rtmp.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(r))
                     cs.tours.append(rtmp)
                     cs.unrouted_requests.remove(r)

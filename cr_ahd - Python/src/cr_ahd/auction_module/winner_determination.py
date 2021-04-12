@@ -1,51 +1,51 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Dict, Tuple
+from typing import List, Tuple
 
 import numpy as np
 
-from src.cr_ahd.core_module.carrier import Carrier
-from src.cr_ahd.core_module.vertex import Vertex
+from src.cr_ahd.core_module import instance as it, solution as slt
 
 logger = logging.getLogger(__name__)
 
+
 class WinnerDeterminationBehavior(ABC):
-    def execute(self, bids: Dict[Tuple[Vertex], Dict[Carrier, float]]):
+    def execute(self, instance: it.PDPInstance, solution: slt.GlobalSolution, bundles: List, bids_matrix: List):
         """
-        apply the concrete winner determination behavior. NOTE: this will modify the bids and render them useless!
+        apply the concrete winner determination behavior. Each carrier can only win a single bundle for now
 
-        :param bids: dict of bids per bundle per carrier: {bundleA: {carrier1: bid, carrier2: bid}, bundleB: {
-        carrier1: bid, carrier2: bid}
-        :return: nothing for now
         """
-
-        for bundle, carrier_bids in bids.items():
-            winner, winning_bid = self._determine_winner(carrier_bids)
-            winner.assign_requests(bundle)
-            self._remove_bids_of_carrier(winner, bids)  # updating the dict I'm iterating over
+        if not len(bundles) == instance.num_carriers:
+            raise NotImplementedError('Proper set partitioning for WDP ist not implemented yet')
+        for bundle, bids in zip(bundles, bids_matrix):
+            winner, _ = self._determine_winner(bids)
+            solution.assign_requests_to_carriers(bundle, [winner] * len(bundle))
+            # ensure that the winner can not win another bundle by 'deleting' his bids (setting them to +- inf)
+            self._remove_bids_of_carrier(winner, bids_matrix)
         return
 
     @abstractmethod
-    def _determine_winner(self, carrier_bids):
+    def _determine_winner(self, carrier_bids) -> Tuple[int, float]:
         pass
 
+    @abstractmethod
     def _remove_bids_of_carrier(self, carrier, all_bids):
-        """
-
-        :param carrier: the carrier whose bids shall be removed from the given bids
-        :param all_bids: set of ALL bids (dict of dicts) from which to remove the ones submitted by carrier
-        :return:
-        """
-        for bundle, bundle_bids in all_bids.items():
-            bundle_bids[carrier] = np.infty
         pass
 
 
 class LowestBid(WinnerDeterminationBehavior):
+
     def _determine_winner(self, carrier_bids):
         """
 
         :param carrier_bids: dict of {carrierA: bidA, carrierB: bidB, ... }
         :return:
         """
-        return min(carrier_bids.items(), key=lambda x: x[1])
+        winner = np.argmin(carrier_bids)
+        winning_bid = min(carrier_bids)
+        return winner, winning_bid
+
+    def _remove_bids_of_carrier(self, carrier: int, bids_matrix):
+        for bundle_bids in bids_matrix:
+            bundle_bids[carrier] = float('inf')
+        pass

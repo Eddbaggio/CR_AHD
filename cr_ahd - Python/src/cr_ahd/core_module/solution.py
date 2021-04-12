@@ -16,18 +16,22 @@ class GlobalSolution:
         # REQUESTS that are not assigned to any carrier (went with a list rather than a set because when re-assigning
         # requests, i need index-based access to the elements
         self.unassigned_requests = list(instance.requests)
-        # the current REQUEST-to-carrier (not vertex-to-carrier) allocation, initialized with -1 for requests
+        # the current REQUEST-to-carrier (not vertex-to-carrier) allocation, initialized with nan for all requests
         self.request_to_carrier_assignment = np.full(instance.num_requests, np.nan)
+        # TODO unassigned_requests and request_to_carrier_assignment contain redundant data.
+        #  unassigned_requests == np.where(np.isnan(request_to_carrier_assignment))
         # basically no apriori time windows for all VERTICES
         self.tw_open = np.full(instance.num_carriers + 2 * instance.num_requests, ut.START_TIME)
         self.tw_close = np.full(instance.num_carriers + 2 * instance.num_requests, ut.END_TIME)
-        self.carrier_solutions = [PDPSolution(instance, c) for c in range(instance.num_carriers)]
 
-        self.cost = 0
+        self.carrier_solutions = [PDPSolution(c) for c in range(instance.num_carriers)]
+
+        # self.cost = 0
         self.solution_algorithm = None
+        self.auction_mechanism = None
 
     @property
-    def unrouted(self):
+    def unrouted_requests(self):
         return set().union(*[c.unrouted_requests for c in self.carrier_solutions])
 
     def sum_travel_distance(self):
@@ -49,7 +53,7 @@ class GlobalSolution:
         for r, c in zip(requests, carriers):
             self.request_to_carrier_assignment[r] = c
             self.unassigned_requests.remove(r)
-            self.carrier_solutions[c].unrouted_requests.add(r)
+            self.carrier_solutions[c].unrouted_requests.append(r)
 
     def as_dict(self):
         """The solution as a nested python dictionary"""
@@ -79,13 +83,11 @@ class GlobalSolution:
 
 
 class PDPSolution:
-    def __init__(self, instance: it.PDPInstance, carrier_index):
+    def __init__(self, carrier_index):
         self.id_ = carrier_index
-        # self.unrouted = set(r for r in instance.requests if instance.carrier_assignment(r) == carrier_index)
-        self.unrouted_requests = set()
+        self.unrouted_requests: List = list()  # must be a list (instead of a set) because it must be sorted for bidding (could create a local list-copy though, if i really wanted)
         self.tours: List[tr.Tour] = []
 
-        self.cost = 0
         self.solution_algorithm = None
 
     def num_routing_stops(self):
@@ -125,6 +127,25 @@ class PDPSolution:
             'sum_revenue': self.sum_revenue(),
             'tour_summaries': {t.id_: t.summary() for t in self.tours}
         }
+
+    def exchange_vertices(self, instance: it.PDPInstance, solution: GlobalSolution, old_tour: int, new_tour: int,
+                          old_positions: List[int],
+                          new_positions: List[int]):
+        """
+        used for the PDPExchange local search operator. Allows to move vertices from one tour to another. In a PDP
+        context this will always be pickup-delivery pairs being moved from one tour to another.
+
+        :param instance:
+        :param solution:
+        :param old_tour:
+        :param new_tour:
+        :param old_positions:
+        :param new_positions:
+        :return:
+        """
+        vertices = self.tours[old_tour].pop_and_update(instance, solution, old_positions)
+        self.tours[new_tour].insert_and_update(instance, solution, new_positions, vertices)
+
 
 
 def read_solution_and_summary_from_json(path: Path):
