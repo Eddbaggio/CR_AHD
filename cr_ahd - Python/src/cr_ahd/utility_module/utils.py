@@ -76,36 +76,6 @@ def euclidean_distance(a: Coordinates, b: Coordinates):
     return np.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 
 
-def make_travel_dist_matrix(coordinates: pd.DataFrame):
-    """
-    :param coordinates: x, y DataFrame
-    :return: pd.DataFrame distance matrix
-    """
-    index = [i.id_ for i in vertices]
-    dist_matrix: pd.DataFrame = pd.DataFrame(index=index, columns=index, dtype='float64')
-
-    for i in vertices:
-        for j in vertices:
-            dist_matrix.loc[i.id_, j.id_] = euclidean_distance(i.coords, j.coords)
-    assert dist_matrix.index.is_unique, f"Distance matrix must have unique row id's"
-    return dist_matrix
-
-
-# def make_travel_dist_matrix(vertices: List):
-#     """
-#     :param vertices: List of vertices each of class Vertex
-#     :return: pd.DataFrame distance matrix
-#     """
-#     index = [i.id_ for i in vertices]
-#     dist_matrix: pd.DataFrame = pd.DataFrame(index=index, columns=index, dtype='float64')
-#
-#     for i in vertices:
-#         for j in vertices:
-#             dist_matrix.loc[i.id_, j.id_] = euclidean_distance(i.coords, j.coords)
-#     assert dist_matrix.index.is_unique, f"Distance matrix must have unique row id's"
-#     return dist_matrix
-
-
 def make_travel_duration_matrix(vertices: List):
     """
     :param vertices: List of vertices each of class Vertex
@@ -203,6 +173,14 @@ def flatten_dict_of_lists(d: dict):
     for _, v in d.items():
         pool.extend(v)
     return pool
+
+
+def flatten(S):
+    if S == []:
+        return S
+    if isinstance(S[0], list):
+        return flatten(S[0]) + flatten(S[1:])
+    return S[:1] + flatten(S[1:])
 
 
 def random_partition(li):

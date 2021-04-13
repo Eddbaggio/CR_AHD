@@ -9,6 +9,7 @@ from src.cr_ahd.core_module.carrier import Carrier
 from src.cr_ahd.core_module.vehicle import Vehicle
 from src.cr_ahd.core_module import instance as it, solution as slt
 from src.cr_ahd.utility_module import utils as ut
+import itertools
 
 config = dict({'scrollZoom': True})
 
@@ -130,47 +131,114 @@ def plot_carrier(instance: it.PDPInstance, solution: slt.GlobalSolution, carrier
         fig.show(config=config)
 
 
-def _add_tour(fig: go.Figure, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, t: int):
-    tour = solution.carrier_solutions[carrier].tours[t]
+def _make_tour_scatter(instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, tour: int):
+    t = solution.carrier_solutions[carrier].tours[tour]
 
     df = pd.DataFrame({
-        'id_': tour.routing_sequence[:-1],
-        'x': [instance.x_coords[v] for v in tour.routing_sequence[:-1]],
-        'y': [instance.y_coords[v] for v in tour.routing_sequence[:-1]],
-        'tw_open': [solution.tw_open[v] for v in tour.routing_sequence[:-1]],
-        'tw_close': [solution.tw_close[v] for v in tour.routing_sequence[:-1]], })
-    fig.add_scatter(x=df['x'], y=df['y'], mode='markers+text',
-                    marker_symbol=['square', *['circle'] * (tour.num_routing_stops - 2), 'square'],
-                    marker_size=20,
-                    marker_color=ut.univie_colors_60[carrier], marker_line_color=ut.univie_colors_100[carrier],
-                    marker_line_width=2,
-                    text=df['id_'], name=f'Carrier {carrier}, Tour {t}',
-                    # legendgroup=carrier, hoverinfo='x+y'
-                    )
-    for i in range(len(tour.routing_sequence) - 1):
-        arrow_tail = (instance.x_coords[tour.routing_sequence[i]], instance.y_coords[tour.routing_sequence[i]])
-        arrow_head = (instance.x_coords[tour.routing_sequence[i + 1]], instance.y_coords[tour.routing_sequence[i + 1]])
-        fig.add_annotation(x=arrow_head[0], y=arrow_head[1], ax=arrow_tail[0], ay=arrow_tail[1],
-                           xref='x', yref='y', axref='x', ayref='y',
-                           text="",
-                           showarrow=True, arrowhead=2, arrowsize=2, arrowwidth=1,
-                           arrowcolor=ut.univie_colors_100[carrier],
-                           standoff=10, startstandoff=10, name=f'Carrier {carrier}, Tour {tour}')
-    pass
+        'id_': t.routing_sequence[:-1],
+        'x': [instance.x_coords[v] for v in t.routing_sequence[:-1]],
+        'y': [instance.y_coords[v] for v in t.routing_sequence[:-1]],
+        'tw_open': [solution.tw_open[v] for v in t.routing_sequence[:-1]],
+        'tw_close': [solution.tw_close[v] for v in t.routing_sequence[:-1]], })
+    return go.Scatter(x=df['x'], y=df['y'], mode='markers+text',
+                      marker=dict(
+                          symbol=['square', *['circle'] * (t.num_routing_stops - 2), 'square'],
+                          size=20,
+                          line=dict(color=ut.univie_colors_100[carrier], width=2),
+                          color=ut.univie_colors_60[carrier]),
+                      text=df['id_'], name=f'Carrier {carrier}, Tour {tour}',
+                      # legendgroup=carrier, hoverinfo='x+y'
+                      )
 
 
-def _add_carrier_solution(fig, instance, solution: slt.GlobalSolution, carrier: int):
+def _make_tour_edges(instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, tour: int):
+    t = solution.carrier_solutions[carrier].tours[tour]
+    # creating arrows as annotations
+    directed_edges = []
+    for i in range(len(t.routing_sequence) - 1):
+        arrow_tail = (instance.x_coords[t.routing_sequence[i]], instance.y_coords[t.routing_sequence[i]])
+        arrow_head = (
+            instance.x_coords[t.routing_sequence[i + 1]], instance.y_coords[t.routing_sequence[i + 1]])
+        anno = go.layout.Annotation(x=arrow_head[0], y=arrow_head[1], ax=arrow_tail[0], ay=arrow_tail[1],
+                                    xref='x', yref='y', axref='x', ayref='y',
+                                    text="",
+                                    showarrow=True, arrowhead=2, arrowsize=2, arrowwidth=1,
+                                    arrowcolor=ut.univie_colors_100[carrier],
+                                    standoff=10, startstandoff=10, name=f'Carrier {carrier}, Tour {t}')
+        directed_edges.append(anno)
+    return directed_edges
+
+
+def _add_carrier_solution(fig: go.Figure, instance, solution: slt.GlobalSolution, carrier: int):
     carrier_solution = solution.carrier_solutions[carrier]
+    scatter_traces = []
+    edge_traces = []
     for t in range(carrier_solution.num_tours()):
-        _add_tour(fig, instance, solution, carrier, t)
+        scatter = _make_tour_scatter(instance, solution, carrier, t)
+        fig.add_trace(scatter)
+        scatter_traces.append(scatter)
+
+        edges = _make_tour_edges(instance, solution, carrier, t)
+        for edge in edges:
+            fig.add_annotation(edge)
+        edge_traces.append(edges)
+    return scatter_traces, edge_traces
 
 
 def plot_solution_2(instance: it.PDPInstance, solution: slt.GlobalSolution, title='', tours: bool = True,
                     time_windows: bool = True, arrival_times: bool = True, service_times: bool = True,
                     show: bool = False):
     fig = go.Figure()
+    # [[scatter tour 0, scatter tour 1], [scatter tour 0, scatter tour 1, scatter tour 2], ...]
+    scatters = []
+    # [carrier 0:
+    #   tour 0: [[edge_0, edge_1, edge_2, ...],
+    #   tour 1: [edge_0, edge_1, edge_2, ...], ],
+    # carrier 1:
+    #   tour 0: [[edge_0, edge_1, edge_2, ...],
+    #   tour 1: [edge_0, edge_1, edge_2, ...], ]
+    # ]
+    edges = []
+
     for c in range(instance.num_carriers):
-        _add_carrier_solution(fig, instance, solution, c)
+        scatter_traces, edge_traces = _add_carrier_solution(fig, instance, solution, c)
+        scatters.append(scatter_traces)
+        edges.append(edge_traces)
+
+    button_dicts = []
+    for c in range(instance.num_carriers):
+        for t in range(solution.carrier_solutions[c].num_tours()):
+            button_dicts.append(
+                dict(label=f'Carrier {c}, Tour {t}',
+                     method='update',
+                     args=[dict(visible=[True]),
+                           dict(annotations=edges[c][t])
+                           ],
+                     # args2=[dict(visible=[True]),
+                     #        dict(annotations=edges)
+                     #        ],
+                     )
+            )
+    button_dicts.append(
+        dict(label=f'All',
+             method='update',
+             args=[dict(visible=[True]),
+                   dict(annotations=ut.flatten(edges))
+                   ],
+
+             )
+    )
+
+    fig.update_layout(updatemenus=(
+        [
+            dict(type='buttons',
+                 # y=c / instance.num_carriers,
+                 # yanchor='auto',
+                 active=-1,
+                 buttons=button_dicts
+                 )
+        ]))
+
     if show:
         fig.show(config=config)
 

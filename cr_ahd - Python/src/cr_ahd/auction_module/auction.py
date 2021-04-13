@@ -9,7 +9,7 @@ from src.cr_ahd.core_module import instance as it, solution as slt
 class Auction(ABC):
     def execute(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         self._run_auction(instance, solution)
-        solution.auction_mechanism = self
+        solution.auction_mechanism = self.__class__.__name__
         pass
 
     @abstractmethod
@@ -57,6 +57,7 @@ class AuctionC(Auction):
 
     def _run_auction(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         submitted_requests = rs.HighestInsertionCostDistance().execute(instance, solution, ut.NUM_REQUESTS_TO_SUBMIT)
-        bundles = bg.KMeansBundles().execute(instance, solution, submitted_requests)
-        bids = bd.CheapestInsertionDistanceIncrease().execute(instance, solution, bundles)
-        wd.LowestBid().execute(instance, solution, bundles, bids)
+        if submitted_requests:
+            bundles = bg.KMeansBundles().execute(instance, solution, submitted_requests)
+            bids = bd.CheapestInsertionDistanceIncrease().execute(instance, solution, bundles)
+            wd.LowestBid().execute(instance, solution, bundles, bids)

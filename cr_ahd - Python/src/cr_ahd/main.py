@@ -136,7 +136,8 @@ if __name__ == '__main__':
     # read_and_execute_all(Path("../../../data/Input/Custom/C101/C101_3_15_ass_#002.json"))  # single collaborative
     # read_and_execute_all(Path("../../../data/Input/Custom/C201/C201_1_45_ass_#001.json"))  # single centralized
     read_and_execute_all(Path(
-        "../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/run=0+dist=200+rad=150+n=10.dat"))  # single collaborative
+        # "../../../data/Input/Gansterer_Hartl/3carriers/1V_instances/O1/O1_10/run=0+dist=200+rad=150+n=10.dat"))
+        "../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/run=4+dist=200+rad=150+n=10.dat"))  # single collaborative
     # grouped_evaluations = read_and_execute_all_parallel(n=2, which=solomon_list)  # multiple
 
     # plotly_bar_plot(solomon_list, attributes=['num_act_veh', 'travel_distance'])  #, 'duration'

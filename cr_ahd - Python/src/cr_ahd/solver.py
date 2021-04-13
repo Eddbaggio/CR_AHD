@@ -305,6 +305,7 @@ class DynamicCollaborativeAHD(Solver):
         Assumes that each carrier has the same num_request!
         Does not work on a vertex level but on a request level!
         """
+        n = min(n, len(solution.unassigned_requests)//instance.num_carriers)
         logger.debug(f'Assigning {n} requests to each carrier')
         # assumes equal num_requests for all carriers! Does not work otherwise!
         assert len(solution.unassigned_requests) % instance.num_carriers == 0
@@ -312,7 +313,8 @@ class DynamicCollaborativeAHD(Solver):
         requests = []
         for c in range(instance.num_carriers):
             for i in range(n):
-                requests.append(solution.unassigned_requests[c * k + i])
+                index = c * k + i
+                requests.append(solution.unassigned_requests[index])
         carriers = [instance.request_to_carrier_assignment[i] for i in requests]
         # TODO insert TW Management here!
         solution.assign_requests_to_carriers(requests, carriers)

@@ -401,19 +401,32 @@ def read_solomon(name: str, num_carriers: int) -> PDPInstance:
     return inst
 
 
-def read_gansterer_hartl_mv(path: Path) -> PDPInstance:
+def read_gansterer_hartl_mv(path: Path, num_carriers=3) -> PDPInstance:
     """read an instance file as used in (Gansterer,M., & Hartl,R.F. (2016). Request evaluation strategies
     for carriers in auction-based collaborations. https://doi.org/10.1007/s00291-015-0411-1).
     multiplies the max vehicle load by 10!
     """
     vrp_params = pd.read_csv(path, skiprows=1, nrows=3, delim_whitespace=True, header=None, squeeze=True, index_col=0)
-    depots = pd.read_csv(path, skiprows=7, nrows=3, delim_whitespace=True, header=None, index_col=False,
+    depots = pd.read_csv(path, skiprows=7, nrows=num_carriers, delim_whitespace=True, header=None, index_col=False,
                          usecols=[1, 2], names=['x', 'y'])
     cols = ['carrier_index', 'pickup_x', 'pickup_y', 'delivery_x', 'delivery_y', 'revenue', 'load']
-    requests = pd.read_csv(path, skiprows=13, delim_whitespace=True, names=cols, index_col=False,
+    requests = pd.read_csv(path, skiprows=10+num_carriers, delim_whitespace=True, names=cols, index_col=False,
                            float_precision='round_trip')
     requests['service_time'] = dt.timedelta(0)
     return PDPInstance(path.stem, requests, depots, vrp_params['V'], vrp_params['L'] * 10, vrp_params['T'])
+
+
+def read_gansterer_hartl_sv(path: Path) -> PDPInstance:
+    """read an instance file as used in (Gansterer,M., & Hartl,R.F. (2016). Request evaluation strategies
+    for carriers in auction-based collaborations. https://doi.org/10.1007/s00291-015-0411-1).
+    """
+    depots = pd.read_csv(path, skiprows=2, nrows=3, delim_whitespace=True, header=None, index_col=False,
+                         usecols=[1, 2], names=['x', 'y'])
+    cols = ['carrier_index', 'pickup_x', 'pickup_y', 'delivery_x', 'delivery_y', 'revenue', 'load']
+    requests = pd.read_csv(path, skiprows=8, delim_whitespace=True, names=cols, index_col=False,
+                           float_precision='round_trip')
+    requests['service_time'] = dt.timedelta(0)
+    return PDPInstance(path.stem, requests, depots, 1, float('inf'), float('inf'))
 
 
 # def read_gansterer_hartl_mv(path: Path) -> Instance:

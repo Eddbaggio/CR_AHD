@@ -35,9 +35,13 @@ class CheapestInsertionDistanceIncrease(BiddingBehavior):
         cs_copy = deepcopy(solution.carrier_solutions[carrier])  # create a temporary copy
         cs_copy.unrouted_requests.extend(bundle)
         solution.carrier_solutions.append(cs_copy)
-        cns.CheapestInsertion()._solve_carrier(instance, solution, instance.num_carriers)
-        after = cs_copy.sum_travel_distance()
-        solution.carrier_solutions.pop()  # del the temporary copy
+        try:
+            cns.CheapestInsertion()._solve_carrier(instance, solution, instance.num_carriers)
+            after = cs_copy.sum_travel_distance()
+        except AssertionError:
+            after = float('inf')
+        finally:
+            solution.carrier_solutions.pop()  # del the temporary copy
         return after - before
 
 
