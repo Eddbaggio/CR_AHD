@@ -1,8 +1,10 @@
 from abc import ABC, abstractmethod
-import numpy as np
 import datetime as dt
 
-from src.cr_ahd.utility_module.utils import opts
+from scipy.spatial.distance import pdist
+
+from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
+from src.cr_ahd.utility_module import utils as ut
 
 
 class TourInitializationBehavior(ABC):
@@ -11,83 +13,54 @@ class TourInitializationBehavior(ABC):
     or a single specific carrier. Contrary to the routing visitor, this one will only allocate a single seed request
     """
 
-    def __init__(self, verbose=opts['verbose'], plot_level=opts['plot_level']):
-        """
-        :param verbose:
-        :param plot_level:
-        """
+    def execute(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        for carrier in range(instance.num_carriers):
+            self.initialize_carrier(instance, solution, carrier)
+        pass
 
-        self.verbose = verbose
-        self.plot_level = plot_level
-        self._runtime = 0
-        # TODO: adding a timer to measure the performance?
-
-    @abstractmethod
-    def find_seed_request(self, carrier):
+    def initialize_carrier(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
+        cs = solution.carrier_solutions[carrier]
+        best_request = None
+        best_evaluation = -float('inf')
+        for request in cs.unrouted_requests:
+            evaluation = self.request_evaluation(instance, solution, carrier, request)
+            if evaluation > best_evaluation:
+                best_request = request
+                best_evaluation = evaluation
+        tour = tr.Tour(carrier, instance, solution, carrier)
+        tour.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(best_request))
+        cs.tours.append(tour)
         pass
 
     @abstractmethod
-    def initialize_instance(self, instance):
+    def request_evaluation(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, request: int):
         pass
-
-    @abstractmethod
-    def initialize_carrier(self, carrier):
-        pass
-
-    # a method initialize_tour (or initialize_vehicle) is not required as the initialization on a tour-level does not
-    # depend on the visitor, i.e. on the initialization strategy: the tour cannot distinguish between earliest due
-    # date or furthest distance as it does not have access to the vertex information that shall be inserted
 
 
 class EarliestDueDate(TourInitializationBehavior):
-    """
-    Visitor for building a pendulum tour for
-    a) every carrier's first inactive vehicle
-    b) a unique carrier's first inactive vehicle
-    by finding the vertex with earliest due date
-    """
-
-    def find_seed_request(self, carrier):
+    def request_evaluation(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, request: int):
         """find request with earliest deadline"""
-        earliest = dt.datetime.max
-        for request in carrier.unrouted_requests:
-            if request.tw.l < earliest:
-                seed = request
-                earliest = request.tw.l
-        return seed
-
-    def initialize_instance(self, instance):
-        for carrier in instance.carriers:
-            # carrier.initialize(EarliestDueDate(self.verbose, self.plot_level))
-            self.initialize_carrier(carrier)
-        # instance.initializing_visitor = self
-        # instance._initialized = True
-        return
-
-    def initialize_carrier(self, carrier):
-        vehicle = carrier.inactive_vehicles[0]
-        assert len(vehicle.tour) == 2, 'Vehicle already has a tour'
-        # find request with earliest deadline and initialize pendulum tour
-        if carrier.unrouted_requests:
-            seed = self.find_seed_request(carrier)
-            vehicle.tour.insert_and_update(index=1, vertex=seed)
-        # carrier.initializing_visitor = self
-        # carrier._initialized = True
-        pass
+        _, delivery_vertex = instance.pickup_delivery_pair(request)
+        tw_close = solution.tw_close(delivery_vertex)
+        #  return the negative, as the procedure searched for the HIGHEST value and
+        return - tw_close.total_seconds
 
 
-"""
-class FurthestDistance(InitializationVisitor):
+class FurthestDistance(TourInitializationBehavior):
+    def request_evaluation(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, request: int):
+        midpoint_x, midpoint_y = ut.midpoint(instance, *instance.pickup_delivery_pair(request))
+        depot_x = instance.x_coords[carrier]
+        depot_y = instance.y_coords[carrier]
+        dist = pdist([[midpoint_x, midpoint_y], [depot_x, depot_y]], 'euclidean')[0]
+        return dist
 
-    def find_seed_request(self, carrier):
-        raise NotImplementedError
-        pass
 
-    def initialize_instance(self, instance):
-        raise NotImplementedError
-        pass
+class ClosestDistance(TourInitializationBehavior):
 
-    def initialize_carrier(self, carrier):
-        raise NotImplementedError
-        pass
-"""
+    def request_evaluation(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, request: int):
+        midpoint_x, midpoint_y = ut.midpoint(instance, *instance.pickup_delivery_pair(request))
+        depot_x = instance.x_coords[carrier]
+        depot_y = instance.y_coords[carrier]
+        dist = pdist([[midpoint_x, midpoint_y], [depot_x, depot_y]], 'euclidean')[0]
+        #  return the negative, as the procedure searched for the HIGHEST value and
+        return -dist

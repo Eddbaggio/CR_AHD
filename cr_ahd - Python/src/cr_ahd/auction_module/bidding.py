@@ -4,8 +4,11 @@ from typing import List
 
 from src.cr_ahd.routing_module import tour_construction as cns
 from src.cr_ahd.routing_module.tour_initialization import EarliestDueDate
-from src.cr_ahd.utility_module.utils import InsertionError
+from src.cr_ahd.utility_module.utils import InsertionError, ConstraintViolationError
 from src.cr_ahd.core_module import instance as it, solution as slt
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class BiddingBehavior(ABC):
@@ -19,6 +22,7 @@ class BiddingBehavior(ABC):
         for b in range(len(bundles)):
             carrier_bundle_bids = []
             for c in range(instance.num_carriers):
+                logger.debug(f'Carrier {c} generating bids for bundle {b}')
                 carrier_bundle_bids.append(self._generate_bid(instance, solution, bundles[b], c))
             bundle_bids.append(carrier_bundle_bids)
         solution.bidding_behavior = self.__class__.__name__
@@ -36,9 +40,9 @@ class CheapestInsertionDistanceIncrease(BiddingBehavior):
         cs_copy.unrouted_requests.extend(bundle)
         solution.carrier_solutions.append(cs_copy)
         try:
-            cns.CheapestInsertion()._solve_carrier(instance, solution, instance.num_carriers)
+            cns.CheapestInsertion()._carrier_cheapest_insertion(instance, solution, instance.num_carriers)
             after = cs_copy.sum_travel_distance()
-        except AssertionError:
+        except ConstraintViolationError:
             after = float('inf')
         finally:
             solution.carrier_solutions.pop()  # del the temporary copy

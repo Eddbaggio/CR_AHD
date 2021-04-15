@@ -1,13 +1,11 @@
 import abc
 
 from src.cr_ahd.utility_module import utils as ut
-import src.cr_ahd.core_module.carrier as cr
-import src.cr_ahd.core_module.vertex as vx
 import src.cr_ahd.core_module.tour as tr
 
 
 class TWOfferingBehavior(abc.ABC):
-    def execute(self, carrier: cr.Carrier, request: vx.Vertex):
+    def execute(self, carrier, request):
         assert request.tw == ut.TIME_HORIZON
         offered_time_windows = {tw: self._evaluate_time_window(tw, carrier, request) for tw in ut.ALL_TW}
         offered_time_windows = {k: v for k, v in offered_time_windows.items() if bool(v)}  # only positive evaluations
@@ -33,7 +31,7 @@ class TWOfferingBehavior(abc.ABC):
 
 class FeasibleTW(TWOfferingBehavior):
 
-    def _evaluate_time_window(self, tw: ut.TimeWindow, carrier: cr.Carrier, request):
+    def _evaluate_time_window(self, tw: ut.TimeWindow, carrier, request):
         feasible_flag = False
         for vehicle in [*carrier.active_vehicles, carrier.inactive_vehicles[0]]:  # TODO: what about initializing a new route?!
             first_index = self._find_first_insertion_index(tw, vehicle.tour)

@@ -7,7 +7,7 @@ import numpy as np
 
 from src.cr_ahd.core_module import instance as it, solution as slt
 from src.cr_ahd.routing_module import tour_construction as cns
-
+from src.cr_ahd.utility_module import utils as ut
 logger = logging.getLogger(__name__)
 
 
@@ -61,7 +61,7 @@ class Random(RequestSelectionBehavior):
 
 
 class HighestInsertionCostDistance(RequestSelectionBehavior):
-    """given the current set of routes, returns the n unrouted requests that has the HIGHEST Insertion distance cost.
+    """given the current set of routes, returns the n unrouted requests that have the HIGHEST Insertion distance cost.
      NOTE: since routes may not be final, the current highest-marginal-cost request might not have been chosen at an
      earlier or later stage!"""
 
@@ -72,14 +72,15 @@ class HighestInsertionCostDistance(RequestSelectionBehavior):
             best_delta_for_r = float('inf')
             for tour in range(cs.num_tours()):
                 # cheapest way to fit request into tour
-                delta, _, _ = cns.CheapestInsertion()._solve_tour(instance, solution, carrier, tour, request)
+                delta, _, _ = cns.CheapestInsertion()._tour_cheapest_insertion(instance, solution, carrier, tour, request)
                 if delta < best_delta_for_r:
                     best_delta_for_r = delta
-            # if no feasible insertion for the current request was found, create a new tour
+            # if no feasible insertion for the current request was found, attempt to create a new tour, if that's not
+            # feasible the best_delta_for_r will be infinity
             if best_delta_for_r == float('inf'):
-                assert cs.num_tours() < instance.carriers_max_num_vehicles
-                pickup, delivery = instance.pickup_delivery_pair(request)
-                best_delta_for_r = instance.distance([carrier, pickup, delivery], [pickup, delivery, carrier])
+                if cs.num_tours() < instance.carriers_max_num_vehicles:
+                    pickup, delivery = instance.pickup_delivery_pair(request)
+                    best_delta_for_r = instance.distance([carrier, pickup, delivery], [pickup, delivery, carrier])
             evaluation.append(best_delta_for_r)
         return [r for _, r in sorted(zip(evaluation, cs.unrouted_requests))][:num_requests]
 

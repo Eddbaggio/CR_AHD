@@ -17,12 +17,13 @@ class WinnerDeterminationBehavior(ABC):
         """
         if not len(bundles) == instance.num_carriers:
             raise NotImplementedError('Proper set partitioning for WDP ist not implemented yet')
+        bundle_winners = []
         for bundle, bids in zip(bundles, bids_matrix):
             winner, _ = self._determine_winner(bids)
-            solution.assign_requests_to_carriers(bundle, [winner] * len(bundle))
+            bundle_winners.append(winner)
             # ensure that the winner can not win another bundle by 'deleting' his bids (setting them to +- inf)
             self._remove_bids_of_carrier(winner, bids_matrix)
-        return
+        return bundle_winners
 
     @abstractmethod
     def _determine_winner(self, carrier_bids) -> Tuple[int, float]:

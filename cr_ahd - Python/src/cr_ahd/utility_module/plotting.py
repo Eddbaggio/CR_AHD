@@ -5,11 +5,8 @@ import matplotlib.pyplot as plt
 from matplotlib.text import Annotation
 import plotly.express as px
 import plotly.graph_objects as go
-from src.cr_ahd.core_module.carrier import Carrier
-from src.cr_ahd.core_module.vehicle import Vehicle
 from src.cr_ahd.core_module import instance as it, solution as slt
 from src.cr_ahd.utility_module import utils as ut
-import itertools
 
 config = dict({'scrollZoom': True})
 
@@ -140,13 +137,21 @@ def _make_tour_scatter(instance: it.PDPInstance, solution: slt.GlobalSolution, c
         'y': [instance.y_coords[v] for v in t.routing_sequence[:-1]],
         'tw_open': [solution.tw_open[v] for v in t.routing_sequence[:-1]],
         'tw_close': [solution.tw_close[v] for v in t.routing_sequence[:-1]], })
+    original_carrier_assignment = [instance.request_to_carrier_assignment[r] for r in
+                                   [instance.request_from_vertex(v) for v in t.routing_sequence[1:-1]]]
+    original_carrier_assignment.insert(0, carrier)
+    hovertext = [f'Request {instance.request_from_vertex(v)}' for v in t.routing_sequence[1:-1]]
+    hovertext.insert(0, f'Depot {carrier}')
+
+    colorscale = [(c, ut.univie_colors_100[c]) for c in range(instance.num_carriers)]
     return go.Scatter(x=df['x'], y=df['y'], mode='markers+text',
                       marker=dict(
-                          symbol=['square', *['circle'] * (t.num_routing_stops - 2), 'square'],
+                          symbol=['square', *['circle'] * (t.num_routing_stops - 2)],
                           size=20,
-                          line=dict(color=ut.univie_colors_100[carrier], width=2),
+                          line=dict(color=[ut.univie_colors_100[c] for c in original_carrier_assignment], width=2),
                           color=ut.univie_colors_60[carrier]),
                       text=df['id_'], name=f'Carrier {carrier}, Tour {tour}',
+                      hovertext=hovertext
                       # legendgroup=carrier, hoverinfo='x+y'
                       )
 
@@ -229,15 +234,15 @@ def plot_solution_2(instance: it.PDPInstance, solution: slt.GlobalSolution, titl
              )
     )
 
-    fig.update_layout(updatemenus=(
-        [
-            dict(type='buttons',
-                 # y=c / instance.num_carriers,
-                 # yanchor='auto',
-                 active=-1,
-                 buttons=button_dicts
-                 )
-        ]))
+    fig.update_layout(updatemenus=
+                      [dict(type='buttons',
+                            # y=c / instance.num_carriers,
+                            # yanchor='auto',
+                            active=-1,
+                            buttons=button_dicts
+                            )
+                       ],
+                      title=title)
 
     if show:
         fig.show(config=config)
@@ -261,7 +266,7 @@ def plot_solution(instance: it.PDPInstance, solution: slt.GlobalSolution, title=
 
 
 class CarrierConstructionAnimation(object):
-    def __init__(self, carrier: Carrier, title=None):
+    def __init__(self, carrier, title=None):
         self.carrier = carrier
         self.fig: plt.Figure
         self.ax: plt.Axes
@@ -279,7 +284,7 @@ class CarrierConstructionAnimation(object):
         self.freeze_frames = [*self.requests_artist, *self.depot_artist]  # artists that are plotted each frame
         self.ims = []
 
-    def add_current_frame(self, vehicle: Union['all', Vehicle] = 'all'):
+    def add_current_frame(self, vehicle: Union['all',] = 'all'):
         if vehicle != 'all':
             artists = vehicle.tour.plot(color=vehicle.color, plot_depot=False)
         else:

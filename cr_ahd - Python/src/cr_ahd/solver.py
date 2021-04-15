@@ -2,13 +2,8 @@ import abc
 import logging.config
 from typing import final
 
-import src.cr_ahd.tw_management_module.tw_management as twm
 import src.cr_ahd.utility_module.utils as ut
-from src.cr_ahd.auction_module import auction as au, \
-    bidding as bd, \
-    bundle_generation as bg, \
-    request_selection as rs, \
-    winner_determination as wd
+from src.cr_ahd.auction_module import auction as au
 from src.cr_ahd.core_module import instance as it, solution as slt
 from src.cr_ahd.routing_module import tour_construction as cns, tour_improvement as imp, tour_initialization as ini
 
@@ -24,7 +19,7 @@ class Solver(abc.ABC):
         :return: None
         """
         self._solve(instance, solution)
-        solution.solution_algorithm = self
+        solution.solution_algorithm = self.__class__.__name__
         pass
 
     @abc.abstractmethod
@@ -32,6 +27,66 @@ class Solver(abc.ABC):
         pass
 
 
+class StaticSolver(Solver):
+    @final
+    def _solve(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        self.assign_all_requests(instance, solution)
+        self.initialize_pendulum_tours(instance, solution)
+        if instance.num_carriers > 1:  # not for centralized instances
+            self.run_auction(instance, solution)
+        # build tours with the re-allocated requests
+        self.build_tours(instance, solution)
+        self.finalize_with_local_search(instance, solution)
+
+    pass
+
+    def assign_all_requests(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        logger.debug(f'Assigning all requests to their carriers')
+        solution.assign_requests_to_carriers(instance.requests, instance.request_to_carrier_assignment)
+        self.time_window_management(instance, solution)
+        pass
+
+    @abc.abstractmethod
+    def initialize_pendulum_tours(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        pass
+
+    def run_auction(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        pass
+
+    @abc.abstractmethod
+    def build_tours(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        pass
+
+    def finalize_with_local_search(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        imp.PDPExchange().improve_global_solution(instance, solution)
+        pass
+
+    def time_window_management(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        pass
+
+
+class Static(StaticSolver):
+    def initialize_pendulum_tours(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        ini.FurthestDistance().execute(instance, solution)
+        pass
+
+    def build_tours(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        cns.CheapestInsertion().solve(instance, solution)
+        pass
+
+
+class StaticCollaborative(StaticSolver):
+    def initialize_pendulum_tours(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        ini.FurthestDistance().execute(instance, solution)
+        pass
+
+    def build_tours(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        cns.CheapestInsertion().solve(instance, solution)
+
+    def run_auction(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        au.AuctionC().execute(instance, solution)
+
+'''
 class StaticSequentialInsertion(Solver):
     """
     Initializes pendulum tours first! Then builds the routes. The Dynamic Version does NOT initialize tours
@@ -58,7 +113,7 @@ class StaticSequentialInsertion(Solver):
         pass
 
     def finalize_with_local_search(self, instance):
-        imp.TwoOpt().improve_instance(instance)
+        imp.TwoOpt().improve_global_solution(instance)
         pass
 
 
@@ -87,11 +142,11 @@ class StaticI1Insertion(Solver):
         ini.EarliestDueDate().initialize_carrier(carrier)
 
     def build_routes(self, instance):
-        carrier = cns.I1Insertion().solve(instance)
+        carrier = cns.I1Insertion().execute(instance)
         return carrier
 
     def finalize_with_local_search(self, instance):
-        imp.TwoOpt().improve_instance(instance)
+        imp.TwoOpt().improve_global_solution(instance)
         pass
 
 
@@ -122,12 +177,12 @@ class StaticI1InsertionWithAuction(Solver):
         ini.EarliestDueDate().initialize_carrier(carrier)
 
     def build_routes(self, instance):
-        carrier = cns.I1Insertion().solve(instance)
+        carrier = cns.I1Insertion().execute(instance)
         return carrier
 
     def finalize_with_local_search(self, instance):
-        imp.TwoOpt().improve_instance(instance)
-
+        imp.TwoOpt().improve_global_solution(instance)
+'''
 
 # =====================================================================================================================
 # DYNAMIC
@@ -139,7 +194,10 @@ class DynamicSolver(Solver):
     def _solve(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         while solution.unassigned_requests:
             self.assign_n_requests(instance, solution, ut.DYNAMIC_CYCLE_TIME)
-            self._solve_cycle(instance, solution)
+            if instance.num_carriers > 1:  # not for centralized instances
+                self.run_auction(instance, solution)
+            # build tours with the re-allocated requests
+            self.build_tours(instance, solution)
         self.finalize_with_local_search(instance, solution)
 
     @final
@@ -154,187 +212,40 @@ class DynamicSolver(Solver):
         k: int = len(solution.unassigned_requests) // instance.num_carriers
         requests = []
         for c in range(instance.num_carriers):
-            for i in range(n):
+            for i in range(min(n, k)):
                 requests.append(solution.unassigned_requests[c * k + i])
         carriers = [instance.request_to_carrier_assignment[i] for i in requests]
+        self.time_window_management(instance, solution)
         solution.assign_requests_to_carriers(requests, carriers)
         pass
 
-    @final
+    def time_window_management(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        pass
+
     def finalize_with_local_search(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
-        # imp.TwoOpt().improve_instance(instance)
+        imp.PDPExchange().improve_global_solution(instance, solution)
+        pass
+
+    def run_auction(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         pass
 
     @abc.abstractmethod
-    def _solve_cycle(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+    def build_tours(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         pass
 
 
-class DynamicSequentialInsertion(DynamicSolver):
-    """
-    Does NOT initialize pendulum tours!
-    """
-
-    def _solve_cycle(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
-        cns.SequentialInsertion().solve(instance, solution)
-        pass
-
-
-class DynamicCheapestInsertion(DynamicSolver):
-
-    def _solve_cycle(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+class Dynamic(DynamicSolver):
+    def build_tours(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         cns.CheapestInsertion().solve(instance, solution)
-        pass
 
 
-class DynamicI1Insertion(DynamicSolver):
-    """
-    ADD DOCSTRING!!
-    """
-
-    def _solve_cycle(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
-        self.build_routes()
-        '''
-        carrier = True
-        while carrier:
-            carrier = self.build_routes(instance)
-            if carrier:
-                self.initialize_another_tour(carrier)
-        '''
-
-    def initialize_another_tour(self, carrier):
-        ini.EarliestDueDate().initialize_carrier(carrier)
-
-    def build_routes(self, instance, solution):
-        cns.I1Insertion().solve(instance, solution)
-        pass
-
-
-class DynamicI1InsertionWithAuctionA(DynamicSolver):
-    """
-    ADD DOCSTRING!!
-    """
-
-    def _solve_cycle(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
-        if instance.num_carriers > 1:
-            self.run_auction(instance)
-        carrier = True
-        while carrier:
-            carrier = self.build_routes(instance)
-            if carrier:
-                self.initialize_another_tour(carrier)
-
-    def run_auction(self, instance):
-        au.AuctionA().execute(instance)
-
-    def initialize_another_tour(self, carrier):
-        ini.EarliestDueDate().initialize_carrier(carrier)
-
-    def build_routes(self, instance):
-        carrier = cns.I1Insertion().solve(instance)
-        return carrier
-
-
-class DynamicI1InsertionWithAuctionB(DynamicSolver):
-    """
-    ADD DOCSTRING!!
-    """
-
-    def _solve_cycle(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
-        if instance.num_carriers > 1:
-            self.run_auction(instance)
-        carrier = True
-        while carrier:
-            carrier = self.build_routes(instance)
-            if carrier:
-                self.initialize_another_tour(carrier)
-
-    def run_auction(self, instance):
-        au.AuctionB().execute(instance)
-
-    def initialize_another_tour(self, carrier):
-        ini.EarliestDueDate().initialize_carrier(carrier)
-
-    def build_routes(self, instance):
-        carrier = cns.I1Insertion().solve(instance)
-        return carrier
-
-
-class DynamicI1InsertionWithAuctionC(DynamicSolver):
-    """
-    ADD DOCSTRING!!
-    """
-
-    def _solve_cycle(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
-        if instance.num_carriers > 1:
-            self.run_auction(instance)
-        carrier = True
-        while carrier:
-            carrier = self.build_routes(instance)
-            if carrier:
-                self.initialize_another_tour(carrier)
-
-    def run_auction(self, instance):
-        au.AuctionC().execute(instance)
-
-    def initialize_another_tour(self, carrier):
-        ini.EarliestDueDate().initialize_carrier(carrier)
-
-    def build_routes(self, instance):
-        carrier = cns.I1Insertion().solve(instance)
-        return carrier
-
-
-class DynamicCollaborativeAHD(Solver):
+class DynamicCollaborative(DynamicSolver):
     """
     The full program: Dynamic TW Management and auction-based Collaboration. Uses Auction type C
     """
 
-    # TODO refactoring and tidy up required! Can I create a meaningful superclass?
-
-    @final
-    def _solve(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
-        while solution.unassigned_requests:
-            self.assign_n_requests(instance, solution, ut.DYNAMIC_CYCLE_TIME)
-            self._solve_cycle(instance, solution)
-        self.finalize_with_local_search(instance, solution)
-
-    @final
-    def assign_n_requests(self, instance: it.PDPInstance, solution: slt.GlobalSolution, n):
-        """Assigns n REQUESTS to their corresponding carrier, following the data stored in the instance.
-        Assumes that each carrier has the same num_request!
-        Does not work on a vertex level but on a request level!
-        """
-        n = min(n, len(solution.unassigned_requests)//instance.num_carriers)
-        logger.debug(f'Assigning {n} requests to each carrier')
-        # assumes equal num_requests for all carriers! Does not work otherwise!
-        assert len(solution.unassigned_requests) % instance.num_carriers == 0
-        k: int = len(solution.unassigned_requests) // instance.num_carriers
-        requests = []
-        for c in range(instance.num_carriers):
-            for i in range(n):
-                index = c * k + i
-                requests.append(solution.unassigned_requests[index])
-        carriers = [instance.request_to_carrier_assignment[i] for i in requests]
-        # TODO insert TW Management here!
-        solution.assign_requests_to_carriers(requests, carriers)
-        pass
-
-    @final
-    def finalize_with_local_search(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
-        imp.PDPExchange().improve_instance(instance, solution)
-        pass
-
-    def _solve_cycle(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
-        if instance.num_carriers > 1:  # not for centralized instances
-            self.run_auction(instance, solution)
-        # build tours with the re-allocated requests
-        self.build_tours(instance, solution)
-
     def run_auction(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         au.AuctionC().execute(instance, solution)
-        pass
 
     def build_tours(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         cns.CheapestInsertion().solve(instance, solution)
-        pass

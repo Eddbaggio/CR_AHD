@@ -1,6 +1,6 @@
 import datetime as dt
 import logging.config
-from typing import List, Iterable, Reversible
+from typing import List, Union, Tuple, Iterable
 import numpy as np
 
 import src.cr_ahd.utility_module.utils as ut
@@ -17,6 +17,8 @@ class Tour:
         :param solution:
         :param depot_index: may be different to the id! id's can exist twice temporarily if a carrier is copied!
         """
+        logger.debug(f'Initializing tour {id_}')
+
         self.id_ = id_
         self._routing_sequence = []  # sequence of vertices
         self._travel_distance_sequence: List[float] = []  # sequence of arc distance costs
@@ -144,14 +146,17 @@ class Tour:
             self._arrival_schedule.insert(index, ut.START_TIME)
             self._service_schedule.insert(index, ut.START_TIME)
             self._load_sequence.insert(index, 0)
+            self._revenue_sequence.insert(index, 0)
         else:
             self._arrival_schedule.insert(index, None)
             self._service_schedule.insert(index, None)
             self._load_sequence.insert(index, None)
+            self._revenue_sequence.insert(index, None)
+
         logger.debug(f'{vertex} inserted into {self.id_} at index {index}')
         pass
 
-    def insert_and_update(self, instance, solution, indices: List[int], vertices: List[int]):
+    def insert_and_update(self, instance, solution, indices: Iterable[int], vertices: Iterable[int]):
         """
          inserts a vertex BEFORE the specified index and resets/deletes all cost and schedules. If insertion is
          infeasible due to time window constraints, it will undo the insertion and raise InsertionError
@@ -166,7 +171,7 @@ class Tour:
         for index, vertex in zip(indices, vertices):
             self._insert_no_update(index, vertex)
         if len(self) > 1:
-            self.update_cost_and_schedules_from(instance, solution, indices[0])
+            self.update_sequences_and_schedules(instance, solution, indices[0])
 
         pass
 
@@ -179,6 +184,7 @@ class Tour:
         self._arrival_schedule.pop(index)
         self._service_schedule.pop(index)
         self._load_sequence.pop(index)
+        self._revenue_sequence.pop(index)
         logger.debug(f'{popped} popped from {self.id_} at index {index}')
         return popped
 
@@ -189,11 +195,11 @@ class Tour:
         # iterate backwards because otherwise the 2nd index won't match after the 1st index has been removed
         for index in reversed(indices):
             popped.append(self._pop_no_update(index))
-        self.update_cost_and_schedules_from(instance, solution, indices[0])
+        self.update_sequences_and_schedules(instance, solution, indices[0])
         # the popped objects are in reverse order to the input indices, thus reverse again
         return reversed(popped)
 
-    def update_cost_and_schedules_from(self, instance, solution, index: int = 1):
+    def update_sequences_and_schedules(self, instance, solution, index: int = 1):
         """update schedules from given index to end of routing sequence. index should be the same as the insertion
         or removal index. """
         for pos in range(index, len(self)):
@@ -203,24 +209,25 @@ class Tour:
             cumul_travel_dist = sum(self.travel_distance_sequence[:pos]) + travel_dist
             arrival = self.service_schedule[pos - 1] + ut.travel_time(travel_dist)
             cumul_load = sum(self.load_sequence[:pos]) + instance.load[vertex]
-            try:
-                # check the feasibility constraints
-                assert cumul_travel_dist < instance.vehicles_max_travel_distance, f'{cumul_travel_dist} too long'
-                assert arrival <= solution.tw_close[vertex], f'{arrival} too late'
-                assert cumul_load <= instance.vehicles_max_load, f'{cumul_load} to high'
-                self._travel_distance_sequence[pos] = travel_dist
-                self._travel_duration_sequence[pos] = ut.travel_time(travel_dist)
-                self._arrival_schedule[pos] = arrival
-                self._service_schedule[pos] = max(arrival, solution.tw_open[vertex])
-                self._load_sequence[pos] = instance.load[vertex]
-            except AssertionError:
-                logger.debug(f'{self.id_} update from index {index} failed at position {pos} with vertex {vertex}: '
-                             f'cumul_travel_dist: {cumul_travel_dist}, max cumul_travel_dist: {instance.vehicles_max_travel_distance} '
-                             f'arrival: {arrival}, tw_close: {solution.tw_close[vertex]}; '
-                             f'cumul_load: {cumul_load}, max vehicle cumul_load: {instance.vehicles_max_load} '
-                             )
-                raise ut.InsertionError('One of the feasibility constraints is not satisfied. Check feasibility before '
-                                        'insertion using Tour.insertion_feasibility_check()', '')
+            # check the feasibility constraints
+            if cumul_travel_dist >= instance.vehicles_max_travel_distance:
+                message = f'{cumul_travel_dist} too long'
+                logger.error(message)
+                raise ut.ConstraintViolationError(message, message)
+            if arrival > solution.tw_close[vertex]:
+                message = f'{arrival} too late'
+                logger.error(message)
+                raise ut.ConstraintViolationError(message, message)
+            if cumul_load > instance.vehicles_max_load:
+                message = f'{cumul_load} to high'
+                logger.error(message)
+                raise ut.ConstraintViolationError(message, message)
+            self._travel_distance_sequence[pos] = travel_dist
+            self._travel_duration_sequence[pos] = ut.travel_time(travel_dist)
+            self._arrival_schedule[pos] = arrival
+            self._service_schedule[pos] = max(arrival, solution.tw_open[vertex])
+            self._load_sequence[pos] = instance.load[vertex]
+            self._revenue_sequence[pos] = instance.revenue[vertex]
         logger.debug(f'{self.id_} updated from index {index}')
         pass
 
@@ -239,15 +246,15 @@ class Tour:
             popped = self._pop_no_update(i)
             self._insert_no_update(j - k, popped)
         try:
-            self.update_cost_and_schedules_from(instance, solution, i)  # maybe the new routing sequence is infeasible
+            self.update_sequences_and_schedules(instance, solution, i)  # maybe the new routing sequence is infeasible
         except ut.InsertionError as e:
             self.reverse_section(instance, solution, i, j)  # undo all the reversal
             raise e
 
-    def insertion_distance_cost(self, instance, insertion_positions: List[int], insertion_vertices: List[int]):
+    def insertion_distance_delta(self, instance, insertion_positions: List[int], insertion_vertices: List[int]):
         """
         returns the distance surplus that is obtained by inserting the insertion_vertices at the insertion_positions.
-        NOTE: Does NOT perform a feasibility check!
+        NOTE: Does NOT perform a feasibility check and does NOT actually insert the vertices!
 
         :param instance:
         :param insertion_positions:
@@ -266,13 +273,18 @@ class Tour:
 
         return delta
 
-    def removal_distance_savings(self, instance, removal_positions: List[int]):
+    def insertion_revenue_delta(self, instance, insertion_vertices: List[int]):
+        delta = 0
+        for vertex in insertion_vertices:
+            delta += instance.revenue[vertex]
+
+    def removal_distance_delta(self, instance, removal_positions: List[int]):
         """
         does not actually remove anything, simply tests what it would save to remove the vertices located at positions.
-        NOTE: Does NOT perform any feasibility checks!
+        NOTE: Does NOT perform any feasibility checks and does NOT actually remove the vertices!
         :param instance:
         :param removal_positions: indices of the requests to be removed
-        :return: POSITIVE number, giving the distance savings
+        :return: NEGATIVE number, giving the distance savings
         """
         tmp_routing_sequence = list(self.routing_sequence)
         savings = 0
@@ -280,7 +292,7 @@ class Tour:
             vertex = tmp_routing_sequence[pos]
             predecessor_vertex = tmp_routing_sequence[pos - 1]
             successor_vertex = tmp_routing_sequence[pos]
-            savings += instance.distance(
+            savings -= instance.distance(
                 [predecessor_vertex, vertex], [vertex, successor_vertex]) - instance.distance(
                 [predecessor_vertex], [successor_vertex]
             )
@@ -331,5 +343,4 @@ class Tour:
             load += instance.load[vertex]
             if load > instance.vehicles_max_load:
                 return False
-
         return True

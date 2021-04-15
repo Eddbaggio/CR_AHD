@@ -60,7 +60,7 @@ class KMeansBundles(BundleSetGenerationBehavior):
                              submitted_requests: Iterable):
         request_midpoints = [ut.midpoint(instance, *instance.pickup_delivery_pair(sr)) for sr in submitted_requests]
         k_means = KMeans(n_clusters=instance.num_carriers, random_state=0).fit(request_midpoints)
-        bundles = [np.take(submitted_requests, np.nonzero(k_means.labels_ == b)[0]) for b in range(k_means.n_clusters)]
+        bundles = [list(np.take(submitted_requests, np.nonzero(k_means.labels_ == b)[0])) for b in range(k_means.n_clusters)]
         return bundles
 
 

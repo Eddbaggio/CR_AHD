@@ -13,19 +13,8 @@ from src.cr_ahd.utility_module import utils as ut, plotting as pl
 from src.cr_ahd.core_module import instance as it, solution as slt
 
 # TODO write pseudo codes for ALL the stuff that's happening
-
-# TODO re-integrate (animated) plots for
-#  (1) static/dynamic sequential cheapest insertion construction
-#  (2) dynamic construction
-#  (3) I1 insertion construction
-
 # TODO: describe what THIS file is for and how it works exactly
-
-# TODO use Memento Pattern for (e.g.) Tours and Vertices. This will avoid costly "undo" operations that are currently
-#  handled specifically. E.g. atm an infeasible route section reversal (as in 2opt) will be reverted / "undone" by
-#  re-reverting the attempt. maybe simply taking an old snapshot is less costly
-
-# TODO two-opt: best improvement vs. first improvement!!
+# TODO local search: best improvement vs. first improvement!!
 
 logging.config.dictConfig(log.LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
@@ -36,19 +25,13 @@ def execute_all(instance: it.PDPInstance):
     :param instance: (custom) instance that will we (deep)copied for each algorithm
     :return: evaluation metrics (Instance.evaluation_metrics) of all the solutions obtained
     """
-    solution_summaries = []
+    solutions = []
 
     for solver in [
-        # slv.StaticSequentialInsertion,
-        # slv.StaticI1Insertion,
-        # slv.StaticI1InsertionWithAuction,
-        # slv.DynamicSequentialInsertion,
-        # slv.DynamicI1Insertion,
-        # slv.DynamicCheapestInsertion,
-        # slv.DynamicI1InsertionWithAuctionA,
-        # slv.DynamicI1InsertionWithAuctionB,
-        # slv.DynamicI1InsertionWithAuctionC,
-        slv.DynamicCollaborativeAHD,
+        # slv.Static,
+        # slv.StaticCollaborative,
+        slv.Dynamic,
+        # slv.DynamicCollaborative,
     ]:
         solution = slt.GlobalSolution(instance)
         if instance.num_carriers == 1 and 'Auction' in solver.__name__:
@@ -56,65 +39,58 @@ def execute_all(instance: it.PDPInstance):
         logger.info(f'Solving {instance.id_} via {solver.__name__}')
         solver().execute(instance, solution)
         solution.write_to_json()
-        solution_summaries.append(solution.summary())
-        pl.plot_solution_2(instance, solution, show=True)
-    return solution_summaries
+        solutions.append(solution)
+        # pl.plot_solution_2(instance, solution, title=f'{instance.id_} with {solver.__name__}', show=True)
+    return solutions
 
 
 def read_and_execute_all(path: Path):
-    """reads CUSTOM instance from a given path before executing all available visitors"""
     log.remove_all_file_handlers(logging.getLogger())
     log_file_path = ut.path_output_gansterer.joinpath(f'{path.stem}_log.log')
     log.add_file_handler(logging.getLogger(), str(log_file_path))
-    if 'gansterer' in str(path).lower():
-        instance = it.read_gansterer_hartl_mv(path)
-    else:
-        instance = it.read_custom_json_instance(path)
-    solution_summaries = execute_all(instance)
-    return solution_summaries
+
+    instance = it.read_gansterer_hartl_mv(path)
+    solutions = execute_all(instance)
+    return solutions
 
 
-def read_and_execute_all_parallel(n: int, which: List):
-    """reads the first n variants of the CUSTOM instances specified by the solomon list and runs all visitors via
-    multiprocessing
+def read_and_execute_all_parallel(paths):
+    with multiprocessing.Pool() as pool:
+        solutions = list(
+            tqdm(pool.imap(read_and_execute_all, paths), total=len(paths)))
+    df = write_solutions_to_multiindex_df(solutions)
+    return df
 
-    :param n:number of randomized instances to consider
-    :param which: which instances (defined by Solomon string) to consider
+
+def write_solutions_to_multiindex_df(solutions_per_instance: List[List[slt.GlobalSolution]]):
     """
-    custom_files_paths = get_custom_instance_paths(n, which)
 
-    with multiprocessing.Pool(8) as pool:
-        solution_summaries_collection = list(
-            tqdm(pool.imap(read_and_execute_all, custom_files_paths), total=len(custom_files_paths)))
-    flat_solution_summaries_collection = [r for results in solution_summaries_collection for r in results]
-    grouped = write_solution_summaries_df(
-        flat_solution_summaries_collection)  # rename function; not clear what are the results?
-    return grouped
-
-
-def write_solution_summaries_df(solution_summaries: list):
+    :param solutions_per_instance: A List of Lists. Each sublist contains solutions for a specific instance, each of
+    them obtained from a different solution algorithm
+    :return:
     """
-    write the collected outputs of the execute_all function to csv files. One file is created for each solomon_base
-
-    :param solution_summaries: (flat) list of single results (i.e. the evaluation metrics) of the execute_all function
-    :return: the solomon_base grouped dataframe of results
-    """
-    performance = pd.DataFrame(solution_summaries)
-    for column in performance.select_dtypes(include=['timedelta64']):
-        performance[column] = performance[column].dt.total_seconds()
-    performance = performance.set_index(
-        ['solomon_base', 'rand_copy', 'solution_algorithm', 'num_carriers', 'num_vehicles'])
-    grouped = performance.groupby('solomon_base')
-
-    for name, group in grouped:
-        write_dir = ut.path_output_custom.joinpath(name)
-        write_dir.mkdir(parents=True, exist_ok=True)
-        file_name = f'{name}_custom_eval.csv'
-        write_path = write_dir.joinpath(file_name)
-        group.to_csv(write_path)
-        group.to_excel(write_path.with_suffix('.xlsx'), merge_cells=False)
-
-    return grouped
+    df = []
+    for instance_solutions in solutions_per_instance:
+        for solution in instance_solutions:
+            for carrier in range(solution.num_carriers()):
+                for tour in range(solution.carrier_solutions[carrier].num_tours()):
+                    d = solution.carrier_solutions[carrier].tours[tour].summary()
+                    d['id_'] = solution.id_
+                    d.update(solution.meta)
+                    d['num_carriers'] = solution.num_carriers()
+                    d['solution_algorithm'] = solution.solution_algorithm
+                    d['carrier_id_'] = carrier
+                    d['tour_id_'] = tour
+                    df.append(d)
+    df = pd.DataFrame.from_records(df)
+    df.set_index(
+        keys=['id_', 'run', 'dist', 'rad', 'n', 'num_carriers', 'solution_algorithm', 'carrier_id_', 'tour_id_'],
+        inplace=True)
+    for column in df.select_dtypes(include=['timedelta64']):
+        df[column] = df[column].dt.total_seconds()
+    df.to_csv(ut.unique_path(ut.path_output_gansterer, 'evaluation' + '_#{:03d}'+'.csv'))
+    df.to_excel(ut.unique_path(ut.path_output_gansterer, 'evaluation' + '_#{:03d}'+'.xlsx'), merge_cells=False)
+    return df
 
 
 def get_custom_instance_paths(n, which: List):
@@ -131,15 +107,10 @@ def get_custom_instance_paths(n, which: List):
 
 if __name__ == '__main__':
     logger.info('START')
-    solomon_list = ['C101', 'C201']  # , 'R101', 'R201', 'RC101', 'RC201']
-    # solomon_list = ut.Solomon_Instances
-    # read_and_execute_all(Path("../../../data/Input/Custom/C101/C101_3_15_ass_#002.json"))  # single collaborative
-    # read_and_execute_all(Path("../../../data/Input/Custom/C201/C201_1_45_ass_#001.json"))  # single centralized
-    read_and_execute_all(Path(
-        # "../../../data/Input/Gansterer_Hartl/3carriers/1V_instances/O1/O1_10/run=0+dist=200+rad=150+n=10.dat"))
-        "../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/run=4+dist=200+rad=150+n=10.dat"))  # single collaborative
-    # grouped_evaluations = read_and_execute_all_parallel(n=2, which=solomon_list)  # multiple
 
-    # plotly_bar_plot(solomon_list, attributes=['num_act_veh', 'travel_distance'])  #, 'duration'
-    # bar_plot_with_errors(solomon_list, attributes=['num_act_veh', 'cost', ])
+    # paths = [Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/test.dat')]
+    paths = list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir())
+    # for path in paths:
+    #     read_and_execute_all(path)
+    df = read_and_execute_all_parallel(paths)
     logger.info('END')

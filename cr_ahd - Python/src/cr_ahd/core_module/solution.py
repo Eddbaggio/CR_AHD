@@ -13,6 +13,7 @@ class GlobalSolution:
     # default, empty solution
     def __init__(self, instance: it.PDPInstance):
         self.id_ = instance.id_
+        self.meta = instance.meta
         # REQUESTS that are not assigned to any carrier (went with a list rather than a set because when re-assigning
         # requests, i need index-based access to the elements
         self.unassigned_requests = list(instance.requests)
@@ -26,7 +27,6 @@ class GlobalSolution:
 
         self.carrier_solutions = [PDPSolution(c) for c in range(instance.num_carriers)]
 
-        # self.cost = 0
         self.solution_algorithm = None
         self.auction_mechanism = None
 
@@ -46,8 +46,15 @@ class GlobalSolution:
     def sum_revenue(self):
         return sum(c.sum_revenue() for c in self.carrier_solutions)
 
+    def num_carriers(self):
+        return len(self.carrier_solutions)
+
     def num_tours(self):
         return sum(c.num_tours() for c in self.carrier_solutions)
+
+    def num_routing_stops(self):
+        return sum(c.num_routing_stops() for c in self.carrier_solutions)
+        pass
 
     def assign_requests_to_carriers(self, requests: List[int], carriers: List[int]):
         for r, c in zip(requests, carriers):
@@ -61,24 +68,25 @@ class GlobalSolution:
 
     def summary(self):
         return {
-            # 'id_': self.id_,
+            'id_': self.id_,
+            'solution_algorithm': self.solution_algorithm,
+            'num_carriers': self.num_carriers(),
             'sum_travel_distance': self.sum_travel_distance(),
             'sum_travel_duration': self.sum_travel_duration(),
             'sum_load': self.sum_load(),
             'sum_revenue': self.sum_revenue(),
             'num_tours': self.num_tours(),
+            'num_routing_stops': self.num_routing_stops(),
             'carrier_summaries': {c.id_: c.summary() for c in self.carrier_solutions}
         }
 
     def write_to_json(self):
-        path = ut.path_output_gansterer.joinpath(self.id_)
+        path = ut.path_output_gansterer.joinpath(f'{self.num_carriers()}carriers',
+                                                 self.id_ + '_' + self.solution_algorithm)
         path = ut.unique_path(path.parent, path.stem + '_#{:03d}' + '.json')
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, mode='w') as f:
             json.dump({'summary': self.summary(), 'solution': self.as_dict()}, f, indent=4, cls=ut.MyJSONEncoder)
-        pass
-
-    def plot(self):
         pass
 
 
@@ -145,7 +153,6 @@ class PDPSolution:
         """
         vertices = self.tours[old_tour].pop_and_update(instance, solution, old_positions)
         self.tours[new_tour].insert_and_update(instance, solution, new_positions, vertices)
-
 
 
 def read_solution_and_summary_from_json(path: Path):

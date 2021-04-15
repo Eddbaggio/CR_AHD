@@ -4,10 +4,14 @@ import src.cr_ahd.utility_module.utils as ut
 from src.cr_ahd.auction_module import request_selection as rs, bundle_generation as bg, bidding as bd, \
     winner_determination as wd
 from src.cr_ahd.core_module import instance as it, solution as slt
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class Auction(ABC):
     def execute(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        logger.debug(f'running auction {self.__class__.__name__}')
         self._run_auction(instance, solution)
         solution.auction_mechanism = self.__class__.__name__
         pass
@@ -57,7 +61,15 @@ class AuctionC(Auction):
 
     def _run_auction(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         submitted_requests = rs.HighestInsertionCostDistance().execute(instance, solution, ut.NUM_REQUESTS_TO_SUBMIT)
+        logger.debug(f'requests {submitted_requests} have been submitted to the auction pool')
         if submitted_requests:
             bundles = bg.KMeansBundles().execute(instance, solution, submitted_requests)
+            logger.debug(f'bundles {bundles} have been created')
+            logger.debug(f'Generating bids')
             bids = bd.CheapestInsertionDistanceIncrease().execute(instance, solution, bundles)
-            wd.LowestBid().execute(instance, solution, bundles, bids)
+            logger.debug(f'Bids {bids} have been created for bundles {bundles}')
+            bundle_winners = wd.LowestBid().execute(instance, solution, bundles, bids)
+            logger.debug(f'reassigning bundles {bundles} to carriers {bundle_winners}')
+            for bundle, winner in zip(bundles, bundle_winners):
+                solution.assign_requests_to_carriers(bundle, [winner] * len(bundle))
+

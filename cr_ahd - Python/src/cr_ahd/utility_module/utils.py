@@ -108,6 +108,12 @@ class InsertionError(Exception):
         self.message = message
 
 
+class ConstraintViolationError(Exception):
+    def __init__(self, expression='', message=''):
+        self.expression = expression
+        self.message = message
+
+
 def timer(func):
     """Print the runtime of the decorated function"""
 
@@ -124,7 +130,7 @@ def timer(func):
     return wrapper_timer
 
 
-def unique_path(directory, name_pattern):
+def unique_path(directory, name_pattern) -> Path:
     """
     construct a unique numbered file name based on a template
     :param directory: directory which shall be the parent dir of the file
