@@ -107,6 +107,14 @@ class Tour:
         return np.cumsum(self.revenue_sequence)
 
     @property
+    def profit_sequence(self):
+        raise NotImplementedError
+
+    @property
+    def sum_profit(self):
+        return self.sum_travel_distance - self.sum_revenue
+
+    @property
     def arrival_schedule(self):
         return tuple(self._arrival_schedule)
 
@@ -128,6 +136,7 @@ class Tour:
     def summary(self):
         return {
             # 'id_': self.id_,
+            'sum_profit': self.sum_profit,
             'num_routing_stops': self.num_routing_stops,
             'sum_travel_distance': self.sum_travel_distance,
             'sum_travel_duration': self.sum_travel_duration,
@@ -277,6 +286,7 @@ class Tour:
         delta = 0
         for vertex in insertion_vertices:
             delta += instance.revenue[vertex]
+        return delta
 
     def removal_distance_delta(self, instance, removal_positions: List[int]):
         """
@@ -297,6 +307,12 @@ class Tour:
                 [predecessor_vertex], [successor_vertex]
             )
         return savings
+
+    def removal_revenue_delta(self, instance, insertion_vertices: List[int]):
+        delta = 0
+        for vertex in insertion_vertices:
+            delta += instance.revenue[vertex]
+        return delta
 
     def insertion_feasibility_check(self, instance,
                                     solution,

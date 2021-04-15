@@ -46,6 +46,9 @@ class GlobalSolution:
     def sum_revenue(self):
         return sum(c.sum_revenue() for c in self.carrier_solutions)
 
+    def sum_profit(self):
+        return sum(c.sum_profit() for c in self.carrier_solutions)
+
     def num_carriers(self):
         return len(self.carrier_solutions)
 
@@ -113,6 +116,9 @@ class PDPSolution:
     def sum_revenue(self):
         return sum(t.sum_revenue for t in self.tours)
 
+    def sum_profit(self):
+        return sum(t.sum_profit for t in self.tours)
+
     def num_tours(self):
         return len(self.tours)
 
@@ -129,6 +135,7 @@ class PDPSolution:
             # 'id_': self.id_,
             'num_tours': self.num_tours(),
             'num_routing_stops': self.num_routing_stops(),
+            'sum_profit': self.sum_profit(),
             'sum_travel_distance': self.sum_travel_distance(),
             'sum_travel_duration': self.sum_travel_duration(),
             'sum_load': self.sum_load(),

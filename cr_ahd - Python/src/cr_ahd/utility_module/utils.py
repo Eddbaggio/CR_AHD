@@ -261,6 +261,14 @@ def datetime_range(start: dt.datetime, end: dt.datetime, freq: dt.timedelta, inc
     return (start + x * freq for x in range(((end - start) // freq) + include_end))
 
 
+def argmin(a):
+    return min(range(len(a)), key=lambda x: a[x])
+
+
+def argmax(a):
+    return max(range(len(a)), key=lambda x: a[x])
+
+
 START_TIME = dt.datetime.min
 END_TIME = dt.datetime.min + dt.timedelta(minutes=3390)
 TIME_HORIZON = TimeWindow(START_TIME, END_TIME)

@@ -5,6 +5,7 @@ from typing import List, Tuple
 import numpy as np
 
 from src.cr_ahd.core_module import instance as it, solution as slt
+from src.cr_ahd.utility_module import utils as ut
 
 logger = logging.getLogger(__name__)
 
@@ -29,24 +30,31 @@ class WinnerDeterminationBehavior(ABC):
     def _determine_winner(self, carrier_bids) -> Tuple[int, float]:
         pass
 
-    @abstractmethod
-    def _remove_bids_of_carrier(self, carrier, all_bids):
+    def _remove_bids_of_carrier(self, carrier, bids_matrix):
+        for bundle_bids in bids_matrix:
+            bundle_bids[carrier] = float('inf')
         pass
 
 
 class LowestBid(WinnerDeterminationBehavior):
-
     def _determine_winner(self, carrier_bids):
         """
 
         :param carrier_bids: dict of {carrierA: bidA, carrierB: bidB, ... }
         :return:
         """
-        winner = np.argmin(carrier_bids)
+        winner = ut.argmin(carrier_bids)
         winning_bid = min(carrier_bids)
         return winner, winning_bid
 
-    def _remove_bids_of_carrier(self, carrier: int, bids_matrix):
-        for bundle_bids in bids_matrix:
-            bundle_bids[carrier] = float('inf')
-        pass
+
+class HighestBid(WinnerDeterminationBehavior):
+    def _determine_winner(self, carrier_bids):
+        """
+
+        :param carrier_bids: dict of {carrierA: bidA, carrierB: bidB, ... }
+        :return:
+        """
+        winner = ut.argmax(carrier_bids)
+        winning_bid = max(carrier_bids)
+        return winner, winning_bid
