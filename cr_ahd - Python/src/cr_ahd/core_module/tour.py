@@ -112,7 +112,7 @@ class Tour:
 
     @property
     def sum_profit(self):
-        return self.sum_travel_distance - self.sum_revenue
+        return self.sum_revenue - self.sum_travel_distance
 
     @property
     def arrival_schedule(self):

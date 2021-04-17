@@ -15,6 +15,7 @@ from src.cr_ahd.core_module import instance as it, solution as slt
 # TODO write pseudo codes for ALL the stuff that's happening
 # TODO: describe what THIS file is for and how it works exactly
 # TODO local search: best improvement vs. first improvement!!
+# TODO Better construction heuristic, better local search, metaheuristic
 
 logging.config.dictConfig(log.LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
@@ -30,17 +31,18 @@ def execute_all(instance: it.PDPInstance):
     for solver in [
         # slv.Static,
         # slv.StaticCollaborative,
-        slv.Dynamic,
-        # slv.DynamicCollaborative,
+        # slv.Dynamic,
+        slv.DynamicCollaborative,
+        # slv.DynamicCollaborativeAHD
     ]:
         solution = slt.GlobalSolution(instance)
         if instance.num_carriers == 1 and 'Auction' in solver.__name__:
             continue  # skip auction solvers for centralized instances
         logger.info(f'Solving {instance.id_} via {solver.__name__}')
         solver().execute(instance, solution)
+        pl.plot_solution_2(instance, solution, title=f'{instance.id_} with Solver "{solver.__name__}"', show=True)
         solution.write_to_json()
         solutions.append(solution)
-        # pl.plot_solution_2(instance, solution, title=f'{instance.id_} with {solver.__name__}', show=True)
     return solutions
 
 
@@ -109,7 +111,7 @@ if __name__ == '__main__':
     logger.info('START')
 
     # paths = [Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/test.dat')]
-    paths = list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir())
+    paths = list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir())[:1]
     # for path in paths:
     #     read_and_execute_all(path)
     df = read_and_execute_all_parallel(paths)

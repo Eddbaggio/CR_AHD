@@ -4,6 +4,7 @@ from typing import final
 
 import src.cr_ahd.utility_module.utils as ut
 from src.cr_ahd.auction_module import auction as au
+from src.cr_ahd.tw_management_module import tw_management as twm
 from src.cr_ahd.core_module import instance as it, solution as slt
 from src.cr_ahd.routing_module import tour_construction as cns, tour_improvement as imp, tour_initialization as ini
 
@@ -194,6 +195,7 @@ class DynamicSolver(Solver):
     def _solve(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         while solution.unassigned_requests:
             self.assign_n_requests(instance, solution, ut.DYNAMIC_CYCLE_TIME)
+            self.time_window_management(instance, solution)
             if instance.num_carriers > 1:  # not for centralized instances
                 self.run_auction(instance, solution)
             # build tours with the re-allocated requests
@@ -215,7 +217,6 @@ class DynamicSolver(Solver):
             for i in range(min(n, k)):
                 requests.append(solution.unassigned_requests[c * k + i])
         carriers = [instance.request_to_carrier_assignment[i] for i in requests]
-        self.time_window_management(instance, solution)
         solution.assign_requests_to_carriers(requests, carriers)
         pass
 
@@ -249,3 +250,17 @@ class DynamicCollaborative(DynamicSolver):
 
     def build_tours(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         cns.CheapestInsertion().solve(instance, solution)
+
+
+class DynamicCollaborativeAHD(DynamicSolver):
+    def time_window_management(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        twm.TWManagement0().execute(instance, solution)
+        pass
+
+    def run_auction(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        au.AuctionC().execute(instance, solution)
+        pass
+
+    def build_tours(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        cns.CheapestInsertion().solve(instance, solution)
+        pass

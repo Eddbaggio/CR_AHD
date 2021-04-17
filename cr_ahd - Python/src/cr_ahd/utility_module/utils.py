@@ -6,7 +6,7 @@ import time
 import datetime as dt
 from collections import namedtuple
 from pathlib import Path
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Dict, Any, Iterable, Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -14,7 +14,7 @@ import pandas as pd
 from matplotlib.colors import LinearSegmentedColormap
 
 Coordinates = namedtuple('Coords', ['x', 'y'])
-TimeWindow = namedtuple('TimeWindow', ['e', 'l'])
+TimeWindow = namedtuple('TimeWindow', ['open', 'close'])
 
 opts = {
     'verbose': 0,
@@ -163,8 +163,8 @@ def get_carrier_by_id(carriers, id_):
     raise ValueError
 
 
-def powerset(iterable, include_empty_set=True):
-    """powerset([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"""
+def power_set(iterable, include_empty_set=True):
+    """power_set([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"""
     s = list(iterable)
     if include_empty_set:
         rng = range(len(s) + 1)
@@ -173,20 +173,12 @@ def powerset(iterable, include_empty_set=True):
     return itertools.chain.from_iterable(itertools.combinations(s, r) for r in rng)
 
 
-def flatten_dict_of_lists(d: dict):
-    """d is Dict[Any, List[Any]] pairs. This unpacks it such that there is only a flat list of all values"""
-    pool = []
-    for _, v in d.items():
-        pool.extend(v)
-    return pool
-
-
-def flatten(S):
-    if S == []:
-        return S
-    if isinstance(S[0], list):
-        return flatten(S[0]) + flatten(S[1:])
-    return S[:1] + flatten(S[1:])
+def flatten(sequence: Sequence):
+    if not sequence:
+        return sequence
+    if isinstance(sequence[0], Sequence):
+        return flatten(sequence[0]) + flatten(sequence[1:])
+    return sequence[:1] + flatten(sequence[1:])
 
 
 def random_partition(li):
@@ -283,3 +275,14 @@ def midpoint(instance, pickup_vertex, delivery_vertex):
     pickup_x, pickup_y = instance.x_coords[pickup_vertex], instance.y_coords[delivery_vertex]
     delivery_x, delivery_y = instance.x_coords[pickup_vertex], instance.y_coords[delivery_vertex]
     return (pickup_x + delivery_x) / 2, (pickup_y + delivery_y) / 2
+
+
+def linear_interpolation(iterable: Sequence, new_min: float, new_max: float):
+    """
+    return the iterable re-scaled to the range between new_min and new_max.
+    https://gamedev.stackexchange.com/questions/33441/how-to-convert-a-number-from-one-min-max-set-to-another-min-max-set/33445
+
+    """
+    it_min = min(iterable)
+    it_max = max(iterable)
+    return [((x - it_min) / (it_max - it_min)) * (new_max - new_min) + new_min for x in iterable]

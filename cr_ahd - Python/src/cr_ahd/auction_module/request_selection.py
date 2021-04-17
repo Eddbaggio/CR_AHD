@@ -31,7 +31,7 @@ class RequestSelectionBehavior(ABC):
             selected = [r for _, r in
                         sorted(zip(valuations, solution.carrier_solutions[carrier].unrouted_requests))][:k]
             for s in selected:
-                solution.carrier_solutions[carrier].unrouted_requests.remove(s)
+                solution.carrier_solutions[carrier].unrouted_requests.remove(s)  # TODO it's not routed yet! why do I already remove it here?
                 solution.request_to_carrier_assignment[s] = np.nan
                 submitted_requests.append(s)
                 solution.unassigned_requests.append(s)  # if i do this, the assign_n_requests function will not work
@@ -86,7 +86,7 @@ class HighestInsertionCostDistance(RequestSelectionBehavior):
             # if no feasible insertion for the current request was found, attempt to create a new tour, if that's not
             # feasible the best_delta_for_r will be infinity
             if best_delta_for_r == float('inf'):
-                if cs.num_tours() < instance.carriers_max_num_vehicles:
+                if cs.num_tours() < instance.carriers_max_num_tours:
                     pickup, delivery = instance.pickup_delivery_pair(request)
                     best_delta_for_r = instance.distance([carrier, pickup, delivery], [pickup, delivery, carrier])
             # collect the NEGATIVE value, since high insertion cost mean a low valuation for the carrier
@@ -96,10 +96,13 @@ class HighestInsertionCostDistance(RequestSelectionBehavior):
 
 class LowestProfit(RequestSelectionBehavior):
     def _evaluate_requests(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
-        revenue = [instance.revenue[r] for r in solution.carrier_solutions[carrier].unrouted_requests]
+        revenue = []
+        for r in solution.carrier_solutions[carrier].unrouted_requests:
+            request_revenue = sum([instance.revenue[v] for v in instance.pickup_delivery_pair(r)])
+            revenue.append(request_revenue)
         ins_cost = HighestInsertionCostDistance()._evaluate_requests(instance, solution, carrier)
         # return the profit, high profit means high valuation
-        return [rev - cost for rev, cost in zip(revenue, ins_cost)]
+        return [rev + cost for rev, cost in zip(revenue, ins_cost)]
 
 
 '''

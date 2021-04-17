@@ -54,10 +54,10 @@ class InsertionConstruction(TourConstructionBehavior):
     def _create_new_tour_with_request(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int,
                                       request: int):
         cs = solution.carrier_solutions[carrier]
-        if cs.num_tours() >= instance.carriers_max_num_vehicles:
+        if cs.num_tours() >= instance.carriers_max_num_tours:
             logger.error(f'Max Vehicle Constraint violated!')
-            raise ut.ConstraintViolationError(
-                f'Max. number of vehicles is {instance.carriers_max_num_vehicles}!')
+            raise ut.ConstraintViolationError(f'Cannot create new route with request {request} for carrier {carrier}.'
+                                              f' Max. number of vehicles is {instance.carriers_max_num_tours}!')
         rtmp = tr.Tour(len(cs.tours), instance, solution, cs.id_)
         rtmp.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(request))
         cs.tours.append(rtmp)

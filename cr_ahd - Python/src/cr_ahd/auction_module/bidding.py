@@ -52,4 +52,4 @@ class Profit(BiddingBehavior):
     def _generate_bid(self, instance: it.PDPInstance, solution: slt.GlobalSolution, bundle: List[int], carrier: int):
         ins_cost = CheapestInsertionDistanceIncrease()._generate_bid(instance, solution, bundle, carrier)
         ins_revenue = sum([instance.revenue[r] for r in bundle])
-        return ins_cost - ins_revenue
+        return ins_revenue - ins_cost

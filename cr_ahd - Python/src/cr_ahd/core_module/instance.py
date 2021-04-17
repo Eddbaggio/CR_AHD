@@ -18,7 +18,7 @@ class PDPInstance:
                  id_: str,
                  requests: pd.DataFrame,
                  carrier_depots: pd.DataFrame,
-                 carriers_max_num_vehicles: int,
+                 carriers_max_num_tours: int,
                  vehicles_max_load: float,
                  vehicles_max_tour_length: float):
         """
@@ -33,7 +33,7 @@ class PDPInstance:
         self.vehicles_max_load = vehicles_max_load
         self.vehicles_max_travel_distance = vehicles_max_tour_length
         self.carrier_depots = carrier_depots
-        self.carriers_max_num_vehicles = carriers_max_num_vehicles
+        self.carriers_max_num_tours = carriers_max_num_tours
         self.requests: np.ndarray = requests.index.values
         self.x_coords: np.ndarray = np.concatenate([carrier_depots['x'], requests['pickup_x'], requests['delivery_x']])
         self.y_coords: np.ndarray = np.concatenate([carrier_depots['y'], requests['pickup_y'], requests['delivery_y']])

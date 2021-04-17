@@ -60,16 +60,18 @@ class AuctionC(Auction):
     """
 
     def _run_auction(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
-        submitted_requests = rs.HighestInsertionCostDistance().execute(instance, solution, ut.NUM_REQUESTS_TO_SUBMIT)
-        logger.debug(f'requests {submitted_requests} have been submitted to the auction pool')
+        submitted_requests = rs.LowestProfit().execute(instance, solution, ut.NUM_REQUESTS_TO_SUBMIT)
         if submitted_requests:
+            logger.debug(f'requests {submitted_requests} have been submitted to the auction pool')
             bundles = bg.KMeansBundles().execute(instance, solution, submitted_requests)
             logger.debug(f'bundles {bundles} have been created')
             logger.debug(f'Generating bids')
-            bids = bd.CheapestInsertionDistanceIncrease().execute(instance, solution, bundles)
+            bids = bd.Profit().execute(instance, solution, bundles)
             logger.debug(f'Bids {bids} have been created for bundles {bundles}')
-            bundle_winners = wd.LowestBid().execute(instance, solution, bundles, bids)
+            bundle_winners = wd.HighestBid().execute(instance, solution, bundles, bids)
             logger.debug(f'reassigning bundles {bundles} to carriers {bundle_winners}')
             for bundle, winner in zip(bundles, bundle_winners):
                 solution.assign_requests_to_carriers(bundle, [winner] * len(bundle))
+        else:
+            logger.warning(f'No requests have been submitted!')
 

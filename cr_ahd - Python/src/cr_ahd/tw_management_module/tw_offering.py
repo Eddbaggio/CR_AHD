@@ -1,56 +1,70 @@
 import abc
-
+from src.cr_ahd.core_module import instance as it, solution as slt
 from src.cr_ahd.utility_module import utils as ut
 import src.cr_ahd.core_module.tour as tr
 
 
 class TWOfferingBehavior(abc.ABC):
-    def execute(self, carrier, request):
-        assert request.tw == ut.TIME_HORIZON
-        offered_time_windows = {tw: self._evaluate_time_window(tw, carrier, request) for tw in ut.ALL_TW}
-        offered_time_windows = {k: v for k, v in offered_time_windows.items() if bool(v)}  # only positive evaluations
-        offered_time_windows = {k: v for k, v in sorted(offered_time_windows.items(), key=lambda item: item[1])}
-        return tuple(offered_time_windows.keys())  # [:num_tw]
+    def execute(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, request: int):
+        pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
+        # make sure that the request has not been given a tw yet
+        assert (solution.tw_open[delivery_vertex], solution.tw_close[delivery_vertex]) == (ut.START_TIME, ut.END_TIME)
+
+        tw_valuations = [self._evaluate_time_window(instance, solution, carrier, request, tw) for tw in ut.ALL_TW]
+        offered_time_windows = list(sorted(zip(tw_valuations, ut.ALL_TW)))
+        offered_time_windows = [tw for valuation, tw in offered_time_windows if valuation >= 0]
+        return offered_time_windows  # [:num_tw]
 
     @abc.abstractmethod
-    def _evaluate_time_window(self, tw, carrier, request):
+    def _evaluate_time_window(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, request: int,
+                              tw: ut.TimeWindow):
         pass
 
-    def _find_first_insertion_index(self, tw: ut.TimeWindow, tour: tr.Tour):
-        for first_index, request in enumerate(tour.routing_sequence[1:], 1):
-            if tw.e <= request.tw.l:
+    def _find_first_insertion_index(self, solution: slt.GlobalSolution, tw: ut.TimeWindow, tour: tr.Tour):
+        """
+        based on the current tour, what is the first index in which insertion is feasible based on tw constraints?
+        """
+        for first_index, vertex in enumerate(tour.routing_sequence[1:], 1):
+            if tw.open <= solution.tw_close[vertex]:
                 return first_index
         return first_index
 
-    def _find_last_insertion_index(self, tw, tour, first_index):
-        for last_index, request in enumerate(tour.routing_sequence[first_index:], first_index):
-            if tw.l <= request.tw.e:
+    def _find_last_insertion_index(self, solution: slt.GlobalSolution, tw: ut.TimeWindow, tour: tr.Tour,
+                                   first_index: int):
+        """
+        based on the current routing sequence, what is the last index in which insertion is feasible based on tw
+        constraints
+        """
+        for last_index, vertex in enumerate(tour.routing_sequence[first_index:], first_index):
+            if tw.close <= solution.tw_open[vertex]:
                 return last_index
         return last_index
 
 
 class FeasibleTW(TWOfferingBehavior):
+    def _evaluate_time_window(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, request: int,
+                              tw: ut.TimeWindow):
+        cs = solution.carrier_solutions[carrier]
+        pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
 
-    def _evaluate_time_window(self, tw: ut.TimeWindow, carrier, request):
-        feasible_flag = False
-        for vehicle in [*carrier.active_vehicles, carrier.inactive_vehicles[0]]:  # TODO: what about initializing a new route?!
-            first_index = self._find_first_insertion_index(tw, vehicle.tour)
-            last_index = self._find_last_insertion_index(tw, vehicle.tour, first_index)
-            for insertion_index in range(first_index, last_index + 1):
-                try:
-                    vehicle.tour.insert_and_update(insertion_index, request)
-                    vehicle.tour.pop_and_update(insertion_index)
-                    feasible_flag = True
-                    return feasible_flag
-                except ut.InsertionError:
-                    continue
-        return feasible_flag
+        # can the carrier open a new tour and insert the request there?
+        if cs.num_tours() < instance.carriers_max_num_tours:
+            dist = instance.distance([carrier, pickup_vertex], [pickup_vertex, delivery_vertex])
+            if ut.travel_time(dist) <= solution.tw_close[delivery_vertex]:
+                return 1
+
+        # if no new tour can be built, can the request be inserted into one of the existing ones?
+        for tour in cs.tours:
+            first_index = self._find_first_insertion_index(solution, tw, tour)
+            last_index = self._find_last_insertion_index(solution, tw, tour, first_index)
+            for pickup_insertion_index in range(first_index):
+                for delivery_insertion_index in range(first_index, last_index + 1):
+                    if tour.insertion_feasibility_check(instance, solution,
+                                                        [pickup_insertion_index, delivery_insertion_index],
+                                                        [pickup_vertex, delivery_vertex]):
+                        return 1
+
+        # if request cannot be inserted anywhere, return negative valuation
+        return -1
 
 
-class CheapestTW(TWOfferingBehavior):
-    """
-    Select time windows based on their cheapest insertion cost for the request.
-    """
-
-    def _evaluate_time_window(self, tw, carrier, request):
-        pass

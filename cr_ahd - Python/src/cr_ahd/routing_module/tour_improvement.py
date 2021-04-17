@@ -135,6 +135,30 @@ class PDPExchange(TourImprovementBehavior):
         return best_delta, best_new_tour, best_pos_i, best_pos_j
 
 
+class PDPRelocate(TourImprovementBehavior):
+    """
+    Take a PD pair and see whether inserting it in a different location of the same route improves the solution
+    """
+
+    def improve_global_solution(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        for carrier in range(instance.num_carriers):
+            self.improve_carrier_solution(instance, solution, carrier)
+        pass
+
+    def improve_carrier_solution(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
+        # raise NotImplementedError
+        cs = solution.carrier_solutions[carrier]
+        for tour in range(cs.num_tours()):
+            self.improve_tour(instance, solution, carrier, tour)
+        pass
+
+    def improve_tour(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, tour: int):
+        cs = solution.carrier_solutions[carrier]
+        t = cs.tours[tour]
+        raise NotImplementedError
+        pass
+
+
 # class ThreeOpt(TourImprovementBehavior):
 #     pass
 

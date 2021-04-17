@@ -1,3 +1,5 @@
+from unittest import TestCase
+
 from src.cr_ahd.core_module.tour import Tour
 from src.cr_ahd.routing_module.tour_improvement import TwoOpt
 import src.cr_ahd.utility_module.utils as ut
@@ -54,5 +56,7 @@ def test_tour_reverse_InsertionError(small_tw_tour: Tour):
         small_tw_tour.reverse_section(2, 6)
 
 
-if __name__ == '__main__':
-    pass
+class TestTour(TestCase):
+    def test__insert_no_update(self, ):
+
+        self.fail()
