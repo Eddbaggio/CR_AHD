@@ -87,6 +87,7 @@ class StaticCollaborative(StaticSolver):
     def run_auction(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         au.AuctionC().execute(instance, solution)
 
+
 '''
 class StaticSequentialInsertion(Solver):
     """
@@ -185,12 +186,13 @@ class StaticI1InsertionWithAuction(Solver):
         imp.TwoOpt().improve_global_solution(instance)
 '''
 
+
 # =====================================================================================================================
 # DYNAMIC
 # =====================================================================================================================
 
 
-class DynamicSolver(Solver):
+class DynamicSolver(Solver, abc.ABC):
     @final
     def _solve(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         while solution.unassigned_requests:
@@ -211,6 +213,7 @@ class DynamicSolver(Solver):
         logger.debug(f'Assigning {n} requests to each carrier')
         # assumes equal num_requests for all carriers! Does not work otherwise!
         assert len(solution.unassigned_requests) % instance.num_carriers == 0
+        assert n <= instance.num_requests / instance.num_carriers
         k: int = len(solution.unassigned_requests) // instance.num_carriers
         requests = []
         for c in range(instance.num_carriers):

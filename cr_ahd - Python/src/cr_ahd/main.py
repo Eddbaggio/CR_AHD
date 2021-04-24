@@ -31,8 +31,8 @@ def execute_all(instance: it.PDPInstance):
     for solver in [
         # slv.Static,
         # slv.StaticCollaborative,
-        # slv.Dynamic,
-        slv.DynamicCollaborative,
+        slv.Dynamic,
+        # slv.DynamicCollaborative,
         # slv.DynamicCollaborativeAHD
     ]:
         solution = slt.GlobalSolution(instance)

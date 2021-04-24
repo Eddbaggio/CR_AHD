@@ -2,7 +2,7 @@ import datetime as dt
 import json
 import logging.config
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Sequence
 
 import numpy as np
 import pandas as pd
@@ -16,11 +16,24 @@ logger = logging.getLogger(__name__)
 class PDPInstance:
     def __init__(self,
                  id_: str,
-                 requests: pd.DataFrame,
-                 carrier_depots: pd.DataFrame,
-                 carriers_max_num_tours: int,
-                 vehicles_max_load: float,
-                 vehicles_max_tour_length: float):
+                 max_num_tours_per_carrier: int,
+                 max_vehicle_load: float,
+                 max_tour_length: float,
+                 requests: Sequence,
+                 requests_initial_carrier_assignment: Sequence,
+                 requests_pickup_x: Sequence,
+                 requests_pickup_y: Sequence,
+                 requests_delivery_x: Sequence,
+                 requests_delivery_y: Sequence,
+                 requests_revenue: Sequence,
+                 requests_pickup_service_time: Sequence,
+                 requests_delivery_service_time: Sequence,
+                 requests_pickup_load: Sequence,
+                 requests_delivery_load: Sequence,
+                 carrier_depots_x: Sequence,
+                 carrier_depots_y: Sequence,
+
+                 ):
         """
         Create an instance for the collaborative transportation network for attended home delivery
 
@@ -29,43 +42,30 @@ class PDPInstance:
         self._id_ = id_
         self.meta = dict((k.strip(), int(v.strip()))
                          for k, v in (item.split('=')
-                         for item in id_.split('+')))
-        self.vehicles_max_load = vehicles_max_load
-        self.vehicles_max_travel_distance = vehicles_max_tour_length
-        self.carrier_depots = carrier_depots
-        self.carriers_max_num_tours = carriers_max_num_tours
-        self.requests: np.ndarray = requests.index.values
-        self.x_coords: np.ndarray = np.concatenate([carrier_depots['x'], requests['pickup_x'], requests['delivery_x']])
-        self.y_coords: np.ndarray = np.concatenate([carrier_depots['y'], requests['pickup_y'], requests['delivery_y']])
-        self.request_to_carrier_assignment = requests['carrier_index']
-        self.revenue = np.concatenate(
-            [np.zeros(self.num_carriers), np.zeros_like(requests['revenue']), requests['revenue']])
-        self.load = np.concatenate(
-            [np.zeros(self.num_carriers), requests['load'], -requests['load']])
-        self.service_time = tuple(
-            [*pd.Series([pd.Timedelta(0)] * self.num_carriers), *requests['service_time'], *requests['service_time']])
+                                      for item in id_.split('+')))
+        self.num_carriers = len(carrier_depots_x)
+        self.vehicles_max_load = max_vehicle_load
+        self.vehicles_max_travel_distance = max_tour_length
+        # self.carrier_depots = carrier_depots
+        self.carriers_max_num_tours = max_num_tours_per_carrier
+        self.requests = requests
+        self.x_coords = [*carrier_depots_x, *requests_pickup_x, *requests_delivery_x]
+        self.y_coords = [*carrier_depots_y, *requests_pickup_y, *requests_delivery_y]
+        self.request_to_carrier_assignment = requests_initial_carrier_assignment
+        self.revenue = [*[0] * (self.num_carriers + len(requests)), *requests_revenue]
+        self.load = [*[0] * self.num_carriers, *requests_pickup_load, *requests_delivery_load]
+        self.service_time = [*[dt.timedelta(0)] * self.num_carriers, *requests_pickup_service_time, *requests_delivery_service_time]
 
         # compute the distance matrix
-        request_coordinates = pd.concat([
-            requests[['pickup_x', 'pickup_y']].rename(columns={'pickup_x': 'x', 'pickup_y': 'y'}),
-            requests[['delivery_x', 'delivery_y']].rename(columns={'delivery_x': 'x', 'delivery_y': 'y'})],
-            keys=['pickup', 'delivery']
-        ).swaplevel()
-        self._distance_matrix = squareform(pdist(np.concatenate([carrier_depots, request_coordinates]), 'euclidean'))
-        # self.df = requests  # store the data as pd.DataFrame as well?
+        self._distance_matrix = squareform(pdist(np.array(list(zip(self.x_coords, self.y_coords))), 'euclidean'))
         logger.debug(f'{id_}: created')
 
     def __str__(self):
-        return f'Instance {self.id_} with {len(self.requests)} customers and {len(self.carrier_depots)} carriers'
+        return f'Instance {self.id_} with {len(self.requests)} customers and {self.num_carriers} carriers'
 
     @property
     def id_(self):
         return self._id_
-
-    @property
-    def num_carriers(self):
-        """The number of carriers in the Instance"""
-        return len(self.carrier_depots)
 
     @property
     def num_requests(self):
@@ -73,19 +73,30 @@ class PDPInstance:
         return len(self.requests)
 
     def distance(self, i: List[int], j: List[int]):
+        """
+        returns the distance between pairs of elements in i and j. Think sum(distance(i[0], j[0]), distance(i[1], j[1]),
+        ...)
+
+        """
         d = 0
-        for ii in i:
-            for jj in j:
-                d += self._distance_matrix[ii, jj]
+        for ii, jj in zip(i, j):
+            d += self._distance_matrix[ii, jj]
         return d
 
     def pickup_delivery_pair(self, request: int) -> Tuple[int, int]:
         """returns a tuple of pickup & delivery vertex indices for the given request"""
+        if request >= self.num_requests:
+            raise IndexError(
+                f'you asked for request {request} but instance {self.id_} only has {self.num_requests} requests')
         return self.num_carriers + request, self.num_carriers + self.num_requests + request
 
     def request_from_vertex(self, vertex: int):
-        assert vertex >= self.num_carriers, f'vertex {vertex} does not belong to a request but is a depot vertex'
-        if vertex <= self.num_carriers + self.num_requests - 1:  # pickup vertex
+        if vertex < self.num_carriers:
+            raise IndexError(f'you provided vertex {vertex} but that is a depot not a request vertex')
+        elif vertex >= self.num_carriers + 2 * self.num_requests:
+            raise IndexError(
+                f'you provided vertex {vertex} but there are only {self.num_carriers + 2 * self.num_requests} vertices')
+        elif vertex <= self.num_carriers + self.num_requests - 1:  # pickup vertex
             return vertex - self.num_carriers
         else:  # delivery vertex
             return vertex - self.num_carriers - self.num_requests
@@ -126,6 +137,16 @@ class PDPInstance:
         # LOGGER.debug(f'{self.id_}: wrote instance to json at {file_name}')
         return file_name
 
+    def vertex_type(self, vertex: int):
+        if vertex < self.num_carriers:
+            return "depot"
+        elif vertex < self.num_carriers + self.num_requests:
+            return "pickup"
+        elif vertex < self.num_carriers + 2*self.num_requests:
+            return "delivery"
+        else:
+            raise IndexError(f'Vertex index {vertex} out of range')
+
 
 def read_gansterer_hartl_mv(path: Path, num_carriers=3) -> PDPInstance:
     """read an instance file as used in (Gansterer,M., & Hartl,R.F. (2016). Request evaluation strategies
@@ -139,13 +160,31 @@ def read_gansterer_hartl_mv(path: Path, num_carriers=3) -> PDPInstance:
     requests = pd.read_csv(path, skiprows=10 + num_carriers, delim_whitespace=True, names=cols, index_col=False,
                            float_precision='round_trip')
     requests['service_time'] = dt.timedelta(0)
-    return PDPInstance(path.stem, requests, depots, vrp_params['V'], vrp_params['L'] * 10, vrp_params['T'])
+    return PDPInstance(path.stem,
+                       vrp_params['V'].tolist(),
+                       (vrp_params['L'] * 10).tolist(),
+                       vrp_params['T'].tolist(),
+                       requests.index.tolist(),
+                       requests['carrier_index'].tolist(),
+                       requests['pickup_x'].tolist(),
+                       requests['pickup_y'].tolist(),
+                       requests['delivery_x'].tolist(),
+                       requests['delivery_y'].tolist(),
+                       requests['revenue'].tolist(),
+                       requests['service_time'].tolist(),
+                       requests['service_time'].tolist(),
+                       requests['load'].tolist(),
+                       (-requests['load']).tolist(),
+                       depots['x'].tolist(),
+                       depots['y'].tolist(),
+                       )
 
 
 def read_gansterer_hartl_sv(path: Path) -> PDPInstance:
     """read an instance file as used in (Gansterer,M., & Hartl,R.F. (2016). Request evaluation strategies
     for carriers in auction-based collaborations. https://doi.org/10.1007/s00291-015-0411-1).
     """
+    raise NotImplementedError
     depots = pd.read_csv(path, skiprows=2, nrows=3, delim_whitespace=True, header=None, index_col=False,
                          usecols=[1, 2], names=['x', 'y'])
     cols = ['carrier_index', 'pickup_x', 'pickup_y', 'delivery_x', 'delivery_y', 'revenue', 'load']

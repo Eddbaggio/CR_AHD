@@ -1,6 +1,6 @@
 import datetime as dt
 import logging.config
-from typing import List, Union, Tuple, Iterable
+from typing import List, Union, Tuple, Iterable, Sequence
 import numpy as np
 
 import src.cr_ahd.utility_module.utils as ut
@@ -165,14 +165,13 @@ class Tour:
         logger.debug(f'{vertex} inserted into {self.id_} at index {index}')
         pass
 
-    def insert_and_update(self, instance, solution, indices: Iterable[int], vertices: Iterable[int]):
+    def insert_and_update(self, instance, solution, indices: Sequence[int], vertices: Sequence[int]):
         """
-         inserts a vertex BEFORE the specified index and resets/deletes all cost and schedules. If insertion is
-         infeasible due to time window constraints, it will undo the insertion and raise InsertionError
+         inserts a vertex BEFORE the specified index and updates all sequences and schedules.
 
         :param solution:
         :param instance:
-        :param indices: index before which the given vertex/request is to be inserted
+        :param indices: index before which the given vertex is to be inserted
         :param vertices: vertex to insert into the tour
         """
         assert all(indices[i] <= indices[i + 1] for i in range(len(indices) - 1))  # assure that indices are sorted
@@ -242,18 +241,18 @@ class Tour:
 
     def reverse_section(self, instance, solution, i, j):
         """
-        reverses a section of the route from index i to index j-1. If reversal is infeasible, will raise InsertionError
-        (and undoes the attempted reversal)
+        reverses a section of the route by connecting i->j and i+1 -> j+1.
+        If reversal is infeasible, will raise InsertionError (and undoes the attempted reversal)
 
         Example: \n
         >> tour.sequence = [0, 1, 2, 3, 4, 0] \n
         >> tour.reverse_section(1, 4) \n
         >> print (tour.sequence) \n
-        >> [0, 3, 2, 1, 4, 0]
+        >> [0, 1, 4, 3, 2, 0]
         """
         for k in range(1, j - i):
-            popped = self._pop_no_update(i)
-            self._insert_no_update(j - k, popped)
+            popped = self._pop_no_update(i + 1)
+            self._insert_no_update(j - k + 1, popped)
         try:
             self.update_sequences_and_schedules(instance, solution, i)  # maybe the new routing sequence is infeasible
         except ut.InsertionError as e:

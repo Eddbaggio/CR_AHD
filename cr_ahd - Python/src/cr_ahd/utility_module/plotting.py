@@ -163,6 +163,43 @@ def _make_tour_scatter(instance: it.PDPInstance, solution: slt.GlobalSolution, c
                       )
 
 
+def _make_unrouted_scatter(instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
+    cs = solution.carrier_solutions[carrier]
+    unrouted_vertices = ut.flatten([list(instance.pickup_delivery_pair(r)) for r in cs.unrouted_requests])
+
+    df = pd.DataFrame({
+        'id_': unrouted_vertices,
+        'x': [instance.x_coords[v] for v in unrouted_vertices],
+        'y': [instance.y_coords[v] for v in unrouted_vertices],
+        'revenue': [instance.revenue[v] for v in unrouted_vertices],
+        'tw_open': [solution.tw_open[v] for v in unrouted_vertices],
+        'tw_close': [solution.tw_close[v] for v in unrouted_vertices],
+        'original_carrier_assignment': [instance.request_to_carrier_assignment[r] for r in
+                                        [instance.request_from_vertex(v) for v in unrouted_vertices]]})
+
+    hover_text = []
+    for v in unrouted_vertices:
+        if v < instance.num_requests:
+            v_type = 'Pickup'
+        else:
+            v_type = 'Delivery'
+        hover_text.append(f'Request {instance.request_from_vertex(v)}</br>{v_type}</br>Revenue: {instance.revenue[v]}')
+
+    return go.Scatter(
+        x=df['x'], y=df['y'], mode='markers+text',
+        marker=dict(
+            symbol=['circle'] * len(unrouted_vertices),
+            size=ut.linear_interpolation(df['revenue'].values, 15, 30),
+            line=dict(color=[ut.univie_colors_100[c] for c in df['original_carrier_assignment']], width=2),
+            color=ut.univie_colors_60[carrier]),
+        text=df['id_'],
+        textfont=dict(color='red'),
+        name=f'Carrier {carrier}, unrouted',
+        hovertext=hover_text
+        # legendgroup=carrier, hoverinfo='x+y'
+    )
+
+
 def _make_tour_edges(instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, tour: int):
     t = solution.carrier_solutions[carrier].tours[tour]
     # creating arrows as annotations
@@ -172,19 +209,18 @@ def _make_tour_edges(instance: it.PDPInstance, solution: slt.GlobalSolution, car
         to_vertex = t.routing_sequence[i + 1]
         arrow_tail = (instance.x_coords[from_vertex], instance.y_coords[from_vertex])
         arrow_head = (instance.x_coords[to_vertex], instance.y_coords[to_vertex])
-        min_rev = instance.revenue.min()
-        max_rev = instance.revenue.max()
+        min_rev = min(instance.revenue)
+        max_rev = max(instance.revenue)
 
-        anno = go.layout.Annotation(x=arrow_head[0], y=arrow_head[1], ax=arrow_tail[0], ay=arrow_tail[1],
-                                    xref='x', yref='y', axref='x', ayref='y',
-                                    text="",
-                                    showarrow=True, arrowhead=2, arrowsize=2, arrowwidth=1,
-                                    arrowcolor=ut.univie_colors_100[carrier],
-                                    standoff=ut.linear_interpolation([instance.revenue[to_vertex]], min_rev,
-                                                                     max_rev) / 2,
-                                    startstandoff=ut.linear_interpolation([instance.revenue[from_vertex]], min_rev,
-                                                                          max_rev) / 2,
-                                    name=f'Carrier {carrier}, Tour {t}')
+        anno = go.layout.Annotation(
+            x=arrow_head[0], y=arrow_head[1], ax=arrow_tail[0], ay=arrow_tail[1],
+            xref='x', yref='y', axref='x', ayref='y',
+            text="",
+            showarrow=True, arrowhead=2, arrowsize=2, arrowwidth=1,
+            arrowcolor=ut.univie_colors_100[carrier],
+            standoff=ut.linear_interpolation([instance.revenue[to_vertex]], 15, 30, min_rev, max_rev)[0] / 2,
+            startstandoff=ut.linear_interpolation([instance.revenue[from_vertex]], 15, 30, min_rev, max_rev)[0] / 2,
+            name=f'Carrier {carrier}, Tour {t}')
         directed_edges.append(anno)
     return directed_edges
 
@@ -193,15 +229,21 @@ def _add_carrier_solution(fig: go.Figure, instance, solution: slt.GlobalSolution
     carrier_solution = solution.carrier_solutions[carrier]
     scatter_traces = []
     edge_traces = []
-    for t in range(carrier_solution.num_tours()):
-        scatter = _make_tour_scatter(instance, solution, carrier, t)
-        fig.add_trace(scatter)
-        scatter_traces.append(scatter)
+    for tour in range(carrier_solution.num_tours()):
+        tour_scatter = _make_tour_scatter(instance, solution, carrier, tour)
+        fig.add_trace(tour_scatter)
+        scatter_traces.append(tour_scatter)
 
-        edges = _make_tour_edges(instance, solution, carrier, t)
+        edges = _make_tour_edges(instance, solution, carrier, tour)
         for edge in edges:
             fig.add_annotation(edge)
         edge_traces.append(edges)
+
+    if carrier_solution.unrouted_requests:
+        unrouted_scatter = _make_unrouted_scatter(instance, solution, carrier)
+        fig.add_trace(unrouted_scatter)
+        scatter_traces.append(unrouted_scatter)
+
     return scatter_traces, edge_traces
 
 
@@ -257,9 +299,10 @@ def plot_solution_2(instance: it.PDPInstance, solution: slt.GlobalSolution, titl
         scatters.append(scatter_traces)
         edges.append(edge_traces)
 
-    unassigned_scatter = _make_unassigned_scatter(fig, instance, solution)
-    fig.add_trace(unassigned_scatter)
-    scatters.append(unassigned_scatter)
+    if solution.unassigned_requests:
+        unassigned_scatter = _make_unassigned_scatter(fig, instance, solution)
+        fig.add_trace(unassigned_scatter)
+        scatters.append(unassigned_scatter)
 
     # custom buttons to hide edges
     button_dicts = []

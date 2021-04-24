@@ -96,7 +96,9 @@ class GlobalSolution:
 class PDPSolution:
     def __init__(self, carrier_index):
         self.id_ = carrier_index
-        self.unrouted_requests: List = list()  # must be a list (instead of a set) because it must be sorted for bidding (could create a local list-copy though, if i really wanted)
+        # must be a list (instead of a set) because it must be sorted for bidding (could create a local list-copy
+        # though, if i really wanted)
+        self.unrouted_requests: List = list()
         self.tours: List[tr.Tour] = []
 
         self.solution_algorithm = None

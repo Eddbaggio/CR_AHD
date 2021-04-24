@@ -277,12 +277,13 @@ def midpoint(instance, pickup_vertex, delivery_vertex):
     return (pickup_x + delivery_x) / 2, (pickup_y + delivery_y) / 2
 
 
-def linear_interpolation(iterable: Sequence, new_min: float, new_max: float):
+def linear_interpolation(iterable: Sequence, new_min: float, new_max: float, old_min=None, old_max=None):
     """
     return the iterable re-scaled to the range between new_min and new_max.
     https://gamedev.stackexchange.com/questions/33441/how-to-convert-a-number-from-one-min-max-set-to-another-min-max-set/33445
 
     """
-    it_min = min(iterable)
-    it_max = max(iterable)
-    return [((x - it_min) / (it_max - it_min)) * (new_max - new_min) + new_min for x in iterable]
+    if old_min is None and old_max is None:
+        old_min = min(iterable)
+        old_max = max(iterable)
+    return [((x - old_min) / (old_max - old_min)) * (new_max - new_min) + new_min for x in iterable]
