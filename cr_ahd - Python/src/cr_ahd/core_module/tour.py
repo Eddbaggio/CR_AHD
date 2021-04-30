@@ -259,19 +259,22 @@ class Tour:
             self.reverse_section(instance, solution, i, j)  # undo all the reversal
             raise e
 
-    def insertion_distance_delta(self, instance, insertion_positions: List[int], insertion_vertices: List[int]):
+    def insertion_distance_delta(self, instance, indices: List[int], vertices: List[int]):
         """
         returns the distance surplus that is obtained by inserting the insertion_vertices at the insertion_positions.
         NOTE: Does NOT perform a feasibility check and does NOT actually insert the vertices!
 
         :param instance:
-        :param insertion_positions:
-        :param insertion_vertices:
+        :param indices: indices for insertion. provide for each vertex the index that it should be inserted at, CONSIDERING THAT PREVIOUSLY LISTED VERTICES UPDATE THE INDEX NUMBER OF ALL ITS (THEN) SUCCESSORS
+        :param vertices:
         :return:
         """
+        raise NotImplementedError  # does not consider difference in consecutive vertices
+        assert all(indices[i] <= indices[i + 1] for i in range(len(indices) - 1))  # assure that indices are sorted
+
         tmp_routing_sequence = list(self.routing_sequence)
         delta = 0
-        for pos, vertex in zip(insertion_positions, insertion_vertices):
+        for pos, vertex in zip(indices, vertices):
             predecessor_vertex = tmp_routing_sequence[pos - 1]
             successor_vertex = tmp_routing_sequence[pos]
             tmp_routing_sequence.insert(pos, vertex)
@@ -279,38 +282,6 @@ class Tour:
                      instance.distance([vertex], [successor_vertex]) - \
                      instance.distance([predecessor_vertex], [successor_vertex])
 
-        return delta
-
-    def insertion_revenue_delta(self, instance, insertion_vertices: List[int]):
-        delta = 0
-        for vertex in insertion_vertices:
-            delta += instance.revenue[vertex]
-        return delta
-
-    def removal_distance_delta(self, instance, removal_positions: List[int]):
-        """
-        does not actually remove anything, simply tests what it would save to remove the vertices located at positions.
-        NOTE: Does NOT perform any feasibility checks and does NOT actually remove the vertices!
-        :param instance:
-        :param removal_positions: indices of the requests to be removed
-        :return: NEGATIVE number, giving the distance savings
-        """
-        tmp_routing_sequence = list(self.routing_sequence)
-        savings = 0
-        for pos in removal_positions:
-            vertex = tmp_routing_sequence[pos]
-            predecessor_vertex = tmp_routing_sequence[pos - 1]
-            successor_vertex = tmp_routing_sequence[pos]
-            savings -= instance.distance(
-                [predecessor_vertex, vertex], [vertex, successor_vertex]) - instance.distance(
-                [predecessor_vertex], [successor_vertex]
-            )
-        return savings
-
-    def removal_revenue_delta(self, instance, insertion_vertices: List[int]):
-        delta = 0
-        for vertex in insertion_vertices:
-            delta += instance.revenue[vertex]
         return delta
 
     def insertion_feasibility_check(self, instance,
@@ -329,6 +300,7 @@ class Tour:
         """
         assert all(insertion_positions[i] <= insertion_positions[i + 1] for i in range(len(insertion_positions) - 1))
         # create a temporary routing sequence to loop over that contains the new vertices
+        # TODO avoid the copy if possible!
         tmp_routing_sequence = list(self.routing_sequence)
         for pos, vertex in zip(insertion_positions, insertion_vertices):
             tmp_routing_sequence.insert(pos, vertex)

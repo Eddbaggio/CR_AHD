@@ -57,6 +57,8 @@ class PDPInstance:
         self.service_time = [*[dt.timedelta(0)] * self.num_carriers, *requests_pickup_service_time, *requests_delivery_service_time]
 
         # compute the distance matrix
+        # TODO do I need to round the distances due to floating point precision?
+        # self._distance_matrix = np.ceil(squareform(pdist(np.array(list(zip(self.x_coords, self.y_coords))), 'euclidean')))
         self._distance_matrix = squareform(pdist(np.array(list(zip(self.x_coords, self.y_coords))), 'euclidean'))
         logger.debug(f'{id_}: created')
 
@@ -72,7 +74,7 @@ class PDPInstance:
         """The number of requests"""
         return len(self.requests)
 
-    def distance(self, i: List[int], j: List[int]):
+    def distance(self, i: Sequence[int], j: Sequence[int]):
         """
         returns the distance between pairs of elements in i and j. Think sum(distance(i[0], j[0]), distance(i[1], j[1]),
         ...)

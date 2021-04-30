@@ -145,24 +145,6 @@ class PDPSolution:
             'tour_summaries': {t.id_: t.summary() for t in self.tours}
         }
 
-    def exchange_vertices(self, instance: it.PDPInstance, solution: GlobalSolution, old_tour: int, new_tour: int,
-                          old_positions: List[int],
-                          new_positions: List[int]):
-        """
-        used for the PDPExchange local search operator. Allows to move vertices from one tour to another. In a PDP
-        context this will always be pickup-delivery pairs being moved from one tour to another.
-
-        :param instance:
-        :param solution:
-        :param old_tour:
-        :param new_tour:
-        :param old_positions:
-        :param new_positions:
-        :return:
-        """
-        vertices = self.tours[old_tour].pop_and_update(instance, solution, old_positions)
-        self.tours[new_tour].insert_and_update(instance, solution, new_positions, vertices)
-
 
 def read_solution_and_summary_from_json(path: Path):
     with open(path, mode='r') as f:

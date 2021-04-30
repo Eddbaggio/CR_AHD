@@ -129,31 +129,30 @@ def plot_carrier(instance: it.PDPInstance, solution: slt.GlobalSolution, carrier
 
 
 def _make_tour_scatter(instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, tour: int):
-    t = solution.carrier_solutions[carrier].tours[tour]
+    tour_ = solution.carrier_solutions[carrier].tours[tour]
 
     df = pd.DataFrame({
-        'id_': t.routing_sequence[:-1],
-        'x': [instance.x_coords[v] for v in t.routing_sequence[:-1]],
-        'y': [instance.y_coords[v] for v in t.routing_sequence[:-1]],
-        'revenue': [instance.revenue[v] for v in t.routing_sequence[:-1]],
-        'tw_open': [solution.tw_open[v] for v in t.routing_sequence[:-1]],
-        'tw_close': [solution.tw_close[v] for v in t.routing_sequence[:-1]], })
+        'id_': tour_.routing_sequence[:-1],
+        'x': [instance.x_coords[v] for v in tour_.routing_sequence[:-1]],
+        'y': [instance.y_coords[v] for v in tour_.routing_sequence[:-1]],
+        'revenue': [instance.revenue[v] for v in tour_.routing_sequence[:-1]],
+        'tw_open': [solution.tw_open[v] for v in tour_.routing_sequence[:-1]],
+        'tw_close': [solution.tw_close[v] for v in tour_.routing_sequence[:-1]], })
     original_carrier_assignment = [instance.request_to_carrier_assignment[r] for r in
-                                   [instance.request_from_vertex(v) for v in t.routing_sequence[1:-1]]]
+                                   [instance.request_from_vertex(v) for v in tour_.routing_sequence[1:-1]]]
     original_carrier_assignment.insert(0, carrier)
     hover_text = []
-    for v in t.routing_sequence[1:-1]:
-        if v < instance.num_requests:
-            v_type = 'Pickup'
-        else:
-            v_type = 'Delivery'
-        hover_text.append(f'Request {instance.request_from_vertex(v)}</br>{v_type}</br>Revenue: {instance.revenue[v]}')
+    for v in tour_.routing_sequence[1:-1]:
+        hover_text.append(
+            f"Request {instance.request_from_vertex(v)}</br>{instance.vertex_type(v)}</br>"
+            f"Revenue: {instance.revenue[v]}</br>"
+            f"Tour's Travel Distance: {tour_.sum_travel_distance}")
     hover_text.insert(0, f'Depot {carrier}')
 
     # colorscale = [(c, ut.univie_colors_100[c]) for c in range(instance.num_carriers)]
     return go.Scatter(x=df['x'], y=df['y'], mode='markers+text',
                       marker=dict(
-                          symbol=['square', *['circle'] * (t.num_routing_stops - 2)],
+                          symbol=['square', *['circle'] * (tour_.num_routing_stops - 2)],
                           size=ut.linear_interpolation(df['revenue'].values, 15, 30),
                           line=dict(color=[ut.univie_colors_100[c] for c in original_carrier_assignment], width=2),
                           color=ut.univie_colors_60[carrier]),
@@ -332,13 +331,20 @@ def plot_solution_2(instance: it.PDPInstance, solution: slt.GlobalSolution, titl
 
     fig.update_layout(updatemenus=
                       [dict(type='buttons',
-                            # y=c / instance.num_carriers,
-                            # yanchor='auto',
+                            y=c / instance.num_carriers,
+                            yanchor='auto',
                             active=-1,
                             buttons=button_dicts
                             )
                        ],
-                      title=title)
+                      title=title,
+                      # height=1200,
+                      # width=1600
+                      )
+    fig.update_yaxes(
+        scaleanchor="x",
+        scaleratio=1
+    )
 
     if show:
         fig.show(config=config)

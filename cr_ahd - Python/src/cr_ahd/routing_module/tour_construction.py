@@ -38,8 +38,8 @@ class InsertionConstruction(TourConstructionBehavior):
 
         pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(unrouted_request)
 
-        for pickup_pos in range(1, len(t)):
-            for delivery_pos in range(pickup_pos + 1, len(t) + 1):
+        for pickup_pos in range(1, len(t) - 1):
+            for delivery_pos in range(pickup_pos + 1, len(t)):
                 delta = t.insertion_distance_delta(instance, [pickup_pos, delivery_pos],
                                                    [pickup_vertex, delivery_vertex])
                 if not t.insertion_feasibility_check(instance, solution, [pickup_pos, delivery_pos],
@@ -73,14 +73,14 @@ class SequentialInsertion(InsertionConstruction):
     """
 
     def _carrier_cheapest_insertion(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
+        raise NotImplementedError
         logger.debug(f'Sequential Insertion tour construction for carrier {carrier}:')
         cs = solution.carrier_solutions[carrier]
         for r in cs.unrouted_requests:
             best_delta = float('inf')
             for t in range(cs.num_tours()):
                 # cheapest way to fit r into t
-                delta, pickup_position, delivery_position = self._tour_cheapest_insertion(instance, solution,
-                                                                                          carrier, t, r)
+                delta, pickup_position, delivery_position = self._tour_cheapest_insertion()
                 if delta < best_delta:
                     best_delta = delta
                     best_pickup_pos = pickup_position

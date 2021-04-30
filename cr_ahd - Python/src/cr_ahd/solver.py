@@ -59,7 +59,7 @@ class StaticSolver(Solver):
         pass
 
     def finalize_with_local_search(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
-        imp.PDPExchange().improve_global_solution(instance, solution)
+        imp.PDPExchangeMoveBest().improve_global_solution(instance, solution)
         pass
 
     def time_window_management(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
@@ -227,7 +227,7 @@ class DynamicSolver(Solver, abc.ABC):
         pass
 
     def finalize_with_local_search(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
-        imp.PDPExchange().improve_global_solution(instance, solution)
+        imp.PDPExchangeMoveBest().improve_global_solution(instance, solution)
         pass
 
     def run_auction(self, instance: it.PDPInstance, solution: slt.GlobalSolution):

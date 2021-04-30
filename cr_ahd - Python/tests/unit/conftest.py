@@ -35,12 +35,29 @@ def inst_and_sol_gh_0_9_assigned(inst_gh_0: it.PDPInstance, sol_gh_0: slt.Global
 @pytest.fixture
 def inst_and_sol_gh_0_9_ass_6_routed(inst_and_sol_gh_0_9_assigned):
     instance, solution = inst_and_sol_gh_0_9_assigned
-    for carrier in range(instance.num_carriers):
-        tour = tr.Tour(0, instance, solution, carrier)
-        solution.carrier_solutions[carrier].tours.append(tour)
-        for request in solution.carrier_solutions[carrier].unrouted_requests[:2]:
-            tour.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(request))
-            solution.carrier_solutions[carrier].unrouted_requests.remove(request)
+    # carrier 0
+    carrier = 0
+    tour = tr.Tour(0, instance, solution, carrier)
+    solution.carrier_solutions[carrier].tours.append(tour)
+    for request in solution.carrier_solutions[carrier].unrouted_requests[:2]:
+        tour.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(request))
+        solution.carrier_solutions[carrier].unrouted_requests.remove(request)
+
+    # carrier 1
+    carrier = 1
+    tour = tr.Tour(0, instance, solution, carrier)
+    solution.carrier_solutions[carrier].tours.append(tour)
+    tour.insert_and_update(instance, solution, [1, 2, 3, 4], [9, 8, 24, 23])
+    solution.carrier_solutions[carrier].unrouted_requests.remove(5)
+    solution.carrier_solutions[carrier].unrouted_requests.remove(6)
+
+    # carrier 2
+    carrier = 2
+    tour = tr.Tour(0, instance, solution, carrier)
+    solution.carrier_solutions[carrier].tours.append(tour)
+    for request in solution.carrier_solutions[carrier].unrouted_requests[:2]:
+        tour.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(request))
+        solution.carrier_solutions[carrier].unrouted_requests.remove(request)
     return instance, solution
 
 
