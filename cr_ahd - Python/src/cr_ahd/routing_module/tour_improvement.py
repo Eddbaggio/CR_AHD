@@ -54,7 +54,7 @@ class PDPIntraTourLocalSearch(TourImprovementBehavior):
 
     @final
     def improve_carrier_solution(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
-        for tour in range(solution.carrier_solutions[carrier].num_tours()):
+        for tour in range(solution.carriers[carrier].num_tours()):
             improved = True
             while improved:
                 improved = False
@@ -91,7 +91,7 @@ class PDPIntraTourLocalSearch(TourImprovementBehavior):
 
 class PDPTwoOptBest(PDPIntraTourLocalSearch):
     def find_move(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, tour: int):
-        t = solution.carrier_solutions[carrier].tours[tour]
+        t = solution.carriers[carrier].tours[tour]
         best_pos_i = None
         best_pos_j = None
         best_delta = 0  # TODO maybe better to initialize with inf?
@@ -110,7 +110,7 @@ class PDPTwoOptBest(PDPIntraTourLocalSearch):
 
     def feasibility_check(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, tour: int, move):
         i, j = move
-        tour_ = solution.carrier_solutions[carrier].tours[tour]
+        tour_ = solution.carriers[carrier].tours[tour]
         arrival = tour_.arrival_schedule[i]
         load = tour_.load_sequence[i]
 
@@ -147,7 +147,7 @@ class PDPTwoOptBest(PDPIntraTourLocalSearch):
 
     def execute_move(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, tour: int, move):
         _, i, j = move
-        solution.carrier_solutions[carrier].tours[tour].reverse_section(instance, solution, i, j)
+        solution.carriers[carrier].tours[tour].reverse_section(instance, solution, i, j)
 
 
 '''
@@ -168,7 +168,7 @@ class PDPMoveBest(PDPIntraTourLocalSearch):
     """
 
     def find_move(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, tour: int):
-        tour_ = solution.carrier_solutions[carrier].tours[tour]
+        tour_ = solution.carriers[carrier].tours[tour]
 
         best_delta = 0
         best_old_pickup_pos = None
@@ -312,7 +312,7 @@ class PDPMoveBest(PDPIntraTourLocalSearch):
 
     def feasibility_check(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, tour: int, move):
         delta, old_pickup_pos, old_delivery_pos, new_pickup_pos, new_delivery_pos = move
-        tour_ = solution.carrier_solutions[carrier].tours[tour]
+        tour_ = solution.carriers[carrier].tours[tour]
         # create a temporary routing sequence to loop over that contains the new vertices
         # TODO avoid the copy!
         tmp_routing_sequence = list(tour_.routing_sequence)
@@ -351,7 +351,7 @@ class PDPMoveBest(PDPIntraTourLocalSearch):
 
     def execute_move(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, tour: int, move):
         delta, old_pickup_pos, old_delivery_pos, new_pickup_pos, new_delivery_pos = move
-        tour_ = solution.carrier_solutions[carrier].tours[tour]
+        tour_ = solution.carriers[carrier].tours[tour]
 
         pickup, delivery = tour_.pop_and_update(instance, solution, [old_pickup_pos, old_delivery_pos])
         tour_.insert_and_update(instance, solution, [new_pickup_pos, new_delivery_pos], [pickup, delivery])
@@ -416,7 +416,7 @@ class PDPExchangeMoveBest(PDPInterTourLocalSearch):
 
     def find_move(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
         raise NotImplementedError
-        cs = solution.carrier_solutions[carrier]
+        carrier_ = solution.carriers[carrier]
 
         best_delta = 0
 
@@ -432,22 +432,22 @@ class PDPExchangeMoveBest(PDPInterTourLocalSearch):
             best_delta, best_old_tour, best_old_pickup_pos, best_old_delivery_pos, best_new_tour, best_new_pickup_pos,
             best_new_delivery_pos)
 
-        for old_tour in range(cs.num_tours()):
+        for old_tour in range(carrier_.num_tours()):
 
             # check all requests of the old tour
             # a pickup can be at most at index n-2 (n is depot, n-1 must be delivery)
-            for old_pickup_pos in range(1, len(cs.tours[old_tour]) - 2):
+            for old_pickup_pos in range(1, len(carrier_.tours[old_tour]) - 2):
                 delta = 0
 
-                vertex = cs.tours[old_tour].routing_sequence[old_pickup_pos]
+                vertex = carrier_.tours[old_tour].routing_sequence[old_pickup_pos]
                 if instance.vertex_type(vertex) == "delivery":
                     continue  # skip if its a delivery vertex
                 pickup, delivery = instance.pickup_delivery_pair(instance.request_from_vertex(vertex))
-                old_delivery_pos = cs.tours[old_tour].routing_sequence.index(delivery)
-                pickup_predecessor = cs.tours[old_tour].routing_sequence[old_pickup_pos - 1]
-                pickup_successor = cs.tours[old_tour].routing_sequence[old_pickup_pos + 1]
-                delivery_predecessor = cs.tours[old_tour].routing_sequence[old_delivery_pos - 1]
-                delivery_successor = cs.tours[old_tour].routing_sequence[old_delivery_pos + 1]
+                old_delivery_pos = carrier_.tours[old_tour].routing_sequence.index(delivery)
+                pickup_predecessor = carrier_.tours[old_tour].routing_sequence[old_pickup_pos - 1]
+                pickup_successor = carrier_.tours[old_tour].routing_sequence[old_pickup_pos + 1]
+                delivery_predecessor = carrier_.tours[old_tour].routing_sequence[old_delivery_pos - 1]
+                delivery_successor = carrier_.tours[old_tour].routing_sequence[old_delivery_pos + 1]
 
                 # savings of removing request from current tour
                 if delivery_predecessor == pickup:
@@ -462,12 +462,12 @@ class PDPExchangeMoveBest(PDPInterTourLocalSearch):
                         [pickup_predecessor, delivery_predecessor], [pickup_successor, delivery_successor])
 
                 # cost for inserting request into another tour
-                for new_tour in range(cs.num_tours()):
+                for new_tour in range(carrier_.num_tours()):
                     if new_tour == old_tour:
                         continue
-                    for new_pickup_pos in range(1, len(cs.tours[new_tour]) - 1):
-                        for new_delivery_pos in range(new_pickup_pos + 1, len(cs.tours[new_tour])):
-                            insertion_cost = cs.tours[new_tour].insertion_distance_delta(
+                    for new_pickup_pos in range(1, len(carrier_.tours[new_tour]) - 1):
+                        for new_delivery_pos in range(new_pickup_pos + 1, len(carrier_.tours[new_tour])):
+                            insertion_cost = carrier_.tours[new_tour].insertion_distance_delta(
                                 instance, [new_pickup_pos, new_delivery_pos], [pickup, delivery])
                             delta += insertion_cost
 
@@ -483,18 +483,18 @@ class PDPExchangeMoveBest(PDPInterTourLocalSearch):
     def feasibility_check(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, move):
         # TODO check ALL constraints
         delta, old_tour, old_pickup_pos, old_delivery_pos, new_tour, new_pickup_pos, new_delivery_pos = move
-        cs = solution.carrier_solutions[carrier]
-        return cs.tours[new_tour].insertion_feasibility_check(instance, solution, [new_pickup_pos, new_delivery_pos],
-                                                              [(cs.tours[old_tour].routing_sequence[old_pickup_pos]),
-                                                               (cs.tours[old_tour].routing_sequence[old_delivery_pos])])
+        carrier_ = solution.carriers[carrier]
+        return carrier_.tours[new_tour].insertion_feasibility_check(instance, solution, [new_pickup_pos, new_delivery_pos],
+                                                              [(carrier_.tours[old_tour].routing_sequence[old_pickup_pos]),
+                                                               (carrier_.tours[old_tour].routing_sequence[old_delivery_pos])])
 
     def execute_move(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, move):
         delta, old_tour, old_pickup_pos, old_delivery_pos, new_tour, new_pickup_pos, new_delivery_pos = move
-        cs = solution.carrier_solutions[carrier]
-        cs.tours[old_tour].pop_and_update(instance, solution, [old_pickup_pos, old_delivery_pos])
-        cs.tours[new_tour].insert_and_update(instance, solution, [new_pickup_pos, new_delivery_pos],
-                                             [(cs.tours[old_tour].routing_sequence[old_pickup_pos]),
-                                              (cs.tours[old_tour].routing_sequence[old_delivery_pos])])
+        carrier_ = solution.carriers[carrier]
+        carrier_.tours[old_tour].pop_and_update(instance, solution, [old_pickup_pos, old_delivery_pos])
+        carrier_.tours[new_tour].insert_and_update(instance, solution, [new_pickup_pos, new_delivery_pos],
+                                             [(carrier_.tours[old_tour].routing_sequence[old_pickup_pos]),
+                                              (carrier_.tours[old_tour].routing_sequence[old_delivery_pos])])
         pass
 
 

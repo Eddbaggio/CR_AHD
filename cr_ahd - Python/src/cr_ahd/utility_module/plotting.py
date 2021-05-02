@@ -48,7 +48,7 @@ def _add_vertex_annotations(fig: go.Figure, instance: it.PDPInstance, solution: 
 
 def _add_tour_annotations(fig: go.Figure, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int,
                           tour: int, arrival_time=True, service_time=True):
-    t = solution.carrier_solutions[carrier].tours[tour]
+    t = solution.carriers[carrier].tours[tour]
     for index, vertex in enumerate(t.routing_sequence):
         time_format = "Day %d %H:%M:%S"
         text = ''
@@ -100,7 +100,7 @@ def plot_vertices(instance, solution, vertices: List[int], title: str, annotatio
 
 def plot_tour(instance: it.PDPInstance, solution: slt.GlobalSolution, carrier, tour, title,
               time_windows: bool = True, arrival_times: bool = True, service_times: bool = True, show: bool = False):
-    t = solution.carrier_solutions[carrier].tours[tour]
+    t = solution.carriers[carrier].tours[tour]
     fig = _vertex_figure(instance, solution, t.routing_sequence, title)
     _add_edge_traces(fig, instance, t.routing_sequence)
     if time_windows:
@@ -114,22 +114,22 @@ def plot_tour(instance: it.PDPInstance, solution: slt.GlobalSolution, carrier, t
 
 def plot_carrier(instance: it.PDPInstance, solution: slt.GlobalSolution, carrier, title='', tours: bool = True,
                  time_windows: bool = True, arrival_times: bool = True, service_times: bool = True, show: bool = False):
-    vertices = [v for t in solution.carrier_solutions[carrier].tours for v in t.routing_sequence]
+    vertices = [v for t in solution.carriers[carrier].tours for v in t.routing_sequence]
     fig = _vertex_figure(instance, solution, vertices, title)
     if tours:
-        for tour in solution.carrier_solutions[carrier].tours:
+        for tour in solution.carriers[carrier].tours:
             _add_edge_traces(fig, instance, tour.routing_sequence)
     if time_windows:
         _add_vertex_annotations(fig, instance, solution, vertices)
     if arrival_times or service_times:
-        for tour in solution.carrier_solutions[carrier].tours:
+        for tour in solution.carriers[carrier].tours:
             _add_tour_annotations(fig, instance, solution, carrier, tour)
     if show:
         fig.show(config=config)
 
 
 def _make_tour_scatter(instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, tour: int):
-    tour_ = solution.carrier_solutions[carrier].tours[tour]
+    tour_ = solution.carriers[carrier].tours[tour]
 
     df = pd.DataFrame({
         'id_': tour_.routing_sequence[:-1],
@@ -163,8 +163,8 @@ def _make_tour_scatter(instance: it.PDPInstance, solution: slt.GlobalSolution, c
 
 
 def _make_unrouted_scatter(instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
-    cs = solution.carrier_solutions[carrier]
-    unrouted_vertices = ut.flatten([list(instance.pickup_delivery_pair(r)) for r in cs.unrouted_requests])
+    carrier_ = solution.carriers[carrier]
+    unrouted_vertices = ut.flatten([list(instance.pickup_delivery_pair(r)) for r in carrier_.unrouted_requests])
 
     df = pd.DataFrame({
         'id_': unrouted_vertices,
@@ -200,7 +200,7 @@ def _make_unrouted_scatter(instance: it.PDPInstance, solution: slt.GlobalSolutio
 
 
 def _make_tour_edges(instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, tour: int):
-    t = solution.carrier_solutions[carrier].tours[tour]
+    t = solution.carriers[carrier].tours[tour]
     # creating arrows as annotations
     directed_edges = []
     for i in range(len(t.routing_sequence) - 1):
@@ -225,7 +225,7 @@ def _make_tour_edges(instance: it.PDPInstance, solution: slt.GlobalSolution, car
 
 
 def _add_carrier_solution(fig: go.Figure, instance, solution: slt.GlobalSolution, carrier: int):
-    carrier_solution = solution.carrier_solutions[carrier]
+    carrier_solution = solution.carriers[carrier]
     scatter_traces = []
     edge_traces = []
     for tour in range(carrier_solution.num_tours()):
@@ -306,7 +306,7 @@ def plot_solution_2(instance: it.PDPInstance, solution: slt.GlobalSolution, titl
     # custom buttons to hide edges
     button_dicts = []
     for c in range(instance.num_carriers):
-        for t in range(solution.carrier_solutions[c].num_tours()):
+        for t in range(solution.carriers[c].num_tours()):
             button_dicts.append(
                 dict(label=f'Carrier {c}, Tour {t}',
                      method='update',
@@ -356,9 +356,9 @@ def plot_solution(instance: it.PDPInstance, solution: slt.GlobalSolution, title=
     vertices = list(range(instance.num_carriers + 2 * instance.num_requests))
     fig = _vertex_figure(instance, solution, vertices, title)
     for carrier in range(instance.num_carriers):
-        for tour in range(len(solution.carrier_solutions[carrier].tours)):
+        for tour in range(len(solution.carriers[carrier].tours)):
             if tours:
-                _add_edge_traces(fig, instance, solution.carrier_solutions[carrier].tours[tour].routing_sequence)
+                _add_edge_traces(fig, instance, solution.carriers[carrier].tours[tour].routing_sequence)
             if arrival_times or service_times:
                 _add_tour_annotations(fig, instance, solution, carrier, tour)
     if time_windows:

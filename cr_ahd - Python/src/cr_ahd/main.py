@@ -31,8 +31,8 @@ def execute_all(instance: it.PDPInstance):
     for solver in [
         # slv.Static,
         # slv.StaticCollaborative,
-        slv.Dynamic,
-        # slv.DynamicCollaborative,
+        # slv.Dynamic,
+        slv.DynamicCollaborative,
         # slv.DynamicCollaborativeAHD
     ]:
         solution = slt.GlobalSolution(instance)
@@ -75,8 +75,8 @@ def write_solutions_to_multiindex_df(solutions_per_instance: List[List[slt.Globa
     for instance_solutions in solutions_per_instance:
         for solution in instance_solutions:
             for carrier in range(solution.num_carriers()):
-                for tour in range(solution.carrier_solutions[carrier].num_tours()):
-                    d = solution.carrier_solutions[carrier].tours[tour].summary()
+                for tour in range(solution.carriers[carrier].num_tours()):
+                    d = solution.carriers[carrier].tours[tour].summary()
                     d['id_'] = solution.id_
                     d.update(solution.meta)
                     d['num_carriers'] = solution.num_carriers()
@@ -111,7 +111,7 @@ if __name__ == '__main__':
     logger.info('START')
 
     # paths = [Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/test.dat')]
-    paths = list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir())[:1]
+    paths = list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir())[4:5]
     # for path in paths:
     #     read_and_execute_all(path)
     df = read_and_execute_all_parallel(paths)

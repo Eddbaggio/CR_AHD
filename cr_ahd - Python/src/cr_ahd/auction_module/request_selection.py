@@ -14,24 +14,24 @@ class RequestSelectionBehavior(ABC):
     def execute(self, instance: it.PDPInstance, solution: slt.GlobalSolution, num_requests):
         """
         select a set of requests based on the concrete selection behavior. will retract the requests from the carrier
-        and return a dict of lists.
+        and return
 
         :param solution:
         :param num_requests: the number of requests each carrier shall submit. If fractional, will use the corresponding
          percentage of requests assigned to that carrier. If integer, will use the absolut amount of requests. If not
          enough requests are available, will submit as many as are available
         :param instance:
-        :return: dict {carrier_A: List[requests], carrier_B: List[requests]}
+        :return:
         """
         submitted_requests = list()
         for carrier in range(instance.num_carriers):
-            k = self.abs_num_requests(solution.carrier_solutions[carrier], num_requests)
+            k = self._abs_num_requests(solution.carriers[carrier], num_requests)
             valuations = self._evaluate_requests(instance, solution, carrier)
             # pick the worst k evaluated requests (from ascending order)
             selected = [r for _, r in
-                        sorted(zip(valuations, solution.carrier_solutions[carrier].unrouted_requests))][:k]
+                        sorted(zip(valuations, solution.carriers[carrier].unrouted_requests))][:k]
             for s in selected:
-                solution.carrier_solutions[carrier].unrouted_requests.remove(s)  # TODO it's not routed yet! why do I already remove it here?
+                solution.carriers[carrier].unrouted_requests.remove(s)  # TODO it's not routed yet! why do I already remove it here?
                 solution.request_to_carrier_assignment[s] = np.nan
                 submitted_requests.append(s)
                 solution.unassigned_requests.append(s)  # if i do this, the assign_n_requests function will not work
@@ -46,7 +46,7 @@ class RequestSelectionBehavior(ABC):
         """
         pass
 
-    def abs_num_requests(self, carrier: slt.PDPSolution, num_requests) -> int:
+    def _abs_num_requests(self, carrier: slt.PDPSolution, num_requests) -> int:
         """
         returns the absolute number of requests that a carrier shall submit, depending on whether it was initially
         given as an absolute int or a float (relative)
@@ -64,7 +64,7 @@ class Random(RequestSelectionBehavior):
     """
 
     def _evaluate_requests(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
-        return np.random.random(len(solution.carrier_solutions[carrier].unrouted_requests))
+        return np.random.random(len(solution.carriers[carrier].unrouted_requests))
 
 
 class HighestInsertionCostDistance(RequestSelectionBehavior):
@@ -74,19 +74,19 @@ class HighestInsertionCostDistance(RequestSelectionBehavior):
 
     def _evaluate_requests(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
         evaluation = []
-        cs = solution.carrier_solutions[carrier]
-        for request in cs.unrouted_requests:
+        carrier_ = solution.carriers[carrier]
+        for request in carrier_.unrouted_requests:
             best_delta_for_r = float('inf')
-            for tour in range(cs.num_tours()):
+            for tour in range(carrier_.num_tours()):
                 # cheapest way to fit request into tour
-                delta, _, _ = cns.CheapestInsertion()._tour_cheapest_insertion(instance, solution, carrier, tour,
-                                                                               request)
+                delta, _, _ = cns.CheapestPDPInsertion()._tour_cheapest_insertion(instance, solution, carrier, tour,
+                                                                                  request)
                 if delta < best_delta_for_r:
                     best_delta_for_r = delta
             # if no feasible insertion for the current request was found, attempt to create a new tour, if that's not
             # feasible the best_delta_for_r will be infinity
             if best_delta_for_r == float('inf'):
-                if cs.num_tours() < instance.carriers_max_num_tours:
+                if carrier_.num_tours() < instance.carriers_max_num_tours:
                     pickup, delivery = instance.pickup_delivery_pair(request)
                     best_delta_for_r = instance.distance([carrier, pickup, delivery], [pickup, delivery, carrier])
             # collect the NEGATIVE value, since high insertion cost mean a low valuation for the carrier
@@ -97,7 +97,7 @@ class HighestInsertionCostDistance(RequestSelectionBehavior):
 class LowestProfit(RequestSelectionBehavior):
     def _evaluate_requests(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
         revenue = []
-        for r in solution.carrier_solutions[carrier].unrouted_requests:
+        for r in solution.carriers[carrier].unrouted_requests:
             request_revenue = sum([instance.revenue[v] for v in instance.pickup_delivery_pair(r)])
             revenue.append(request_revenue)
         ins_cost = HighestInsertionCostDistance()._evaluate_requests(instance, solution, carrier)

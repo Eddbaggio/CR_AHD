@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import List
+from typing import List, Sequence
 
 import numpy as np
 import datetime as dt
@@ -25,49 +25,49 @@ class GlobalSolution:
         self.tw_open = np.full(instance.num_carriers + 2 * instance.num_requests, ut.START_TIME)
         self.tw_close = np.full(instance.num_carriers + 2 * instance.num_requests, ut.END_TIME)
 
-        self.carrier_solutions = [PDPSolution(c) for c in range(instance.num_carriers)]
+        self.carriers = [PDPSolution(c) for c in range(instance.num_carriers)]
 
         self.solution_algorithm = None
         self.auction_mechanism = None
 
     @property
     def unrouted_requests(self):
-        return set().union(*[c.unrouted_requests for c in self.carrier_solutions])
+        return set().union(*[c.unrouted_requests for c in self.carriers])
 
     def sum_travel_distance(self):
-        return sum(c.sum_travel_distance() for c in self.carrier_solutions)
+        return sum(c.sum_travel_distance() for c in self.carriers)
 
     def sum_travel_duration(self):
-        return np.sum([c.sum_travel_duration() for c in self.carrier_solutions])
+        return np.sum([c.sum_travel_duration() for c in self.carriers])
 
     def sum_load(self):
-        return sum(c.sum_load() for c in self.carrier_solutions)
+        return sum(c.sum_load() for c in self.carriers)
 
     def sum_revenue(self):
-        return sum(c.sum_revenue() for c in self.carrier_solutions)
+        return sum(c.sum_revenue() for c in self.carriers)
 
     def sum_profit(self):
-        return sum(c.sum_profit() for c in self.carrier_solutions)
+        return sum(c.sum_profit() for c in self.carriers)
 
     def num_carriers(self):
-        return len(self.carrier_solutions)
+        return len(self.carriers)
 
     def num_tours(self):
-        return sum(c.num_tours() for c in self.carrier_solutions)
+        return sum(c.num_tours() for c in self.carriers)
 
     def num_routing_stops(self):
-        return sum(c.num_routing_stops() for c in self.carrier_solutions)
+        return sum(c.num_routing_stops() for c in self.carriers)
         pass
 
-    def assign_requests_to_carriers(self, requests: List[int], carriers: List[int]):
+    def assign_requests_to_carriers(self, requests: Sequence[int], carriers: Sequence[int]):
         for r, c in zip(requests, carriers):
             self.request_to_carrier_assignment[r] = c
             self.unassigned_requests.remove(r)
-            self.carrier_solutions[c].unrouted_requests.append(r)
+            self.carriers[c].unrouted_requests.append(r)
 
     def as_dict(self):
         """The solution as a nested python dictionary"""
-        return {carrier.id_: carrier.as_dict() for carrier in self.carrier_solutions}
+        return {carrier.id_: carrier.as_dict() for carrier in self.carriers}
 
     def summary(self):
         return {
@@ -80,7 +80,7 @@ class GlobalSolution:
             'sum_revenue': self.sum_revenue(),
             'num_tours': self.num_tours(),
             'num_routing_stops': self.num_routing_stops(),
-            'carrier_summaries': {c.id_: c.summary() for c in self.carrier_solutions}
+            'carrier_summaries': {c.id_: c.summary() for c in self.carriers}
         }
 
     def write_to_json(self):
@@ -98,10 +98,10 @@ class PDPSolution:
         self.id_ = carrier_index
         # must be a list (instead of a set) because it must be sorted for bidding (could create a local list-copy
         # though, if i really wanted)
-        self.unrouted_requests: List = list()
+        self.unrouted_requests: List = []
         self.tours: List[tr.Tour] = []
 
-        self.solution_algorithm = None
+        # self.solution_algorithm = None
 
     def num_routing_stops(self):
         return sum(t.num_routing_stops for t in self.tours)

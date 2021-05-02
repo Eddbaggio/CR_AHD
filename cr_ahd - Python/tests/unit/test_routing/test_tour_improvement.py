@@ -5,8 +5,8 @@ from src.cr_ahd.routing_module import tour_improvement as imp
 from src.cr_ahd.utility_module import plotting as pl
 
 
-def test_PDPTwoOptBest(inst_and_sol_gh_0_9_ass_6_routed):
-    instance, solution = inst_and_sol_gh_0_9_ass_6_routed
+def test_PDPTwoOptBest(inst_and_sol_gh_0_ass9_routed6):
+    instance, solution = inst_and_sol_gh_0_ass9_routed6
     carrier = 0
     tour = 0
     local_search = imp.PDPTwoOptBest()
@@ -17,8 +17,8 @@ def test_PDPTwoOptBest(inst_and_sol_gh_0_9_ass_6_routed):
     assert best_pos_j is None
 
 
-def test_PDPMoveBest(inst_and_sol_gh_0_9_ass_6_routed):
-    instance, solution = inst_and_sol_gh_0_9_ass_6_routed
+def test_PDPMoveBest(inst_and_sol_gh_0_ass9_routed6):
+    instance, solution = inst_and_sol_gh_0_ass9_routed6
     # pl.plot_solution_2(instance, solution, title="Before PDPMoveBest", show=True)
     carrier = 0
     tour = 0
@@ -32,5 +32,5 @@ def test_PDPMoveBest(inst_and_sol_gh_0_9_ass_6_routed):
     assert new_pickup_pos == 1
     assert new_delivery_pos == 4
     local_search.execute_move(instance, solution, carrier, tour, move)
-    assert solution.carrier_solutions[carrier].tours[tour].routing_sequence == (0, 4, 3, 18, 19, 0)
+    assert solution.carriers[carrier].tours[tour].routing_sequence == (0, 4, 3, 18, 19, 0)
     # pl.plot_solution_2(instance, solution, title=f"After PDPMoveBest; move: {move}", show=True)

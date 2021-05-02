@@ -20,9 +20,9 @@ class BiddingBehavior(ABC):
         bundle_bids = []
         for b in range(len(bundles)):
             carrier_bundle_bids = []
-            for c in range(instance.num_carriers):
-                logger.debug(f'Carrier {c} generating bids for bundle {b}')
-                carrier_bundle_bids.append(self._generate_bid(instance, solution, bundles[b], c))
+            for carrier in range(instance.num_carriers):
+                logger.debug(f'Carrier {carrier} generating bids for bundle {b}')
+                carrier_bundle_bids.append(self._generate_bid(instance, solution, bundles[b], carrier))
             bundle_bids.append(carrier_bundle_bids)
         solution.bidding_behavior = self.__class__.__name__
         return bundle_bids
@@ -34,22 +34,40 @@ class BiddingBehavior(ABC):
 
 class CheapestInsertionDistanceIncrease(BiddingBehavior):
     def _generate_bid(self, instance: it.PDPInstance, solution: slt.GlobalSolution, bundle: List[int], carrier: int):
-        before = solution.carrier_solutions[carrier].sum_travel_distance()
-        cs_copy = deepcopy(solution.carrier_solutions[carrier])  # TODO: can I avoid the copy here? Only if I make cns.CheapestInsertion()._carrier_cheapest_insertion return the delta for the cheapest insertion
-        cs_copy.unrouted_requests.extend(bundle)
-        solution.carrier_solutions.append(cs_copy)
+        before = solution.carriers[carrier].sum_travel_distance()
+        # TODO: can I avoid the copy here? Only if I make cns.CheapestInsertion()._carrier_cheapest_insertion return
+        #  the delta for the cheapest insertion of ALL (!) the requests in the bundle, which is quite impossible because
+        #  the cheapest insertion of one request in the bundle depends on the previous insertion
+        tmp_carrier = instance.num_carriers
+        tmp_carrier_ = deepcopy(solution.carriers[carrier])
+        tmp_carrier_.unrouted_requests.extend(bundle)
+        solution.carriers.append(tmp_carrier_)
         try:
-            cns.CheapestInsertion()._carrier_cheapest_insertion(instance, solution, instance.num_carriers)
-            after = cs_copy.sum_travel_distance()
+            construction = cns.CheapestPDPInsertion()
+            while tmp_carrier_.unrouted_requests:
+                request, tour, pickup_pos, delivery_pos = \
+                    construction._carrier_cheapest_insertion(instance, solution, tmp_carrier,
+                                                             tmp_carrier_.unrouted_requests)
+                # when for a given request no tour can be found, create a new tour and start over
+                if tour is None:
+                    construction._create_new_tour_with_request(instance, solution, tmp_carrier, request)
+                else:
+                    construction._execute_insertion(instance, solution, tmp_carrier, request, tour, pickup_pos,
+                                                    delivery_pos)
+
+            after = tmp_carrier_.sum_travel_distance()
         except ConstraintViolationError:
             after = float('inf')
         finally:
-            solution.carrier_solutions.pop()  # del the temporary copy
+            solution.carriers.pop()  # del the temporary carrier copy
         return after - before
 
 
 class Profit(BiddingBehavior):
     def _generate_bid(self, instance: it.PDPInstance, solution: slt.GlobalSolution, bundle: List[int], carrier: int):
         ins_cost = CheapestInsertionDistanceIncrease()._generate_bid(instance, solution, bundle, carrier)
-        ins_revenue = sum([instance.revenue[r] for r in bundle])
+        ins_revenue = 0
+        for r in bundle:
+            pickup, delivery = instance.pickup_delivery_pair(r)
+            ins_revenue += instance.revenue[pickup] + instance.revenue[delivery]
         return ins_revenue - ins_cost

@@ -1,5 +1,7 @@
 import datetime as dt
 from abc import ABC, abstractmethod
+from typing import Tuple, Sequence
+
 import src.cr_ahd.utility_module.utils as ut
 from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
 import logging
@@ -13,24 +15,49 @@ class TourConstructionBehavior(ABC):
         pass
 
     @abstractmethod
-    def solve(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+    def construct(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         pass
 
 
-class InsertionConstruction(TourConstructionBehavior):
-    def solve(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+class PDPInsertionConstruction(TourConstructionBehavior):
+    def construct(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         for carrier in range(instance.num_carriers):
-            self._carrier_cheapest_insertion(instance, solution, carrier)
+            while solution.carriers[carrier].unrouted_requests:
+                request, tour, pickup_pos, delivery_pos = \
+                    self._carrier_cheapest_insertion(instance, solution, carrier,
+                                                     solution.carriers[carrier].unrouted_requests)
+                # when for a given request no tour can be found, create a new tour and start over
+                if tour is None:
+                    self._create_new_tour_with_request(instance, solution, carrier, request)
+                else:
+                    self._execute_insertion(instance, solution, carrier, request, tour, pickup_pos, delivery_pos)
         pass
 
     @abstractmethod
-    def _carrier_cheapest_insertion(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
+    def _carrier_cheapest_insertion(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int,
+                                    requests: Sequence[int]) -> Tuple[int, int, int, int]:
+        """
+
+        :return: tuple of (request, tour, pickup_pos, delivery_pos) for the insertion operation
+        """
+
         pass
 
-    def _tour_cheapest_insertion(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, tour: int,
+    @staticmethod
+    def _execute_insertion(instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int,
+                           request, tour, pickup_pos, delivery_pos):
+
+        pickup, delivery = instance.pickup_delivery_pair(request)
+        solution.carriers[carrier].tours[tour].insert_and_update(instance, solution,
+                                                                 [pickup_pos, delivery_pos],
+                                                                 [pickup, delivery])
+        solution.carriers[carrier].unrouted_requests.remove(request)
+
+    @staticmethod
+    def _tour_cheapest_insertion(instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, tour: int,
                                  unrouted_request: int):
         """Find the cheapest insertions for pickup and delivery for a given tour"""
-        t: tr.Tour = solution.carrier_solutions[carrier].tours[tour]
+        tour_: tr.Tour = solution.carriers[carrier].tours[tour]
 
         best_delta = float('inf')
         best_pickup_position = None
@@ -38,102 +65,63 @@ class InsertionConstruction(TourConstructionBehavior):
 
         pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(unrouted_request)
 
-        for pickup_pos in range(1, len(t) - 1):
-            for delivery_pos in range(pickup_pos + 1, len(t)):
-                delta = t.insertion_distance_delta(instance, [pickup_pos, delivery_pos],
-                                                   [pickup_vertex, delivery_vertex])
-                if not t.insertion_feasibility_check(instance, solution, [pickup_pos, delivery_pos],
-                                                     [pickup_vertex, delivery_vertex]):
-                    continue
+        for pickup_pos in range(1, len(tour_)):
+            for delivery_pos in range(pickup_pos + 1, len(tour_) + 1):
+                delta = tour_.insertion_distance_delta(instance, [pickup_pos, delivery_pos],
+                                                       [pickup_vertex, delivery_vertex])
                 if delta < best_delta:
-                    best_delta = delta
-                    best_pickup_position = pickup_pos
-                    best_delivery_position = delivery_pos
+                    if tour_.insertion_feasibility_check(instance, solution, [pickup_pos, delivery_pos],
+                                                         [pickup_vertex, delivery_vertex]):
+                        best_delta = delta
+                        best_pickup_position = pickup_pos
+                        best_delivery_position = delivery_pos
         return best_delta, best_pickup_position, best_delivery_position
 
-    def _create_new_tour_with_request(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int,
+    @staticmethod
+    def _create_new_tour_with_request(instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int,
                                       request: int):
-        cs = solution.carrier_solutions[carrier]
-        if cs.num_tours() >= instance.carriers_max_num_tours:
+        carrier_ = solution.carriers[carrier]
+        if carrier_.num_tours() >= instance.carriers_max_num_tours:
             logger.error(f'Max Vehicle Constraint violated!')
             raise ut.ConstraintViolationError(f'Cannot create new route with request {request} for carrier {carrier}.'
                                               f' Max. number of vehicles is {instance.carriers_max_num_tours}!')
-        rtmp = tr.Tour(len(cs.tours), instance, solution, cs.id_)
+        rtmp = tr.Tour(len(carrier_.tours), instance, solution, carrier_.id_)
         rtmp.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(request))
-        cs.tours.append(rtmp)
-        cs.unrouted_requests.remove(request)
+        carrier_.tours.append(rtmp)
+        carrier_.unrouted_requests.remove(request)
         return
 
 
-class SequentialInsertion(InsertionConstruction):
-    """
-    For one request at a time, will find its cheapest insertion position based on the routes built so far. Does not
-    consider the other request ( != Cheapest Insertion)
-
-    """
-
-    def _carrier_cheapest_insertion(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
-        raise NotImplementedError
-        logger.debug(f'Sequential Insertion tour construction for carrier {carrier}:')
-        cs = solution.carrier_solutions[carrier]
-        for r in cs.unrouted_requests:
-            best_delta = float('inf')
-            for t in range(cs.num_tours()):
-                # cheapest way to fit r into t
-                delta, pickup_position, delivery_position = self._tour_cheapest_insertion()
-                if delta < best_delta:
-                    best_delta = delta
-                    best_pickup_pos = pickup_position
-                    best_delivery_pos = delivery_position
-                    best_tour = t
-            # if no feasible insertion for the current request was found, create a new tour
-            if best_delta == float('inf'):
-                self._create_new_tour_with_request(instance, solution, carrier, r)
-                break
-            else:
-                cs.tours[best_tour].insert_and_update(instance, solution, [best_pickup_pos, best_delivery_pos],
-                                                      instance.pickup_delivery_pair(r))
-                cs.unrouted_requests.remove(r)
-
-
-class CheapestInsertion(InsertionConstruction):
+class CheapestPDPInsertion(PDPInsertionConstruction):
     """
     For each REQUEST, identify its cheapest insertion. Compare the collected insertion costs and insert the cheapest
     over all requests.
     """
 
-    def _carrier_cheapest_insertion(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
+    def _carrier_cheapest_insertion(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int,
+                                    requests):
         logger.debug(f'Cheapest Insertion tour construction for carrier {carrier}:')
-        cs = solution.carrier_solutions[carrier]
-        while cs.unrouted_requests:
-            best_delta = float('inf')
-            best_request = best_pickup_position = best_delivery_position = best_tour = None
-            start_over = False
-            for r in cs.unrouted_requests:
-                best_delta_for_r = float('inf')
-                for t in range(cs.num_tours()):
-                    # cheapest way to fit r into t
-                    delta, pickup_position, delivery_position = self._tour_cheapest_insertion(instance, solution,
-                                                                                              carrier, t, r)
-                    if delta < best_delta:
-                        best_delta = delta
-                        best_request = r
-                        best_pickup_position = pickup_position
-                        best_delivery_position = delivery_position
-                        best_tour = t
-                    if delta < best_delta_for_r:
-                        best_delta_for_r = delta
-                # if no feasible insertion for the current request was found, create a new tour
-                if best_delta_for_r == float('inf'):
-                    self._create_new_tour_with_request(instance, solution, carrier, r)
-                    start_over = True
-                    break
-            if not start_over:
-                cs.tours[best_tour].insert_and_update(instance, solution,
-                                                      [best_pickup_position, best_delivery_position],
-                                                      instance.pickup_delivery_pair(best_request))
-                cs.unrouted_requests.remove(best_request)
-        pass
+        carrier_ = solution.carriers[carrier]
+        best_delta = float('inf')
+        best_request = best_pickup_pos = best_delivery_pos = best_tour = None
+        for request in requests:
+            best_delta_for_r = float('inf')
+            for tour in range(carrier_.num_tours()):
+                # cheapest way to fit request into tour
+                delta, pickup_pos, delivery_pos = self._tour_cheapest_insertion(instance, solution, carrier, tour,
+                                                                                request)
+                if delta < best_delta:
+                    best_delta = delta
+                    best_request = request
+                    best_pickup_pos = pickup_pos
+                    best_delivery_pos = delivery_pos
+                    best_tour = tour
+                if delta < best_delta_for_r:
+                    best_delta_for_r = delta
+            # if no feasible insertion for the current request was found, return None for the tour
+            if best_delta_for_r == float('inf'):
+                return request, None, None, None
+        return best_request, best_tour, best_pickup_pos, best_delivery_pos
 
 
 '''

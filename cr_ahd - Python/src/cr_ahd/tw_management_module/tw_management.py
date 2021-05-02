@@ -8,7 +8,7 @@ import src.cr_ahd.utility_module.utils as ut
 class TWManagement(abc.ABC):
     def execute(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         for carrier in range(instance.num_carriers):
-            for request in solution.carrier_solutions[carrier].unrouted_requests:
+            for request in solution.carriers[carrier].unrouted_requests:
                 offer_set = self.get_offer_set(instance, solution, carrier, request)
                 selected_tw = self.get_selected_tw(offer_set, request)
                 pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)

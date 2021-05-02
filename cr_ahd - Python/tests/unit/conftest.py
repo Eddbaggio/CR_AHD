@@ -1,17 +1,15 @@
 import datetime as dt
+from collections import Callable
 
-import numpy as np
-import math
 import pytest
-import random
 from pathlib import Path
-import pandas as pd
 
 import src.cr_ahd.utility_module.utils as ut
 from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
+from src.cr_ahd.utility_module.utils import n_points_on_a_circle
 
 
-@pytest.fixture(scope='class')
+@pytest.fixture()
 def inst_gh_0():
     """
     a small custom instance based on the format of Gansterer & Hartl designed specifically for testing
@@ -19,46 +17,63 @@ def inst_gh_0():
     return it.read_gansterer_hartl_mv(Path('./fixtures/test=1+dist=200+rad=200+n=5.dat'))
 
 
-@pytest.fixture(scope='class')
+@pytest.fixture()
 def sol_gh_0(inst_gh_0):
     return slt.GlobalSolution(inst_gh_0)
 
 
-@pytest.fixture
-def inst_and_sol_gh_0_9_assigned(inst_gh_0: it.PDPInstance, sol_gh_0: slt.GlobalSolution):
+@pytest.fixture(scope='function', name='inst_and_sol_gh_0_ass9')
+def inst_and_sol_gh_0_ass9(inst_gh_0: it.PDPInstance, sol_gh_0: slt.GlobalSolution):
     instance = inst_gh_0
     solution = sol_gh_0
     solution.assign_requests_to_carriers([0, 1, 2, 5, 6, 7, 10, 11, 12], [0, 0, 0, 1, 1, 1, 2, 2, 2])
     return instance, solution
 
 
-@pytest.fixture
-def inst_and_sol_gh_0_9_ass_6_routed(inst_and_sol_gh_0_9_assigned):
-    instance, solution = inst_and_sol_gh_0_9_assigned
+@pytest.fixture(scope='function')
+def inst_and_sol_gh_0_ass9_routed6(inst_and_sol_gh_0_ass9):
+    instance, solution = inst_and_sol_gh_0_ass9
     # carrier 0
     carrier = 0
     tour = tr.Tour(0, instance, solution, carrier)
-    solution.carrier_solutions[carrier].tours.append(tour)
-    for request in solution.carrier_solutions[carrier].unrouted_requests[:2]:
+    solution.carriers[carrier].tours.append(tour)
+    for request in solution.carriers[carrier].unrouted_requests[:2]:
         tour.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(request))
-        solution.carrier_solutions[carrier].unrouted_requests.remove(request)
+        solution.carriers[carrier].unrouted_requests.remove(request)
 
     # carrier 1
     carrier = 1
     tour = tr.Tour(0, instance, solution, carrier)
-    solution.carrier_solutions[carrier].tours.append(tour)
+    solution.carriers[carrier].tours.append(tour)
     tour.insert_and_update(instance, solution, [1, 2, 3, 4], [9, 8, 24, 23])
-    solution.carrier_solutions[carrier].unrouted_requests.remove(5)
-    solution.carrier_solutions[carrier].unrouted_requests.remove(6)
+    solution.carriers[carrier].unrouted_requests.remove(5)
+    solution.carriers[carrier].unrouted_requests.remove(6)
 
     # carrier 2
     carrier = 2
     tour = tr.Tour(0, instance, solution, carrier)
-    solution.carrier_solutions[carrier].tours.append(tour)
-    for request in solution.carrier_solutions[carrier].unrouted_requests[:2]:
+    solution.carriers[carrier].tours.append(tour)
+    for request in solution.carriers[carrier].unrouted_requests[:2]:
         tour.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(request))
-        solution.carrier_solutions[carrier].unrouted_requests.remove(request)
+        solution.carriers[carrier].unrouted_requests.remove(request)
     return instance, solution
+
+
+@pytest.fixture
+def inst_sol_pool_gh_0_ass9_routed6(inst_and_sol_gh_0_ass9_routed6):
+    instance, solution = inst_and_sol_gh_0_ass9_routed6
+    # put all unrouted requests into the auction pool
+    pool = []
+    for carrier_ in solution.carriers:
+        pool.extend(carrier_.unrouted_requests)
+    return instance, solution, pool
+
+
+@pytest.fixture
+def inst_sol_bundles_gh_0_ass9_routed6(inst_sol_pool_gh_0_ass9_routed6):
+    instance, solution, pool = inst_and_sol_gh_0_ass9_routed6
+    # create bundles from the pool
+    raise NotImplementedError
 
 
 @pytest.fixture
@@ -67,15 +82,17 @@ def instance_generator_circular():
                             num_requests_per_carrier: int = 4,
                             max_num_tours_per_carrier: int = 3,
                             max_tour_length: float = 1200,
-                            max_vehicle_load: float = 100):
-        carrier_depots_x, carrier_depots_y = zip(*n_points_on_a_circle(num_carriers, 100))
+                            max_vehicle_load: float = 100,
+                            depot_radius=100,
+                            requests_radius=50):
+        carrier_depots_x, carrier_depots_y = zip(*n_points_on_a_circle(num_carriers, depot_radius))
         requests_pickup_x = []
         requests_pickup_y = []
         requests_delivery_x = []
         requests_delivery_y = []
         for i in range(num_carriers):
-            xs, ys = zip(
-                *n_points_on_a_circle(num_requests_per_carrier * 2, 50, carrier_depots_x[i], carrier_depots_y[i]))
+            xs, ys = zip(*n_points_on_a_circle(num_requests_per_carrier * 2, requests_radius,
+                                               carrier_depots_x[i], carrier_depots_y[i]))
             for j, (x, y) in enumerate(zip(xs, ys)):
                 if j % 2 == 0:
                     requests_pickup_x.append(x)
@@ -108,14 +125,91 @@ def instance_generator_circular():
     return _instance_generator
 
 
-def n_points_on_a_circle(n: int, radius, origin_x=0, origin_y=0):
-    """create coordinates for n points that are evenly spaced on the circumference of  a circle of the given radius"""
-    points = []
-    for i in range(1, n + 1):
-        x = radius * math.cos(2 * math.pi * i / n - math.pi / 2)
-        y = radius * math.sin(2 * math.pi * i / n - math.pi / 2)
-        points.append((origin_x + x, origin_y + y))
-    return points
+@pytest.fixture
+def inst_circular_c3_n4_k3_L1200_Q100(instance_generator_circular):
+    return instance_generator_circular()
+
+
+@pytest.fixture(name='sol_circular_c3_n4_k3_L1200_Q100')
+def sol_circular_c3_n4_k3_L1200_Q100(inst_circular_c3_n4_k3_L1200_Q100):
+    return slt.GlobalSolution(inst_circular_c3_n4_k3_L1200_Q100)
+
+
+@pytest.fixture
+def inst_sol_circular_c3_n4_k3_L1200_Q100_ass6(inst_circular_c3_n4_k3_L1200_Q100: it.PDPInstance,
+                                               sol_circular_c3_n4_k3_L1200_Q100: slt.GlobalSolution):
+    inst = inst_circular_c3_n4_k3_L1200_Q100
+    sol = sol_circular_c3_n4_k3_L1200_Q100
+    sol.assign_requests_to_carriers([0, 1, 4, 5, 8, 9], [0, 0, 1, 1, 2, 2])
+    return inst, sol
+
+
+@pytest.fixture
+def inst_sol_circular_ass_routed_generator(instance_generator_circular: Callable):
+    def _inst_sol_circular_ass_routed_generator(num_carriers: int = 3, num_requests_per_carrier: int = 4,
+                                                max_num_tours_per_carrier: int = 3, max_tour_length: float = 1200,
+                                                max_vehicle_load: float = 100, depot_radius: int = 100,
+                                                requests_radius: int = 50, num_ass_per_carrier: int = 2,
+                                                num_routed_per_carrier: int = 1):
+        inst: it.PDPInstance = instance_generator_circular(num_carriers=num_carriers,
+                                                           num_requests_per_carrier=num_requests_per_carrier,
+                                                           max_num_tours_per_carrier=max_num_tours_per_carrier,
+                                                           max_tour_length=max_tour_length,
+                                                           max_vehicle_load=max_vehicle_load,
+                                                           depot_radius=depot_radius,
+                                                           requests_radius=requests_radius
+                                                           )
+        sol = slt.GlobalSolution(inst)
+        for carrier in range(num_carriers):
+            # assign requests
+            ass = range(carrier * num_requests_per_carrier, carrier * num_requests_per_carrier + num_ass_per_carrier)
+            sol.assign_requests_to_carriers(ass, [carrier] * num_ass_per_carrier)
+
+            # route the assigned requests' vertices
+            tour_ = tr.Tour(0, inst, sol, carrier)
+            sol.carriers[carrier].tours.append(tour_)
+            routed_vertices = []
+            for r in ass[:num_routed_per_carrier]:
+                routed_vertices.extend(inst.pickup_delivery_pair(r))
+                sol.carriers[carrier].unrouted_requests.remove(r)
+
+            ins_indices = range(1, num_routed_per_carrier * 2 + 1)
+
+            # carrier 1: all pickup first, then all delivery
+            if carrier == 1:
+                routed_vertices = sorted(routed_vertices)
+
+            tour_.insert_and_update(inst, sol, ins_indices, routed_vertices)
+
+        return inst, sol
+
+    return _inst_sol_circular_ass_routed_generator
+
+
+@pytest.fixture
+def inst_sol_pool_circular_c3_n6_k3_L1200_Q100_ass4_routed_2(inst_sol_circular_ass_routed_generator: Callable):
+    instance, solution = inst_sol_circular_ass_routed_generator(num_carriers=3,
+                                                                num_requests_per_carrier=6,
+                                                                max_num_tours_per_carrier=3,
+                                                                max_tour_length=1200,
+                                                                max_vehicle_load=100,
+                                                                num_ass_per_carrier=4,
+                                                                num_routed_per_carrier=2,
+                                                                depot_radius=100,
+                                                                requests_radius=120,
+                                                                )
+    # put all unrouted requests into the auction pool
+    pool = []
+    for carrier_ in solution.carriers:
+        pool.extend(carrier_.unrouted_requests)
+    return instance, solution, pool
+
+
+@pytest.fixture
+def inst_sol_bundles_circular_c3_n6_k3_L1200_Q100_ass4_routed_2(
+        inst_sol_pool_circular_c3_n6_k3_L1200_Q100_ass4_routed_2):
+    instance, solution, pool = inst_sol_pool_circular_c3_n6_k3_L1200_Q100_ass4_routed_2
+    raise NotImplementedError
 
 
 @pytest.fixture

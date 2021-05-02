@@ -44,17 +44,17 @@ class TWOfferingBehavior(abc.ABC):
 class FeasibleTW(TWOfferingBehavior):
     def _evaluate_time_window(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, request: int,
                               tw: ut.TimeWindow):
-        cs = solution.carrier_solutions[carrier]
+        carrier_ = solution.carriers[carrier]
         pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
 
         # can the carrier open a new tour and insert the request there?
-        if cs.num_tours() < instance.carriers_max_num_tours:
+        if carrier_.num_tours() < instance.carriers_max_num_tours:
             dist = instance.distance([carrier, pickup_vertex], [pickup_vertex, delivery_vertex])
             if ut.travel_time(dist) <= solution.tw_close[delivery_vertex]:
                 return 1
 
         # if no new tour can be built, can the request be inserted into one of the existing ones?
-        for tour in cs.tours:
+        for tour in carrier_.tours:
             first_index = self._find_first_insertion_index(solution, tw, tour)
             last_index = self._find_last_insertion_index(solution, tw, tour, first_index)
             for pickup_insertion_index in range(first_index):

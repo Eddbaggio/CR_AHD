@@ -72,7 +72,7 @@ class Static(StaticSolver):
         pass
 
     def build_tours(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
-        cns.CheapestInsertion().solve(instance, solution)
+        cns.CheapestPDPInsertion().construct(instance, solution)
         pass
 
 
@@ -82,7 +82,7 @@ class StaticCollaborative(StaticSolver):
         pass
 
     def build_tours(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
-        cns.CheapestInsertion().solve(instance, solution)
+        cns.CheapestPDPInsertion().construct(instance, solution)
 
     def run_auction(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         au.AuctionC().execute(instance, solution)
@@ -227,7 +227,8 @@ class DynamicSolver(Solver, abc.ABC):
         pass
 
     def finalize_with_local_search(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
-        imp.PDPExchangeMoveBest().improve_global_solution(instance, solution)
+        imp.PDPMoveBest().improve_global_solution(instance, solution)
+        # imp.PDPExchangeMoveBest().improve_global_solution(instance, solution)
         pass
 
     def run_auction(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
@@ -240,22 +241,22 @@ class DynamicSolver(Solver, abc.ABC):
 
 class Dynamic(DynamicSolver):
     def build_tours(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
-        cns.CheapestInsertion().solve(instance, solution)
+        cns.CheapestPDPInsertion().construct(instance, solution)
 
 
 class DynamicCollaborative(DynamicSolver):
-    """
-    The full program: Dynamic TW Management and auction-based Collaboration. Uses Auction type C
-    """
-
     def run_auction(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         au.AuctionC().execute(instance, solution)
 
     def build_tours(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
-        cns.CheapestInsertion().solve(instance, solution)
+        cns.CheapestPDPInsertion().construct(instance, solution)
 
 
 class DynamicCollaborativeAHD(DynamicSolver):
+    """
+    The full program: Dynamic TW Management and auction-based Collaboration. Uses Auction type C
+    """
+
     def time_window_management(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         twm.TWManagement0().execute(instance, solution)
         pass
@@ -265,5 +266,5 @@ class DynamicCollaborativeAHD(DynamicSolver):
         pass
 
     def build_tours(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
-        cns.CheapestInsertion().solve(instance, solution)
+        cns.CheapestPDPInsertion().construct(instance, solution)
         pass

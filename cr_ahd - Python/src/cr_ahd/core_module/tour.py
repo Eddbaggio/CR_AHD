@@ -269,7 +269,7 @@ class Tour:
         :param vertices:
         :return:
         """
-        raise NotImplementedError  # does not consider difference in consecutive vertices
+        # raise NotImplementedError  # does not consider difference in consecutive vertices
         assert all(indices[i] <= indices[i + 1] for i in range(len(indices) - 1))  # assure that indices are sorted
 
         tmp_routing_sequence = list(self.routing_sequence)

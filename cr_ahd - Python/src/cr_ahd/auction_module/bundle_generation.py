@@ -1,6 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Iterable
+from typing import Iterable, Sequence
 
 import numpy as np
 from sklearn.cluster import KMeans
@@ -12,30 +12,27 @@ logger = logging.getLogger(__name__)
 
 
 class BundleSetGenerationBehavior(ABC):
-    def execute(self, instance: it.PDPInstance, solution: slt.GlobalSolution, submitted_requests: Iterable):
+    def execute(self, instance: it.PDPInstance, solution: slt.GlobalSolution, submitted_requests: Sequence):
         bundle_set = self._generate_bundle_set(instance, solution, submitted_requests)
         solution.bundle_generation = self.__class__.__name__
         return bundle_set
 
     @abstractmethod
     def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution,
-                             submitted_requests: Iterable):
+                             submitted_requests: Sequence):
         pass
 
 
-'''
-class AllBundles(BundleGenerationBehavior):
+class AllBundles(BundleSetGenerationBehavior):
     """
     creates the power set of all the submitted requests, i.e. all subsets of size k for all k = 1, ..., len(pool).
-    Does not include emtpy set!
+    Does not include emtpy set.
     """
 
-    # TODO how does this ensure that ALL the submitted requests will be re-assigned? There's no way to make sure that
-    #  the union of the bundles that carriers win are actually exhausting the auction pool
-
-    def _generate_bundles(self, submitted_requests: dict):
-        pool = flatten_dict_of_lists(submitted_requests)
-        return powerset(pool, False)'''
+    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution,
+                             submitted_requests: Sequence):
+        pool = ut.flatten(submitted_requests)
+        return tuple(ut.power_set(pool, False))
 
 
 class RandomPartition(BundleSetGenerationBehavior):
@@ -60,7 +57,8 @@ class KMeansBundles(BundleSetGenerationBehavior):
                              submitted_requests: Iterable):
         request_midpoints = [ut.midpoint(instance, *instance.pickup_delivery_pair(sr)) for sr in submitted_requests]
         k_means = KMeans(n_clusters=instance.num_carriers, random_state=0).fit(request_midpoints)
-        bundles = [list(np.take(submitted_requests, np.nonzero(k_means.labels_ == b)[0])) for b in range(k_means.n_clusters)]
+        bundles = [list(np.take(submitted_requests, np.nonzero(k_means.labels_ == b)[0])) for b in
+                   range(k_means.n_clusters)]
         return bundles
 
 

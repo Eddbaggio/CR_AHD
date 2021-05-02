@@ -1,6 +1,7 @@
 import functools
 import itertools
 import json
+import math
 import random
 import time
 import datetime as dt
@@ -287,3 +288,13 @@ def linear_interpolation(iterable: Sequence, new_min: float, new_max: float, old
         old_min = min(iterable)
         old_max = max(iterable)
     return [((x - old_min) / (old_max - old_min)) * (new_max - new_min) + new_min for x in iterable]
+
+
+def n_points_on_a_circle(n: int, radius, origin_x=0, origin_y=0):
+    """create coordinates for n points that are evenly spaced on the circumference of  a circle of the given radius"""
+    points = []
+    for i in range(1, n + 1):
+        x = radius * math.cos(2 * math.pi * i / n - math.pi / 2)
+        y = radius * math.sin(2 * math.pi * i / n - math.pi / 2)
+        points.append((origin_x + x, origin_y + y))
+    return points

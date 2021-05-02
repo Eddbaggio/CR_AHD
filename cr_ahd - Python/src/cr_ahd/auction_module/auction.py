@@ -4,6 +4,7 @@ import src.cr_ahd.utility_module.utils as ut
 from src.cr_ahd.auction_module import request_selection as rs, bundle_generation as bg, bidding as bd, \
     winner_determination as wd
 from src.cr_ahd.core_module import instance as it, solution as slt
+from src.cr_ahd.routing_module import tour_construction as cns
 import logging
 
 logger = logging.getLogger(__name__)
@@ -16,11 +17,47 @@ class Auction(ABC):
         solution.auction_mechanism = self.__class__.__name__
         pass
 
-    @abstractmethod
     def _run_auction(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        submitted_requests = self._request_selection(instance, solution, ut.NUM_REQUESTS_TO_SUBMIT)
+        if submitted_requests:
+            logger.debug(f'requests {submitted_requests} have been submitted to the auction pool')
+            logger.debug(f'routing non-submitted requests {submitted_requests}')
+            self._route_unsubmitted(instance, solution)
+            bundles = self._bundle_generation(instance, solution, submitted_requests)
+            logger.debug(f'bundles {bundles} have been created')
+            logger.debug(f'Generating bids')
+            bids = self._bid_generation(instance, solution, bundles)
+            logger.debug(f'Bids {bids} have been created for bundles {bundles}')
+            winner_bundles, bundle_winners = self._winner_determination(instance, solution, bundles, bids)
+            logger.debug(f'reassigning bundles {bundles} to carriers {bundle_winners}')
+            for bundle, winner in zip(winner_bundles, bundle_winners):
+                solution.assign_requests_to_carriers(bundle, [winner] * len(bundle))
+        else:
+            logger.warning(f'No requests have been submitted!')
+        pass
+
+    @abstractmethod
+    def _request_selection(self, instance, solution, num_request_to_submit):
+        pass
+
+    @abstractmethod
+    def _route_unsubmitted(self, instance, solution):
+        pass
+
+    @abstractmethod
+    def _bundle_generation(self, instance, solution, submitted_requests):
+        pass
+
+    @abstractmethod
+    def _bid_generation(self, instance, solution, bundles):
+        pass
+
+    @abstractmethod
+    def _winner_determination(self, instance, solution, bundles, bids):
         pass
 
 
+'''
 class AuctionA(Auction):
     """
     Request Selection Behavior: Highest Insertion Cost Distance
@@ -49,29 +86,31 @@ class AuctionB(Auction):
         bundle_set = bg.RandomPartition(instance.distance_matrix).execute(submitted_requests)
         bids = bd.I1TravelDistanceIncrease().execute(bundle_set, instance.carriers)
         wd.LowestBid().execute(bids)
+'''
 
 
 class AuctionC(Auction):
     """
-    Request Selection Behavior: Highest Insertion Cost Distance
-    Bundle Generation Behavior: K-Means
-    Bidding Behavior: I1 Travel Distance Increase
-    Winner Determination Behavior: Lowest Bid
+    Request Selection Behavior: Lowest Profit
+    Bundle Generation Behavior: Power Set
+    Bidding Behavior: Profit
+    Winner Determination Behavior: Gurobi - Set Packing Problem
     """
 
-    def _run_auction(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
-        submitted_requests = rs.LowestProfit().execute(instance, solution, ut.NUM_REQUESTS_TO_SUBMIT)
-        if submitted_requests:
-            logger.debug(f'requests {submitted_requests} have been submitted to the auction pool')
-            bundles = bg.KMeansBundles().execute(instance, solution, submitted_requests)
-            logger.debug(f'bundles {bundles} have been created')
-            logger.debug(f'Generating bids')
-            bids = bd.Profit().execute(instance, solution, bundles)
-            logger.debug(f'Bids {bids} have been created for bundles {bundles}')
-            bundle_winners = wd.HighestBid().execute(instance, solution, bundles, bids)
-            logger.debug(f'reassigning bundles {bundles} to carriers {bundle_winners}')
-            for bundle, winner in zip(bundles, bundle_winners):
-                solution.assign_requests_to_carriers(bundle, [winner] * len(bundle))
-        else:
-            logger.warning(f'No requests have been submitted!')
+    def _request_selection(self, instance, solution, num_request_to_submit):
+        return rs.LowestProfit().execute(instance, solution, ut.NUM_REQUESTS_TO_SUBMIT)
+
+    def _route_unsubmitted(self, instance, solution):
+        cns.CheapestPDPInsertion().construct(instance, solution)
+        pass
+
+    def _bundle_generation(self, instance, solution, submitted_requests):
+        return bg.AllBundles().execute(instance, solution, submitted_requests)
+
+    def _bid_generation(self, instance, solution, bundles):
+        return bd.Profit().execute(instance, solution, bundles)
+
+    def _winner_determination(self, instance, solution, bundles, bids):
+        return wd.MaxBidGurobi().execute(instance, solution, bundles, bids)
+
 

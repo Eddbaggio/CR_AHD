@@ -19,17 +19,17 @@ class TourInitializationBehavior(ABC):
         pass
 
     def initialize_carrier(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
-        cs = solution.carrier_solutions[carrier]
+        carrier_ = solution.carriers[carrier]
         best_request = None
         best_evaluation = -float('inf')
-        for request in cs.unrouted_requests:
+        for request in carrier_.unrouted_requests:
             evaluation = self.request_evaluation(instance, solution, carrier, request)
             if evaluation > best_evaluation:
                 best_request = request
                 best_evaluation = evaluation
         tour = tr.Tour(carrier, instance, solution, carrier)
         tour.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(best_request))
-        cs.tours.append(tour)
+        carrier_.tours.append(tour)
         pass
 
     @abstractmethod
