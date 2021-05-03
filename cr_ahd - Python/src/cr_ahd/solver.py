@@ -2,7 +2,7 @@ import abc
 import logging.config
 from typing import final
 
-import src.cr_ahd.utility_module.utils as ut
+from src.cr_ahd.utility_module import utils as ut, plotting as pl
 from src.cr_ahd.auction_module import auction as au
 from src.cr_ahd.tw_management_module import tw_management as twm
 from src.cr_ahd.core_module import instance as it, solution as slt
@@ -51,15 +51,16 @@ class StaticSolver(Solver):
     def initialize_pendulum_tours(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         pass
 
-    def run_auction(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
-        pass
-
     @abc.abstractmethod
     def build_tours(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         pass
 
+    def run_auction(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        pass
+
     def finalize_with_local_search(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
-        imp.PDPExchangeMoveBest().improve_global_solution(instance, solution)
+        imp.PDPMoveBest().improve_global_solution(instance, solution)
+        # imp.PDPExchangeMoveBest().improve_global_solution(instance, solution)
         pass
 
     def time_window_management(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
@@ -77,6 +78,10 @@ class Static(StaticSolver):
 
 
 class StaticCollaborative(StaticSolver):
+    """
+    Executes an auction after all the requests have been assigned
+    """
+
     def initialize_pendulum_tours(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         ini.FurthestDistance().execute(instance, solution)
         pass
@@ -86,6 +91,25 @@ class StaticCollaborative(StaticSolver):
 
     def run_auction(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         au.AuctionC().execute(instance, solution)
+
+
+class StaticCollaborativeAHD(StaticSolver):
+    """
+    Assigns all requests to the original carrier, then does the time window management and finally does an auction
+    """
+
+    def initialize_pendulum_tours(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        ini.FurthestDistance().execute(instance, solution)
+        pass
+
+    def build_tours(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        cns.CheapestPDPInsertion().construct(instance, solution)
+
+    def run_auction(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        au.AuctionC().execute(instance, solution)
+
+    def time_window_management(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        twm.TWManagement0().execute(instance, solution)
 
 
 '''
@@ -202,6 +226,7 @@ class DynamicSolver(Solver, abc.ABC):
                 self.run_auction(instance, solution)
             # build tours with the re-allocated requests
             self.build_tours(instance, solution)
+        # pl.plot_solution_2(instance, solution, show=True, title="Before local search")
         self.finalize_with_local_search(instance, solution)
 
     @final
@@ -240,16 +265,35 @@ class DynamicSolver(Solver, abc.ABC):
 
 
 class Dynamic(DynamicSolver):
+    """
+    requests arrive dynamically. upon request disclosure, it must be inserted into a tour immediately.
+    """
     def build_tours(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         cns.CheapestPDPInsertion().construct(instance, solution)
 
 
 class DynamicCollaborative(DynamicSolver):
+    """
+    requests arrive dynamically in specified cyclic intervals. Once some requests have been collected, an auction
+    takes place and afterwards, allocated requests are inserted into a tour
+    """
     def run_auction(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         au.AuctionC().execute(instance, solution)
 
     def build_tours(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         cns.CheapestPDPInsertion().construct(instance, solution)
+
+
+class DynamicAHD(DynamicSolver):
+    """
+    requests arrive dynamically. Upon request disclosure, a time window management procedure is performed to determine
+    the time window for each new request.
+    """
+    def build_tours(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        cns.CheapestPDPInsertion().construct(instance, solution)
+
+    def time_window_management(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        twm.TWManagement0().execute(instance, solution)
 
 
 class DynamicCollaborativeAHD(DynamicSolver):

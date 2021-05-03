@@ -210,30 +210,48 @@ class Tour:
     def update_sequences_and_schedules(self, instance, solution, index: int = 1):
         """update schedules from given index to end of routing sequence. index should be the same as the insertion
         or removal index. """
+
+        total_travel_dist = sum(self.travel_distance_sequence[:index])
+        load = sum(self.load_sequence[:index])
+
         for pos in range(index, len(self)):
             vertex: int = self.routing_sequence[pos]
             predecessor_vertex: int = self.routing_sequence[pos - 1]
+
+            # check precedence
+            if instance.vertex_type(vertex) == 'delivery':
+                precedence_vertex = vertex - instance.num_requests
+                if precedence_vertex not in self.routing_sequence[:pos]:
+                    message = f'Precedence violated'
+                    logger.error(message)
+                    raise ut.ConstraintViolationError(message, message)
+
+            # check max distance constraints
             travel_dist = instance.distance([predecessor_vertex], [vertex])
-            cumul_travel_dist = sum(self.travel_distance_sequence[:pos]) + travel_dist
-            arrival = self.service_schedule[pos - 1] + ut.travel_time(travel_dist)
-            cumul_load = sum(self.load_sequence[:pos]) + instance.load[vertex]
-            # check the feasibility constraints
-            if cumul_travel_dist >= instance.vehicles_max_travel_distance:
-                message = f'{cumul_travel_dist} too long'
+            total_travel_dist += travel_dist
+            if total_travel_dist > instance.vehicles_max_travel_distance:
+                message = f'{total_travel_dist} too long'
                 logger.error(message)
                 raise ut.ConstraintViolationError(message, message)
-            if arrival > solution.tw_close[vertex]:
-                message = f'{arrival} too late'
+
+            # check tw constraints
+            arrival_time = self.service_schedule[pos - 1] + instance.service_duration[predecessor_vertex] + ut.travel_time(travel_dist)
+            if arrival_time > solution.tw_close[vertex]:
+                message = f'{arrival_time} too late'
                 logger.error(message)
                 raise ut.ConstraintViolationError(message, message)
-            if cumul_load > instance.vehicles_max_load:
-                message = f'{cumul_load} to high'
+
+            # check load constraints
+            load += instance.load[vertex]
+            if load > instance.vehicles_max_load:
+                message = f'{load} to high'
                 logger.error(message)
                 raise ut.ConstraintViolationError(message, message)
+
             self._travel_distance_sequence[pos] = travel_dist
             self._travel_duration_sequence[pos] = ut.travel_time(travel_dist)
-            self._arrival_schedule[pos] = arrival
-            self._service_schedule[pos] = max(arrival, solution.tw_open[vertex])
+            self._arrival_schedule[pos] = arrival_time
+            self._service_schedule[pos] = max(arrival_time, solution.tw_open[vertex])
             self._load_sequence[pos] = instance.load[vertex]
             self._revenue_sequence[pos] = instance.revenue[vertex]
         logger.debug(f'{self.id_} updated from index {index}')
@@ -300,32 +318,37 @@ class Tour:
         """
         assert all(insertion_positions[i] <= insertion_positions[i + 1] for i in range(len(insertion_positions) - 1))
         # create a temporary routing sequence to loop over that contains the new vertices
-        # TODO avoid the copy if possible!
         tmp_routing_sequence = list(self.routing_sequence)
         for pos, vertex in zip(insertion_positions, insertion_vertices):
             tmp_routing_sequence.insert(pos, vertex)
-        tour_length = sum(self.travel_distance_sequence[:insertion_positions[0]])
-        arrival_time = self.arrival_schedule[insertion_positions[0] - 1]
+
+        total_travel_dist = sum(self.travel_distance_sequence[:insertion_positions[0]])
+        service_time = self.service_schedule[insertion_positions[0] - 1]
         load = self.load_sequence[insertion_positions[0] - 1]
 
         # iterate over the temporary tour and check all constraints
         for pos in range(insertion_positions[0], len(tmp_routing_sequence)):
             vertex: int = tmp_routing_sequence[pos]
+            predecessor_vertex: int = tmp_routing_sequence[pos - 1]
+
             # check precedence
-            if vertex >= instance.num_carriers + instance.num_requests:
+            if instance.vertex_type(vertex) == "delivery":
                 precedence_vertex = vertex - instance.num_requests
                 if precedence_vertex not in tmp_routing_sequence[:pos]:
                     return False
-            predecessor_vertex: int = tmp_routing_sequence[pos - 1]
-            travel_distance = instance.distance([predecessor_vertex], [vertex])
+
             # check max tour distance
-            tour_length += travel_distance
-            if tour_length > instance.vehicles_max_travel_distance:
+            travel_distance = instance.distance([predecessor_vertex], [vertex])
+            total_travel_dist += travel_distance
+            if total_travel_dist > instance.vehicles_max_travel_distance:
                 return False
+
             # check time windows
-            arrival_time = arrival_time + instance.service_time[predecessor_vertex] + ut.travel_time(travel_distance)
+            arrival_time = service_time + instance.service_duration[predecessor_vertex] + ut.travel_time(travel_distance)
             if arrival_time > solution.tw_close[vertex]:
                 return False
+            service_time = max(arrival_time, solution.tw_open[vertex])
+
             # check max vehicle load
             load += instance.load[vertex]
             if load > instance.vehicles_max_load:

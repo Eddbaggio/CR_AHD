@@ -70,12 +70,12 @@ class MaxBidGurobi(WinnerDeterminationBehavior):
 
         winner_bundles = []
         bundle_winners = []
-        print(f'the optimal solution for the Winner Determination Problem with {len(bundles)} bundles:')
-        print(f'Objective: {m.objVal}')
+        logger.debug(f'the optimal solution for the Winner Determination Problem with {len(bundles)} bundles:')
+        logger.debug(f'Objective: {m.objVal}')
         for b_idx, bundle in enumerate(bundles):
             if x[b_idx].x > 0.99:
                 winner_bundles.append(bundle)
                 bundle_winners.append(max_bidders[b_idx])
-                print(f'Bundle {b_idx}: {bundle} assigned to {max_bidders[b_idx]} for a bid of {max_bids[b_idx]}')
+                logger.debug(f'Bundle {b_idx}: {bundle} assigned to {max_bidders[b_idx]} for a bid of {max_bids[b_idx]}')
 
         return winner_bundles, bundle_winners

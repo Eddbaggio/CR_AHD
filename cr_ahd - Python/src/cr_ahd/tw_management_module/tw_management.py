@@ -1,34 +1,48 @@
 import abc
+from copy import deepcopy
+
 from src.cr_ahd.core_module import instance as it, solution as slt
-import src.cr_ahd.tw_management_module.tw_offering as two
-import src.cr_ahd.tw_management_module.tw_selection as tws
+from src.cr_ahd.tw_management_module import tw_offering as two, tw_selection as tws
+from src.cr_ahd.routing_module import tour_construction as cns
 import src.cr_ahd.utility_module.utils as ut
 
 
 class TWManagement(abc.ABC):
     def execute(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         for carrier in range(instance.num_carriers):
-            for request in solution.carriers[carrier].unrouted_requests:
-                offer_set = self.get_offer_set(instance, solution, carrier, request)
-                selected_tw = self.get_selected_tw(offer_set, request)
+            # TODO need a temp copy of the carrier to get TW offerings for multiple requests
+            tmp_carrier_ = deepcopy(solution.carriers[carrier])
+            solution.carriers.append(tmp_carrier_)
+            tmp_carrier = instance.num_carriers
+            for request in solution.carriers[tmp_carrier].unrouted_requests:
+                offer_set = self._get_offer_set(instance, solution, tmp_carrier, request)
+                selected_tw = self._get_selected_tw(offer_set, request)
                 pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
                 solution.tw_open[delivery_vertex] = selected_tw.open
                 solution.tw_close[delivery_vertex] = selected_tw.close
+                pdp_insertion = cns.CheapestPDPInsertion()
+                insertion_operation = pdp_insertion._carrier_cheapest_insertion(instance, solution, tmp_carrier, [request])
+                if insertion_operation[1] is None:
+                    pdp_insertion._create_new_tour_with_request(instance, solution, tmp_carrier, request)
+                else:
+                    pdp_insertion._execute_insertion(instance, solution, tmp_carrier, *insertion_operation)
+            # pop the temp carrier from the solution:
+            solution.carriers.pop()
         pass
 
     @abc.abstractmethod
-    def get_offer_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, request: int):
+    def _get_offer_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, request: int):
         pass
 
     @abc.abstractmethod
-    def get_selected_tw(self, offer_set, request: int):
+    def _get_selected_tw(self, offer_set, request: int):
         pass
 
 
 class TWManagement0(TWManagement):
-    """carrier: offer all feasible time windows, customer: select a random time window"""
-    def get_offer_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, request: int):
-        two.FeasibleTW().execute(instance, solution, carrier, request)
+    """carrier: offer all feasible time windows, customer: select a random time window from the offered set"""
+    def _get_offer_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, request: int):
+        return two.FeasibleTW().execute(instance, solution, carrier, request)
 
-    def get_selected_tw(self, offer_set, request: int):
-        tws.UniformPreference().execute(offer_set, request)
+    def _get_selected_tw(self, offer_set, request: int):
+        return tws.UniformPreference().execute(offer_set, request)

@@ -61,8 +61,8 @@ class PDPIntraTourLocalSearch(TourImprovementBehavior):
                 move = self.find_move(instance, solution, carrier, tour)
                 # best_pos_i, best_pos_j, best_delta = self.improve_tour(instance, solution, carrier, tour)
                 if self.acceptance_criterion(move[0]):
+                    logger.debug(f'Intra Tour Local Search move found:')
                     self.execute_move(instance, solution, carrier, tour, move)
-                    logger.debug(f'Intra Tour Local Search move executed')
                     improved = True
         pass
 
@@ -314,7 +314,6 @@ class PDPMoveBest(PDPIntraTourLocalSearch):
         delta, old_pickup_pos, old_delivery_pos, new_pickup_pos, new_delivery_pos = move
         tour_ = solution.carriers[carrier].tours[tour]
         # create a temporary routing sequence to loop over that contains the new vertices
-        # TODO avoid the copy!
         tmp_routing_sequence = list(tour_.routing_sequence)
         delivery = tmp_routing_sequence.pop(old_delivery_pos)
         pickup = tmp_routing_sequence.pop(old_pickup_pos)
@@ -322,27 +321,32 @@ class PDPMoveBest(PDPIntraTourLocalSearch):
         tmp_routing_sequence.insert(new_delivery_pos, delivery)
 
         total_travel_distance = sum(tour_.travel_distance_sequence[:old_pickup_pos])
-        arrival_time = tour_.arrival_schedule[old_pickup_pos - 1]
+        service_time = tour_.service_schedule[old_pickup_pos - 1]
         load = tour_.load_sequence[old_pickup_pos - 1]
 
         # iterate over the temporary tour and check all constraints
         for pos in range(old_pickup_pos, len(tmp_routing_sequence)):
             vertex: int = tmp_routing_sequence[pos]
+            predecessor_vertex: int = tmp_routing_sequence[pos - 1]
+
             # check precedence
             if instance.vertex_type(vertex) == "delivery":
                 precedence_vertex = vertex - instance.num_requests
                 if precedence_vertex not in tmp_routing_sequence[:pos]:
                     return False
-            predecessor_vertex: int = tmp_routing_sequence[pos - 1]
-            travel_distance = instance.distance([predecessor_vertex], [vertex])
+
             # check max tour distance
+            travel_distance = instance.distance([predecessor_vertex], [vertex])
             total_travel_distance += travel_distance
             if total_travel_distance > instance.vehicles_max_travel_distance:
                 return False
+
             # check time windows
-            arrival_time = arrival_time + instance.service_time[predecessor_vertex] + ut.travel_time(travel_distance)
+            arrival_time = service_time + instance.service_duration[predecessor_vertex] + ut.travel_time(travel_distance)
             if arrival_time > solution.tw_close[vertex]:
                 return False
+            service_time = max(arrival_time, solution.tw_open[vertex])
+
             # check max vehicle load
             load += instance.load[vertex]
             if load > instance.vehicles_max_load:
@@ -373,8 +377,8 @@ class PDPInterTourLocalSearch(TourImprovementBehavior):
                 improved = False
                 move = self.find_move(instance, solution, carrier)
                 if self.acceptance_criterion(move[0]):
+                    logger.debug(f'Inter Tour Local Search move found:')
                     self.execute_move(instance, solution, carrier, move)
-                    logger.debug(f'Inter Tour Local Search move executed')
                     improved = True
         pass
 
@@ -484,19 +488,21 @@ class PDPExchangeMoveBest(PDPInterTourLocalSearch):
         # TODO check ALL constraints
         delta, old_tour, old_pickup_pos, old_delivery_pos, new_tour, new_pickup_pos, new_delivery_pos = move
         carrier_ = solution.carriers[carrier]
-        return carrier_.tours[new_tour].insertion_feasibility_check(instance, solution, [new_pickup_pos, new_delivery_pos],
-                                                              [(carrier_.tours[old_tour].routing_sequence[old_pickup_pos]),
-                                                               (carrier_.tours[old_tour].routing_sequence[old_delivery_pos])])
+        return carrier_.tours[new_tour].insertion_feasibility_check(instance, solution,
+                                                                    [new_pickup_pos, new_delivery_pos],
+                                                                    [(carrier_.tours[old_tour].routing_sequence[
+                                                                        old_pickup_pos]),
+                                                                     (carrier_.tours[old_tour].routing_sequence[
+                                                                         old_delivery_pos])])
 
     def execute_move(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, move):
         delta, old_tour, old_pickup_pos, old_delivery_pos, new_tour, new_pickup_pos, new_delivery_pos = move
         carrier_ = solution.carriers[carrier]
         carrier_.tours[old_tour].pop_and_update(instance, solution, [old_pickup_pos, old_delivery_pos])
         carrier_.tours[new_tour].insert_and_update(instance, solution, [new_pickup_pos, new_delivery_pos],
-                                             [(carrier_.tours[old_tour].routing_sequence[old_pickup_pos]),
-                                              (carrier_.tours[old_tour].routing_sequence[old_delivery_pos])])
+                                                   [(carrier_.tours[old_tour].routing_sequence[old_pickup_pos]),
+                                                    (carrier_.tours[old_tour].routing_sequence[old_delivery_pos])])
         pass
-
 
 # class ThreeOpt(TourImprovementBehavior):
 #     pass
@@ -506,13 +512,3 @@ class PDPExchangeMoveBest(PDPInterTourLocalSearch):
 
 # class Swap(TourImprovementBehavior):
 #     pass
-
-class NoImprovement(TourImprovementBehavior):
-    def improve_global_solution(self, instance):
-        pass
-
-    def improve_carrier_solution(self, carrier):
-        pass
-
-    def improve_tour(self, tour):
-        pass

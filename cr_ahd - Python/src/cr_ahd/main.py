@@ -32,15 +32,20 @@ def execute_all(instance: it.PDPInstance):
         # slv.Static,
         # slv.StaticCollaborative,
         # slv.Dynamic,
-        slv.DynamicCollaborative,
-        # slv.DynamicCollaborativeAHD
+        # slv.DynamicCollaborative,
+        slv.DynamicAHD,
+        slv.DynamicCollaborativeAHD
     ]:
         solution = slt.GlobalSolution(instance)
         if instance.num_carriers == 1 and 'Auction' in solver.__name__:
             continue  # skip auction solvers for centralized instances
         logger.info(f'Solving {instance.id_} via {solver.__name__}')
         solver().execute(instance, solution)
-        pl.plot_solution_2(instance, solution, title=f'{instance.id_} with Solver "{solver.__name__}"', show=True)
+        pl.plot_solution_2(
+            instance,
+            solution,
+            title=f'{instance.id_} with Solver "{solver.__name__} - Total profit: {solution.sum_profit()}"',
+            show=True)
         solution.write_to_json()
         solutions.append(solution)
     return solutions
@@ -90,8 +95,8 @@ def write_solutions_to_multiindex_df(solutions_per_instance: List[List[slt.Globa
         inplace=True)
     for column in df.select_dtypes(include=['timedelta64']):
         df[column] = df[column].dt.total_seconds()
-    df.to_csv(ut.unique_path(ut.path_output_gansterer, 'evaluation' + '_#{:03d}'+'.csv'))
-    df.to_excel(ut.unique_path(ut.path_output_gansterer, 'evaluation' + '_#{:03d}'+'.xlsx'), merge_cells=False)
+    df.to_csv(ut.unique_path(ut.path_output_gansterer, 'evaluation' + '_#{:03d}' + '.csv'))
+    df.to_excel(ut.unique_path(ut.path_output_gansterer, 'evaluation' + '_#{:03d}' + '.xlsx'), merge_cells=False)
     return df
 
 
@@ -111,7 +116,7 @@ if __name__ == '__main__':
     logger.info('START')
 
     # paths = [Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/test.dat')]
-    paths = list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir())[4:5]
+    paths = list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir())[:1]
     # for path in paths:
     #     read_and_execute_all(path)
     df = read_and_execute_all_parallel(paths)

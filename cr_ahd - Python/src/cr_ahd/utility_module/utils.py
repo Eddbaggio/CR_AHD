@@ -262,14 +262,15 @@ def argmax(a):
     return max(range(len(a)), key=lambda x: a[x])
 
 
+random.seed(0)
 START_TIME = dt.datetime.min
 END_TIME = dt.datetime.min + dt.timedelta(minutes=3390)
 TIME_HORIZON = TimeWindow(START_TIME, END_TIME)
 TW_LENGTH = dt.timedelta(hours=2)
-ALL_TW = [TimeWindow(e, e + TW_LENGTH) for e in datetime_range(START_TIME, END_TIME, freq=TW_LENGTH)]
+ALL_TW = [TimeWindow(e, min(e + TW_LENGTH, END_TIME)) for e in datetime_range(START_TIME, END_TIME, freq=TW_LENGTH)]
 SPEED_KMH = 60
-DYNAMIC_CYCLE_TIME = 2  # does not actually represent time but the number of requests being assigned each cycle
-NUM_REQUESTS_TO_SUBMIT = 0.5  # either relative (between 0 and 1) or an absolute number lower than DYNAMIC_CYCLE_TIME
+DYNAMIC_CYCLE_TIME = 5  # does not actually represent time but the number of requests being assigned each cycle
+NUM_REQUESTS_TO_SUBMIT = 3 / 5  # either relative (between 0 and 1) or an absolute number lower than DYNAMIC_CYCLE_TIME
 
 
 def midpoint(instance, pickup_vertex, delivery_vertex):

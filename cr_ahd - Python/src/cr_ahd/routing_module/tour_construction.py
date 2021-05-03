@@ -66,7 +66,7 @@ class PDPInsertionConstruction(TourConstructionBehavior):
         pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(unrouted_request)
 
         for pickup_pos in range(1, len(tour_)):
-            for delivery_pos in range(pickup_pos + 1, len(tour_) + 1):
+            for delivery_pos in range(pickup_pos + 1, len(tour_) + 1):  # TODO I only have to check those positions that would not violate the TWs of the other nodes, thus I can potentially start even later that i+1
                 delta = tour_.insertion_distance_delta(instance, [pickup_pos, delivery_pos],
                                                        [pickup_vertex, delivery_vertex])
                 if delta < best_delta:
@@ -82,7 +82,7 @@ class PDPInsertionConstruction(TourConstructionBehavior):
                                       request: int):
         carrier_ = solution.carriers[carrier]
         if carrier_.num_tours() >= instance.carriers_max_num_tours:
-            logger.error(f'Max Vehicle Constraint violated!')
+            # logger.error(f'Max Vehicle Constraint violated!')
             raise ut.ConstraintViolationError(f'Cannot create new route with request {request} for carrier {carrier}.'
                                               f' Max. number of vehicles is {instance.carriers_max_num_tours}!')
         rtmp = tr.Tour(len(carrier_.tours), instance, solution, carrier_.id_)
@@ -99,7 +99,7 @@ class CheapestPDPInsertion(PDPInsertionConstruction):
     """
 
     def _carrier_cheapest_insertion(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int,
-                                    requests):
+                                    requests:Sequence[int]):
         logger.debug(f'Cheapest Insertion tour construction for carrier {carrier}:')
         carrier_ = solution.carriers[carrier]
         best_delta = float('inf')

@@ -48,9 +48,12 @@ class CheapestInsertionDistanceIncrease(BiddingBehavior):
                 request, tour, pickup_pos, delivery_pos = \
                     construction._carrier_cheapest_insertion(instance, solution, tmp_carrier,
                                                              tmp_carrier_.unrouted_requests)
-                # when for a given request no tour can be found, create a new tour and start over
+
+                # when for a given request no tour can be found, create a new tour and start over. This may raise
+                # a ConstraintViolationError if the carrier cannot initialize another new tour
                 if tour is None:
                     construction._create_new_tour_with_request(instance, solution, tmp_carrier, request)
+
                 else:
                     construction._execute_insertion(instance, solution, tmp_carrier, request, tour, pickup_pos,
                                                     delivery_pos)

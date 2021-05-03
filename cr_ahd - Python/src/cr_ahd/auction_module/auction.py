@@ -21,7 +21,7 @@ class Auction(ABC):
         submitted_requests = self._request_selection(instance, solution, ut.NUM_REQUESTS_TO_SUBMIT)
         if submitted_requests:
             logger.debug(f'requests {submitted_requests} have been submitted to the auction pool')
-            logger.debug(f'routing non-submitted requests {submitted_requests}')
+            logger.debug(f'routing non-submitted requests {[c.unrouted_requests for c in solution.carriers]}')
             self._route_unsubmitted(instance, solution)
             bundles = self._bundle_generation(instance, solution, submitted_requests)
             logger.debug(f'bundles {bundles} have been created')
@@ -29,7 +29,7 @@ class Auction(ABC):
             bids = self._bid_generation(instance, solution, bundles)
             logger.debug(f'Bids {bids} have been created for bundles {bundles}')
             winner_bundles, bundle_winners = self._winner_determination(instance, solution, bundles, bids)
-            logger.debug(f'reassigning bundles {bundles} to carriers {bundle_winners}')
+            logger.debug(f'reassigning bundles {winner_bundles} to carriers {bundle_winners} for bids')
             for bundle, winner in zip(winner_bundles, bundle_winners):
                 solution.assign_requests_to_carriers(bundle, [winner] * len(bundle))
         else:

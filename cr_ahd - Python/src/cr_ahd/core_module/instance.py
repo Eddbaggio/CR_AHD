@@ -54,7 +54,7 @@ class PDPInstance:
         self.request_to_carrier_assignment = requests_initial_carrier_assignment
         self.revenue = [*[0] * (self.num_carriers + len(requests)), *requests_revenue]
         self.load = [*[0] * self.num_carriers, *requests_pickup_load, *requests_delivery_load]
-        self.service_time = [*[dt.timedelta(0)] * self.num_carriers, *requests_pickup_service_time, *requests_delivery_service_time]
+        self.service_duration = [*[dt.timedelta(0)] * self.num_carriers, *requests_pickup_service_time, *requests_delivery_service_time]
 
         # compute the distance matrix
         # TODO do I need to round the distances due to floating point precision?

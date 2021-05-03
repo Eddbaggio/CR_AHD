@@ -45,15 +45,37 @@ class FeasibleTW(TWOfferingBehavior):
     def _evaluate_time_window(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, request: int,
                               tw: ut.TimeWindow):
         carrier_ = solution.carriers[carrier]
+        depot = carrier_.id_
         pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
 
-        # can the carrier open a new tour and insert the request there?
+        # can the carrier open a new tour and insert the request there? only checks the time window constraint.
+        # it is assumed that load and max tour length are not exceeded with a single request
         if carrier_.num_tours() < instance.carriers_max_num_tours:
-            dist = instance.distance([carrier, pickup_vertex], [pickup_vertex, delivery_vertex])
-            if ut.travel_time(dist) <= solution.tw_close[delivery_vertex]:
+            new_tour_feasible = True
+            service_time = ut.START_TIME
+            for predecessor_vertex, vertex in zip([depot, pickup_vertex, delivery_vertex],
+                                                  [pickup_vertex, delivery_vertex, depot]):
+
+                # consider the TW to be evaluated if the current vertex is the delivery vertex
+                if vertex == delivery_vertex:
+                    vertex_tw = tw
+                else:
+                    vertex_tw = ut.TimeWindow(solution.tw_open[vertex], solution.tw_close[vertex])
+
+                dist = instance.distance([predecessor_vertex], [vertex])
+                arrival_time = service_time + instance.service_duration[predecessor_vertex] + ut.travel_time(dist)
+
+                if arrival_time > vertex_tw.close:
+                    new_tour_feasible = False
+                    break
+
+                service_time = max(arrival_time, vertex_tw.open)
+
+            if new_tour_feasible:
                 return 1
 
         # if no new tour can be built, can the request be inserted into one of the existing ones?
+
         for tour in carrier_.tours:
             first_index = self._find_first_insertion_index(solution, tw, tour)
             last_index = self._find_last_insertion_index(solution, tw, tour, first_index)
