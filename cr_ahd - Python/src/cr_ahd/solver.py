@@ -165,7 +165,7 @@ class StaticI1Insertion(Solver):
         pass
 
     def initialize_another_tour(self, carrier):
-        ini.EarliestDueDate().initialize_carrier(carrier)
+        ini.EarliestDueDate()._initialize_carrier(carrier)
 
     def build_routes(self, instance):
         carrier = cns.I1Insertion().execute(instance)
@@ -200,7 +200,7 @@ class StaticI1InsertionWithAuction(Solver):
         wd.LowestBid().execute(bids)
 
     def initialize_another_tour(self, carrier):
-        ini.EarliestDueDate().initialize_carrier(carrier)
+        ini.EarliestDueDate()._initialize_carrier(carrier)
 
     def build_routes(self, instance):
         carrier = cns.I1Insertion().execute(instance)

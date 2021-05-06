@@ -73,8 +73,13 @@ def split_iterable(iterable, num_chunks):
     return (iterable[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(num_chunks))
 
 
-def euclidean_distance(a: Coordinates, b: Coordinates):
-    return np.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
+def _euclidean_distance(a: Coordinates, b: Coordinates):
+    raise DeprecationWarning(f'Use new _euclidean_distance function!')
+    return math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
+
+
+def euclidean_distance(x1, x2, y1, y2):
+    return math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
 
 
 def make_travel_duration_matrix(vertices: List):
@@ -87,7 +92,7 @@ def make_travel_duration_matrix(vertices: List):
 
     for i in vertices:
         for j in vertices:
-            travel_duration_matrix.loc[i.id_, j.id_] = travel_time(euclidean_distance(i.coords, j.coords))
+            travel_duration_matrix.loc[i.id_, j.id_] = travel_time(_euclidean_distance(i.coords, j.coords))
     assert travel_duration_matrix.index.is_unique, f"Duration matrix must have unique row id's"
     return travel_duration_matrix
 
@@ -277,6 +282,10 @@ def midpoint(instance, pickup_vertex, delivery_vertex):
     pickup_x, pickup_y = instance.x_coords[pickup_vertex], instance.y_coords[delivery_vertex]
     delivery_x, delivery_y = instance.x_coords[pickup_vertex], instance.y_coords[delivery_vertex]
     return (pickup_x + delivery_x) / 2, (pickup_y + delivery_y) / 2
+
+
+def midpoint_(x1, y1, x2, y2):
+    return (x1 + x2) / 2, (y1 + y2) / 2
 
 
 def linear_interpolation(iterable: Sequence, new_min: float, new_max: float, old_min=None, old_max=None):

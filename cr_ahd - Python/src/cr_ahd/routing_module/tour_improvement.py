@@ -45,7 +45,7 @@ class PDPGradientDescent(TourImprovementBehavior):
 # =====================================================================================================================
 
 
-class PDPIntraTourLocalSearch(TourImprovementBehavior):
+class PDPIntraTourLocalSearch(TourImprovementBehavior, ABC):
     @final
     def improve_global_solution(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         for carrier in range(instance.num_carriers):
@@ -162,7 +162,7 @@ class PDPTwoOptFirstImprovement(PDPIntraTourLocalSearch):
 '''
 
 
-class PDPMoveBest(PDPIntraTourLocalSearch):
+class PDPMoveBest(PDPIntraTourLocalSearch, ABC):
     """
     Take a PD pair and see whether inserting it in a different location of THE SAME route improves the solution
     """

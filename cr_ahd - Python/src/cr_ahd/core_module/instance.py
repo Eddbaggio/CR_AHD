@@ -103,6 +103,9 @@ class PDPInstance:
         else:  # delivery vertex
             return vertex - self.num_carriers - self.num_requests
 
+    def coords(self, vertex:int):
+        return ut.Coordinates(self.x_coords[vertex], self.y_coords[vertex])
+
     '''
     def to_centralized(self, depot_xy: tuple):
         """

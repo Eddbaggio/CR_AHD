@@ -354,3 +354,4 @@ class Tour:
             if load > instance.vehicles_max_load:
                 return False
         return True
+

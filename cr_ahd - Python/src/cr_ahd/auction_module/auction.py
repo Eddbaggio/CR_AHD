@@ -38,6 +38,13 @@ class Auction(ABC):
 
     @abstractmethod
     def _request_selection(self, instance, solution, num_request_to_submit):
+        """
+
+        :param instance:
+        :param solution:
+        :param num_request_to_submit:
+        :return:
+        """
         pass
 
     @abstractmethod
@@ -91,9 +98,9 @@ class AuctionB(Auction):
 
 class AuctionC(Auction):
     """
-    Request Selection Behavior: Lowest Profit
-    Bundle Generation Behavior: Power Set
-    Bidding Behavior: Profit
+    Request Selection Behavior: Lowest Profit \n
+    Bundle Generation Behavior: Power Set - All Bundles \n
+    Bidding Behavior: Profit \n
     Winner Determination Behavior: Gurobi - Set Packing Problem
     """
 

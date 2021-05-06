@@ -13,7 +13,12 @@ logger = logging.getLogger(__name__)
 
 
 class WinnerDeterminationBehavior(ABC):
-    def execute(self, instance: it.PDPInstance, solution: slt.GlobalSolution, bundles: Sequence, bids_matrix: Sequence):
+    def execute(self,
+                instance: it.PDPInstance,
+                solution: slt.GlobalSolution,
+                auction_pool,
+                bundles: Sequence,
+                bids_matrix: Sequence):
         """
         apply the concrete winner determination behavior. Each carrier can only win a single bundle for now and the
         number of bundles must be equal to the number of carriers
@@ -22,10 +27,15 @@ class WinnerDeterminationBehavior(ABC):
          contain the carrier bids on that bundle
         """
 
-        return self._determine_winners(instance, solution, bundles, bids_matrix)
+        return self._determine_winners(instance, solution, auction_pool, bundles, bids_matrix)
 
     @abstractmethod
-    def _determine_winners(self, instance, solution, bundles, bids_matrix):
+    def _determine_winners(self,
+                           instance: it.PDPInstance,
+                           solution: slt.GlobalSolution,
+                           auction_pool: Sequence,
+                           bundles: Sequence,
+                           bids_matrix: Sequence):
         """
         :param bids_matrix: nested sequence of bids. the first axis is the bundles, the second axis (inner sequences)
          contain the carrier bids on that bundle
@@ -45,7 +55,12 @@ class MaxBidGurobi(WinnerDeterminationBehavior):
     Set Packing Formulation for the Combinatorial Auction Problem / Winner Determination Problem
     """
 
-    def _determine_winners(self, instance, solution, bundles, bids_matrix):
+    def _determine_winners(self,
+                           instance: it.PDPInstance,
+                           solution: slt.GlobalSolution,
+                           auction_pool: Sequence,
+                           bundles: Sequence,
+                           bids_matrix: Sequence):
         # (carrier, bid) tuples of the highest bid per bundle
         max_bidders = [ut.argmax(bundle_bids) for bundle_bids in bids_matrix]
         max_bids = [bids_matrix[b][max_bidders[b]] for b in range(len(bids_matrix))]
@@ -60,9 +75,9 @@ class MaxBidGurobi(WinnerDeterminationBehavior):
         # objective: max the sum of bids
         m.modelSense = GRB.MAXIMIZE
 
-        # constraints: each request is assigned to at most one carrier
+        # constraints: each request is assigned to exactly one carrier
         # where set(ut.flatten(bundles)) is basically the pool of submitted requests (set() does not preserve order)
-        for request in set(ut.flatten(bundles)):
+        for request in auction_pool:
             m.addConstr(sum(x[i] for i in range(len(bundles)) if request in bundles[i]) == 1, "single assignment")
 
         # solve
@@ -76,6 +91,7 @@ class MaxBidGurobi(WinnerDeterminationBehavior):
             if x[b_idx].x > 0.99:
                 winner_bundles.append(bundle)
                 bundle_winners.append(max_bidders[b_idx])
-                logger.debug(f'Bundle {b_idx}: {bundle} assigned to {max_bidders[b_idx]} for a bid of {max_bids[b_idx]}')
+                logger.debug(
+                    f'Bundle {b_idx}: {bundle} assigned to {max_bidders[b_idx]} for a bid of {max_bids[b_idx]}')
 
         return winner_bundles, bundle_winners

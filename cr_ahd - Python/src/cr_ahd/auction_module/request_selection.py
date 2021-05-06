@@ -21,7 +21,7 @@ class RequestSelectionBehavior(ABC):
          percentage of requests assigned to that carrier. If integer, will use the absolut amount of requests. If not
          enough requests are available, will submit as many as are available
         :param instance:
-        :return:
+        :return: the auction pool as a list of request indices
         """
         submitted_requests = list()
         for carrier in range(instance.num_carriers):
@@ -31,10 +31,10 @@ class RequestSelectionBehavior(ABC):
             selected = [r for _, r in
                         sorted(zip(valuations, solution.carriers[carrier].unrouted_requests))][:k]
             for s in selected:
-                solution.carriers[carrier].unrouted_requests.remove(s)  # TODO it's not routed yet! why do I already remove it here?
+                solution.carriers[carrier].unrouted_requests.remove(s)
                 solution.request_to_carrier_assignment[s] = np.nan
                 submitted_requests.append(s)
-                solution.unassigned_requests.append(s)  # if i do this, the assign_n_requests function will not work
+                solution.unassigned_requests.append(s)  # TODO if i do this, the assign_n_requests function will not work
         return submitted_requests
 
     @abstractmethod
