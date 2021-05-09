@@ -6,7 +6,7 @@ from typing import List, Tuple, Sequence
 
 import numpy as np
 import pandas as pd
-from scipy.spatial.distance import pdist, squareform
+from scipy.spatial.distance import pdist, squareform, cdist
 
 import src.cr_ahd.utility_module.utils as ut
 
@@ -54,12 +54,17 @@ class PDPInstance:
         self.request_to_carrier_assignment = requests_initial_carrier_assignment
         self.revenue = [*[0] * (self.num_carriers + len(requests)), *requests_revenue]
         self.load = [*[0] * self.num_carriers, *requests_pickup_load, *requests_delivery_load]
-        self.service_duration = [*[dt.timedelta(0)] * self.num_carriers, *requests_pickup_service_time, *requests_delivery_service_time]
+        self.service_duration = [*[dt.timedelta(0)] * self.num_carriers, *requests_pickup_service_time,
+                                 *requests_delivery_service_time]
 
         # compute the distance matrix
         # TODO do I need to round the distances due to floating point precision?
         # self._distance_matrix = np.ceil(squareform(pdist(np.array(list(zip(self.x_coords, self.y_coords))), 'euclidean')))
         self._distance_matrix = squareform(pdist(np.array(list(zip(self.x_coords, self.y_coords))), 'euclidean'))
+        # distances between [centroid of depots] and [depots + customer vertices]
+        # centroid_x, centroid_y = sum(carrier_depots_x) / self.num_carriers, sum(carrier_depots_y) / self.num_carriers
+        # self._center_distance_matrix = cdist(np.array(list(zip(self.x_coords, self.y_coords))),
+        #                                      np.array([[centroid_x, centroid_y]]), 'euclidean')
         logger.debug(f'{id_}: created')
 
     def __str__(self):
@@ -103,7 +108,7 @@ class PDPInstance:
         else:  # delivery vertex
             return vertex - self.num_carriers - self.num_requests
 
-    def coords(self, vertex:int):
+    def coords(self, vertex: int):
         return ut.Coordinates(self.x_coords[vertex], self.y_coords[vertex])
 
     '''
@@ -147,7 +152,7 @@ class PDPInstance:
             return "depot"
         elif vertex < self.num_carriers + self.num_requests:
             return "pickup"
-        elif vertex < self.num_carriers + 2*self.num_requests:
+        elif vertex < self.num_carriers + 2 * self.num_requests:
             return "delivery"
         else:
             raise IndexError(f'Vertex index {vertex} out of range')

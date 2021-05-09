@@ -78,7 +78,7 @@ def _euclidean_distance(a: Coordinates, b: Coordinates):
     return math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 
 
-def euclidean_distance(x1, x2, y1, y2):
+def euclidean_distance(x1, y1, x2, y2):
     return math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
 
 
@@ -200,7 +200,7 @@ def random_partition(li):
             break
 
 
-def random_max_k_partition(ls, max_k) -> Dict[int, Tuple[Any, ...]]:
+def random_max_k_partition(ls, max_k) -> Sequence[Sequence[int]]:
     """partition ls in at most k randomly sized disjoint subsets
 
     """
@@ -226,11 +226,10 @@ def random_max_k_partition(ls, max_k) -> Dict[int, Tuple[Any, ...]]:
     random.shuffle(indices)
     # construct and return the random subset: sort the elements by
     # which subset they will be assigned to, and group them into sets
-    partitions = dict()
-    sortd = sorted(zip(indices, ls), key=lambda x: x[0])
-    for index, subset in itertools.groupby(sortd, key=lambda x: x[0]):
-        partitions[index] = tuple(
-            x[1] for x in subset)  # TODO: better use frozenset (rather than tuple) for dict values?
+    partitions = []
+    sorted_ = sorted(zip(indices, ls), key=lambda x: x[0])
+    for index, subset in itertools.groupby(sorted_, key=lambda x: x[0]):
+        partitions.append([x[1] for x in subset])
     return partitions
 
 

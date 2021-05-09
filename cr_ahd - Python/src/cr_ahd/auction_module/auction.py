@@ -112,7 +112,7 @@ class AuctionC(Auction):
         pass
 
     def _bundle_generation(self, instance, solution, submitted_requests):
-        return bg.AllBundles().execute(instance, solution, submitted_requests)
+        return bg.ProxyTest().execute(instance, solution, submitted_requests)
 
     def _bid_generation(self, instance, solution, bundles):
         return bd.Profit().execute(instance, solution, bundles)

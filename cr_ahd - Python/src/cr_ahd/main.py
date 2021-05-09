@@ -33,7 +33,7 @@ def execute_all(instance: it.PDPInstance):
         # slv.StaticCollaborative,
         # slv.Dynamic,
         # slv.DynamicCollaborative,
-        slv.DynamicAHD,
+        # slv.DynamicAHD,
         slv.DynamicCollaborativeAHD
     ]:
         solution = slt.GlobalSolution(instance)

@@ -60,24 +60,25 @@ class PDPInsertionConstruction(TourConstructionBehavior):
                                  unrouted_request: int):
         """Find the cheapest insertions for pickup and delivery for a given tour"""
         tour_: tr.Tour = solution.carriers[carrier].tours[tour]
-
-        best_delta = float('inf')
-        best_pickup_position = None
-        best_delivery_position = None
-
         pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(unrouted_request)
 
-        for pickup_pos in range(1, len(tour_)):
-            for delivery_pos in range(pickup_pos + 1, len(tour_) + 1):  # TODO I only have to check those positions that would not violate the TWs of the other nodes, thus I can potentially start even later that i+1
-                delta = tour_.insertion_distance_delta(instance, [pickup_pos, delivery_pos],
-                                                       [pickup_vertex, delivery_vertex])
-                if delta < best_delta:
-                    if tour_.insertion_feasibility_check(instance, solution, [pickup_pos, delivery_pos],
-                                                         [pickup_vertex, delivery_vertex]):
-                        best_delta = delta
-                        best_pickup_position = pickup_pos
-                        best_delivery_position = delivery_pos
-        return best_delta, best_pickup_position, best_delivery_position
+        return tour_cheapest_insertion(
+            pickup_vertex=pickup_vertex,
+            delivery_vertex=delivery_vertex,
+            routing_sequence=tour_.routing_sequence,
+            travel_distance_sequence=tour_.travel_distance_sequence,
+            service_schedule=tour_.service_schedule,
+            load_sequence=tour_.load_sequence,
+            num_carriers=instance.num_carriers,
+            num_requests=instance.num_requests,
+            distance_matrix=instance._distance_matrix,
+            vehicles_max_travel_distance=instance.vehicles_max_travel_distance,
+            vertex_load=instance.load,
+            service_duration=instance.service_duration,
+            vehicles_max_load=instance.vehicles_max_load,
+            tw_open=solution.tw_open,
+            tw_close=solution.tw_close,
+        )
 
     @staticmethod
     def _create_new_tour_with_request(instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int,
@@ -101,7 +102,7 @@ class CheapestPDPInsertion(PDPInsertionConstruction):
     """
 
     def _carrier_cheapest_insertion(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int,
-                                    requests:Sequence[int]):
+                                    requests: Sequence[int]):
         logger.debug(f'Cheapest Insertion tour construction for carrier {carrier}:')
         carrier_ = solution.carriers[carrier]
         best_delta = float('inf')
@@ -125,10 +126,59 @@ class CheapestPDPInsertion(PDPInsertionConstruction):
                 return request, None, None, None
         return best_request, best_tour, best_pickup_pos, best_delivery_pos
 
-def cheapest_insertion_tour(routing_sequence: Sequence[int],
-                            x_coords: Sequence[int],
-                            y_coords: Sequence[int],
-                            pickup: int,
-                            delivery:int,
-                            # TODO ... create a cheapest insertion on the most abstract level using only basic data types
-                            ):
+
+def tour_cheapest_insertion(
+        pickup_vertex: int,
+        delivery_vertex: int,
+        routing_sequence: Sequence[int],
+        travel_distance_sequence: Sequence[float],
+        service_schedule: Sequence[dt.datetime],
+        load_sequence: Sequence[float],
+        num_carriers: int,
+        num_requests: int,
+        distance_matrix: Sequence[Sequence[float]],
+        vehicles_max_travel_distance: float,
+        vertex_load: Sequence[int],
+        service_duration: Sequence[dt.timedelta],
+        vehicles_max_load: float,
+        tw_open: Sequence[dt.datetime],
+        tw_close: Sequence[dt.datetime],
+        **kwargs
+):
+    """
+    independent of instance and solution class
+    """
+    best_delta = float('inf')
+    best_pickup_position = None
+    best_delivery_position = None
+
+    for pickup_pos in range(1, len(routing_sequence)):
+        # TODO I only have to check those positions that would not violate the TWs of the other nodes, thus I can
+        #  potentially start even later than i+1. There are functions somewhere that do this afaik
+        for delivery_pos in range(pickup_pos + 1, len(routing_sequence) + 1):
+            delta = tr.insertion_distance_delta(
+                routing_sequence=routing_sequence,
+                distance_matrix=distance_matrix,
+                insertion_indices=[pickup_pos, delivery_pos],
+                vertices=[pickup_vertex, delivery_vertex],
+            )
+            if delta < best_delta:
+                if tr.insertion_feasibility_check(routing_sequence=routing_sequence,
+                                                  travel_distance_sequence=travel_distance_sequence,
+                                                  service_schedule=service_schedule,
+                                                  load_sequence=load_sequence,
+                                                  num_carriers=num_carriers,
+                                                  num_requests=num_requests,
+                                                  distance_matrix=distance_matrix,
+                                                  vehicles_max_travel_distance=vehicles_max_travel_distance,
+                                                  vertex_load=vertex_load,
+                                                  service_duration=service_duration,
+                                                  vehicles_max_load=vehicles_max_load,
+                                                  tw_open=tw_open,
+                                                  tw_close=tw_close,
+                                                  insertion_positions=[pickup_pos, delivery_pos],
+                                                  insertion_vertices=[pickup_vertex, delivery_vertex]):
+                    best_delta = delta
+                    best_pickup_position = pickup_pos
+                    best_delivery_position = delivery_pos
+    return best_delta, best_pickup_position, best_delivery_position

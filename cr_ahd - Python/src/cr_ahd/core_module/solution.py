@@ -22,8 +22,8 @@ class GlobalSolution:
         # TODO unassigned_requests and request_to_carrier_assignment contain redundant data.
         #  unassigned_requests == np.where(np.isnan(request_to_carrier_assignment))
         # basically no apriori time windows for all VERTICES
-        self.tw_open = np.full(instance.num_carriers + 2 * instance.num_requests, ut.START_TIME)
-        self.tw_close = np.full(instance.num_carriers + 2 * instance.num_requests, ut.END_TIME)
+        self.tw_open = np.full(instance.num_carriers + 2 * instance.num_requests, ut.START_TIME).tolist()
+        self.tw_close = np.full(instance.num_carriers + 2 * instance.num_requests, ut.END_TIME).tolist()
 
         self.carriers = [PDPSolution(c) for c in range(instance.num_carriers)]
 

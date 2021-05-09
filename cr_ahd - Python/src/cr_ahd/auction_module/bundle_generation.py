@@ -53,14 +53,28 @@ class KMeansBundles(BundleSetGenerationBehavior):
 
     def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool: Iterable):
         request_midpoints = [ut.midpoint(instance, *instance.pickup_delivery_pair(sr)) for sr in auction_pool]
-        k_means = KMeans(n_clusters=instance.num_carriers, random_state=0).fit(request_midpoints)
+        # k_means = KMeans(n_clusters=instance.num_carriers, random_state=0).fit(request_midpoints)
+        k_means = KMeans(n_clusters=instance.num_carriers).fit(request_midpoints)
         bundles = [list(np.take(auction_pool, np.nonzero(k_means.labels_ == b)[0])) for b in
                    range(k_means.n_clusters)]
         return bundles
 
 
+class ProxyTest(BundleSetGenerationBehavior):
+    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool: Sequence):
+        generator = RandomPartition()
+        best_candidate_solution = None
+        best_proxy_valuation = 0
+        while best_proxy_valuation <=0:
+            candidate = generator._generate_bundle_set(instance, solution, auction_pool)
+            valuation = bv.GHProxyValuation(instance, solution, candidate)
+            if valuation > best_proxy_valuation:
+                best_candidate_solution = candidate
+                best_proxy_valuation = valuation
+        return best_candidate_solution
 
 
+'''
 class GHProxySetPacking(BundleSetGenerationBehavior):
     """
     using bundle valuation measure of Gansterer & Hartl. Does not use a Genetic Algorithm!
@@ -80,3 +94,4 @@ class GHProxySetPacking2(BundleSetGenerationBehavior):
         candidate_valuations = []
         for candidate in candidate_solutions:
             candidate_valuations.append(bv.GHProxy(instance, solution, candidate))
+'''
