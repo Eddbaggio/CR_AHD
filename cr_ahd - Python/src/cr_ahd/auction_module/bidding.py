@@ -1,84 +1,76 @@
+import logging
 from abc import ABC, abstractmethod
-from typing import Dict, Tuple
+from copy import deepcopy
+from typing import List
 
-from src.cr_ahd.core_module.vertex import Vertex
-from src.cr_ahd.solving_module.tour_construction import I1Insertion
-from src.cr_ahd.solving_module.tour_initialization import EarliestDueDate
-from src.cr_ahd.utility_module.utils import InsertionError
+from src.cr_ahd.core_module import instance as it, solution as slt
+from src.cr_ahd.routing_module import tour_construction as cns
+from src.cr_ahd.utility_module.utils import ConstraintViolationError
+
+logger = logging.getLogger(__name__)
 
 
 class BiddingBehavior(ABC):
-    def execute(self, bundle_set: Dict[int, Tuple[Vertex]], carriers):
+    def execute(self, instance: it.PDPInstance, solution: slt.GlobalSolution, bundles) -> List[List[float]]:
         """
+        returns a nested list of bids. the first axis is the bundles, the second axis (inner lists) contain the carrier
+        bids on that bundle:
 
-        :param bundle_set: dictionary of bundles where the key is simply a bundle index
-        :param carriers:
-        :return: dict of bids per bundle per carrier: {bundleA: {carrier1: bid, carrier2: bid}, bundleB: {carrier1: bid,
-        carrier2: bid} Dict[Tuple[Vertex], Dict[Carrier, float]]
         """
-        bundle_bids = dict()
-        for _, bundle in bundle_set.items():
-            carrier_bundle_bids = dict()
-            for carrier in carriers:
-                carrier_bundle_bids[carrier] = self._generate_bid(bundle, carrier)
-            bundle_bids[bundle] = carrier_bundle_bids
-        # solution.bidding_behavior = self.__class__.__name__
+        bundle_bids = []
+        for b in range(len(bundles)):
+            carrier_bundle_bids = []
+            for carrier in range(instance.num_carriers):
+                logger.debug(f'Carrier {carrier} generating bids for bundle {b}')
+                carrier_bundle_bids.append(self._generate_bid(instance, solution, bundles[b], carrier))
+            bundle_bids.append(carrier_bundle_bids)
+        solution.bidding_behavior = self.__class__.__name__
         return bundle_bids
 
     @abstractmethod
-    def _generate_bid(self, bundle, carrier):
+    def _generate_bid(self, instance: it.PDPInstance, solution: slt.GlobalSolution, bundle: List[int], carrier: int):
         pass
 
 
-class I1TravelDistanceIncrease(BiddingBehavior):
-    """determine the bids as the distance cost of inserting a bundle set. Marginal profit is difference in route cost
-    with and without the set where insertion is done with I1 Insertion scheme"""
+class CheapestInsertionDistanceIncrease(BiddingBehavior):
+    def _generate_bid(self, instance: it.PDPInstance, solution: slt.GlobalSolution, bundle: List[int], carrier: int):
+        before = solution.carriers[carrier].sum_travel_distance()
+        # TODO: can I avoid the copy here? Only if I make cns.CheapestInsertion()._carrier_cheapest_insertion return
+        #  the delta for the cheapest insertion of ALL (!) the requests in the bundle, which is quite impossible because
+        #  the cheapest insertion of one request in the bundle depends on the previous insertion
+        tmp_carrier = instance.num_carriers
+        tmp_carrier_ = deepcopy(solution.carriers[carrier])
+        tmp_carrier_.unrouted_requests.extend(bundle)
+        solution.carriers.append(tmp_carrier_)
+        try:
+            construction = cns.CheapestPDPInsertion()
+            while tmp_carrier_.unrouted_requests:
+                request, tour, pickup_pos, delivery_pos = \
+                    construction._carrier_cheapest_insertion(instance, solution, tmp_carrier,
+                                                             tmp_carrier_.unrouted_requests)
 
-    def _generate_bid(self, bundle, carrier):
+                # when for a given request no tour can be found, create a new tour and start over. This may raise
+                # a ConstraintViolationError if the carrier cannot initialize another new tour
+                if tour is None:
+                    construction._create_new_tour_with_request(instance, solution, tmp_carrier, request)
 
-        without_bundle = carrier.sum_travel_distance()
-        prior_unrouted = carrier.unrouted_requests
-        carrier.assign_requests(bundle)
+                else:
+                    construction._execute_insertion(instance, solution, tmp_carrier, request, tour, pickup_pos,
+                                                    delivery_pos)
 
-        # TODO duplicated code fragment, is there a nicer way to do this? do error codes instead of exception handling?
-        c = True
-        while c:
-            try:
-                I1Insertion().solve_carrier(carrier)
-                c = False
-            except InsertionError:
-                EarliestDueDate().initialize_carrier(carrier)
-
-        with_bundle = carrier.sum_travel_distance()
-        carrier.retract_requests_and_update_routes(bundle)
-        carrier.retract_requests_and_update_routes(prior_unrouted)  # need to unroute the previously unrouted again
-        carrier.assign_requests(prior_unrouted)  # and then reassign them (missing a function that only unroutes them)
-        distance_increase = with_bundle - without_bundle
-        return distance_increase
+            after = tmp_carrier_.sum_travel_distance()
+        except ConstraintViolationError:
+            after = float('inf')
+        finally:
+            solution.carriers.pop()  # del the temporary carrier copy
+        return after - before
 
 
-class I1TravelDurationIncrease(BiddingBehavior):
-    """determine the bids as the distance cost of inserting a bundle set. Marginal profit is difference in route cost
-    with and without the set where insertion is done with I1 Insertion scheme"""
-
-    def _generate_bid(self, bundle, carrier):
-
-        without_bundle = carrier.sum_travel_duration()
-        prior_unrouted = carrier.unrouted_requests
-        carrier.assign_requests(bundle)
-
-        # TODO duplicated code fragment, is there a nicer way to do this? do error codes instead of exception handling?
-        c = True
-        while c:
-            try:
-                I1Insertion().solve_carrier(carrier)
-                c = False
-            except InsertionError:
-                EarliestDueDate().initialize_carrier(carrier)
-
-        with_bundle = carrier.sum_travel_duration()
-        carrier.retract_requests_and_update_routes(bundle)
-        carrier.retract_requests_and_update_routes(prior_unrouted)  # need to unroute the previously unrouted again
-        carrier.assign_requests(prior_unrouted)  # and then reassign them (missing a function that only unroutes them)
-        duration_increase = with_bundle - without_bundle
-        return duration_increase
+class Profit(BiddingBehavior):
+    def _generate_bid(self, instance: it.PDPInstance, solution: slt.GlobalSolution, bundle: List[int], carrier: int):
+        ins_cost = CheapestInsertionDistanceIncrease()._generate_bid(instance, solution, bundle, carrier)
+        ins_revenue = 0
+        for r in bundle:
+            pickup, delivery = instance.pickup_delivery_pair(r)
+            ins_revenue += instance.revenue[pickup] + instance.revenue[delivery]
+        return ins_revenue - ins_cost

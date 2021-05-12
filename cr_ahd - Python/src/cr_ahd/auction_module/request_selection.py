@@ -1,44 +1,56 @@
 import itertools
 import logging
 from abc import ABC, abstractmethod
-from typing import List
+
 import numpy as np
-from src.cr_ahd.solving_module.tour_construction import find_cheapest_distance_feasible_insertion
-from src.cr_ahd.utility_module.utils import InsertionError
+
+from src.cr_ahd.core_module import instance as it, solution as slt
+from src.cr_ahd.routing_module import tour_construction as cns
 
 logger = logging.getLogger(__name__)
 
 
 class RequestSelectionBehavior(ABC):
-    def execute(self, instance, num_requests):
+    def execute(self, instance: it.PDPInstance, solution: slt.GlobalSolution, num_requests):
         """
         select a set of requests based on the concrete selection behavior. will retract the requests from the carrier
-        and return a dict of lists.
+        and return
 
+        :param solution:
         :param num_requests: the number of requests each carrier shall submit. If fractional, will use the corresponding
          percentage of requests assigned to that carrier. If integer, will use the absolut amount of requests. If not
          enough requests are available, will submit as many as are available
         :param instance:
-        :return: dict {carrier_A: List[requests], carrier_B: List[requests]}
+        :return: the auction pool as a list of request indices
         """
-        submitted_requests = dict()
-        for carrier in instance.carriers:
-            if not carrier.unrouted_requests:
-                submitted_requests[carrier] = []
-            else:
-                k = self.abs_num_requests(carrier, num_requests)
-                submitted_requests[carrier] = self._select_requests(carrier, k)
-                carrier.retract_requests_and_update_routes(submitted_requests[carrier])
-        # solution.request_selection = self.__class__.__name__
+        submitted_requests = list()
+        for carrier in range(instance.num_carriers):
+            k = self._abs_num_requests(solution.carriers[carrier], num_requests)
+            valuations = self._evaluate_requests(instance, solution, carrier)
+            # pick the worst k evaluated requests (from ascending order)
+            selected = [r for _, r in
+                        sorted(zip(valuations, solution.carriers[carrier].unrouted_requests))][:k]
+            for s in selected:
+                solution.carriers[carrier].unrouted_requests.remove(s)
+                solution.request_to_carrier_assignment[s] = np.nan
+                submitted_requests.append(s)
+                solution.unassigned_requests.append(s)  # TODO if i do this, the assign_n_requests function will not work
         return submitted_requests
 
     @abstractmethod
-    def _select_requests(self, carrier, num_requests: int) -> List:
+    def _evaluate_requests(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
+        """
+        compute the carrier's valuation for all unrouted requests of that carrier.
+        NOTE: a high number corresponds to a high valuation
+
+        """
         pass
 
-    def abs_num_requests(self, carrier, num_requests) -> int:
-        """returns the absolute number of requests that a carrier shall submit, depending on whether it was initially
-        given as an absolute int or a float (relative)"""
+    def _abs_num_requests(self, carrier: slt.PDPSolution, num_requests) -> int:
+        """
+        returns the absolute number of requests that a carrier shall submit, depending on whether it was initially
+        given as an absolute int or a float (relative)
+        """
         if isinstance(num_requests, int):
             return num_requests
         elif isinstance(num_requests, float):
@@ -51,24 +63,56 @@ class Random(RequestSelectionBehavior):
     returns a random selection of unrouted requests
     """
 
-    def _select_requests(self, carrier, num_requests: int) -> List:
-        return np.random.choice(carrier.unrouted_requests, num_requests, replace=False)
+    def _evaluate_requests(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
+        return np.random.random(len(solution.carriers[carrier].unrouted_requests))
 
 
 class HighestInsertionCostDistance(RequestSelectionBehavior):
-    """given the current set of routes, returns the n unrouted requests that has the HIGHEST Insertion distance cost.
+    """given the current set of routes, returns the n unrouted requests that have the HIGHEST Insertion distance cost.
      NOTE: since routes may not be final, the current highest-marginal-cost request might not have been chosen at an
      earlier or later stage!"""
 
-    def _select_requests(self, carrier, num_requests: int) -> List:
-        selected_requests = []
-        for unrouted in carrier.unrouted_requests:
-            distance_cost = cheapest_insertion_distance(unrouted, carrier)
-            selected_requests.append((unrouted, distance_cost))
-        selected_requests, distance_insertion_costs = zip(*sorted(selected_requests, key=lambda x: x[1], reverse=True))
-        return selected_requests[:num_requests]
+    def _evaluate_requests(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
+        evaluation = []
+        carrier_ = solution.carriers[carrier]
+        for request in carrier_.unrouted_requests:
+            best_delta_for_r = float('inf')
+            for tour in range(carrier_.num_tours()):
+                # cheapest way to fit request into tour
+                delta, _, _ = cns.CheapestPDPInsertion()._tour_cheapest_insertion(instance, solution, carrier, tour,
+                                                                                  request)
+                if delta < best_delta_for_r:
+                    best_delta_for_r = delta
+            # if no feasible insertion for the current request was found, attempt to create a new tour, if that's not
+            # feasible the best_delta_for_r will be infinity
+            if best_delta_for_r == float('inf'):
+                if carrier_.num_tours() < instance.carriers_max_num_tours:
+                    pickup, delivery = instance.pickup_delivery_pair(request)
+                    best_delta_for_r = instance.distance([carrier, pickup, delivery], [pickup, delivery, carrier])
+            # collect the NEGATIVE value, since high insertion cost mean a low valuation for the carrier
+            evaluation.append(-best_delta_for_r)
+        return evaluation
 
 
+class LowestProfit(RequestSelectionBehavior):
+    def _evaluate_requests(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
+        revenue = []
+        for r in solution.carriers[carrier].unrouted_requests:
+            request_revenue = sum([instance.revenue[v] for v in instance.pickup_delivery_pair(r)])
+            revenue.append(request_revenue)
+        ins_cost = HighestInsertionCostDistance()._evaluate_requests(instance, solution, carrier)
+        # return the profit, high profit means high valuation
+        return [rev + cost for rev, cost in zip(revenue, ins_cost)]
+
+
+class PackedTW(RequestSelectionBehavior):
+    """
+    offer requests from TW slots that are closest to their limit. this way carrier increases flexibility rather than
+    profitability
+    """
+    pass
+
+'''
 class Cluster(RequestSelectionBehavior):
     """
     Based on: Gansterer,M., & Hartl,R.F. (2016). Request evaluation strategies for carriers in auction-based
@@ -77,11 +121,12 @@ class Cluster(RequestSelectionBehavior):
     proximity
     """
 
-    def _select_requests(self, carrier, num_requests: int) -> List:
-        candidate_clusters = itertools.combinations(carrier.unrouted_requests, num_requests)
+    def _evaluate_requests(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
+        cs = solution.carrier_solutions[carrier]
+        candidate_clusters = itertools.combinations(cs.unrouted_requests, solution.num_carriers())
         best_cluster, best_cluster_evaluation = [], float('inf')
         for candidate in candidate_clusters:
-            evaluation = self.cluster_evaluation(candidate, carrier)
+            evaluation = self.cluster_evaluation(instance, solution, carrier, candidate)
             if evaluation < best_cluster_evaluation:
                 best_cluster, best_cluster_evaluation = candidate, evaluation
         if best_cluster_evaluation < float('inf'):
@@ -89,30 +134,13 @@ class Cluster(RequestSelectionBehavior):
         else:
             raise ValueError()
 
-    def cluster_evaluation(self, cluster, carrier):
+    def cluster_evaluation(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, cluster):
+        """
+        sum of the distances of (pickup_0, pickup_1) and (delivery_0, delivery_1)
+        """
         pairs = itertools.combinations(cluster, 2)
         evaluation = 0
         for r0, r1 in pairs:
-            dist_origins = carrier.distance_matrix[carrier.depot.id_][carrier.depot.id_]  # obviously 0
-            dist_destinations = carrier.distance_matrix[r0.id_][r1.id_]
-            evaluation += dist_origins + dist_destinations
+            evaluation += instance.distance(instance.pickup_delivery_pair(r0), instance.pickup_delivery_pair(r1))
         return evaluation
-
-
-# ======================================================================================================
-# ======================================================================================================
-
-def cheapest_insertion_distance(request, carrier):
-    lowest = float('inf')
-    for vehicle in carrier.active_vehicles:
-        try:
-            _, tour_min = find_cheapest_distance_feasible_insertion(vehicle.tour, request)
-            lowest = min(lowest, tour_min)
-        except InsertionError:
-            continue
-    if lowest >= float('inf'):
-        t = carrier.inactive_vehicles[0].tour
-        t.insert_and_update(1, request)
-        lowest = t.sum_travel_distance
-        t.pop_and_update(1)
-    return lowest
+        '''

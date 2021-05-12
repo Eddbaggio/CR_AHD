@@ -10,7 +10,7 @@ from src.cr_ahd.utility_module.utils import make_travel_dist_matrix, Coordinates
 def test_random_bundle_set_generation(submitted_requests_random_15):
     """cannot actually be tested since it's random"""
     distance_matrix = make_travel_dist_matrix(flatten_dict_of_lists(submitted_requests_random_15))
-    bundle_set = bg.RandomPartition(distance_matrix).execute(submitted_requests_random_15)
+    bundle_set = bg.RandomMaxKPartition(distance_matrix).execute(submitted_requests_random_15)
     assert len(bundle_set) <= len(submitted_requests_random_15)
 
 
@@ -46,5 +46,5 @@ def test_k_means_bundle_set_generation(submitted_requests_a):
 
 # def test_tour_length(request_vertices_b, depot_vertex):
 #     distance_matrix = make_dist_matrix([*request_vertices_b, depot_vertex])
-#     tour_length = bg.GanstererProxyBundles(distance_matrix).bundle_tour_length(request_vertices_b, depot_vertex)
+#     tour_length = bg.GanstererProxyBundles(distance_matrix).bundle_total_travel_distance(request_vertices_b, depot_vertex)
 #     assert tour_length == 62.42640687119285

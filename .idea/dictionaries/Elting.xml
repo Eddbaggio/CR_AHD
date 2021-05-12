@@ -1,14 +1,21 @@
 <component name="ProjectDictionaryState">
   <dictionary name="Elting">
     <words>
+      <w>anno</w>
+      <w>argmin</w>
       <w>chunksize</w>
       <w>cmap</w>
+      <w>coeff</w>
       <w>criss</w>
+      <w>cumsum</w>
+      <w>cumul</w>
       <w>gansterer</w>
       <w>hartl</w>
       <w>istarmap</w>
       <w>matplotlib</w>
+      <w>metaheuristic</w>
       <w>multicategory</w>
+      <w>multiindex</w>
       <w>ndigits</w>
       <w>optimizable</w>
       <w>pathlib</w>
@@ -16,6 +23,7 @@
       <w>unroute</w>
       <w>unrouted</w>
       <w>unroutes</w>
+      <w>updatemenus</w>
     </words>
   </dictionary>
 </component>

@@ -55,7 +55,7 @@ LOGGING_CONFIG = {
             'level': 'DEBUG',
             # 'propagate': False
         },
-        # 'src.cr_ahd.solving_module.solver': {
+        # 'src.cr_ahd.routing_module.solver': {
         #     'handlers': ['file'],
         #     'level': 'DEBUG',
         # },

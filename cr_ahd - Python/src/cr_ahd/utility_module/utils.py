@@ -1,12 +1,13 @@
 import functools
 import itertools
 import json
+import math
 import random
 import time
 import datetime as dt
 from collections import namedtuple
 from pathlib import Path
-from typing import List, Tuple, Dict, Any
+from typing import List, Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -14,7 +15,19 @@ import pandas as pd
 from matplotlib.colors import LinearSegmentedColormap
 
 Coordinates = namedtuple('Coords', ['x', 'y'])
-TimeWindow = namedtuple('TimeWindow', ['e', 'l'])
+
+
+class TimeWindow:
+    def __init__(self, open: dt.datetime, close: dt.datetime):
+        self.open: dt.datetime = open
+        self.close: dt.datetime = close
+
+    def __str__(self):
+        return f'[D{self.open.day} {self.open.strftime("%H:%M:%S")} - D{self.close.day} {self.close.strftime("%H:%M:%S")}]'
+
+    def __repr__(self):
+        return f'[D{self.open.day} {self.open.strftime("%H:%M:%S")} - D{self.close.day} {self.close.strftime("%H:%M:%S")}]'
+
 
 opts = {
     'verbose': 0,
@@ -26,8 +39,6 @@ opts = {
     'ccycler': plt.cycler(color=plt.get_cmap('Set1').colors)(),
 }
 
-
-
 # Solomon_Instances = [file[:-4] for file in os.listdir('..\\data\\Input\\Solomon')]
 path_project = Path(
     'C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home Deliveries/01_Code')
@@ -37,6 +48,7 @@ path_input_solomon = path_input.joinpath('Solomon')
 Solomon_Instances = [file.stem for file in path_input_solomon.iterdir()]
 path_output = path_project.joinpath('data', 'Output')
 path_output_custom = path_output.joinpath('Custom')
+path_output_gansterer = path_output.joinpath('Gansterer_Hartl')
 
 # alpha 100%
 univie_colors_100 = [
@@ -73,23 +85,13 @@ def split_iterable(iterable, num_chunks):
     return (iterable[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(num_chunks))
 
 
-def euclidean_distance(a: Coordinates, b: Coordinates):
-    return np.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
+def _euclidean_distance(a: Coordinates, b: Coordinates):
+    raise DeprecationWarning(f'Use new _euclidean_distance function!')
+    return math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 
 
-def make_travel_dist_matrix(vertices: List):
-    """
-    :param vertices: List of vertices each of class Vertex
-    :return: pd.DataFrame distance matrix
-    """
-    index = [i.id_ for i in vertices]
-    dist_matrix: pd.DataFrame = pd.DataFrame(index=index, columns=index, dtype='float64')
-
-    for i in vertices:
-        for j in vertices:
-            dist_matrix.loc[i.id_, j.id_] = euclidean_distance(i.coords, j.coords)
-    assert dist_matrix.index.is_unique, f"Distance matrix must have unique row id's"
-    return dist_matrix
+def euclidean_distance(x1, y1, x2, y2):
+    return math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
 
 
 def make_travel_duration_matrix(vertices: List):
@@ -102,7 +104,7 @@ def make_travel_duration_matrix(vertices: List):
 
     for i in vertices:
         for j in vertices:
-            travel_duration_matrix.loc[i.id_, j.id_] = travel_time(euclidean_distance(i.coords, j.coords))
+            travel_duration_matrix.loc[i.id_, j.id_] = travel_time(_euclidean_distance(i.coords, j.coords))
     assert travel_duration_matrix.index.is_unique, f"Duration matrix must have unique row id's"
     return travel_duration_matrix
 
@@ -124,6 +126,12 @@ class InsertionError(Exception):
         self.message = message
 
 
+class ConstraintViolationError(Exception):
+    def __init__(self, expression='', message=''):
+        self.expression = expression
+        self.message = message
+
+
 def timer(func):
     """Print the runtime of the decorated function"""
 
@@ -140,7 +148,7 @@ def timer(func):
     return wrapper_timer
 
 
-def unique_path(directory, name_pattern):
+def unique_path(directory, name_pattern) -> Path:
     """
     construct a unique numbered file name based on a template
     :param directory: directory which shall be the parent dir of the file
@@ -173,8 +181,8 @@ def get_carrier_by_id(carriers, id_):
     raise ValueError
 
 
-def powerset(iterable, include_empty_set=True):
-    """powerset([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"""
+def power_set(iterable, include_empty_set=True):
+    """power_set([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"""
     s = list(iterable)
     if include_empty_set:
         rng = range(len(s) + 1)
@@ -183,12 +191,12 @@ def powerset(iterable, include_empty_set=True):
     return itertools.chain.from_iterable(itertools.combinations(s, r) for r in rng)
 
 
-def flatten_dict_of_lists(d: dict):
-    """d is Dict[Any, List[Any]] pairs. This unpacks it such that there is only a flat list of all values"""
-    pool = []
-    for _, v in d.items():
-        pool.extend(v)
-    return pool
+def flatten(sequence: Sequence):
+    if not sequence:
+        return sequence
+    if isinstance(sequence[0], Sequence):
+        return flatten(sequence[0]) + flatten(sequence[1:])
+    return sequence[:1] + flatten(sequence[1:])
 
 
 def random_partition(li):
@@ -204,7 +212,23 @@ def random_partition(li):
             break
 
 
-def random_max_k_partition(ls, max_k) -> Dict[int, Tuple[Any, ...]]:
+def random_max_k_partition_idx(ls, max_k) -> List[int]:
+    if max_k < 1:
+        return []
+    # randomly determine the actual k
+    k = random.randint(1, min(max_k, len(ls)))
+    # We require that this list contains k different values, so we
+    # start by adding each possible different value.
+    indices = list(range(k))
+    # now we add random values from range(k) to indices to fill it up
+    # to the length of ls
+    indices.extend([random.choice(list(range(k))) for _ in range(len(ls) - k)])
+    # shuffle the indices into a random order
+    random.shuffle(indices)
+    return indices
+
+
+def random_max_k_partition(ls, max_k) -> Sequence[Sequence[int]]:
     """partition ls in at most k randomly sized disjoint subsets
 
     """
@@ -230,21 +254,67 @@ def random_max_k_partition(ls, max_k) -> Dict[int, Tuple[Any, ...]]:
     random.shuffle(indices)
     # construct and return the random subset: sort the elements by
     # which subset they will be assigned to, and group them into sets
-    partitions = dict()
-    sortd = sorted(zip(indices, ls), key=lambda x: x[0])
-    for index, subset in itertools.groupby(sortd, key=lambda x: x[0]):
-        partitions[index] = tuple(
-            x[1] for x in subset)  # TODO: better use frozenset (rather than tuple) for dict values?
+    partitions = []
+    sorted_ = sorted(zip(indices, ls), key=lambda x: x[0])
+    for index, subset in itertools.groupby(sorted_, key=lambda x: x[0]):
+        partitions.append([x[1] for x in subset])
     return partitions
 
 
-class DateTimeEncoder(json.JSONEncoder):
-    def default(self, o):
-        if isinstance(o, dt.datetime):
-            return o.isoformat()
-        if isinstance(o, dt.timedelta):
-            return o.total_seconds()
-        return super().default(o)
+class MyJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, dt.datetime):
+            return obj.isoformat()
+        if isinstance(obj, dt.timedelta):
+            return obj.total_seconds()
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        else:
+            return super().default(obj)
+
+
+def argmin(a):
+    return min(range(len(a)), key=lambda x: a[x])
+
+
+def argmax(a):
+    return max(range(len(a)), key=lambda x: a[x])
+
+
+def midpoint(instance, pickup_vertex, delivery_vertex):
+    pickup_x, pickup_y = instance.x_coords[pickup_vertex], instance.y_coords[delivery_vertex]
+    delivery_x, delivery_y = instance.x_coords[pickup_vertex], instance.y_coords[delivery_vertex]
+    return (pickup_x + delivery_x) / 2, (pickup_y + delivery_y) / 2
+
+
+def midpoint_(x1, y1, x2, y2):
+    return (x1 + x2) / 2, (y1 + y2) / 2
+
+
+def linear_interpolation(iterable: Sequence, new_min: float, new_max: float, old_min=None, old_max=None):
+    """
+    return the iterable re-scaled to the range between new_min and new_max.
+    https://gamedev.stackexchange.com/questions/33441/how-to-convert-a-number-from-one-min-max-set-to-another-min-max-set/33445
+
+    """
+    if old_min is None and old_max is None:
+        old_min = min(iterable)
+        old_max = max(iterable)
+    return [((x - old_min) / (old_max - old_min)) * (new_max - new_min) + new_min for x in iterable]
+
+
+def n_points_on_a_circle(n: int, radius, origin_x=0, origin_y=0):
+    """create coordinates for n points that are evenly spaced on the circumference of  a circle of the given radius"""
+    points = []
+    for i in range(1, n + 1):
+        x = radius * math.cos(2 * math.pi * i / n - math.pi / 2)
+        y = radius * math.sin(2 * math.pi * i / n - math.pi / 2)
+        points.append((origin_x + x, origin_y + y))
+    return points
 
 
 def datetime_range(start: dt.datetime, end: dt.datetime, freq: dt.timedelta, include_end=True):
@@ -256,11 +326,12 @@ def datetime_range(start: dt.datetime, end: dt.datetime, freq: dt.timedelta, inc
     return (start + x * freq for x in range(((end - start) // freq) + include_end))
 
 
+random.seed(0)
 START_TIME = dt.datetime.min
 END_TIME = dt.datetime.min + dt.timedelta(minutes=3390)
-TIME_HORIZON = TimeWindow(START_TIME, END_TIME)
 TW_LENGTH = dt.timedelta(hours=2)
-ALL_TW = [TimeWindow(e, e + TW_LENGTH) for e in datetime_range(START_TIME, END_TIME, freq=TW_LENGTH)]
+ALL_TW = [TimeWindow(e, min(e + TW_LENGTH, END_TIME)) for e in datetime_range(START_TIME, END_TIME, freq=TW_LENGTH)]
+TIME_HORIZON = TimeWindow(START_TIME, END_TIME)
 SPEED_KMH = 60
-DYNAMIC_CYCLE_TIME = 25  # does not actually represent time but the number of requests being assigned each cycle
-NUM_REQUESTS_TO_SUBMIT = 0.5  # has to be either relative [0, 1] or absolute
+DYNAMIC_CYCLE_TIME = 5  # does not actually represent time but the number of requests being assigned each cycle
+NUM_REQUESTS_TO_SUBMIT = 3 / 5  # either relative (between 0 and 1) or an absolute number lower than DYNAMIC_CYCLE_TIME
