@@ -1,9 +1,11 @@
 import abc
+import logging
 import random
 from typing import List
 
-from src.cr_ahd.core_module import instance as it, solution as slt
 from src.cr_ahd.utility_module.utils import TimeWindow
+
+logger = logging.getLogger(__name__)
 
 
 class TWSelectionBehavior(abc.ABC):

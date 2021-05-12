@@ -164,7 +164,7 @@ class PDPTwoOptFirstImprovement(PDPIntraTourLocalSearch):
 
 class PDPMoveBest(PDPIntraTourLocalSearch, ABC):
     """
-    Take a PD pair and see whether inserting it in a different location of THE SAME route improves the solution
+    Take a PD pair and see whether inserting it in a different location of the SAME route improves the solution
     """
 
     def find_move(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, tour: int):

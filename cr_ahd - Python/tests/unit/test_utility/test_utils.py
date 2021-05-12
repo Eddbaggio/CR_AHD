@@ -57,7 +57,9 @@ class Test:
         pd.testing.assert_frame_equal(tt_matrix, result, check_dtype=False)
 
     def test_datetime_range(self):
-        dt_range = tuple(ut.datetime_range(ut.START_TIME, ut.START_TIME+ut.TW_LENGTH, ut.TW_LENGTH, True))
-        assert dt_range == (ut.START_TIME, ut.START_TIME+ut.TW_LENGTH)
-        dt_range_1 = tuple(ut.datetime_range(ut.START_TIME, ut.START_TIME+ut.TW_LENGTH, ut.TW_LENGTH, False))
+        dt_range = tuple(src.cr_ahd.utility_module.utils.datetime_range(ut.START_TIME, ut.START_TIME + src.cr_ahd.utility_module.utils.TW_LENGTH,
+                                                                        src.cr_ahd.utility_module.utils.TW_LENGTH, True))
+        assert dt_range == (ut.START_TIME, ut.START_TIME + src.cr_ahd.utility_module.utils.TW_LENGTH)
+        dt_range_1 = tuple(src.cr_ahd.utility_module.utils.datetime_range(ut.START_TIME, ut.START_TIME + src.cr_ahd.utility_module.utils.TW_LENGTH,
+                                                                          src.cr_ahd.utility_module.utils.TW_LENGTH, False))
         assert dt_range_1 == (ut.START_TIME, )

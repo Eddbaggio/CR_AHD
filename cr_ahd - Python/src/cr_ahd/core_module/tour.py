@@ -1,5 +1,6 @@
 import datetime as dt
 import logging.config
+from time import strftime
 from typing import List, Union, Tuple, Iterable, Sequence
 import numpy as np
 
@@ -33,18 +34,21 @@ class Tour:
         self.insert_and_update(instance, solution, [0], [depot_index])
 
     def __str__(self):
-        arrival_schedule = []
-        service_schedule = []
-        for i in range(len(self)):
-            if self.arrival_schedule[i] is None:
-                arrival_schedule.append(None)
-                service_schedule.append(None)
-            else:
-                arrival_schedule.append(self.arrival_schedule[i])
-                service_schedule.append(self.service_schedule[i])
-        distance = round(self.sum_travel_distance, 2)
-        return f'ID:\t\t\t{self.id_}\nSequence:\t{self.routing_sequence}\nArrival:\t{arrival_schedule}\n' \
-               f'Service:\t{service_schedule}\nDistance:\t\t{distance}\nDuration:\t\t{self.sum_travel_duration} '
+        # arrival_schedule: List[dt.datetime] = []
+        # service_schedule: List[dt.datetime] = []
+        # for i in range(len(self)):
+        #     if self.arrival_schedule[i] is None:
+        #         arrival_schedule.append(None)
+        #         service_schedule.append(None)
+        #     else:
+        #         arrival_schedule.append(self.arrival_schedule[i])
+        #         service_schedule.append(self.service_schedule[i])
+        return f'ID:\t\t\t{self.id_}\n' \
+               f'Sequence:\t{self.routing_sequence}\n' \
+               f'Arrival:\t{[x.strftime("%d-%H:%M:%S") for x in self._arrival_schedule]}\n' \
+               f'Service:\t{[x.strftime("%d-%H:%M:%S") for x in self._service_schedule]}\n' \
+               f'Distance:\t{round(self.sum_travel_distance, 2)}\n' \
+               f'Duration:\t{self.sum_travel_duration} '
 
     def __len__(self):
         return len(self.routing_sequence)
@@ -159,7 +163,7 @@ class Tour:
             index=index,
             vertex=vertex,
         )
-        logger.debug(f'{vertex} inserted into {self.id_} at index {index}')
+        logger.debug(f'vertex {vertex} inserted into tour {self.id_} at index {index}')
         pass
 
     def insert_and_update(self, instance, solution, indices: Sequence[int], vertices: Sequence[int]):
@@ -171,27 +175,12 @@ class Tour:
         :param indices: index before which the given vertex is to be inserted
         :param vertices: vertex to insert into the tour
         """
-        insert_and_update(
-            indices=indices,
-            vertices=vertices,
-            routing_sequence=self._routing_sequence,
-            travel_duration_sequence=self._travel_duration_sequence,
-            travel_distance_sequence=self._travel_distance_sequence,
-            arrival_schedule=self._arrival_schedule,
-            service_schedule=self._service_schedule,
-            load_sequence=self._load_sequence,
-            revenue_sequence=self._revenue_sequence,
-            num_carriers=instance.num_carriers,
-            num_requests=instance.num_requests,
-            distance_matrix=instance._distance_matrix,
-            vertex_load=instance.load,
-            revenue=instance.revenue,
-            service_duration=instance.service_duration,
-            vehicles_max_travel_distance=instance.vehicles_max_travel_distance,
-            vehicles_max_load=instance.vehicles_max_load,
-            tw_open=solution.tw_open,
-            tw_close=solution.tw_close,
-        )
+        assert all(indices[i] <= indices[i + 1] for i in range(len(indices) - 1))  # assure that indices are sorted
+
+        for index, vertex in zip(indices, vertices):
+            self._insert_no_update(index, vertex)
+        if len(self) > 1:
+            self.update_sequences_and_schedules(instance, solution, indices[0])
         pass
 
     def _pop_no_update(self, index: int):
@@ -210,28 +199,14 @@ class Tour:
 
     def pop_and_update(self, instance, solution, indices: List[int]):
         """removes the vertex at the index position from the tour and resets all cost and schedules"""
-        popped = pop_and_update(
-            indices=indices,
-            routing_sequence=self._routing_sequence,
-            travel_distance_sequence=self._travel_distance_sequence,
-            travel_duration_sequence=self._travel_duration_sequence,
-            load_sequence=self._load_sequence,
-            revenue_sequence=self._revenue_sequence,
-            arrival_schedule=self._arrival_schedule,
-            service_schedule=self._service_schedule,
-            num_carriers=instance.num_carriers,
-            num_requests=instance.num_requests,
-            distance_matrix=instance._distance_matrix,
-            vertex_load=instance.load,
-            revenue=instance.revenue,
-            service_duration=instance.service_duration,
-            vehicles_max_travel_distance=instance.vehicles_max_travel_distance,
-            vehicles_max_load=instance.vehicles_max_load,
-            tw_open=solution.tw_open,
-            tw_close=solution.tw_close,
-        )
-
-        return popped
+        assert all(indices[i] <= indices[i + 1] for i in range(len(indices) - 1))  # assure that indices are sorted
+        popped = []
+        # iterate backwards because otherwise the 2nd index won't match after the 1st index has been removed
+        for index in reversed(indices):
+            popped.append(self._pop_no_update(index))
+        self.update_sequences_and_schedules(instance, solution, indices[0])
+        # the popped objects are in reverse order to the input indices, thus reverse again
+        return reversed(popped)
 
     def update_sequences_and_schedules(self, instance, solution, index: int = 1):
         """update schedules from given index to end of routing sequence. index should be the same as the insertion
@@ -257,7 +232,7 @@ class Tour:
             tw_close=solution.tw_close,
             index=index,
         )
-        logger.debug(f'{self.id_} updated from index {index}')
+        logger.debug(f'tour {self.id_} updated from index {index}')
         pass
 
     def reverse_section(self, instance, solution, i, j):
@@ -365,7 +340,7 @@ def insertion_feasibility_check(routing_sequence: Sequence[int],
         predecessor_vertex: int = tmp_routing_sequence[pos - 1]
 
         # check precedence if vertex is a delivery vertex
-        if num_carriers + num_requests <= vertex < num_carriers + 2*num_requests :
+        if num_carriers + num_requests <= vertex < num_carriers + 2 * num_requests:
             precedence_vertex = vertex - num_requests
             if precedence_vertex not in tmp_routing_sequence[:pos]:
                 return False
@@ -474,7 +449,8 @@ def update_sequences_and_schedules(
         # check tw constraints
         arrival_time = service_schedule[pos - 1] + service_duration[predecessor_vertex] + ut.travel_time(travel_dist)
         if arrival_time > tw_close[vertex]:
-            message = f'{arrival_time} too late'
+            vertex_type = "delivery" if num_carriers + num_requests <= vertex < num_carriers + 2 * num_requests else "pickup"
+            message = f'arrival at vertex {vertex} ({vertex_type} ) in position {pos} at {arrival_time} too late, tw closes at {tw_close[vertex]}'
             logger.error(message)
             raise ut.ConstraintViolationError(message, message)
 

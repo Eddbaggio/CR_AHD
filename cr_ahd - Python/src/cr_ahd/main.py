@@ -31,21 +31,20 @@ def execute_all(instance: it.PDPInstance):
     for solver in [
         # slv.Static,
         # slv.StaticCollaborative,
+        slv.StaticCollaborativeAHD,
         # slv.Dynamic,
         # slv.DynamicCollaborative,
         # slv.DynamicAHD,
-        slv.DynamicCollaborativeAHD
+        # slv.DynamicCollaborativeAHD
     ]:
         solution = slt.GlobalSolution(instance)
         if instance.num_carriers == 1 and 'Auction' in solver.__name__:
             continue  # skip auction solvers for centralized instances
         logger.info(f'Solving {instance.id_} via {solver.__name__}')
         solver().execute(instance, solution)
-        pl.plot_solution_2(
-            instance,
-            solution,
-            title=f'{instance.id_} with Solver "{solver.__name__} - Total profit: {solution.sum_profit()}"',
-            show=True)
+        pl.plot_solution_2(instance, solution,
+                           title=f'{instance.id_} with Solver "{solver.__name__} - Total profit: {solution.sum_profit()}"',
+                           show=True)
         solution.write_to_json()
         solutions.append(solution)
     return solutions
@@ -63,8 +62,7 @@ def read_and_execute_all(path: Path):
 
 def read_and_execute_all_parallel(paths):
     with multiprocessing.Pool() as pool:
-        solutions = list(
-            tqdm(pool.imap(read_and_execute_all, paths), total=len(paths)))
+        solutions = list(tqdm(pool.imap(read_and_execute_all, paths), total=len(paths)))
     df = write_solutions_to_multiindex_df(solutions)
     return df
 
@@ -117,7 +115,7 @@ if __name__ == '__main__':
 
     # paths = [Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/test.dat')]
     paths = list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir())[:1]
-    # for path in paths:
-    #     read_and_execute_all(path)
-    df = read_and_execute_all_parallel(paths)
+    for path in paths:
+        read_and_execute_all(path)
+    # df = read_and_execute_all_parallel(paths)
     logger.info('END')

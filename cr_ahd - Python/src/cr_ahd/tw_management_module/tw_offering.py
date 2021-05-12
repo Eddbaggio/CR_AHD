@@ -1,4 +1,5 @@
 import abc
+
 from src.cr_ahd.core_module import instance as it, solution as slt
 from src.cr_ahd.utility_module import utils as ut
 import src.cr_ahd.core_module.tour as tr
@@ -11,7 +12,8 @@ class TWOfferingBehavior(abc.ABC):
         assert (solution.tw_open[delivery_vertex], solution.tw_close[delivery_vertex]) == (ut.START_TIME, ut.END_TIME)
 
         tw_valuations = [self._evaluate_time_window(instance, solution, carrier, request, tw) for tw in ut.ALL_TW]
-        offered_time_windows = list(sorted(zip(tw_valuations, ut.ALL_TW)))
+        offered_time_windows = list(
+            sorted(zip(tw_valuations, ut.ALL_TW), key=lambda x: x[0]))
         offered_time_windows = [tw for valuation, tw in offered_time_windows if valuation >= 0]
         return offered_time_windows  # [:num_tw]
 
@@ -45,8 +47,10 @@ class FeasibleTW(TWOfferingBehavior):
     def _evaluate_time_window(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, request: int,
                               tw: ut.TimeWindow):
         carrier_ = solution.carriers[carrier]
-        depot = carrier_.id_
+        depot = carrier_.id_  # operating on a tmp carrier, thus the depot index is not equal to the carrier id
         pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
+        solution.tw_open[delivery_vertex] = tw.open
+        solution.tw_close[delivery_vertex] = tw.close
 
         # can the carrier open a new tour and insert the request there? only checks the time window constraint.
         # it is assumed that load and max tour length are not exceeded with a single request
@@ -56,37 +60,45 @@ class FeasibleTW(TWOfferingBehavior):
             for predecessor_vertex, vertex in zip([depot, pickup_vertex, delivery_vertex],
                                                   [pickup_vertex, delivery_vertex, depot]):
 
-                # consider the TW to be evaluated if the current vertex is the delivery vertex
-                if vertex == delivery_vertex:
-                    vertex_tw = tw
-                else:
-                    vertex_tw = ut.TimeWindow(solution.tw_open[vertex], solution.tw_close[vertex])
-
                 dist = instance.distance([predecessor_vertex], [vertex])
                 arrival_time = service_time + instance.service_duration[predecessor_vertex] + ut.travel_time(dist)
 
-                if arrival_time > vertex_tw.close:
+                if arrival_time > solution.tw_close[vertex]:
                     new_tour_feasible = False
                     break
 
-                service_time = max(arrival_time, vertex_tw.open)
+                service_time = max(arrival_time, solution.tw_open[vertex])
 
             if new_tour_feasible:
+                # undo the setting of the time window and return
+                solution.tw_open[delivery_vertex] = ut.START_TIME
+                solution.tw_close[delivery_vertex] = ut.END_TIME
                 return 1
 
         # if no new tour can be built, can the request be inserted into one of the existing ones?
-
-        for tour in carrier_.tours:
-            first_index = self._find_first_insertion_index(solution, tw, tour)
-            last_index = self._find_last_insertion_index(solution, tw, tour, first_index)
-            for pickup_insertion_index in range(first_index):
-                for delivery_insertion_index in range(first_index, last_index + 1):
-                    if tour.insertion_feasibility_check(instance, solution,
-                                                        [pickup_insertion_index, delivery_insertion_index],
-                                                        [pickup_vertex, delivery_vertex]):
+        for tour_ in carrier_.tours:
+            # first_index = self._find_first_insertion_index(solution, tw, tour_)
+            # last_index = self._find_last_insertion_index(solution, tw, tour_, first_index)
+            for pickup_pos in range(1, len(tour_)):
+                for delivery_pos in range(pickup_pos + 1, len(tour_) + 1):
+                    if tour_.insertion_feasibility_check(instance, solution,
+                                                         [pickup_pos, delivery_pos],
+                                                         [pickup_vertex, delivery_vertex]):
+                        # undo the setting of the time window and return
+                        solution.tw_open[delivery_vertex] = ut.START_TIME
+                        solution.tw_close[delivery_vertex] = ut.END_TIME
                         return 1
 
-        # if request cannot be inserted anywhere, return negative valuation
+        # if request cannot be inserted anywhere return negative valuation
+        # undo the setting of the time window and return
+        solution.tw_open[delivery_vertex] = ut.START_TIME
+        solution.tw_close[delivery_vertex] = ut.END_TIME
         return -1
 
 
+class EmptyTW(TWOfferingBehavior):
+    """
+    offer only TW in which no request is being served yet.
+    Alternatively offer those TW that have the highest capacity still free
+    """
+    pass

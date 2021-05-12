@@ -105,6 +105,13 @@ class LowestProfit(RequestSelectionBehavior):
         return [rev + cost for rev, cost in zip(revenue, ins_cost)]
 
 
+class PackedTW(RequestSelectionBehavior):
+    """
+    offer requests from TW slots that are closest to their limit. this way carrier increases flexibility rather than
+    profitability
+    """
+    pass
+
 '''
 class Cluster(RequestSelectionBehavior):
     """

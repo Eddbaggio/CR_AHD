@@ -99,20 +99,22 @@ def bundle_isolation(bundle_centroid: ut.Coordinates,
     return min_separation
 
 
-def bundle_tour_length(instance: it.PDPInstance,
-                       solution: slt.GlobalSolution,
-                       centroid: ut.Coordinates,
-                       bundle_idx: int,
-                       bundle: Sequence,
-                       extended_distance_matrix
-                       ):
+def bundle_total_travel_distance(instance: it.PDPInstance,
+                                 solution: slt.GlobalSolution,
+                                 centroid: ut.Coordinates,
+                                 bundle_idx: int,
+                                 bundle: Sequence,
+                                 extended_distance_matrix
+                                 ):
     """
     total travel distance needed to visit all requests in a bundle. Since finding the optimal solutions for
     all bundles is too time consuming, the tour length is approximated using the cheapest insertion heuristic
     ["...using an algorithm proposed by Renaud et al. (2000).]
+    uses bundle centroid as depot
 
     :param extended_distance_matrix: a replica of the instance's distance matrix, extended by all the distances to the
-    centroids that exist in the candidate solution. these additional distances are the final indices in the matrix
+    centroids that exist in the candidate solution. these additional distances are positioned at the very end of
+    the matrix; the centroids will have the corresponding indices starting at num_carriers + 2* num_requests
     """
     num_bundles = len(extended_distance_matrix) - (instance.num_carriers + 2 * instance.num_requests)
     tour_dict = {'routing_sequence': [],
@@ -159,6 +161,7 @@ def bundle_tour_length(instance: it.PDPInstance,
     tr.insert_and_update(indices=(1, 2), vertices=instance.pickup_delivery_pair(seed),
                          **tour_dict, **instance_dict, **solution_dict)
 
+    # construction
     while tmp_bundle:
         best_request = None
         best_request_idx = None
@@ -175,7 +178,7 @@ def bundle_tour_length(instance: it.PDPInstance,
                 best_pickup_pos = pickup_pos
                 best_delivery_pos = delivery_pos
 
-            # if no feasible tour is possible with this bundle
+            # if no feasible tour is possible with this request
             if delta == float('inf'):
                 return float('inf')
         tr.insert_and_update(indices=(best_pickup_pos, best_delivery_pos),
@@ -200,13 +203,15 @@ def GHProxyValuation(instance: it.PDPInstance, solution: slt.GlobalSolution,
 
     radii = []
     densities = []
-    tour_lengths = []
+    total_travel_distances = []
     for idx, bundle in enumerate(candidate_solution):
         travel_dist_to_centroid = bundle_vertex_to_centroid_travel_dist(instance, idx, bundle, extended_distance_matrix)
         radii.append(bundle_radius(bundle, travel_dist_to_centroid))
         densities.append(bundle_density(request_direct_travel_distances[idx], travel_dist_to_centroid))
-        tour_lengths.append(
-            bundle_tour_length(instance, solution, centroids[idx], idx, bundle, extended_distance_matrix))
+        travel_dist = bundle_total_travel_distance(instance, solution, centroids[idx], idx, bundle, extended_distance_matrix)
+        if travel_dist == float('inf'):
+            return -float('inf')
+        total_travel_distances.append(travel_dist)
 
     isolations = []
     for i in range(len(candidate_solution)):
@@ -215,96 +220,5 @@ def GHProxyValuation(instance: it.PDPInstance, solution: slt.GlobalSolution,
                                            radii[i],
                                            radii[:i] + radii[i + 1:]))
 
-    return (min(isolations) * min(densities)) / (max(tour_lengths) * len(candidate_solution))
-
-    def algorithm_u(ns, m):
-        """
-        https://codereview.stackexchange.com/a/1944
-
-        Generates all set partitions with a given number of blocks
-
-        :param ns: sequence of integers
-        :param m: integer, smaller than ns
-        :return:
-        """
-        assert m > 1
-
-        def visit(n, a):
-            ps = [[] for i in range(m)]
-            for j in range(n):
-                ps[a[j + 1]].append(ns[j])
-            return ps
-
-        def f(mu, nu, sigma, n, a):
-            if mu == 2:
-                yield visit(n, a)
-            else:
-                for v in f(mu - 1, nu - 1, (mu + sigma) % 2, n, a):
-                    yield v
-            if nu == mu + 1:
-                a[mu] = mu - 1
-                yield visit(n, a)
-                while a[nu] > 0:
-                    a[nu] = a[nu] - 1
-                    yield visit(n, a)
-            elif nu > mu + 1:
-                if (mu + sigma) % 2 == 1:
-                    a[nu - 1] = mu - 1
-                else:
-                    a[mu] = mu - 1
-                if (a[nu] + sigma) % 2 == 1:
-                    for v in b(mu, nu - 1, 0, n, a):
-                        yield v
-                else:
-                    for v in f(mu, nu - 1, 0, n, a):
-                        yield v
-                while a[nu] > 0:
-                    a[nu] = a[nu] - 1
-                    if (a[nu] + sigma) % 2 == 1:
-                        for v in b(mu, nu - 1, 0, n, a):
-                            yield v
-                    else:
-                        for v in f(mu, nu - 1, 0, n, a):
-                            yield v
-
-        def b(mu, nu, sigma, n, a):
-            if nu == mu + 1:
-                while a[nu] < mu - 1:
-                    yield visit(n, a)
-                    a[nu] = a[nu] + 1
-                yield visit(n, a)
-                a[mu] = 0
-            elif nu > mu + 1:
-                if (a[nu] + sigma) % 2 == 1:
-                    for v in f(mu, nu - 1, 0, n, a):
-                        yield v
-                else:
-                    for v in b(mu, nu - 1, 0, n, a):
-                        yield v
-                while a[nu] < mu - 1:
-                    a[nu] = a[nu] + 1
-                    if (a[nu] + sigma) % 2 == 1:
-                        for v in f(mu, nu - 1, 0, n, a):
-                            yield v
-                    else:
-                        for v in b(mu, nu - 1, 0, n, a):
-                            yield v
-                if (mu + sigma) % 2 == 1:
-                    a[nu - 1] = 0
-                else:
-                    a[mu] = 0
-            if mu == 2:
-                yield visit(n, a)
-            else:
-                for v in b(mu - 1, nu - 1, (mu + sigma) % 2, n, a):
-                    yield v
-
-        n = len(ns)
-        a = [0] * (n + 1)
-        for j in range(1, m + 1):
-            a[n - m + j] = j - 1
-        return f(m, n, 0, n, a)
-
-    if __name__ == '__main__':
-        for v in algorithm_u([1, 3, 5, 2, 4, 6], 1):
-            print(v)
+    # TODO raises RuntimeWarning: invalid value encountered in double_scalars
+    return (min(isolations) * min(densities)) / (max(total_travel_distances) * len(candidate_solution))

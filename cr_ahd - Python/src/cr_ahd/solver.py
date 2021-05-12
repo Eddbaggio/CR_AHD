@@ -252,7 +252,7 @@ class DynamicSolver(Solver, abc.ABC):
         pass
 
     def finalize_with_local_search(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
-        imp.PDPMoveBest().improve_global_solution(instance, solution)
+        # imp.PDPMoveBest().improve_global_solution(instance, solution)
         # imp.PDPExchangeMoveBest().improve_global_solution(instance, solution)
         pass
 

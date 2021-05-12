@@ -4,6 +4,7 @@ from collections import Callable
 import pytest
 from pathlib import Path
 
+import src.cr_ahd.utility_module.utils
 import src.cr_ahd.utility_module.utils as ut
 from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
 from src.cr_ahd.utility_module.utils import n_points_on_a_circle
@@ -224,8 +225,8 @@ def request_vertices_spiral():
         for i in range(max(X, Y) ** 2):
             if (-X / 2 < x <= X / 2) and (-Y / 2 < y <= Y / 2):
                 requests.append(
-                    Vertex(f'r{i - 1}', x, y, 0, ut.START_TIME + i * ut.TW_LENGTH,
-                           ut.START_TIME + (i + 1) * ut.TW_LENGTH, dt.timedelta(minutes=10)))
+                    Vertex(f'r{i - 1}', x, y, 0, ut.START_TIME + i * src.cr_ahd.utility_module.utils.TW_LENGTH,
+                           ut.START_TIME + (i + 1) * src.cr_ahd.utility_module.utils.TW_LENGTH, dt.timedelta(minutes=10)))
             if x == y or (x < 0 and x == -y) or (x > 0 and x == 1 - y):
                 dx, dy = -dy, dx
             x, y = x + dx, y + dy

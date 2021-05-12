@@ -7,7 +7,7 @@ import time
 import datetime as dt
 from collections import namedtuple
 from pathlib import Path
-from typing import List, Tuple, Dict, Any, Iterable, Sequence
+from typing import List, Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,7 +15,19 @@ import pandas as pd
 from matplotlib.colors import LinearSegmentedColormap
 
 Coordinates = namedtuple('Coords', ['x', 'y'])
-TimeWindow = namedtuple('TimeWindow', ['open', 'close'])
+
+
+class TimeWindow:
+    def __init__(self, open: dt.datetime, close: dt.datetime):
+        self.open: dt.datetime = open
+        self.close: dt.datetime = close
+
+    def __str__(self):
+        return f'[D{self.open.day} {self.open.strftime("%H:%M:%S")} - D{self.close.day} {self.close.strftime("%H:%M:%S")}]'
+
+    def __repr__(self):
+        return f'[D{self.open.day} {self.open.strftime("%H:%M:%S")} - D{self.close.day} {self.close.strftime("%H:%M:%S")}]'
+
 
 opts = {
     'verbose': 0,
@@ -200,6 +212,22 @@ def random_partition(li):
             break
 
 
+def random_max_k_partition_idx(ls, max_k) -> List[int]:
+    if max_k < 1:
+        return []
+    # randomly determine the actual k
+    k = random.randint(1, min(max_k, len(ls)))
+    # We require that this list contains k different values, so we
+    # start by adding each possible different value.
+    indices = list(range(k))
+    # now we add random values from range(k) to indices to fill it up
+    # to the length of ls
+    indices.extend([random.choice(list(range(k))) for _ in range(len(ls) - k)])
+    # shuffle the indices into a random order
+    random.shuffle(indices)
+    return indices
+
+
 def random_max_k_partition(ls, max_k) -> Sequence[Sequence[int]]:
     """partition ls in at most k randomly sized disjoint subsets
 
@@ -249,32 +277,12 @@ class MyJSONEncoder(json.JSONEncoder):
             return super().default(obj)
 
 
-def datetime_range(start: dt.datetime, end: dt.datetime, freq: dt.timedelta, include_end=True):
-    """
-    returns a generator object that yields datetime objects in the range from start to end in steps of freq.
-    :param include_end: determines whether the specified end is included in the range
-    :return:
-    """
-    return (start + x * freq for x in range(((end - start) // freq) + include_end))
-
-
 def argmin(a):
     return min(range(len(a)), key=lambda x: a[x])
 
 
 def argmax(a):
     return max(range(len(a)), key=lambda x: a[x])
-
-
-random.seed(0)
-START_TIME = dt.datetime.min
-END_TIME = dt.datetime.min + dt.timedelta(minutes=3390)
-TIME_HORIZON = TimeWindow(START_TIME, END_TIME)
-TW_LENGTH = dt.timedelta(hours=2)
-ALL_TW = [TimeWindow(e, min(e + TW_LENGTH, END_TIME)) for e in datetime_range(START_TIME, END_TIME, freq=TW_LENGTH)]
-SPEED_KMH = 60
-DYNAMIC_CYCLE_TIME = 5  # does not actually represent time but the number of requests being assigned each cycle
-NUM_REQUESTS_TO_SUBMIT = 3 / 5  # either relative (between 0 and 1) or an absolute number lower than DYNAMIC_CYCLE_TIME
 
 
 def midpoint(instance, pickup_vertex, delivery_vertex):
@@ -307,3 +315,23 @@ def n_points_on_a_circle(n: int, radius, origin_x=0, origin_y=0):
         y = radius * math.sin(2 * math.pi * i / n - math.pi / 2)
         points.append((origin_x + x, origin_y + y))
     return points
+
+
+def datetime_range(start: dt.datetime, end: dt.datetime, freq: dt.timedelta, include_end=True):
+    """
+    returns a generator object that yields datetime objects in the range from start to end in steps of freq.
+    :param include_end: determines whether the specified end is included in the range
+    :return:
+    """
+    return (start + x * freq for x in range(((end - start) // freq) + include_end))
+
+
+random.seed(0)
+START_TIME = dt.datetime.min
+END_TIME = dt.datetime.min + dt.timedelta(minutes=3390)
+TW_LENGTH = dt.timedelta(hours=2)
+ALL_TW = [TimeWindow(e, min(e + TW_LENGTH, END_TIME)) for e in datetime_range(START_TIME, END_TIME, freq=TW_LENGTH)]
+TIME_HORIZON = TimeWindow(START_TIME, END_TIME)
+SPEED_KMH = 60
+DYNAMIC_CYCLE_TIME = 5  # does not actually represent time but the number of requests being assigned each cycle
+NUM_REQUESTS_TO_SUBMIT = 3 / 5  # either relative (between 0 and 1) or an absolute number lower than DYNAMIC_CYCLE_TIME

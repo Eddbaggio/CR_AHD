@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Sequence
 
 import src.cr_ahd.utility_module.utils as ut
 from src.cr_ahd.auction_module import request_selection as rs, bundle_generation as bg, bidding as bd, \
@@ -18,18 +19,29 @@ class Auction(ABC):
         pass
 
     def _run_auction(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
-        submitted_requests = self._request_selection(instance, solution, ut.NUM_REQUESTS_TO_SUBMIT)
-        if submitted_requests:
-            logger.debug(f'requests {submitted_requests} have been submitted to the auction pool')
+
+        # Request Selection
+        auction_pool = self._request_selection(instance, solution, ut.NUM_REQUESTS_TO_SUBMIT)
+
+        if auction_pool:
+
+            logger.debug(f'requests {auction_pool} have been submitted to the auction pool')
             logger.debug(f'routing non-submitted requests {[c.unrouted_requests for c in solution.carriers]}')
             self._route_unsubmitted(instance, solution)
-            bundles = self._bundle_generation(instance, solution, submitted_requests)
+
+            # Bundle Generation
+            bundles = self._bundle_generation(instance, solution, auction_pool)
             logger.debug(f'bundles {bundles} have been created')
-            logger.debug(f'Generating bids')
-            bids = self._bid_generation(instance, solution, bundles)
-            logger.debug(f'Bids {bids} have been created for bundles {bundles}')
-            winner_bundles, bundle_winners = self._winner_determination(instance, solution, bundles, bids)
-            logger.debug(f'reassigning bundles {winner_bundles} to carriers {bundle_winners} for bids')
+            logger.debug(f'Generating bids_matrix')
+
+            # Bidding
+            bids_matrix = self._bid_generation(instance, solution, bundles)
+            logger.debug(f'Bids {bids_matrix} have been created for bundles {bundles}')
+
+            # Winner Determination
+            winner_bundles, bundle_winners = self._winner_determination(instance, solution, auction_pool, bundles, bids_matrix)
+            # logger.debug(f'reassigning bundles {winner_bundles} to carriers {bundle_winners}')
+
             for bundle, winner in zip(winner_bundles, bundle_winners):
                 solution.assign_requests_to_carriers(bundle, [winner] * len(bundle))
         else:
@@ -37,7 +49,7 @@ class Auction(ABC):
         pass
 
     @abstractmethod
-    def _request_selection(self, instance, solution, num_request_to_submit):
+    def _request_selection(self, instance:it.PDPInstance, solution:slt.GlobalSolution, num_request_to_submit:int):
         """
 
         :param instance:
@@ -48,19 +60,20 @@ class Auction(ABC):
         pass
 
     @abstractmethod
-    def _route_unsubmitted(self, instance, solution):
+    def _route_unsubmitted(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         pass
 
     @abstractmethod
-    def _bundle_generation(self, instance, solution, submitted_requests):
+    def _bundle_generation(self, instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool):
         pass
 
     @abstractmethod
-    def _bid_generation(self, instance, solution, bundles):
+    def _bid_generation(self, instance: it.PDPInstance, solution: slt.GlobalSolution, bundles):
         pass
 
     @abstractmethod
-    def _winner_determination(self, instance, solution, bundles, bids):
+    def _winner_determination(self, instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool: Sequence[int],
+                              bundles: Sequence[Sequence[int]], bids_matrix:Sequence[Sequence[float]]):
         pass
 
 
@@ -104,20 +117,19 @@ class AuctionC(Auction):
     Winner Determination Behavior: Gurobi - Set Packing Problem
     """
 
-    def _request_selection(self, instance, solution, num_request_to_submit):
+    def _request_selection(self, instance:it.PDPInstance, solution:slt.GlobalSolution, num_request_to_submit:int):
         return rs.LowestProfit().execute(instance, solution, ut.NUM_REQUESTS_TO_SUBMIT)
 
-    def _route_unsubmitted(self, instance, solution):
+    def _route_unsubmitted(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         cns.CheapestPDPInsertion().construct(instance, solution)
         pass
 
-    def _bundle_generation(self, instance, solution, submitted_requests):
-        return bg.ProxyTest().execute(instance, solution, submitted_requests)
+    def _bundle_generation(self, instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool):
+        return bg.ProxyTest().execute(instance, solution, auction_pool)
 
-    def _bid_generation(self, instance, solution, bundles):
+    def _bid_generation(self, instance: it.PDPInstance, solution: slt.GlobalSolution, bundles):
         return bd.Profit().execute(instance, solution, bundles)
 
-    def _winner_determination(self, instance, solution, bundles, bids):
-        return wd.MaxBidGurobi().execute(instance, solution, bundles, bids)
-
-
+    def _winner_determination(self, instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool: Sequence[int],
+                              bundles: Sequence[Sequence[int]], bids_matrix:Sequence[Sequence[float]]):
+        return wd.MaxBidGurobiCAP1().execute(instance, solution, auction_pool, bundles, bids_matrix)
