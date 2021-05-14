@@ -220,5 +220,4 @@ def GHProxyValuation(instance: it.PDPInstance, solution: slt.GlobalSolution,
                                            radii[i],
                                            radii[:i] + radii[i + 1:]))
 
-    # TODO raises RuntimeWarning: invalid value encountered in double_scalars
     return (min(isolations) * min(densities)) / (max(total_travel_distances) * len(candidate_solution))

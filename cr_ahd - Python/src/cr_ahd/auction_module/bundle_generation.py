@@ -63,6 +63,9 @@ class KMeansBundles(BundleSetGenerationBehavior):
 
 class GeneticAlgorithm(BundleSetGenerationBehavior):
     def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool: Sequence):
+        population = self._initialize_population(auction_pool)
+        fitness = bv.GHProxyValuation(instance, solution, population)
+
         pass
 
     @staticmethod
@@ -83,9 +86,17 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
 
     def _initialize_population(self, auction_pool: Sequence[int]):
         population_size = 100
-        population = [ut.random_max_k_partition_idx(auction_pool, len(auction_pool)) for _ in range(population_size)]
+        n = len(auction_pool)
+        population = [ut.random_max_k_partition_idx(auction_pool, n) for _ in range(population_size)]
         for individual in population:
             self._normalize_individual(individual)
+        return population
+
+    def _roulette_wheel(self, fitness:Sequence[float]):
+        pass
+
+    def _crossover_uniform(self, parent1, parent2):
+        pass
 
 
 

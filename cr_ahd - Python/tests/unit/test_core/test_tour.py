@@ -60,7 +60,7 @@ def test__pop_no_update(inst_and_sol_gh_0_ass9_routed6):
     c = 0
     t = 0
     tour = solution.carriers[c].tours[t]
-    tour.pop_no_update(3)
+    tour._pop_no_update(3)
     assert tour.routing_sequence == (0, 4, 19, 18, 0)
     # assert tour.revenue_sequence == ()
     # assert tour.load_sequence == ()
