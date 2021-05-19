@@ -216,11 +216,9 @@ def random_max_k_partition_idx(ls, max_k) -> List[int]:
         return []
     # randomly determine the actual k
     k = random.randint(1, min(max_k, len(ls)))
-    # We require that this list contains k different values, so we
-    # start by adding each possible different value.
+    # We require that this list contains k different values, so we start by adding each possible different value.
     indices = list(range(k))
-    # now we add random values from range(k) to indices to fill it up
-    # to the length of ls
+    # now we add random values from range(k) to indices to fill it up to the length of ls
     indices.extend([random.choice(list(range(k))) for _ in range(len(ls) - k)])
     # shuffle the indices into a random order
     random.shuffle(indices)
@@ -282,6 +280,24 @@ def argmin(a):
 
 def argmax(a):
     return max(range(len(a)), key=lambda x: a[x])
+
+
+def argsmin(a, k: int):
+    """
+    returns the indices of the k min arguments in a
+    """
+    assert k > 0
+    a_sorted = sorted(range(len(a)), key=lambda x: a[x])  # indices in increasing order of values
+    return a_sorted[:k]
+
+
+def argsmax(a, k: int):
+    """
+    returns the indices of the k max arguments in a
+    """
+    assert k > 0
+    a_sorted = sorted(range(len(a)), key=lambda x: a[x], reverse=True)  # indices in decreasing order of values
+    return a_sorted[:k]
 
 
 def midpoint(instance, pickup_vertex, delivery_vertex):

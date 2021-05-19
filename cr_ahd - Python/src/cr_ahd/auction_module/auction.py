@@ -125,7 +125,7 @@ class AuctionC(Auction):
         pass
 
     def _bundle_generation(self, instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool):
-        return bg.ProxyTest().execute(instance, solution, auction_pool)
+        return bg.GeneticAlgorithm().execute(instance, solution, auction_pool)
 
     def _bid_generation(self, instance: it.PDPInstance, solution: slt.GlobalSolution, bundles):
         return bd.Profit().execute(instance, solution, bundles)

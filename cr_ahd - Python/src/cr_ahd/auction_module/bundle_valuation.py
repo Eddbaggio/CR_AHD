@@ -157,12 +157,12 @@ def bundle_total_travel_distance(instance: it.PDPInstance,
             seed = request
             seed_idx = request_idx
             best_evaluation = evaluation
-    tmp_bundle.pop(seed_idx)
+    tmp_bundle = np.delete(tmp_bundle, seed_idx)
     tr.insert_and_update(indices=(1, 2), vertices=instance.pickup_delivery_pair(seed),
                          **tour_dict, **instance_dict, **solution_dict)
 
     # construction
-    while tmp_bundle:
+    while tmp_bundle.any():
         best_request = None
         best_request_idx = None
         best_delta = float('inf')
@@ -184,16 +184,31 @@ def bundle_total_travel_distance(instance: it.PDPInstance,
         tr.insert_and_update(indices=(best_pickup_pos, best_delivery_pos),
                              vertices=instance.pickup_delivery_pair(best_request),
                              **tour_dict, **instance_dict, **solution_dict)
-        tmp_bundle.pop(best_request_idx)
+        tmp_bundle = np.delete(tmp_bundle, best_request_idx)
 
     return sum(tour_dict['travel_distance_sequence'])
 
 
-def GHProxyValuation(instance: it.PDPInstance, solution: slt.GlobalSolution,
-                     candidate_solution: Sequence[Sequence[int]]):
+def GHProxyValuation(instance: it.PDPInstance,
+                     solution: slt.GlobalSolution,
+                     candidate_solution: Sequence[int],
+                     auction_pool: Sequence[int]
+                     ):
+    """
+
+    :param auction_pool:
+    :param instance:
+    :param solution:
+    :param candidate_solution: encoded as a sequence of bundle indices
+    :return:
+    """
     centroids = []
     request_direct_travel_distances = []
-    for bundle in candidate_solution:
+    num_bundles = max(candidate_solution)+1
+    candidate_solution = np.array(candidate_solution)
+    auction_pool_array = np.array(auction_pool)
+    for bundle_idx in range(num_bundles):
+        bundle = auction_pool_array[candidate_solution == bundle_idx]
         direct_travel_dist = bundle_direct_travel_dist(instance, bundle)
         request_direct_travel_distances.append(direct_travel_dist)
         centroid = bundle_centroid(instance, bundle, direct_travel_dist)
@@ -204,20 +219,23 @@ def GHProxyValuation(instance: it.PDPInstance, solution: slt.GlobalSolution,
     radii = []
     densities = []
     total_travel_distances = []
-    for idx, bundle in enumerate(candidate_solution):
-        travel_dist_to_centroid = bundle_vertex_to_centroid_travel_dist(instance, idx, bundle, extended_distance_matrix)
+    for bundle_idx in range(num_bundles):
+        bundle = auction_pool_array[candidate_solution == bundle_idx]
+        travel_dist_to_centroid = bundle_vertex_to_centroid_travel_dist(instance, bundle_idx, bundle, extended_distance_matrix)
         radii.append(bundle_radius(bundle, travel_dist_to_centroid))
-        densities.append(bundle_density(request_direct_travel_distances[idx], travel_dist_to_centroid))
-        travel_dist = bundle_total_travel_distance(instance, solution, centroids[idx], idx, bundle, extended_distance_matrix)
+        densities.append(bundle_density(request_direct_travel_distances[bundle_idx], travel_dist_to_centroid))
+        travel_dist = bundle_total_travel_distance(instance, solution, centroids[bundle_idx], bundle_idx, bundle,
+                                                   extended_distance_matrix)
         if travel_dist == float('inf'):
+            # print(f'No feasible tour for this bundle: {bundle}')
             return -float('inf')
         total_travel_distances.append(travel_dist)
 
     isolations = []
-    for i in range(len(candidate_solution)):
-        isolations.append(bundle_isolation(centroids[i],
-                                           centroids[:i] + centroids[i + 1:],
-                                           radii[i],
-                                           radii[:i] + radii[i + 1:]))
+    for bundle_idx in range(num_bundles):
+        isolations.append(bundle_isolation(centroids[bundle_idx],
+                                           centroids[:bundle_idx] + centroids[bundle_idx + 1:],
+                                           radii[bundle_idx],
+                                           radii[:bundle_idx] + radii[bundle_idx + 1:]))
 
     return (min(isolations) * min(densities)) / (max(total_travel_distances) * len(candidate_solution))
