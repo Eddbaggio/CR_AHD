@@ -33,10 +33,10 @@ def bundle_centroid(instance: it.PDPInstance, bundle: Sequence, direct_travel_di
     return centroid
 
 
-def bundle_extended_distance_matrix(instance: it.PDPInstance, centroids: Sequence[ut.Coordinates]):
+def bundle_extended_distance_matrix(instance: it.PDPInstance, additional_vertex_coords: Sequence[ut.Coordinates]):
     x = instance.x_coords.copy()
     y = instance.y_coords.copy()
-    for centroid in centroids:
+    for centroid in additional_vertex_coords:
         x.append(centroid.x)
         y.append(centroid.y)
     return squareform(pdist(np.array(list(zip(x, y)))))
@@ -90,7 +90,10 @@ def bundle_isolation(bundle_centroid: ut.Coordinates,
                      other_bundles_centroid: Sequence[ut.Coordinates],
                      bundle_radius: float,
                      other_bundles_radius: Sequence[float]):
-    """minimum separation of bundle from other bundles"""
+    """minimum separation of bundle from other bundles. returns 0 if there's a single bundle only"""
+    if len(other_bundles_centroid) == 0:
+        return 0
+
     min_separation = float('inf')
     for other_centroid, other_radius in zip(other_bundles_centroid, other_bundles_radius):
         separation = bundle_separation(bundle_centroid, other_centroid, bundle_radius, other_radius)
@@ -99,22 +102,34 @@ def bundle_isolation(bundle_centroid: ut.Coordinates,
     return min_separation
 
 
+def bundle_total_travel_distance_proxy(instance: it.PDPInstance,
+                                       bundle: Sequence[int],
+                                       ):
+    """
+    estimate the total travel distance required to visit all requests in the bundle. Ignores all constraints (time
+    windows, vehicle capacity, max tour length, ...)
+    """
+    routing_sequence = []
+    for request in bundle:
+        routing_sequence.extend(instance.pickup_delivery_pair(request))
+    return instance.distance(routing_sequence[:-1], routing_sequence[1:])
+
+
 def bundle_total_travel_distance(instance: it.PDPInstance,
                                  solution: slt.GlobalSolution,
                                  centroid: ut.Coordinates,
                                  bundle_idx: int,
-                                 bundle: Sequence,
+                                 bundle: Sequence[int],
                                  extended_distance_matrix
                                  ):
     """
     total travel distance needed to visit all requests in a bundle. Since finding the optimal solutions for
     all bundles is too time consuming, the tour length is approximated using the cheapest insertion heuristic
-    ["...using an algorithm proposed by Renaud et al. (2000).]
-    uses bundle centroid as depot
+    ["...using an algorithm proposed by Renaud et al. (2000).]\n
+    BEFORE: used bundle centroid as depot\n
+    NOW: uses bundle member as depot, because the former version may lead to infeasibility.
 
-    :param extended_distance_matrix: a replica of the instance's distance matrix, extended by all the distances to the
-    centroids that exist in the candidate solution. these additional distances are positioned at the very end of
-    the matrix; the centroids will have the corresponding indices starting at num_carriers + 2* num_requests
+    :param extended_distance_matrix: a replica of the instance's distance matrix, extended by all the distances to the centroids that exist in the candidate solution. these additional distances are positioned at the very end of the matrix; the centroids will have the corresponding indices starting at num_carriers + 2* num_requests
     """
     num_bundles = len(extended_distance_matrix) - (instance.num_carriers + 2 * instance.num_requests)
     tour_dict = {'routing_sequence': [],
@@ -139,11 +154,12 @@ def bundle_total_travel_distance(instance: it.PDPInstance,
         'tw_close': solution.tw_close + [ut.END_TIME] * num_bundles,
     }
 
-    centroid_index = instance.num_carriers + 2 * instance.num_requests + bundle_idx
+    # treat the pickup of the first-to-open delivery vertex as the depot
+
     # TODO not sure why i have to initialize in reverse order here, but I do the same in the Tour class and doing it
     #  with [0, 1] causes errors whn updating
-    tr.insert_and_update(indices=[1], vertices=[centroid_index], **tour_dict, **instance_dict, **solution_dict)
-    tr.insert_and_update(indices=[0], vertices=[centroid_index], **tour_dict, **instance_dict, **solution_dict)
+    tr.insert_and_update(indices=[1], vertices=[artificial_depot], **tour_dict, **instance_dict, **solution_dict)
+    tr.insert_and_update(indices=[0], vertices=[artificial_depot], **tour_dict, **instance_dict, **solution_dict)
 
     # furthest distance seed request
     best_evaluation = -float('inf')
@@ -178,8 +194,9 @@ def bundle_total_travel_distance(instance: it.PDPInstance,
                 best_pickup_pos = pickup_pos
                 best_delivery_pos = delivery_pos
 
-            # if no feasible tour is possible with this request
-            if delta == float('inf'):
+            # if not feasible to insert this request into the bundle-tour (initializing a second route: cannot ensure
+            # feasibility)
+            elif delta == float('inf'):
                 return float('inf')
         tr.insert_and_update(indices=(best_pickup_pos, best_delivery_pos),
                              vertices=instance.pickup_delivery_pair(best_request),
@@ -204,7 +221,7 @@ def GHProxyValuation(instance: it.PDPInstance,
     """
     centroids = []
     request_direct_travel_distances = []
-    num_bundles = max(candidate_solution)+1
+    num_bundles = max(candidate_solution) + 1
     candidate_solution = np.array(candidate_solution)
     auction_pool_array = np.array(auction_pool)
     for bundle_idx in range(num_bundles):
@@ -220,16 +237,26 @@ def GHProxyValuation(instance: it.PDPInstance,
     densities = []
     total_travel_distances = []
     for bundle_idx in range(num_bundles):
+        # recreate the bundle
+        # todo make the functions below work with the GH decoding of bundles directly
         bundle = auction_pool_array[candidate_solution == bundle_idx]
-        travel_dist_to_centroid = bundle_vertex_to_centroid_travel_dist(instance, bundle_idx, bundle, extended_distance_matrix)
+
+        # compute the radius
+        travel_dist_to_centroid = bundle_vertex_to_centroid_travel_dist(instance, bundle_idx, bundle,
+                                                                        extended_distance_matrix)
         radii.append(bundle_radius(bundle, travel_dist_to_centroid))
+
+        # compute bundle density
         densities.append(bundle_density(request_direct_travel_distances[bundle_idx], travel_dist_to_centroid))
-        travel_dist = bundle_total_travel_distance(instance, solution, centroids[bundle_idx], bundle_idx, bundle,
-                                                   extended_distance_matrix)
-        if travel_dist == float('inf'):
-            # print(f'No feasible tour for this bundle: {bundle}')
+
+        # estimating the tour length of the bundle
+        approx_travel_dist = bundle_total_travel_distance_proxy(instance, bundle)
+
+        # if there is no feasible tour for this bundle, return a valuation of negative infinity for the whole bundling
+        if approx_travel_dist == float('inf'):
             return -float('inf')
-        total_travel_distances.append(travel_dist)
+
+        total_travel_distances.append(approx_travel_dist)
 
     isolations = []
     for bundle_idx in range(num_bundles):

@@ -127,26 +127,25 @@ class CheapestPDPInsertion(PDPInsertionConstruction):
         return best_request, best_tour, best_pickup_pos, best_delivery_pos
 
 
-def tour_cheapest_insertion(
-        pickup_vertex: int,
-        delivery_vertex: int,
-        routing_sequence: Sequence[int],
-        travel_distance_sequence: Sequence[float],
-        service_schedule: Sequence[dt.datetime],
-        load_sequence: Sequence[float],
-        num_carriers: int,
-        num_requests: int,
-        distance_matrix: Sequence[Sequence[float]],
-        vehicles_max_travel_distance: float,
-        vertex_load: Sequence[int],
-        service_duration: Sequence[dt.timedelta],
-        vehicles_max_load: float,
-        tw_open: Sequence[dt.datetime],
-        tw_close: Sequence[dt.datetime],
-        **kwargs
-):
+def tour_cheapest_insertion(pickup_vertex: int,
+                            delivery_vertex: int,
+                            routing_sequence: Sequence[int],
+                            travel_distance_sequence: Sequence[float],
+                            service_schedule: Sequence[dt.datetime],
+                            load_sequence: Sequence[float],
+                            num_carriers: int,
+                            num_requests: int,
+                            distance_matrix: Sequence[Sequence[float]],
+                            vehicles_max_travel_distance: float,
+                            vertex_load: Sequence[int],
+                            service_duration: Sequence[dt.timedelta],
+                            vehicles_max_load: float,
+                            tw_open: Sequence[dt.datetime],
+                            tw_close: Sequence[dt.datetime],
+                            **kwargs
+                            ):
     """
-    independent of instance and solution class
+    independent of PDPInstance class and GlobalSolution class
     """
     best_delta = float('inf')
     best_pickup_position = None
@@ -154,7 +153,7 @@ def tour_cheapest_insertion(
 
     for pickup_pos in range(1, len(routing_sequence)):
         # TODO I only have to check those positions that would not violate the TWs of the other nodes, thus I can
-        #  potentially start even later than i+1. There are functions somewhere that do this afaik
+        #  potentially start even later than i+1. There are functions somewhere that do this, afaik
         for delivery_pos in range(pickup_pos + 1, len(routing_sequence) + 1):
             delta = tr.insertion_distance_delta(
                 routing_sequence=routing_sequence,

@@ -10,7 +10,19 @@ from src.cr_ahd.routing_module import tour_construction as cns
 logger = logging.getLogger(__name__)
 
 
-class RequestSelectionBehavior(ABC):
+def _abs_num_requests(carrier_: slt.PDPSolution, num_requests) -> int:
+    """
+    returns the absolute number of requests that a carrier shall submit, depending on whether it was initially
+    given as an absolute int or a float (relative)
+    """
+    if isinstance(num_requests, int):
+        return num_requests
+    elif isinstance(num_requests, float):
+        assert num_requests <= 1, 'If providing a float, must be <=1 to be converted to percentage'
+        return round(len(carrier_.unrouted_requests) * num_requests)
+
+
+class RequestSelectionBehavior_individual(ABC):
     def execute(self, instance: it.PDPInstance, solution: slt.GlobalSolution, num_requests):
         """
         select a set of requests based on the concrete selection behavior. will retract the requests from the carrier
@@ -19,23 +31,25 @@ class RequestSelectionBehavior(ABC):
         :param solution:
         :param num_requests: the number of requests each carrier shall submit. If fractional, will use the corresponding
          percentage of requests assigned to that carrier. If integer, will use the absolut amount of requests. If not
-         enough requests are available, will submit as many as are available
+         enough requests are available, will submit as many as are available.
         :param instance:
-        :return: the auction pool as a list of request indices
+        :return: the auction pool as a list of request indices and a default bundling, i.e. a list of the carriers that
+        originally submitted the request.
         """
-        submitted_requests = list()
+        auction_pool = []
+        original_bundles = []
         for carrier in range(instance.num_carriers):
-            k = self._abs_num_requests(solution.carriers[carrier], num_requests)
+            k = _abs_num_requests(solution.carriers[carrier], num_requests)
             valuations = self._evaluate_requests(instance, solution, carrier)
             # pick the worst k evaluated requests (from ascending order)
-            selected = [r for _, r in
-                        sorted(zip(valuations, solution.carriers[carrier].unrouted_requests))][:k]
+            selected = [r for _, r in sorted(zip(valuations, solution.carriers[carrier].unrouted_requests))][:k]
             for s in selected:
                 solution.carriers[carrier].unrouted_requests.remove(s)
                 solution.request_to_carrier_assignment[s] = np.nan
-                submitted_requests.append(s)
-                solution.unassigned_requests.append(s)  # TODO if i do this, the assign_n_requests function will not work
-        return submitted_requests
+                auction_pool.append(s)
+                original_bundles.append(carrier)
+                solution.unassigned_requests.append(s)
+        return auction_pool, original_bundles
 
     @abstractmethod
     def _evaluate_requests(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
@@ -46,19 +60,8 @@ class RequestSelectionBehavior(ABC):
         """
         pass
 
-    def _abs_num_requests(self, carrier: slt.PDPSolution, num_requests) -> int:
-        """
-        returns the absolute number of requests that a carrier shall submit, depending on whether it was initially
-        given as an absolute int or a float (relative)
-        """
-        if isinstance(num_requests, int):
-            return num_requests
-        elif isinstance(num_requests, float):
-            assert num_requests <= 1, 'If providing a float, must be <=1 to be converted to percentage'
-            return round(len(carrier.unrouted_requests) * num_requests)
 
-
-class Random(RequestSelectionBehavior):
+class Random(RequestSelectionBehavior_individual):
     """
     returns a random selection of unrouted requests
     """
@@ -67,7 +70,7 @@ class Random(RequestSelectionBehavior):
         return np.random.random(len(solution.carriers[carrier].unrouted_requests))
 
 
-class HighestInsertionCostDistance(RequestSelectionBehavior):
+class HighestInsertionCostDistance(RequestSelectionBehavior_individual):
     """given the current set of routes, returns the n unrouted requests that have the HIGHEST Insertion distance cost.
      NOTE: since routes may not be final, the current highest-marginal-cost request might not have been chosen at an
      earlier or later stage!"""
@@ -94,8 +97,12 @@ class HighestInsertionCostDistance(RequestSelectionBehavior):
         return evaluation
 
 
-class LowestProfit(RequestSelectionBehavior):
+class LowestProfit(RequestSelectionBehavior_individual):
     def _evaluate_requests(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
+        raise NotImplementedError
+        # this is a wrong implementation of mProfit (Gansterer & Hartl / Berger & Bierwirth). It SHOULD be:
+        # fulfillment costs = (tour costs with the request) - (tour costs without the request)
+
         revenue = []
         for r in solution.carriers[carrier].unrouted_requests:
             request_revenue = sum([instance.revenue[v] for v in instance.pickup_delivery_pair(r)])
@@ -105,42 +112,71 @@ class LowestProfit(RequestSelectionBehavior):
         return [rev + cost for rev, cost in zip(revenue, ins_cost)]
 
 
-class PackedTW(RequestSelectionBehavior):
+class PackedTW(RequestSelectionBehavior_individual):
     """
     offer requests from TW slots that are closest to their limit. this way carrier increases flexibility rather than
     profitability
     """
     pass
 
-'''
-class Cluster(RequestSelectionBehavior):
-    """
-    Based on: Gansterer,M., & Hartl,R.F. (2016). Request evaluation strategies for carriers in auction-based
-    collaborations.
-    Uses geographical information (intra-cluster distances of cluster members) to select requests that are in close
-    proximity
-    """
 
-    def _evaluate_requests(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
-        cs = solution.carrier_solutions[carrier]
-        candidate_clusters = itertools.combinations(cs.unrouted_requests, solution.num_carriers())
-        best_cluster, best_cluster_evaluation = [], float('inf')
-        for candidate in candidate_clusters:
-            evaluation = self.cluster_evaluation(instance, solution, carrier, candidate)
-            if evaluation < best_cluster_evaluation:
-                best_cluster, best_cluster_evaluation = candidate, evaluation
-        if best_cluster_evaluation < float('inf'):
-            return best_cluster  # , best_cluster_evaluation
-        else:
-            raise ValueError()
+class RequestSelectionBehavior_bundle(ABC):
+    def execute(self, instance: it.PDPInstance, solution: slt.GlobalSolution, num_requests):
+        auction_pool = []
+        original_bundles = []
 
-    def cluster_evaluation(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, cluster):
+        for carrier in range(instance.num_carriers):
+            k = _abs_num_requests(solution.carriers[carrier], num_requests)
+
+            # make the bundles that shall be evaluated
+            bundles = self._create_bundles(instance, solution, carrier, k)
+
+            # find the best bundle for the given carrier
+            best_bundle = None
+            best_bundle_valuation = -float('inf')
+            for bundle in bundles:
+                bundle_valuation = self._evaluate_bundle(instance, solution, carrier, bundle)
+                if bundle_valuation >= best_bundle_valuation:
+                    best_bundle = bundle
+                    best_bundle_valuation = bundle_valuation
+
+            # add the carrier's best bundle to the auction pool and to the original bundling
+            for request in best_bundle:
+                solution.carriers[carrier].unrouted_requests.remove(request)
+                solution.request_to_carrier_assignment[request] = np.nan
+                auction_pool.append(request)
+                original_bundles.append(carrier)
+                solution.unassigned_requests.append(request)
+
+        return auction_pool, original_bundles
+
+    @abstractmethod
+    def _create_bundles(self, instance, solution, carrier, k):
+        pass
+
+    @abstractmethod
+    def _evaluate_bundle(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, bundle):
+        pass
+
+
+class Cluster(RequestSelectionBehavior_bundle):
+
+    def _create_bundles(self, instance, solution, carrier, k):
         """
-        sum of the distances of (pickup_0, pickup_1) and (delivery_0, delivery_1)
+        create all possible bundles of size k
         """
-        pairs = itertools.combinations(cluster, 2)
+        return itertools.combinations(solution.carriers[carrier].unrouted_requests, k)
+
+    def _evaluate_bundle(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, bundle):
+        """
+        the sum of travel distances of all pairs of requests in this cluster, where the travel distance of a request
+        pair is defined as the distance between their origins (pickup locations) plus the distance between
+        their destinations (delivery locations).
+        """
+        pairs = itertools.combinations(bundle, 2)
         evaluation = 0
         for r0, r1 in pairs:
-            evaluation += instance.distance(instance.pickup_delivery_pair(r0), instance.pickup_delivery_pair(r1))
+            # negative value: low distance between pairs means high valuation
+            # pickup0 to pickup1 + delivery0 to delivery1
+            evaluation -= instance.distance(instance.pickup_delivery_pair(r0), instance.pickup_delivery_pair(r1))
         return evaluation
-        '''

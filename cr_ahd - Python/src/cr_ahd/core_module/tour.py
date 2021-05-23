@@ -168,7 +168,8 @@ class Tour:
 
     def insert_and_update(self, instance, solution, indices: Sequence[int], vertices: Sequence[int]):
         """
-         inserts a vertex BEFORE the specified index and updates all sequences and schedules.
+         inserts a vertex BEFORE the specified index and updates all sequences and schedules. Does not remove the
+         request from the carrier's list of unrouted requests!
 
         :param solution:
         :param instance:

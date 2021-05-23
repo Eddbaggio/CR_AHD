@@ -7,21 +7,22 @@ import numpy as np
 from sklearn.cluster import KMeans
 from tqdm import tqdm
 
+from src.cr_ahd.auction_module import bundle_valuation as bv
 from src.cr_ahd.core_module import instance as it, solution as slt
 from src.cr_ahd.utility_module import utils as ut
-from src.cr_ahd.auction_module import bundle_valuation as bv
 
 logger = logging.getLogger(__name__)
 
 
 class BundleSetGenerationBehavior(ABC):
-    def execute(self, instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool: Sequence):
-        bundle_set = self._generate_bundle_set(instance, solution, auction_pool)
+    def execute(self, instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool: Sequence, original_bundles):
+        bundle_set = self._generate_bundle_set(instance, solution, auction_pool, original_bundles)
         solution.bundle_generation = self.__class__.__name__
         return bundle_set
 
     @abstractmethod
-    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool: Sequence):
+    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool: Sequence,
+                             original_bundles):
         pass
 
 
@@ -31,8 +32,9 @@ class AllBundles(BundleSetGenerationBehavior):
     Does not include emtpy set.
     """
 
-    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool: Sequence):
-        return tuple(ut.power_set(auction_pool, False))
+    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool: Sequence,
+                             original_bundles):
+        return tuple(ut.power_set(auction_pool, False))  # todo GH decoding of a bundle pool!
 
 
 class RandomMaxKPartition(BundleSetGenerationBehavior):
@@ -40,9 +42,10 @@ class RandomMaxKPartition(BundleSetGenerationBehavior):
     creates a random partition of the submitted bundles with AT MOST as many subsets as there are carriers
     """
 
-    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool: Sequence):
+    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool: Sequence,
+                             original_bundles):
         bundles = ut.random_max_k_partition(auction_pool, max_k=instance.num_carriers)
-        return bundles
+        return bundles  # todo GH decoding of a bundle pool!
 
 
 class KMeansBundles(BundleSetGenerationBehavior):
@@ -52,23 +55,8 @@ class KMeansBundles(BundleSetGenerationBehavior):
     :return a List of lists, where each sublist contains the cluster members of a cluster
     """
 
-    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool: Iterable):
-        request_midpoints = [ut.midpoint(instance, *instance.pickup_delivery_pair(sr)) for sr in auction_pool]
-        # k_means = KMeans(n_clusters=instance.num_carriers, random_state=0).fit(request_midpoints)
-        k_means = KMeans(n_clusters=instance.num_carriers).fit(request_midpoints)
-        bundles = [list(np.take(auction_pool, np.nonzero(k_means.labels_ == b)[0])) for b in
-                   range(k_means.n_clusters)]
-        return bundles
-
-
-class KMeansBundles_GHDecoding(BundleSetGenerationBehavior):
-    """
-    creates a k-means partitions of the submitted requests. generates exactly as many clusters as there are carriers.
-
-    :return a List of lists, where each sublist contains the cluster members of a cluster
-    """
-
-    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool: Iterable):
+    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool: Iterable,
+                             original_bundles):
         request_midpoints = [ut.midpoint(instance, *instance.pickup_delivery_pair(sr)) for sr in auction_pool]
         # k_means = KMeans(n_clusters=instance.num_carriers, random_state=0).fit(request_midpoints)
         k_means = KMeans(n_clusters=instance.num_carriers).fit(request_midpoints)
@@ -76,7 +64,8 @@ class KMeansBundles_GHDecoding(BundleSetGenerationBehavior):
 
 
 class GeneticAlgorithm(BundleSetGenerationBehavior):
-    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool: Sequence):
+    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool: Sequence,
+                             original_bundles: List[int]):
         # parameters
         population_size = 100
         # n = len(auction_pool)  # will produce infeasible candidates for the WDP
@@ -91,11 +80,17 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
         population = []
         fitness = []
 
-        # initialize at least one k-means bundle that is likely to be feasible
-        k_means_individual = list(KMeansBundles_GHDecoding().execute(instance, solution, auction_pool))
+        # add the original bundling as the first candidate - this cannot be infeasible
+        self._normalize_individual(original_bundles)
+        population.append(original_bundles)
+        fitness.append(bv.GHProxyValuation(instance, solution, original_bundles, auction_pool))
+
+        # initialize at least one k-means bundle that is also likely to be feasible
+        k_means_individual = list(KMeansBundles().execute(instance, solution, auction_pool, None))
         self._normalize_individual(k_means_individual)
-        population.append(k_means_individual)
-        fitness.append(bv.GHProxyValuation(instance, solution, population[0], auction_pool))
+        if k_means_individual not in population:
+            population.append(k_means_individual)
+            fitness.append(bv.GHProxyValuation(instance, solution, k_means_individual, auction_pool))
 
         while len(population) < population_size - 1:
             individual = ut.random_max_k_partition_idx(auction_pool, n)
@@ -107,13 +102,13 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
                 fitness.append(bv.GHProxyValuation(instance, solution, individual, auction_pool))
 
         # genetic algorithm
-        generation_counter = 1
         best = ut.argmax(fitness)
-        print(f'Best in gen {generation_counter}:\n'
+        print(f'Best in gen 1:\n'
               f'Index: {best}\n'
               f'Fitness: {fitness[best]}\n'
               f'Chromosome: {population[best]}\n')
-        while generation_counter < num_generations:
+
+        for generation_counter in tqdm(range(1, num_generations)):
 
             # initialize new generation with the elites from the previous generation
             elites = ut.argsmax(fitness, int(population_size * (1 - generation_gap)))
@@ -121,7 +116,6 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
             new_fitness: List[int] = [fitness[i] for i in elites]
 
             offspring_counter = 0
-
             while offspring_counter < population_size * generation_gap:
 
                 # parent selection (get the parent's index first, then the actual parent string/chromosome)
@@ -164,18 +158,26 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
             fitness = new_fitness
             generation_counter += 1
 
-            # DEBUG
-            # for f, i in zip(population, fitness):
-            #     print(f, i)
             best = ut.argmax(fitness)
-            print(f'Best in gen {generation_counter}:\n'
-                  f'Index: {best}\n'
-                  f'Fitness: {fitness[best]}\n'
-                  f'Chromosome: {population[best]}\n')
 
-        print()
+        print(f'Best in gen {generation_counter}:\n'
+              f'Index: {best}\n'
+              f'Fitness: {fitness[best]}\n'
+              f'Chromosome: {population[best]}\n')
 
-    pass
+        # create the set of bundles that is offered in the auction (carrier must solve routing to place bids on these)
+        auction_pool_array = np.array(auction_pool)
+        bundle_pool = []
+        population_sorted = (b for b, f in sorted(zip(population, fitness)))
+        while len(bundle_pool) < ut.NUM_BUNDLES_TO_AUCTION:
+            candidate_solution = next(population_sorted)
+            candidate_solution = np.array(candidate_solution)
+            for bundle_idx in range(max(candidate_solution)):
+                bundle = auction_pool_array[candidate_solution == bundle_idx].tolist()
+                if bundle not in bundle_pool:
+                    bundle_pool.append(bundle)
+
+        return bundle_pool
 
     @staticmethod
     def _normalize_individual(individual: List[int]):
@@ -257,7 +259,7 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
 
         # merge two bundles if there are more bundles than allowed
         if max(offspring) >= instance.num_carriers:
-            rnd_bundle_1, rnd_bundle_2 = random.sample(range(0, max(offspring)+1), k=2)
+            rnd_bundle_1, rnd_bundle_2 = random.sample(range(0, max(offspring) + 1), k=2)
             for i in range(len(offspring)):
                 if offspring[i] == rnd_bundle_1:
                     offspring[i] = rnd_bundle_2
@@ -289,7 +291,7 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
 
         # merge two random bundles if the new exceeds the num_carriers
         if new_bundle_idx > instance.num_carriers:
-            rnd_bundle_1, rnd_bundle_2 = random.sample(range(0, new_bundle_idx+1), k=2)
+            rnd_bundle_1, rnd_bundle_2 = random.sample(range(0, new_bundle_idx + 1), k=2)
             for i in range(len(offspring)):
                 if offspring[i] == rnd_bundle_1:
                     offspring[i] = rnd_bundle_2
@@ -317,7 +319,8 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
 
 
 class ProxyTest(BundleSetGenerationBehavior):
-    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool: Sequence):
+    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool: Sequence,
+                             original_bundles):
         best_candidate_solution = None
         best_proxy_valuation = 0
 
@@ -338,28 +341,6 @@ class ProxyTest(BundleSetGenerationBehavior):
                     best_candidate_solution = candidate
                     best_proxy_valuation = valuation
 
-        return best_candidate_solution
-
-
-class ProxyTest2(BundleSetGenerationBehavior):
-    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool: Sequence):
-        candidate_generator = RandomMaxKPartition()
-        best_candidate_solution = None
-        best_proxy_valuation = 0
-
-        runs = 0
-        pbar = tqdm(total=runs + 1)
-        while best_proxy_valuation <= 0:
-            candidate = candidate_generator.execute(instance, solution, auction_pool)
-            valuation = bv.GHProxyValuation(instance, solution, candidate, auction_pool)
-
-            if valuation > best_proxy_valuation:
-                best_candidate_solution = candidate
-                best_proxy_valuation = valuation
-
-            runs += 1
-            pbar.update(1)
-        pbar.close()
         return best_candidate_solution
 
 

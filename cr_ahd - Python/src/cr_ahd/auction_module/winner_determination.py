@@ -66,6 +66,7 @@ class MaxBidGurobiCAP1(WinnerDeterminationBehavior):
                            bids_matrix: Sequence[Sequence[float]]):
         # a numpy array
         bids_matrix = np.array(bids_matrix)
+
         # bids as a tuple dict
         coeff = {(b, c): bids_matrix[b, c] for b in range(len(bundles)) for c in range(instance.num_carriers)}
 

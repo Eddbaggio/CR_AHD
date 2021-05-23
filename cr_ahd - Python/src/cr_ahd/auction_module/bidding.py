@@ -1,7 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import List
+from typing import List, Sequence
 
 from src.cr_ahd.core_module import instance as it, solution as slt
 from src.cr_ahd.routing_module import tour_construction as cns
@@ -11,7 +11,10 @@ logger = logging.getLogger(__name__)
 
 
 class BiddingBehavior(ABC):
-    def execute(self, instance: it.PDPInstance, solution: slt.GlobalSolution, bundles) -> List[List[float]]:
+    def execute(self,
+                instance: it.PDPInstance,
+                solution: slt.GlobalSolution,
+                bundles: Sequence[Sequence[int]]) -> List[List[float]]:
         """
         returns a nested list of bids. the first axis is the bundles, the second axis (inner lists) contain the carrier
         bids on that bundle:
@@ -28,7 +31,11 @@ class BiddingBehavior(ABC):
         return bundle_bids
 
     @abstractmethod
-    def _generate_bid(self, instance: it.PDPInstance, solution: slt.GlobalSolution, bundle: List[int], carrier: int):
+    def _generate_bid(self,
+                      instance: it.PDPInstance,
+                      solution: slt.GlobalSolution,
+                      bundle: Sequence[int],
+                      carrier: int):
         pass
 
 

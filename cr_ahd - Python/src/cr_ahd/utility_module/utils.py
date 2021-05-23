@@ -347,6 +347,7 @@ END_TIME = dt.datetime.min + dt.timedelta(minutes=3390)
 TW_LENGTH = dt.timedelta(hours=2)
 ALL_TW = [TimeWindow(e, min(e + TW_LENGTH, END_TIME)) for e in datetime_range(START_TIME, END_TIME, freq=TW_LENGTH)]
 TIME_HORIZON = TimeWindow(START_TIME, END_TIME)
-SPEED_KMH = 60
+SPEED_KMH = 60  # vehicle speed (set to 60 to treat distance = time)
 DYNAMIC_CYCLE_TIME = 5  # does not actually represent time but the number of requests being assigned each cycle
 NUM_REQUESTS_TO_SUBMIT = 3 / 5  # either relative (between 0 and 1) or an absolute number lower than DYNAMIC_CYCLE_TIME
+NUM_BUNDLES_TO_AUCTION = 50  # 100, 200, 300, 500
