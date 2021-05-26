@@ -41,7 +41,7 @@ opts = {
 
 # Solomon_Instances = [file[:-4] for file in os.listdir('..\\data\\Input\\Solomon')]
 path_project = Path(
-    'C:/Users/steff/CR_AHD')
+    'C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home Deliveries/01_Code/cr_ahd - Python')
 path_input = path_project.joinpath('data', 'Input')
 path_input_custom = path_input.joinpath('Custom')
 path_input_solomon = path_input.joinpath('Solomon')

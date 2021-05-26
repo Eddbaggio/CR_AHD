@@ -48,7 +48,9 @@ class Tour:
                f'Arrival:\t{[x.strftime("%d-%H:%M:%S") for x in self._arrival_schedule]}\n' \
                f'Service:\t{[x.strftime("%d-%H:%M:%S") for x in self._service_schedule]}\n' \
                f'Distance:\t{round(self.sum_travel_distance, 2)}\n' \
-               f'Duration:\t{self.sum_travel_duration} '
+               f'Duration:\t{self.sum_travel_duration}\n' \
+               f'Revenue:\t{self.sum_revenue}\n' \
+               f'Profit:\t\t{self.sum_profit}'
 
     def __len__(self):
         return len(self.routing_sequence)
@@ -225,7 +227,7 @@ class Tour:
             num_requests=instance.num_requests,
             distance_matrix=instance._distance_matrix,
             vertex_load=instance.load,
-            revenue=instance.load,
+            revenue=instance.revenue,
             service_duration=instance.service_duration,
             vehicles_max_travel_distance=instance.vehicles_max_travel_distance,
             vehicles_max_load=instance.vehicles_max_load,

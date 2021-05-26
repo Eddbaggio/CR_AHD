@@ -40,8 +40,8 @@ class StaticSolver(Solver):
             self.run_auction(instance, solution)
 
         # build tours with the re-allocated requests
+        self.initialize_pendulum_tours(instance, solution)
         self.build_tours(instance, solution)
-
         self.finalize_with_local_search(instance, solution)
 
     pass
@@ -65,6 +65,7 @@ class StaticSolver(Solver):
 
     def finalize_with_local_search(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         imp.PDPMoveBest().improve_global_solution(instance, solution)
+        # imp.PDPTwoOptBest().improve_global_solution(instance, solution)
         # imp.PDPExchangeMoveBest().improve_global_solution(instance, solution)
         pass
 
@@ -95,7 +96,7 @@ class StaticCollaborative(StaticSolver):
         cns.CheapestPDPInsertion().construct(instance, solution)
 
     def run_auction(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
-        au.AuctionC().execute(instance, solution)
+        au.AuctionD().execute(instance, solution)
 
 
 class StaticCollaborativeAHD(StaticSolver):

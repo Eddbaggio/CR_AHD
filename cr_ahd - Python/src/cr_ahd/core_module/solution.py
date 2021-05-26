@@ -30,6 +30,14 @@ class GlobalSolution:
         self.solution_algorithm = None
         self.auction_mechanism = None
 
+    def __str__(self):
+        s = f'Solution {self.id_}'
+        s += '\n'
+        for c in self.carriers:
+            s += str(c)
+            s += '\n'
+        return s
+
     @property
     def unrouted_requests(self):
         return set().union(*[c.unrouted_requests for c in self.carriers])
@@ -102,6 +110,14 @@ class PDPSolution:
         self.tours: List[tr.Tour] = []
 
         # self.solution_algorithm = None
+
+    def __str__(self):
+        s = f'Carrier {self.id_}'
+        s += '\n'
+        for tour_ in self.tours:
+            s += str(tour_)
+            s += '\n'
+        return s
 
     def num_routing_stops(self):
         return sum(t.num_routing_stops for t in self.tours)
