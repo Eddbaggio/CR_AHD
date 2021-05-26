@@ -31,10 +31,6 @@ class StaticSolver(Solver):
         # assign all requests to their corresponding carrier
         self.assign_all_requests(instance, solution)
 
-        # todo: why pendulum tours? this prohibits me from submitting these seed requests to the auction pool. Also
-        #  it seems that the seed requests are not removed from the 'unrouted' list
-        # self.initialize_pendulum_tours(instance, solution)
-
         # skip auction for centralized instances
         if instance.num_carriers > 1:
             self.run_auction(instance, solution)

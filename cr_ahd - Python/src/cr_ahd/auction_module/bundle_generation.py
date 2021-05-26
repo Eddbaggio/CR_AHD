@@ -103,10 +103,10 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
 
         # genetic algorithm
         best = ut.argmax(fitness)
-        print(f'Best in gen 1:\n'
-              f'Index: {best}\n'
-              f'Fitness: {fitness[best]}\n'
-              f'Chromosome: {population[best]}\n')
+        # print(f'Best in gen 1:\n'
+        #       f'Index: {best}\n'
+        #       f'Fitness: {fitness[best]}\n'
+        #       f'Chromosome: {population[best]}\n')
 
         for generation_counter in tqdm(range(1, num_generations)):
 
@@ -160,10 +160,10 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
 
             best = ut.argmax(fitness)
 
-        print(f'Best in gen {generation_counter}:\n'
-              f'Index: {best}\n'
-              f'Fitness: {fitness[best]}\n'
-              f'Chromosome: {population[best]}\n')
+        # print(f'Best in gen {generation_counter}:\n'
+        #       f'Index: {best}\n'
+        #       f'Fitness: {fitness[best]}\n'
+        #       f'Chromosome: {population[best]}\n')
 
         # create the set of bundles that is offered in the auction (carrier must solve routing to place bids on these)
         auction_pool_array = np.array(auction_pool)

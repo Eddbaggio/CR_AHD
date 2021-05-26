@@ -350,4 +350,4 @@ TIME_HORIZON = TimeWindow(START_TIME, END_TIME)
 SPEED_KMH = 60  # vehicle speed (set to 60 to treat distance = time)
 DYNAMIC_CYCLE_TIME = 5  # does not actually represent time but the number of requests being assigned each cycle
 NUM_REQUESTS_TO_SUBMIT = 3 / 5  # either relative (between 0 and 1) or an absolute number lower than DYNAMIC_CYCLE_TIME
-NUM_BUNDLES_TO_AUCTION = 50  # 100, 200, 300, 500
+NUM_BUNDLES_TO_AUCTION = 50  # 50, 100, 200, 300, 500
