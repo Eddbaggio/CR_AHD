@@ -66,6 +66,7 @@ class MaxBidGurobiCAP1(WinnerDeterminationBehavior):
                            bids_matrix: Sequence[Sequence[float]]):
         # a numpy array
         bids_matrix = np.array(bids_matrix)
+        bids_matrix[bids_matrix == -float('inf')] = -GRB.INFINITY
 
         # bids as a tuple dict
         coeff = {(b, c): bids_matrix[b, c] for b in range(len(bundles)) for c in range(instance.num_carriers)}
@@ -95,6 +96,7 @@ class MaxBidGurobiCAP1(WinnerDeterminationBehavior):
         # solve
         m.write(str(ut.path_output_gansterer.joinpath('WDP.lp')))
         m.optimize()
+        assert m.Status == GRB.OPTIMAL
 
         winner_bundles = []
         bundle_winners = []

@@ -30,8 +30,8 @@ def execute_all(instance: it.PDPInstance):
 
     for solver in [
         # slv.Static,
-        # slv.StaticCollaborative,
-        slv.StaticCollaborativeAHD,
+        slv.StaticCollaborative,
+        # slv.StaticCollaborativeAHD,
         # slv.Dynamic,
         # slv.DynamicCollaborative,
         # slv.DynamicAHD,

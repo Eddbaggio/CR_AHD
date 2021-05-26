@@ -31,15 +31,12 @@ class StaticSolver(Solver):
         # assign all requests to their corresponding carrier
         self.assign_all_requests(instance, solution)
 
-        # todo: why pendulum tours? this prohibits me from submitting these seed requests to the auction pool. Also
-        #  it seems that the seed requests are not removed from the 'unrouted' list
-        # self.initialize_pendulum_tours(instance, solution)
-
         # skip auction for centralized instances
         if instance.num_carriers > 1:
             self.run_auction(instance, solution)
 
         # build tours with the re-allocated requests
+        self.initialize_pendulum_tours(instance, solution)
         self.build_tours(instance, solution)
 
         self.finalize_with_local_search(instance, solution)
@@ -95,7 +92,7 @@ class StaticCollaborative(StaticSolver):
         cns.CheapestPDPInsertion().construct(instance, solution)
 
     def run_auction(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
-        au.AuctionC().execute(instance, solution)
+        au.AuctionD().execute(instance, solution)
 
 
 class StaticCollaborativeAHD(StaticSolver):
