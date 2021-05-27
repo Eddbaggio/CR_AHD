@@ -5,7 +5,7 @@ from typing import Iterable, Sequence, List, Callable
 
 import numpy as np
 from sklearn.cluster import KMeans
-from tqdm import tqdm
+import tqdm
 
 from src.cr_ahd.auction_module import bundle_valuation as bv
 from src.cr_ahd.core_module import instance as it, solution as slt
@@ -108,7 +108,7 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
         #       f'Fitness: {fitness[best]}\n'
         #       f'Chromosome: {population[best]}\n')
 
-        for generation_counter in tqdm(range(1, num_generations)):
+        for generation_counter in tqdm.trange(1, num_generations, desc='Bundle Generation'):
 
             # initialize new generation with the elites from the previous generation
             elites = ut.argsmax(fitness, int(population_size * (1 - generation_gap)))
@@ -300,12 +300,14 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
     @staticmethod
     def _mutation_join(instance: it.PDPInstance, solution: slt.GlobalSolution, offspring: List[int]):
         """
-        Two randomly chosen bundles are merged.
+        Two randomly chosen bundles are merged. If the offspring has only a single bundle, nothing happens
         """
-        rnd_bundle_1, rnd_bundle_2 = random.sample(range(0, max(offspring) + 1), k=2)  # todo check the range
-        for i in range(len(offspring)):
-            if offspring[i] == rnd_bundle_1:
-                offspring[i] = rnd_bundle_2
+        num_bundles = max(offspring)
+        if num_bundles >= 2:
+            rnd_bundle_1, rnd_bundle_2 = random.sample(range(0, num_bundles + 1), k=2)
+            for i in range(len(offspring)):
+                if offspring[i] == rnd_bundle_1:
+                    offspring[i] = rnd_bundle_2
         pass
 
     @staticmethod
@@ -334,7 +336,7 @@ class ProxyTest(BundleSetGenerationBehavior):
         # generate all partitions of size [2, 3, 4, ... instance.num_carriers] i.e. all possible candidate solutions
         for k in range(2, instance.num_carriers + 1):
             candidate_generator = algorithm_u(auction_pool, k)
-            for candidate in tqdm(candidate_generator, total=stirling_second(len(auction_pool), instance.num_carriers)):
+            for candidate in tqdm.tqdm(candidate_generator, total=stirling_second(len(auction_pool), instance.num_carriers)):
                 valuation = bv.GHProxyValuation(instance, solution, candidate, auction_pool)
 
                 if valuation > best_proxy_valuation:

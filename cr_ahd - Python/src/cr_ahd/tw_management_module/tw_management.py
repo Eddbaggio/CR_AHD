@@ -9,7 +9,33 @@ from src.cr_ahd.tw_management_module import tw_offering as two, tw_selection as 
 logger = logging.getLogger(__name__)
 
 
-class TWManagement(abc.ABC):
+class TWManagementSingle:
+    """
+    handles a single request/customer at a time. a new routing is required after each call to this class'
+    execute function! Requests must also be assigned one at a time
+    """
+
+    def execute(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
+        carrier_ = solution.carriers[carrier]
+        assert len(carrier_.unrouted_requests) == 1, f'For the "Single" version of the TWM, only one request can be' \
+                                                     f'handled at a time'
+        request = carrier_.unrouted_requests[0]
+        offer_set = two.FeasibleTW().execute(instance, solution, carrier, request)  # which TWs to offer?
+        selected_tw = tws.UniformPreference().execute(offer_set, request)  # which TW is selected?
+
+        # set the TW open and close times
+        pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
+        solution.tw_open[delivery_vertex] = selected_tw.open
+        solution.tw_close[delivery_vertex] = selected_tw.close
+
+    pass
+
+
+class TWManagementMultiple(abc.ABC):
+    """
+    can handle multiple unrouted requests incrementally but requires a temporary copy to do so
+    """
+
     def execute(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
         for carrier in range(instance.num_carriers):
 
@@ -32,7 +58,8 @@ class TWManagement(abc.ABC):
                 solution.tw_close[delivery_vertex] = selected_tw.close
                 # execute the insertion. this must be done in twm since twm is done in batches
                 pdp_insertion = cns.CheapestPDPInsertion()
-                insertion_operation = pdp_insertion._carrier_cheapest_insertion(instance, solution, tmp_carrier, [request])
+                insertion_operation = pdp_insertion._carrier_cheapest_insertion(instance, solution, tmp_carrier,
+                                                                                [request])
 
                 if insertion_operation[1] is None:
                     pdp_insertion._create_new_tour_with_request(instance, solution, tmp_carrier, request)
@@ -53,8 +80,9 @@ class TWManagement(abc.ABC):
         pass
 
 
-class TWManagement0(TWManagement):
+class TWManagementMultiple0(TWManagementMultiple):
     """carrier: offer all feasible time windows, customer: select a random time window from the offered set"""
+
     def _get_offer_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, request: int):
         return two.FeasibleTW().execute(instance, solution, carrier, request)
 

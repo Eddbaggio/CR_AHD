@@ -5,7 +5,7 @@ import src.cr_ahd.utility_module.utils as ut
 from src.cr_ahd.auction_module import request_selection as rs, bundle_generation as bg, bidding as bd, \
     winner_determination as wd
 from src.cr_ahd.core_module import instance as it, solution as slt
-from src.cr_ahd.routing_module import tour_construction as cns
+from src.cr_ahd.routing_module import tour_construction as cns, tour_initialization as ini
 import logging
 
 logger = logging.getLogger(__name__)
@@ -24,12 +24,13 @@ class Auction(ABC):
         auction_pool, original_bundles = self._request_selection(instance, solution, ut.NUM_REQUESTS_TO_SUBMIT)
 
         if auction_pool:
-            # add the requests to the tours that have not been submitted for auction
+            # add the requests (that have not been submitted for auction) to the tours
             logger.debug(f'requests {auction_pool} have been submitted to the auction pool')
             logger.debug(f'routing non-submitted requests {[c.unrouted_requests for c in solution.carriers]}')
             self._route_unsubmitted(instance, solution)
 
             # Bundle Generation
+            # todo bundles should be a list of bundle indices rather than a list of lists of request indices
             bundles = self._bundle_generation(instance, solution, auction_pool, original_bundles)
             logger.debug(f'bundles {bundles} have been created')
 
@@ -148,6 +149,7 @@ class AuctionD(Auction):
         return rs.Cluster().execute(instance, solution, ut.NUM_REQUESTS_TO_SUBMIT)
 
     def _route_unsubmitted(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+        ini.FurthestDistance().execute(instance, solution)
         cns.CheapestPDPInsertion().construct(instance, solution)
 
     def _bundle_generation(self, instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool,

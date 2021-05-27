@@ -21,22 +21,23 @@ class TourInitializationBehavior(ABC):
 
     def _initialize_carrier(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
         carrier_ = solution.carriers[carrier]
-        best_request = None
-        best_evaluation = -float('inf')
-        for request in carrier_.unrouted_requests:
-            evaluation = self._request_evaluation(*instance.pickup_delivery_pair(request),
-                                                  **{'x_depot': instance.x_coords[carrier],
-                                                     'y_depot': instance.y_coords[carrier],
-                                                     'x_coords': instance.x_coords,
-                                                     'y_coords': instance.y_coords,
-                                                     })
-            if evaluation > best_evaluation:
-                best_request = request
-                best_evaluation = evaluation
-        tour = tr.Tour(carrier, instance, solution, carrier)
-        tour.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(best_request))
-        carrier_.tours.append(tour)
-        carrier_.unrouted_requests.remove(best_request)
+        if carrier_.unrouted_requests:
+            best_request = None
+            best_evaluation = -float('inf')
+            for request in carrier_.unrouted_requests:
+                evaluation = self._request_evaluation(*instance.pickup_delivery_pair(request),
+                                                      **{'x_depot': instance.x_coords[carrier],
+                                                         'y_depot': instance.y_coords[carrier],
+                                                         'x_coords': instance.x_coords,
+                                                         'y_coords': instance.y_coords,
+                                                         })
+                if evaluation > best_evaluation:
+                    best_request = request
+                    best_evaluation = evaluation
+            tour = tr.Tour(carrier, instance, solution, carrier)
+            tour.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(best_request))
+            carrier_.tours.append(tour)
+            carrier_.unrouted_requests.remove(best_request)
         pass
 
     @abstractmethod

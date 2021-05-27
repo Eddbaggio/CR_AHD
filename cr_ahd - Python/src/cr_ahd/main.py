@@ -30,12 +30,13 @@ def execute_all(instance: it.PDPInstance):
 
     for solver in [
         # slv.Static,
-        slv.StaticCollaborative,
+        # slv.StaticCollaborative,
         # slv.StaticCollaborativeAHD,
         # slv.Dynamic,
         # slv.DynamicCollaborative,
         # slv.DynamicAHD,
         # slv.DynamicCollaborativeAHD
+        slv.DynamicCollaborativeAHDSingleAuction
     ]:
         solution = slt.GlobalSolution(instance)
         if instance.num_carriers == 1 and 'Auction' in solver.__name__:
@@ -114,7 +115,7 @@ if __name__ == '__main__':
     logger.info('START')
 
     # paths = [Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/test.dat')]
-    paths = list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir())[4:5]
+    paths = list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir())[1:2]
     for path in paths:
         read_and_execute_all(path)
     # df = read_and_execute_all_parallel(paths)

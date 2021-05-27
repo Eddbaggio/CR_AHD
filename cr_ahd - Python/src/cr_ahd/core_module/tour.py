@@ -445,7 +445,7 @@ def update_sequences_and_schedules(
         travel_dist = distance_matrix[predecessor_vertex][vertex]
         total_travel_dist += travel_dist
         if total_travel_dist > vehicles_max_travel_distance:
-            message = f'{total_travel_dist} too long'
+            message = f'Distance {total_travel_dist} too long'
             logger.error(message)
             raise ut.ConstraintViolationError(message, message)
 
@@ -460,7 +460,7 @@ def update_sequences_and_schedules(
         # check load constraints
         load += vertex_load[vertex]
         if load > vehicles_max_load:
-            message = f'{load} to high'
+            message = f'Load {load} to high'
             logger.error(message)
             raise ut.ConstraintViolationError(message, message)
 

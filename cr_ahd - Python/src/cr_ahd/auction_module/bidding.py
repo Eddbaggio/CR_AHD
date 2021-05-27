@@ -3,6 +3,8 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import List, Sequence
 
+import tqdm
+
 from src.cr_ahd.core_module import instance as it, solution as slt
 from src.cr_ahd.routing_module import tour_construction as cns
 from src.cr_ahd.utility_module.utils import ConstraintViolationError
@@ -21,7 +23,7 @@ class BiddingBehavior(ABC):
 
         """
         bundle_bids = []
-        for b in range(len(bundles)):
+        for b in tqdm.trange(len(bundles), desc='Bidding'):
             carrier_bundle_bids = []
             for carrier in range(instance.num_carriers):
                 logger.debug(f'Carrier {carrier} generating bids for bundle {b}')
@@ -41,10 +43,12 @@ class BiddingBehavior(ABC):
 
 class CheapestInsertionDistanceIncrease(BiddingBehavior):
     def _generate_bid(self, instance: it.PDPInstance, solution: slt.GlobalSolution, bundle: List[int], carrier: int):
-        before = solution.carriers[carrier].sum_travel_distance()
+        without_bundle = solution.carriers[carrier].sum_travel_distance()
+
         # TODO: can I avoid the copy here? Only if I make cns.CheapestInsertion()._carrier_cheapest_insertion return
         #  the delta for the cheapest insertion of ALL (!) the requests in the bundle, which is quite impossible because
         #  the cheapest insertion of one request in the bundle depends on the previous insertion
+        #  Alternatively, add the bundle to the original carrier, do the routing, and remove it again?!
         tmp_carrier = instance.num_carriers
         tmp_carrier_ = deepcopy(solution.carriers[carrier])
         tmp_carrier_.unrouted_requests.extend(bundle)
@@ -65,12 +69,12 @@ class CheapestInsertionDistanceIncrease(BiddingBehavior):
                     construction._execute_insertion(instance, solution, tmp_carrier, request, tour, pickup_pos,
                                                     delivery_pos)
 
-            after = tmp_carrier_.sum_travel_distance()
+            with_bundle = tmp_carrier_.sum_travel_distance()
         except ConstraintViolationError:
-            after = float('inf')
+            with_bundle = float('inf')
         finally:
             solution.carriers.pop()  # del the temporary carrier copy
-        return after - before
+        return with_bundle - without_bundle
 
 
 class Profit(BiddingBehavior):
