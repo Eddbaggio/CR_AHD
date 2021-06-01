@@ -2,10 +2,10 @@ from src.cr_ahd.core_module import instance as it, solution as slt
 
 
 class TestGlobalSolution:
-    def test_unrouted_requests(self, sol_gh_0: slt.GlobalSolution):
+    def test_unrouted_requests(self, sol_gh_0: slt.CAHDSolution):
         assert sol_gh_0.unrouted_requests == list(range(15))
 
-    def test_assign_requests_to_carriers(self, sol_gh_0: slt.GlobalSolution):
+    def test_assign_requests_to_carriers(self, sol_gh_0: slt.CAHDSolution):
         solution = sol_gh_0
         req = [1, 5, 6, 14]
         carrier = [2, 0, 1, 1]

@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class WinnerDeterminationBehavior(ABC):
     def execute(self,
                 instance: it.PDPInstance,
-                solution: slt.GlobalSolution,
+                solution: slt.CAHDSolution,
                 auction_pool,
                 bundles: Sequence,
                 bids_matrix: Sequence):
@@ -32,7 +32,7 @@ class WinnerDeterminationBehavior(ABC):
     @abstractmethod
     def _determine_winners(self,
                            instance: it.PDPInstance,
-                           solution: slt.GlobalSolution,
+                           solution: slt.CAHDSolution,
                            auction_pool: Sequence[int],
                            bundles: Sequence[Sequence[int]],
                            bids_matrix: Sequence[Sequence[float]]):
@@ -60,7 +60,7 @@ class MaxBidGurobiCAP1(WinnerDeterminationBehavior):
 
     def _determine_winners(self,
                            instance: it.PDPInstance,
-                           solution: slt.GlobalSolution,
+                           solution: slt.CAHDSolution,
                            auction_pool: Sequence[int],
                            bundles: Sequence[Sequence[int]],
                            bids_matrix: Sequence[Sequence[float]]):
@@ -72,7 +72,7 @@ class MaxBidGurobiCAP1(WinnerDeterminationBehavior):
         coeff = {(b, c): bids_matrix[b, c] for b in range(len(bundles)) for c in range(instance.num_carriers)}
 
         # model
-        m = gp.Model(name="Set Packing/Covering/Partitioning Problem")
+        m = gp.Model(name="Set Partitioning Problem")
         m.setParam('OutputFlag', 0)
 
         # variables: bundle-to-bidder assignment
@@ -82,6 +82,8 @@ class MaxBidGurobiCAP1(WinnerDeterminationBehavior):
         m.setObjective(y.prod(coeff), GRB.MAXIMIZE)
 
         # constraints: each request is assigned to exactly one carrier
+        # (set covering: assigned to at least one carrier
+        # set packing: assigned to at most one carrier)
         for request in auction_pool:
             expr = gp.LinExpr()
             for b, bundle in enumerate(bundles):
@@ -94,7 +96,7 @@ class MaxBidGurobiCAP1(WinnerDeterminationBehavior):
             m.addLConstr(y.sum('*', c), GRB.LESS_EQUAL, 1, f'single bundle {c}')
 
         # solve
-        m.write(str(ut.path_output_gansterer.joinpath('WDP.lp')))
+        m.write(str(ut.output_dir_GH.joinpath('WDP.lp')))
         m.optimize()
         assert m.Status == GRB.OPTIMAL
 
@@ -122,7 +124,7 @@ class MaxBidGurobiCAP2(WinnerDeterminationBehavior):
 
     def _determine_winners(self,
                            instance: it.PDPInstance,
-                           solution: slt.GlobalSolution,
+                           solution: slt.CAHDSolution,
                            auction_pool: Sequence[int],
                            bundles: Sequence[Sequence[int]],
                            bids_matrix: Sequence[Sequence[float]]):

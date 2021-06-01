@@ -15,13 +15,13 @@ class TWManagementSingle:
     execute function! Requests must also be assigned one at a time
     """
 
-    def execute(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
+    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
         carrier_ = solution.carriers[carrier]
         assert len(carrier_.unrouted_requests) == 1, f'For the "Single" version of the TWM, only one request can be' \
                                                      f'handled at a time'
         request = carrier_.unrouted_requests[0]
         offer_set = two.FeasibleTW().execute(instance, solution, carrier, request)  # which TWs to offer?
-        selected_tw = tws.UniformPreference().execute(offer_set, request)  # which TW is selected?
+        selected_tw = tws.UnequalPreference().execute(offer_set, request)  # which TW is selected?
 
         # set the TW open and close times
         pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
@@ -33,10 +33,11 @@ class TWManagementSingle:
 
 class TWManagementMultiple(abc.ABC):
     """
-    can handle multiple unrouted requests incrementally but requires a temporary copy to do so
+    can handle multiple unrouted requests incrementally but requires a temporary copy to do so. Not the most elegant way
+    , thus I currently suggest using the Single version if possible
     """
 
-    def execute(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         for carrier in range(instance.num_carriers):
 
             # need a temp copy of the carrier to get TW offerings for *multiple* requests (which i need due to the way
@@ -72,7 +73,7 @@ class TWManagementMultiple(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def _get_offer_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, request: int):
+    def _get_offer_set(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
         pass
 
     @abc.abstractmethod
@@ -83,7 +84,7 @@ class TWManagementMultiple(abc.ABC):
 class TWManagementMultiple0(TWManagementMultiple):
     """carrier: offer all feasible time windows, customer: select a random time window from the offered set"""
 
-    def _get_offer_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, request: int):
+    def _get_offer_set(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
         return two.FeasibleTW().execute(instance, solution, carrier, request)
 
     def _get_selected_tw(self, offer_set, request: int):

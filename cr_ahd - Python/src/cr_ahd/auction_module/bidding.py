@@ -6,7 +6,7 @@ from typing import List, Sequence
 import tqdm
 
 from src.cr_ahd.core_module import instance as it, solution as slt
-from src.cr_ahd.routing_module import tour_construction as cns
+from src.cr_ahd.routing_module import tour_construction as cns, tour_improvement as imp
 from src.cr_ahd.utility_module.utils import ConstraintViolationError
 
 logger = logging.getLogger(__name__)
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class BiddingBehavior(ABC):
     def execute(self,
                 instance: it.PDPInstance,
-                solution: slt.GlobalSolution,
+                solution: slt.CAHDSolution,
                 bundles: Sequence[Sequence[int]]) -> List[List[float]]:
         """
         returns a nested list of bids. the first axis is the bundles, the second axis (inner lists) contain the carrier
@@ -23,7 +23,7 @@ class BiddingBehavior(ABC):
 
         """
         bundle_bids = []
-        for b in tqdm.trange(len(bundles), desc='Bidding'):
+        for b in tqdm.trange(len(bundles), desc='Bidding', disable=False):
             carrier_bundle_bids = []
             for carrier in range(instance.num_carriers):
                 logger.debug(f'Carrier {carrier} generating bids for bundle {b}')
@@ -35,20 +35,19 @@ class BiddingBehavior(ABC):
     @abstractmethod
     def _generate_bid(self,
                       instance: it.PDPInstance,
-                      solution: slt.GlobalSolution,
+                      solution: slt.CAHDSolution,
                       bundle: Sequence[int],
                       carrier: int):
         pass
 
 
 class CheapestInsertionDistanceIncrease(BiddingBehavior):
-    def _generate_bid(self, instance: it.PDPInstance, solution: slt.GlobalSolution, bundle: List[int], carrier: int):
+    def _generate_bid(self, instance: it.PDPInstance, solution: slt.CAHDSolution, bundle: List[int], carrier: int):
+        # travel distance without the bundle
         without_bundle = solution.carriers[carrier].sum_travel_distance()
 
-        # TODO: can I avoid the copy here? Only if I make cns.CheapestInsertion()._carrier_cheapest_insertion return
-        #  the delta for the cheapest insertion of ALL (!) the requests in the bundle, which is quite impossible because
-        #  the cheapest insertion of one request in the bundle depends on the previous insertion
-        #  Alternatively, add the bundle to the original carrier, do the routing, and remove it again?!
+        # calculate the travel distance with the bundle's request included. Must happen from scratch to ensure the same
+        # result as in the acceptance phase
         tmp_carrier = instance.num_carriers
         tmp_carrier_ = deepcopy(solution.carriers[carrier])
         tmp_carrier_.unrouted_requests.extend(bundle)
@@ -69,6 +68,9 @@ class CheapestInsertionDistanceIncrease(BiddingBehavior):
                     construction._execute_insertion(instance, solution, tmp_carrier, request, tour, pickup_pos,
                                                     delivery_pos)
 
+                # local search
+                imp.PDPMoveBestImpr().improve_carrier_solution_first_improvement(instance, solution, tmp_carrier)
+
             with_bundle = tmp_carrier_.sum_travel_distance()
         except ConstraintViolationError:
             with_bundle = float('inf')
@@ -78,7 +80,7 @@ class CheapestInsertionDistanceIncrease(BiddingBehavior):
 
 
 class Profit(BiddingBehavior):
-    def _generate_bid(self, instance: it.PDPInstance, solution: slt.GlobalSolution, bundle: List[int], carrier: int):
+    def _generate_bid(self, instance: it.PDPInstance, solution: slt.CAHDSolution, bundle: List[int], carrier: int):
         ins_cost = CheapestInsertionDistanceIncrease()._generate_bid(instance, solution, bundle, carrier)
         ins_revenue = 0
         for r in bundle:

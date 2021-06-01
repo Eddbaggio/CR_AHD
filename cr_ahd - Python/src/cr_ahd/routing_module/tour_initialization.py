@@ -14,12 +14,12 @@ class TourInitializationBehavior(ABC):
     or a single specific carrier. Contrary to the routing visitor, this one will only allocate a single seed request
     """
 
-    def execute(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         for carrier in range(instance.num_carriers):
             self._initialize_carrier(instance, solution, carrier)
         pass
 
-    def _initialize_carrier(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
+    def _initialize_carrier(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
         carrier_ = solution.carriers[carrier]
         if carrier_.unrouted_requests:
             best_request = None
@@ -34,7 +34,7 @@ class TourInitializationBehavior(ABC):
                 if evaluation > best_evaluation:
                     best_request = request
                     best_evaluation = evaluation
-            tour = tr.Tour(carrier, instance, solution, carrier)
+            tour = tr.Tour(carrier_.num_tours(), instance, solution, carrier)
             tour.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(best_request))
             carrier_.tours.append(tour)
             carrier_.unrouted_requests.remove(best_request)

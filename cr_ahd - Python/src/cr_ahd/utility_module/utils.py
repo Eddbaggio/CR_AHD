@@ -39,15 +39,12 @@ opts = {
     'ccycler': plt.cycler(color=plt.get_cmap('Set1').colors)(),
 }
 
-# Solomon_Instances = [file[:-4] for file in os.listdir('..\\data\\Input\\Solomon')]
-path_project = Path(
-    'C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home Deliveries/01_Code/cr_ahd - Python')
-path_input = path_project.joinpath('data', 'Input')
-path_input_custom = path_input.joinpath('Custom')
-path_input_solomon = path_input.joinpath('Solomon')
-path_output = path_project.joinpath('data', 'Output')
-path_output_custom = path_output.joinpath('Custom')
-path_output_gansterer = path_output.joinpath('Gansterer_Hartl')
+working_dir = Path()
+data_dir = working_dir.absolute().parent.parent.parent.joinpath('data')
+input_dir = data_dir.joinpath('Input')
+
+output_dir = data_dir.joinpath('Output')
+output_dir_GH = output_dir.joinpath('Gansterer_Hartl')
 
 # alpha 100%
 univie_colors_100 = [
@@ -344,10 +341,11 @@ def datetime_range(start: dt.datetime, end: dt.datetime, freq: dt.timedelta, inc
 random.seed(0)
 START_TIME = dt.datetime.min
 END_TIME = dt.datetime.min + dt.timedelta(minutes=3390)
+# END_TIME = dt.datetime.min + dt.timedelta(days=1)
 TW_LENGTH = dt.timedelta(hours=2)
 ALL_TW = [TimeWindow(e, min(e + TW_LENGTH, END_TIME)) for e in datetime_range(START_TIME, END_TIME, freq=TW_LENGTH)]
 TIME_HORIZON = TimeWindow(START_TIME, END_TIME)
 SPEED_KMH = 60  # vehicle speed (set to 60 to treat distance = time)
 DYNAMIC_CYCLE_TIME = 5  # does not actually represent time but the number of requests being assigned each cycle
-NUM_REQUESTS_TO_SUBMIT = 3 / 5  # either relative (between 0 and 1) or an absolute number lower than DYNAMIC_CYCLE_TIME
-NUM_BUNDLES_TO_AUCTION = 50  # 50, 100, 200, 300, 500
+NUM_REQUESTS_TO_SUBMIT = 0.6  # either relative (between 0 and 1) OR an absolute number <= DYNAMIC_CYCLE_TIME
+AUCTION_POOL_SIZE = 50  # 50, 100, 200, 300, 500

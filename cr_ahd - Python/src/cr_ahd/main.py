@@ -21,7 +21,7 @@ logging.config.dictConfig(log.LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
 
 
-def execute_all(instance: it.PDPInstance):
+def execute_all(instance: it.PDPInstance, plot=False):
     """
     :param instance: (custom) instance that will we (deep)copied for each algorithm
     :return: evaluation metrics (Instance.evaluation_metrics) of all the solutions obtained
@@ -32,20 +32,28 @@ def execute_all(instance: it.PDPInstance):
         # slv.Static,
         # slv.StaticCollaborative,
         # slv.StaticCollaborativeAHD,
+
         # slv.Dynamic,
         # slv.DynamicCollaborative,
-        # slv.DynamicAHD,
-        # slv.DynamicCollaborativeAHD
-        slv.DynamicCollaborativeAHDSingleAuction
+        # slv.DynamicCollaborativeSingleAuction,
+
+        # slv.IsolatedPlanning,
+        # slv.DynamicCollaborativeAHD,
+        slv.CollaborativePlanning
     ]:
-        solution = slt.GlobalSolution(instance)
+        solution = slt.CAHDSolution(instance)
         if instance.num_carriers == 1 and 'Auction' in solver.__name__:
             continue  # skip auction solvers for centralized instances
-        logger.info(f'Solving {instance.id_} via {solver.__name__}')
+        logger.info(f'{instance.id_}: Solving via {solver.__name__} ...')
         solver().execute(instance, solution)
-        pl.plot_solution_2(instance, solution,
-                           title=f'{instance.id_} with Solver "{solver.__name__} - Total profit: {solution.sum_profit()}"',
-                           show=True)
+        logger.info(f'{instance.id_}: Successfully solved via {solver.__name__}')
+        if plot:
+            pl.plot_solution_2(
+                instance,
+                solution,
+                title=f'{instance.id_} with Solver "{solver.__name__} - Total profit: {solution.sum_profit()}"',
+                show=True
+            )
         solution.write_to_json()
         solutions.append(solution)
     return solutions
@@ -53,7 +61,7 @@ def execute_all(instance: it.PDPInstance):
 
 def read_and_execute_all(path: Path):
     log.remove_all_file_handlers(logging.getLogger())
-    log_file_path = ut.path_output_gansterer.joinpath(f'{path.stem}_log.log')
+    log_file_path = ut.output_dir_GH.joinpath(f'{path.stem}_log.log')
     log.add_file_handler(logging.getLogger(), str(log_file_path))
 
     instance = it.read_gansterer_hartl_mv(path)
@@ -61,19 +69,19 @@ def read_and_execute_all(path: Path):
     return solutions
 
 
+"""
 def read_and_execute_all_parallel(paths):
     with multiprocessing.Pool() as pool:
-        solutions = list(tqdm(pool.imap(read_and_execute_all, paths), total=len(paths)))
+        solutions = list(tqdm(pool.imap(read_and_execute_all, paths), total=len(paths), desc="Parallel Solving"))
     df = write_solutions_to_multiindex_df(solutions)
     return df
+"""
 
 
-def write_solutions_to_multiindex_df(solutions_per_instance: List[List[slt.GlobalSolution]]):
+def write_solutions_to_multiindex_df(solutions_per_instance: List[List[slt.CAHDSolution]]):
     """
 
-    :param solutions_per_instance: A List of Lists. Each sublist contains solutions for a specific instance, each of
-    them obtained from a different solution algorithm
-    :return:
+    :param solutions_per_instance: A List of Lists of solutions. First Axis: instance, Second Axis: solver
     """
     df = []
     for instance_solutions in solutions_per_instance:
@@ -94,29 +102,19 @@ def write_solutions_to_multiindex_df(solutions_per_instance: List[List[slt.Globa
         inplace=True)
     for column in df.select_dtypes(include=['timedelta64']):
         df[column] = df[column].dt.total_seconds()
-    df.to_csv(ut.unique_path(ut.path_output_gansterer, 'evaluation' + '_#{:03d}' + '.csv'))
-    df.to_excel(ut.unique_path(ut.path_output_gansterer, 'evaluation' + '_#{:03d}' + '.xlsx'), merge_cells=False)
+    df.to_csv(ut.unique_path(ut.output_dir_GH, 'evaluation' + '_#{:03d}' + '.csv'))
+    df.to_excel(ut.unique_path(ut.output_dir_GH, 'evaluation' + '_#{:03d}' + '.xlsx'), merge_cells=False)
     return df
-
-
-def get_custom_instance_paths(n, which: List):
-    """retrieve the Path to the first n custom instances
-    :param n: number of custom paths to retrieve, if None, then all available files are considered
-    :param which: List of customized solomon name instances to consider"""
-
-    custom_directories = (ut.path_input_custom.joinpath(s) for s in which)
-    custom_files_paths = []
-    for cd in custom_directories:
-        custom_files_paths.extend(list(cd.iterdir())[:n])
-    return custom_files_paths
 
 
 if __name__ == '__main__':
     logger.info('START')
 
     # paths = [Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/test.dat')]
-    paths = list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir())[1:2]
+    paths = list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir())[5:6]
+    solutions = []
     for path in paths:
-        read_and_execute_all(path)
-    # df = read_and_execute_all_parallel(paths)
+        solver_solutions = read_and_execute_all(path)  # does not include evaluation!
+        solutions.append(solver_solutions)
+    write_solutions_to_multiindex_df(solutions)
     logger.info('END')

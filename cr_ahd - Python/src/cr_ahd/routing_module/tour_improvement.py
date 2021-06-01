@@ -13,11 +13,11 @@ logger = logging.getLogger(__name__)
 class TourImprovementBehavior(ABC):
 
     @abstractmethod
-    def improve_global_solution(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+    def improve_global_solution(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         pass
 
     @abstractmethod
-    def improve_carrier_solution_first_improvement(self, instance: it.PDPInstance, solution: slt.GlobalSolution,
+    def improve_carrier_solution_first_improvement(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
                                                    carrier: int):
         pass
 
@@ -48,13 +48,13 @@ class PDPGradientDescent(TourImprovementBehavior):
 
 class PDPIntraTourLocalSearch(TourImprovementBehavior, ABC):
     @final
-    def improve_global_solution(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+    def improve_global_solution(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         for carrier in range(instance.num_carriers):
             self.improve_carrier_solution_first_improvement(instance, solution, carrier)
         pass
 
     @final
-    def improve_carrier_solution_first_improvement(self, instance: it.PDPInstance, solution: slt.GlobalSolution,
+    def improve_carrier_solution_first_improvement(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
                                                    carrier: int):
         for tour in range(solution.carriers[carrier].num_tours()):
             improved = True
@@ -68,7 +68,7 @@ class PDPIntraTourLocalSearch(TourImprovementBehavior, ABC):
         pass
 
     @abstractmethod
-    def feasibility_check(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, tour: int, move):
+    def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, tour: int, move):
         pass
 
     def acceptance_criterion(self, delta):  # acceptance criteria could even be their own class
@@ -78,11 +78,11 @@ class PDPIntraTourLocalSearch(TourImprovementBehavior, ABC):
             return False
 
     @abstractmethod
-    def execute_move(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, tour: int, move):
+    def execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, tour: int, move):
         pass
 
     @abstractmethod
-    def find_move(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, tour: int):
+    def find_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, tour: int):
         """
         :return: tuple containing all necessary information to see whether to accept a move and the information to
         execute a move. The first element must be the delta
@@ -91,7 +91,7 @@ class PDPIntraTourLocalSearch(TourImprovementBehavior, ABC):
 
 
 class PDPTwoOptBestImpr(PDPIntraTourLocalSearch):
-    def find_move(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, tour: int):
+    def find_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, tour: int):
         t = solution.carriers[carrier].tours[tour]
         best_pos_i = None
         best_pos_j = None
@@ -109,7 +109,7 @@ class PDPTwoOptBestImpr(PDPIntraTourLocalSearch):
                         best_delta = delta
         return best_delta, best_pos_i, best_pos_j
 
-    def feasibility_check(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, tour: int, move):
+    def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, tour: int, move):
         i, j = move
         tour_ = solution.carriers[carrier].tours[tour]
         arrival = tour_.arrival_schedule[i]
@@ -146,7 +146,7 @@ class PDPTwoOptBestImpr(PDPIntraTourLocalSearch):
         # if no feasibility check failed
         return True
 
-    def execute_move(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, tour: int, move):
+    def execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, tour: int, move):
         _, i, j = move
         solution.carriers[carrier].tours[tour].reverse_section(instance, solution, i, j)
 
@@ -168,7 +168,7 @@ class PDPMoveBestImpr(PDPIntraTourLocalSearch, ABC):
     Take a PD pair and see whether inserting it in a different location of the SAME route improves the solution
     """
 
-    def find_move(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, tour: int):
+    def find_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, tour: int):
         tour_ = solution.carriers[carrier].tours[tour]
 
         best_delta = 0
@@ -311,7 +311,7 @@ class PDPMoveBestImpr(PDPIntraTourLocalSearch, ABC):
         return best_move
         '''
 
-    def feasibility_check(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, tour: int, move):
+    def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, tour: int, move):
         delta, old_pickup_pos, old_delivery_pos, new_pickup_pos, new_delivery_pos = move
         tour_ = solution.carriers[carrier].tours[tour]
 
@@ -361,7 +361,7 @@ class PDPMoveBestImpr(PDPIntraTourLocalSearch, ABC):
 
         return True
 
-    def execute_move(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, tour: int, move):
+    def execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, tour: int, move):
         delta, old_pickup_pos, old_delivery_pos, new_pickup_pos, new_delivery_pos = move
         tour_ = solution.carriers[carrier].tours[tour]
 
@@ -378,7 +378,7 @@ class PDPMoveBestImpr(PDPIntraTourLocalSearch, ABC):
 
 class PDPInterTourLocalSearch(TourImprovementBehavior):
     @final
-    def improve_global_solution(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+    def improve_global_solution(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         for carrier in range(instance.num_carriers):
             improved = True
             while improved:
@@ -391,12 +391,12 @@ class PDPInterTourLocalSearch(TourImprovementBehavior):
         pass
 
     @final
-    def improve_carrier_solution_first_improvement(self, instance: it.PDPInstance, solution: slt.GlobalSolution,
+    def improve_carrier_solution_first_improvement(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
                                                    carrier: int):
         pass
 
     @abstractmethod
-    def feasibility_check(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, move):
+    def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move):
         """must be used in the find_move method"""
         pass
 
@@ -407,11 +407,11 @@ class PDPInterTourLocalSearch(TourImprovementBehavior):
             return False
 
     @abstractmethod
-    def execute_move(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, move):
+    def execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move):
         pass
 
     @abstractmethod
-    def find_move(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
+    def find_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
         """
         finds the best/first feasible move
 
@@ -427,7 +427,7 @@ class PDPExchangeMoveBest(PDPInterTourLocalSearch):
     BEST improvement for each PD request.
     """
 
-    def find_move(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
+    def find_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
         raise NotImplementedError
         carrier_ = solution.carriers[carrier]
 
@@ -494,7 +494,7 @@ class PDPExchangeMoveBest(PDPInterTourLocalSearch):
 
         return best_move
 
-    def feasibility_check(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, move):
+    def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move):
         # TODO check ALL constraints
         delta, old_tour, old_pickup_pos, old_delivery_pos, new_tour, new_pickup_pos, new_delivery_pos = move
         carrier_ = solution.carriers[carrier]
@@ -505,7 +505,7 @@ class PDPExchangeMoveBest(PDPInterTourLocalSearch):
                                                                      (carrier_.tours[old_tour].routing_sequence[
                                                                          old_delivery_pos])])
 
-    def execute_move(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, move):
+    def execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move):
         delta, old_tour, old_pickup_pos, old_delivery_pos, new_tour, new_pickup_pos, new_delivery_pos = move
         carrier_ = solution.carriers[carrier]
         carrier_.tours[old_tour].pop_and_update(instance, solution, [old_pickup_pos, old_delivery_pos])

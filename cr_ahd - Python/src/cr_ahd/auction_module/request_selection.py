@@ -10,7 +10,7 @@ from src.cr_ahd.routing_module import tour_construction as cns
 logger = logging.getLogger(__name__)
 
 
-def _abs_num_requests(carrier_: slt.PDPSolution, num_requests) -> int:
+def _abs_num_requests(carrier_: slt.AHDSolution, num_requests) -> int:
     """
     returns the absolute number of requests that a carrier shall submit, depending on whether it was initially
     given as an absolute int or a float (relative)
@@ -23,7 +23,7 @@ def _abs_num_requests(carrier_: slt.PDPSolution, num_requests) -> int:
 
 
 class RequestSelectionBehavior_individual(ABC):
-    def execute(self, instance: it.PDPInstance, solution: slt.GlobalSolution, num_requests):
+    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, num_requests):
         """
         select a set of requests based on the concrete selection behavior. will retract the requests from the carrier
         and return
@@ -52,7 +52,7 @@ class RequestSelectionBehavior_individual(ABC):
         return auction_pool, original_bundles
 
     @abstractmethod
-    def _evaluate_requests(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
+    def _evaluate_requests(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
         """
         compute the carrier's valuation for all unrouted requests of that carrier.
         NOTE: a high number corresponds to a high valuation
@@ -66,7 +66,7 @@ class Random(RequestSelectionBehavior_individual):
     returns a random selection of unrouted requests
     """
 
-    def _evaluate_requests(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
+    def _evaluate_requests(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
         return np.random.random(len(solution.carriers[carrier].unrouted_requests))
 
 
@@ -75,7 +75,7 @@ class HighestInsertionCostDistance(RequestSelectionBehavior_individual):
      NOTE: since routes may not be final, the current highest-marginal-cost request might not have been chosen at an
      earlier or later stage!"""
 
-    def _evaluate_requests(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
+    def _evaluate_requests(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
         evaluation = []
         carrier_ = solution.carriers[carrier]
         for request in carrier_.unrouted_requests:
@@ -98,7 +98,7 @@ class HighestInsertionCostDistance(RequestSelectionBehavior_individual):
 
 
 class LowestProfit(RequestSelectionBehavior_individual):
-    def _evaluate_requests(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
+    def _evaluate_requests(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
         raise NotImplementedError
         # this is a wrong implementation of mProfit (Gansterer & Hartl / Berger & Bierwirth). It SHOULD be:
         # fulfillment costs = (tour costs with the request) - (tour costs without the request)
@@ -120,8 +120,12 @@ class PackedTW(RequestSelectionBehavior_individual):
     pass
 
 
+# =====================================================================================================================
+# BUNDLE-BASED EVALUATION
+# =====================================================================================================================
+
 class RequestSelectionBehavior_bundle(ABC):
-    def execute(self, instance: it.PDPInstance, solution: slt.GlobalSolution, num_requests):
+    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, num_requests):
         auction_pool = []
         original_bundles = []
 
@@ -155,7 +159,7 @@ class RequestSelectionBehavior_bundle(ABC):
         pass
 
     @abstractmethod
-    def _evaluate_bundle(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, bundle):
+    def _evaluate_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, bundle):
         pass
 
 
@@ -167,7 +171,7 @@ class Cluster(RequestSelectionBehavior_bundle):
         """
         return itertools.combinations(solution.carriers[carrier].unrouted_requests, k)
 
-    def _evaluate_bundle(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, bundle):
+    def _evaluate_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, bundle):
         """
         the sum of travel distances of all pairs of requests in this cluster, where the travel distance of a request
         pair is defined as the distance between their origins (pickup locations) plus the distance between

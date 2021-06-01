@@ -15,12 +15,12 @@ class TourConstructionBehavior(ABC):
         pass
 
     @abstractmethod
-    def construct(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+    def construct(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         pass
 
 
-class PDPInsertionConstruction(TourConstructionBehavior):
-    def construct(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
+class PDPInsertionConstruction(TourConstructionBehavior, ABC):
+    def construct(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         for carrier in range(instance.num_carriers):
             while solution.carriers[carrier].unrouted_requests:
                 request, tour, pickup_pos, delivery_pos = \
@@ -34,7 +34,7 @@ class PDPInsertionConstruction(TourConstructionBehavior):
         pass
 
     @abstractmethod
-    def _carrier_cheapest_insertion(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int,
+    def _carrier_cheapest_insertion(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
                                     requests: Sequence[int]) -> Tuple[int, int, int, int]:
         """
 
@@ -44,7 +44,7 @@ class PDPInsertionConstruction(TourConstructionBehavior):
         pass
 
     @staticmethod
-    def _execute_insertion(instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int,
+    def _execute_insertion(instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
                            request, tour, pickup_pos, delivery_pos):
 
         pickup, delivery = instance.pickup_delivery_pair(request)
@@ -55,7 +55,7 @@ class PDPInsertionConstruction(TourConstructionBehavior):
 
     @staticmethod
     def _tour_cheapest_insertion(instance: it.PDPInstance,
-                                 solution: slt.GlobalSolution,
+                                 solution: slt.CAHDSolution,
                                  carrier: int, tour: int,
                                  unrouted_request: int):
         """Find the cheapest insertions for pickup and delivery for a given tour"""
@@ -81,14 +81,14 @@ class PDPInsertionConstruction(TourConstructionBehavior):
         )
 
     @staticmethod
-    def _create_new_tour_with_request(instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int,
+    def _create_new_tour_with_request(instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
                                       request: int):
         carrier_ = solution.carriers[carrier]
         if carrier_.num_tours() >= instance.carriers_max_num_tours:
             # logger.error(f'Max Vehicle Constraint violated!')
             raise ut.ConstraintViolationError(f'Cannot create new route with request {request} for carrier {carrier}.'
                                               f' Max. number of vehicles is {instance.carriers_max_num_tours}!')
-        rtmp = tr.Tour(len(carrier_.tours), instance, solution, carrier_.id_)
+        rtmp = tr.Tour(carrier_.num_tours(), instance, solution, carrier_.id_)
         rtmp.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(request))
         carrier_.tours.append(rtmp)
         carrier_.unrouted_requests.remove(request)
@@ -97,16 +97,19 @@ class PDPInsertionConstruction(TourConstructionBehavior):
 
 class CheapestPDPInsertion(PDPInsertionConstruction):
     """
-    For each REQUEST, identify its cheapest insertion. Compare the collected insertion costs and insert the cheapest
+    For each request, identify its cheapest insertion. Compare the collected insertion costs and insert the cheapest
     over all requests.
     """
 
-    def _carrier_cheapest_insertion(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int,
+    def _carrier_cheapest_insertion(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
                                     requests: Sequence[int]):
         logger.debug(f'Cheapest Insertion tour construction for carrier {carrier}:')
         carrier_ = solution.carriers[carrier]
         best_delta = float('inf')
-        best_request = best_pickup_pos = best_delivery_pos = best_tour = None
+        best_request = None
+        best_pickup_pos = None
+        best_delivery_pos = None
+        best_tour = None
         for request in requests:
             best_delta_for_r = float('inf')
             for tour in range(carrier_.num_tours()):

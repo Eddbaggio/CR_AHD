@@ -9,7 +9,7 @@ from src.cr_ahd.core_module import instance as it, tour as tr
 from src.cr_ahd.utility_module import utils as ut
 
 
-class GlobalSolution:
+class CAHDSolution:
     # default, empty solution
     def __init__(self, instance: it.PDPInstance):
         self.id_ = instance.id_
@@ -25,7 +25,7 @@ class GlobalSolution:
         self.tw_open = np.full(instance.num_carriers + 2 * instance.num_requests, ut.START_TIME).tolist()
         self.tw_close = np.full(instance.num_carriers + 2 * instance.num_requests, ut.END_TIME).tolist()
 
-        self.carriers = [PDPSolution(c) for c in range(instance.num_carriers)]
+        self.carriers = [AHDSolution(c) for c in range(instance.num_carriers)]
 
         self.solution_algorithm = None
         self.auction_mechanism = None
@@ -92,8 +92,8 @@ class GlobalSolution:
         }
 
     def write_to_json(self):
-        path = ut.path_output_gansterer.joinpath(f'{self.num_carriers()}carriers',
-                                                 self.id_ + '_' + self.solution_algorithm)
+        path = ut.output_dir_GH.joinpath(f'{self.num_carriers()}carriers',
+                                         self.id_ + '_' + self.solution_algorithm)
         path = ut.unique_path(path.parent, path.stem + '_#{:03d}' + '.json')
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, mode='w') as f:
@@ -101,7 +101,7 @@ class GlobalSolution:
         pass
 
 
-class PDPSolution:
+class AHDSolution:
     def __init__(self, carrier_index):
         self.id_ = carrier_index
         # must be a list (instead of a set) because it must be sorted for bidding (could create a local list-copy
@@ -112,7 +112,7 @@ class PDPSolution:
         # self.solution_algorithm = None
 
     def __str__(self):
-        s = f'Carrier {self.id_}'
+        s = f'---// Carrier ID: {self.id_} //---'
         s += '\n'
         for tour_ in self.tours:
             s += str(tour_)

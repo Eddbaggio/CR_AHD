@@ -32,7 +32,6 @@ class PDPInstance:
                  requests_delivery_load: Sequence,
                  carrier_depots_x: Sequence,
                  carrier_depots_y: Sequence,
-
                  ):
         """
         Create an instance for the collaborative transportation network for attended home delivery
@@ -46,7 +45,6 @@ class PDPInstance:
         self.num_carriers = len(carrier_depots_x)
         self.vehicles_max_load = max_vehicle_load
         self.vehicles_max_travel_distance = max_tour_length
-        # self.carrier_depots = carrier_depots
         self.carriers_max_num_tours = max_num_tours_per_carrier
         self.requests = requests
         self.x_coords = [*carrier_depots_x, *requests_pickup_x, *requests_delivery_x]
@@ -58,13 +56,10 @@ class PDPInstance:
                                  *requests_delivery_service_time]
 
         # compute the distance matrix
-        # TODO do I need to round the distances due to floating point precision?
-        # self._distance_matrix = np.ceil(squareform(pdist(np.array(list(zip(self.x_coords, self.y_coords))), 'euclidean')))
-        self._distance_matrix = squareform(pdist(np.array(list(zip(self.x_coords, self.y_coords))), 'euclidean'))
-        # distances between [centroid of depots] and [depots + customer vertices]
-        # centroid_x, centroid_y = sum(carrier_depots_x) / self.num_carriers, sum(carrier_depots_y) / self.num_carriers
-        # self._center_distance_matrix = cdist(np.array(list(zip(self.x_coords, self.y_coords))),
-        #                                      np.array([[centroid_x, centroid_y]]), 'euclidean')
+        # TODO do I need to round the distances due to floating point precision? YES!
+        self._distance_matrix = np.ceil(
+            squareform(pdist(np.array(list(zip(self.x_coords, self.y_coords))), 'euclidean')))
+        # self._distance_matrix = squareform(pdist(np.array(list(zip(self.x_coords, self.y_coords))), 'euclidean'))
         logger.debug(f'{id_}: created')
 
     def __str__(self):

@@ -20,11 +20,11 @@ def inst_gh_0():
 
 @pytest.fixture()
 def sol_gh_0(inst_gh_0):
-    return slt.GlobalSolution(inst_gh_0)
+    return slt.CAHDSolution(inst_gh_0)
 
 
 @pytest.fixture(scope='function', name='inst_and_sol_gh_0_ass9')
-def inst_and_sol_gh_0_ass9(inst_gh_0: it.PDPInstance, sol_gh_0: slt.GlobalSolution):
+def inst_and_sol_gh_0_ass9(inst_gh_0: it.PDPInstance, sol_gh_0: slt.CAHDSolution):
     instance = inst_gh_0
     solution = sol_gh_0
     solution.assign_requests_to_carriers([0, 1, 2, 5, 6, 7, 10, 11, 12], [0, 0, 0, 1, 1, 1, 2, 2, 2])
@@ -133,12 +133,12 @@ def inst_circular_c3_n4_k3_L1200_Q100(instance_generator_circular):
 
 @pytest.fixture(name='sol_circular_c3_n4_k3_L1200_Q100')
 def sol_circular_c3_n4_k3_L1200_Q100(inst_circular_c3_n4_k3_L1200_Q100):
-    return slt.GlobalSolution(inst_circular_c3_n4_k3_L1200_Q100)
+    return slt.CAHDSolution(inst_circular_c3_n4_k3_L1200_Q100)
 
 
 @pytest.fixture
 def inst_sol_circular_c3_n4_k3_L1200_Q100_ass6(inst_circular_c3_n4_k3_L1200_Q100: it.PDPInstance,
-                                               sol_circular_c3_n4_k3_L1200_Q100: slt.GlobalSolution):
+                                               sol_circular_c3_n4_k3_L1200_Q100: slt.CAHDSolution):
     inst = inst_circular_c3_n4_k3_L1200_Q100
     sol = sol_circular_c3_n4_k3_L1200_Q100
     sol.assign_requests_to_carriers([0, 1, 4, 5, 8, 9], [0, 0, 1, 1, 2, 2])
@@ -160,7 +160,7 @@ def inst_sol_circular_ass_routed_generator(instance_generator_circular: Callable
                                                            depot_radius=depot_radius,
                                                            requests_radius=requests_radius
                                                            )
-        sol = slt.GlobalSolution(inst)
+        sol = slt.CAHDSolution(inst)
         for carrier in range(num_carriers):
             # assign requests
             ass = range(carrier * num_requests_per_carrier, carrier * num_requests_per_carrier + num_ass_per_carrier)

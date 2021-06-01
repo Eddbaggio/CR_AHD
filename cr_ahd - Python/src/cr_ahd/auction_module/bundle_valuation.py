@@ -20,16 +20,26 @@ def bundle_direct_travel_dist(instance: it.PDPInstance, bundle: Sequence):
     return direct_travel_dist
 
 
-def bundle_centroid(instance: it.PDPInstance, bundle: Sequence, direct_travel_dist: Sequence):
-    """centroid of the request’s centers, where the center of request is the midpoint between pickup and delivery
-     location. centers are weighted with the length of their request, which is the direct travel distance between
-      pickup and delivery of request"""
+def bundle_centroid(instance: it.PDPInstance, bundle: Sequence, pd_direct_travel_dist: Sequence):
+    """
+    centroid of the request’s centers, where the center of request is the midpoint between pickup and delivery
+    location. centers are weighted with the length of their request, which is the direct travel distance between
+    pickup and delivery of request
+    """
     centers = []
     for request in bundle:
         pickup, delivery = instance.pickup_delivery_pair(request)
         centers.append(ut.midpoint_(instance.x_coords[pickup], instance.y_coords[pickup],
                                     instance.x_coords[delivery], instance.y_coords[delivery]))
-    centroid = ut.Coordinates(*np.average(centers, axis=0, weights=direct_travel_dist))
+
+    # there is one instance (run=1+dist=200+rad=150+n=10) for which pickup and delivery of a request are at the same
+    # location, in that case, the pd_direct_travel_dist is zero, thus the following if clause is needed
+    if sum(pd_direct_travel_dist) == 0:
+        weights = None
+    else:
+        weights = pd_direct_travel_dist
+
+    centroid = ut.Coordinates(*np.average(centers, axis=0, weights=weights))
     return centroid
 
 
@@ -77,7 +87,7 @@ def bundle_density(direct_travel_dist, vertex_to_centroid_travel_dist: Sequence[
     request_to_centroid_travel_dist = [pickup_dist + delivery_dist for pickup_dist, delivery_dist in
                                        vertex_to_centroid_travel_dist]
     max_dist_to_centroid = max(request_to_centroid_travel_dist)
-    return avg_direct_travel_dist / max_dist_to_centroid
+    return avg_direct_travel_dist / max_dist_to_centroid  # todo causes issues due to python rounding small numbers to zero
 
 
 def bundle_separation(centroid_a: ut.Coordinates, centroid_b: ut.Coordinates, radius_a: float, radius_b: float):
@@ -116,7 +126,7 @@ def bundle_total_travel_distance_proxy(instance: it.PDPInstance,
 
 
 def bundle_total_travel_distance(instance: it.PDPInstance,
-                                 solution: slt.GlobalSolution,
+                                 solution: slt.CAHDSolution,
                                  centroid: ut.Coordinates,
                                  bundle_idx: int,
                                  bundle: Sequence[int],
@@ -207,7 +217,7 @@ def bundle_total_travel_distance(instance: it.PDPInstance,
 
 
 def GHProxyValuation(instance: it.PDPInstance,
-                     solution: slt.GlobalSolution,
+                     solution: slt.CAHDSolution,
                      candidate_solution: Sequence[int],
                      auction_pool: Sequence[int]
                      ):
@@ -226,9 +236,9 @@ def GHProxyValuation(instance: it.PDPInstance,
     auction_pool_array = np.array(auction_pool)
     for bundle_idx in range(num_bundles):
         bundle = auction_pool_array[candidate_solution == bundle_idx]
-        direct_travel_dist = bundle_direct_travel_dist(instance, bundle)
-        request_direct_travel_distances.append(direct_travel_dist)
-        centroid = bundle_centroid(instance, bundle, direct_travel_dist)
+        pd_direct_travel_dist = bundle_direct_travel_dist(instance, bundle)
+        request_direct_travel_distances.append(pd_direct_travel_dist)
+        centroid = bundle_centroid(instance, bundle, pd_direct_travel_dist)
         centroids.append(centroid)
 
     extended_distance_matrix = bundle_extended_distance_matrix(instance, centroids)
@@ -238,7 +248,7 @@ def GHProxyValuation(instance: it.PDPInstance,
     total_travel_distances = []
     for bundle_idx in range(num_bundles):
         # recreate the bundle
-        # todo make the functions below work with the GH decoding of bundles directly
+        # todo make the functions below work with the GH decoding of bundles directly?
         bundle = auction_pool_array[candidate_solution == bundle_idx]
 
         # compute the radius
@@ -264,5 +274,5 @@ def GHProxyValuation(instance: it.PDPInstance,
                                            centroids[:bundle_idx] + centroids[bundle_idx + 1:],
                                            radii[bundle_idx],
                                            radii[:bundle_idx] + radii[bundle_idx + 1:]))
-
-    return (min(isolations) * min(densities)) / (max(total_travel_distances) * len(candidate_solution))
+    
+    return (min(isolations) * min(densities)) / (max(total_travel_distances) * max(candidate_solution)+1)

@@ -6,7 +6,7 @@ import src.cr_ahd.core_module.tour as tr
 
 
 class TWOfferingBehavior(abc.ABC):
-    def execute(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, request: int):
+    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
         pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
         # make sure that the request has not been given a tw yet
         assert (solution.tw_open[delivery_vertex], solution.tw_close[delivery_vertex]) == (ut.START_TIME, ut.END_TIME)
@@ -18,11 +18,11 @@ class TWOfferingBehavior(abc.ABC):
         return offered_time_windows  # [:num_tw]
 
     @abc.abstractmethod
-    def _evaluate_time_window(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, request: int,
+    def _evaluate_time_window(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int,
                               tw: ut.TimeWindow):
         pass
 
-    def _find_first_insertion_index(self, solution: slt.GlobalSolution, tw: ut.TimeWindow, tour: tr.Tour):
+    def _find_first_insertion_index(self, solution: slt.CAHDSolution, tw: ut.TimeWindow, tour: tr.Tour):
         """
         based on the current tour, what is the first index in which insertion is feasible based on tw constraints?
         """
@@ -31,7 +31,7 @@ class TWOfferingBehavior(abc.ABC):
                 return first_index
         return first_index
 
-    def _find_last_insertion_index(self, solution: slt.GlobalSolution, tw: ut.TimeWindow, tour: tr.Tour,
+    def _find_last_insertion_index(self, solution: slt.CAHDSolution, tw: ut.TimeWindow, tour: tr.Tour,
                                    first_index: int):
         """
         based on the current routing sequence, what is the last index in which insertion is feasible based on tw
@@ -44,7 +44,7 @@ class TWOfferingBehavior(abc.ABC):
 
 
 class FeasibleTW(TWOfferingBehavior):
-    def _evaluate_time_window(self, instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, request: int,
+    def _evaluate_time_window(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int,
                               tw: ut.TimeWindow):
         carrier_ = solution.carriers[carrier]
         depot = carrier_.id_  # operating on a tmp carrier, thus the depot index is not equal to the carrier id

@@ -129,7 +129,7 @@ def plot_carrier(instance: it.PDPInstance, solution: slt.GlobalSolution, carrier
 '''
 
 
-def _make_depot_scatter(instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
+def _make_depot_scatter(instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
     carrier_ = solution.carriers[carrier]
     return go.Scatter(x=[instance.x_coords[carrier]],
                       y=[instance.y_coords[carrier]],
@@ -146,7 +146,7 @@ def _make_depot_scatter(instance: it.PDPInstance, solution: slt.GlobalSolution, 
                       )
 
 
-def _make_tour_scatter(instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, tour: int):
+def _make_tour_scatter(instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, tour: int):
     tour_ = solution.carriers[carrier].tours[tour]
 
     df = pd.DataFrame({
@@ -170,26 +170,27 @@ def _make_tour_scatter(instance: it.PDPInstance, solution: slt.GlobalSolution, c
             f'Request {instance.request_from_vertex(v)}</br>{instance.vertex_type(v)}</br>'
             f'Vertex id: {v}</br>'
             f'Revenue: {instance.revenue[v]}</br>'
-            f'TW: [{solution.tw_open[v]} - {solution.tw_close[v]}]</br>'
+            f'TW: {ut.TimeWindow(solution.tw_open[v], solution.tw_close[v])}</br>'
             f'Tour\'s Travel Distance: {tour_.sum_travel_distance}')
 
     # colorscale = [(c, ut.univie_colors_100[c]) for c in range(instance.num_carriers)]
-    return go.Scatter(x=df['x'],
-                      y=df['y'],
-                      mode='markers+text',
-                      marker=dict(
-                          symbol='circle',
-                          size=ut.linear_interpolation(df['revenue'].values, 15, 30),
-                          line=dict(color=[ut.univie_colors_100[c] for c in original_carrier_assignment], width=2),
-                          color=ut.univie_colors_60[carrier]),
-                      text=df['text'],
-                      name=f'Carrier {carrier}, Tour {tour}',
-                      hovertext=hover_text
-                      # legendgroup=carrier, hoverinfo='x+y'
-                      )
+    return go.Scatter(
+        x=df['x'],
+        y=df['y'],
+        mode='markers+text',
+        marker=dict(
+            symbol='circle',
+            size=ut.linear_interpolation(df['revenue'].values, 15, 30, min(instance.revenue), max(instance.revenue)),
+            line=dict(color=[ut.univie_colors_100[c] for c in original_carrier_assignment], width=2),
+            color=ut.univie_colors_60[carrier]),
+        text=df['text'],
+        name=f'Carrier {carrier}, Tour {tour}',
+        hovertext=hover_text
+        # legendgroup=carrier, hoverinfo='x+y'
+    )
 
 
-def _make_unrouted_scatter(instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int):
+def _make_unrouted_scatter(instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
     carrier_ = solution.carriers[carrier]
     unrouted_vertices = ut.flatten([list(instance.pickup_delivery_pair(r)) for r in carrier_.unrouted_requests])
 
@@ -220,7 +221,7 @@ def _make_unrouted_scatter(instance: it.PDPInstance, solution: slt.GlobalSolutio
         x=df['x'], y=df['y'], mode='markers+text',
         marker=dict(
             symbol=['circle'] * len(unrouted_vertices),
-            size=ut.linear_interpolation(df['revenue'].values, 15, 30),
+            size=ut.linear_interpolation(df['revenue'].values, 15, 30, min(instance.revenue), max(instance.revenue)),
             line=dict(color=[ut.univie_colors_100[c] for c in df['original_carrier_assignment']], width=2),
             color=ut.univie_colors_60[carrier]),
         text=df['text'],
@@ -231,7 +232,7 @@ def _make_unrouted_scatter(instance: it.PDPInstance, solution: slt.GlobalSolutio
     )
 
 
-def _make_unassigned_scatter(instance: it.PDPInstance, solution: slt.GlobalSolution):
+def _make_unassigned_scatter(instance: it.PDPInstance, solution: slt.CAHDSolution):
     vertex_id = ut.flatten(
         [[p, d] for p, d in [instance.pickup_delivery_pair(r) for r in solution.unassigned_requests]])
     df = pd.DataFrame({
@@ -256,20 +257,21 @@ def _make_unassigned_scatter(instance: it.PDPInstance, solution: slt.GlobalSolut
             f'TW: [{solution.tw_open[v]} - {solution.tw_close[v]}]</br>'
         )
 
-    return go.Scatter(x=df['x'], y=df['y'], mode='markers+text',
-                      marker=dict(
-                          symbol=['circle'] * len(df),
-                          size=ut.linear_interpolation(df['revenue'].values, 15, 30),
-                          line=dict(color=[ut.univie_colors_100[c] for c in df['original_carrier_assignment']],
-                                    width=2),
-                          color='white'),
-                      text=df['text'],
-                      name=f'Unassigned',
-                      hovertext=hover_text
-                      )
+    return go.Scatter(
+        x=df['x'], y=df['y'], mode='markers+text',
+        marker=dict(
+            symbol=['circle'] * len(df),
+            size=ut.linear_interpolation(df['revenue'].values, 15, 30, min(instance.revenue), max(instance.revenue)),
+            line=dict(color=[ut.univie_colors_100[c] for c in df['original_carrier_assignment']],
+                      width=2),
+            color='white'),
+        text=df['text'],
+        name=f'Unassigned',
+        hovertext=hover_text
+    )
 
 
-def _make_tour_edges(instance: it.PDPInstance, solution: slt.GlobalSolution, carrier: int, tour: int):
+def _make_tour_edges(instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, tour: int):
     tour_ = solution.carriers[carrier].tours[tour]
     # creating arrows as annotations
     directed_edges = []
@@ -294,7 +296,7 @@ def _make_tour_edges(instance: it.PDPInstance, solution: slt.GlobalSolution, car
     return directed_edges
 
 
-def _add_carrier_solution(fig: go.Figure, instance, solution: slt.GlobalSolution, carrier: int):
+def _add_carrier_solution(fig: go.Figure, instance, solution: slt.CAHDSolution, carrier: int):
     carrier_solution = solution.carriers[carrier]
     scatter_traces = []
     edge_traces = []
@@ -321,7 +323,7 @@ def _add_carrier_solution(fig: go.Figure, instance, solution: slt.GlobalSolution
     return scatter_traces, edge_traces
 
 
-def plot_solution_2(instance: it.PDPInstance, solution: slt.GlobalSolution, title='', tours: bool = True,
+def plot_solution_2(instance: it.PDPInstance, solution: slt.CAHDSolution, title='', tours: bool = True,
                     time_windows: bool = True, arrival_times: bool = True, service_times: bool = True,
                     show: bool = False):
     fig = go.Figure()
@@ -392,6 +394,7 @@ def plot_solution_2(instance: it.PDPInstance, solution: slt.GlobalSolution, titl
     if show:
         fig.show(config=config)
 
+
 '''
 def plot_solution(instance: it.PDPInstance, solution: slt.GlobalSolution, title='', tours: bool = True,
                   time_windows: bool = True, arrival_times: bool = True, service_times: bool = True,
@@ -409,6 +412,7 @@ def plot_solution(instance: it.PDPInstance, solution: slt.GlobalSolution, title=
     if show:
         fig.show(config=config)
 '''
+
 
 class CarrierConstructionAnimation(object):
     def __init__(self, carrier, title=None):
@@ -473,7 +477,7 @@ class CarrierConstructionAnimation(object):
         plt.show()
         # self.fig.show()
 
-    def save(self, filename=ut.path_output.joinpath('Animations', 'animation.gif')):
+    def save(self, filename=ut.output_dir.joinpath('Animations', 'animation.gif')):
         self._finish()
         movie_writer = ani.ImageMagickFileWriter(fps=24)
         # filename.mkdir(parents=True, exist_ok=True)  # TODO use pathlib Paths everywhere!

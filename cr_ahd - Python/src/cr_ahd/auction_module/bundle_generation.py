@@ -15,13 +15,13 @@ logger = logging.getLogger(__name__)
 
 
 class BundleSetGenerationBehavior(ABC):
-    def execute(self, instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool: Sequence, original_bundles):
+    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool: Sequence, original_bundles):
         bundle_set = self._generate_bundle_set(instance, solution, auction_pool, original_bundles)
         solution.bundle_generation = self.__class__.__name__
         return bundle_set
 
     @abstractmethod
-    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool: Sequence,
+    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool: Sequence,
                              original_bundles):
         pass
 
@@ -32,7 +32,7 @@ class AllBundles(BundleSetGenerationBehavior):
     Does not include emtpy set.
     """
 
-    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool: Sequence,
+    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool: Sequence,
                              original_bundles):
         return tuple(ut.power_set(auction_pool, False))  # todo GH decoding of a bundle pool!
 
@@ -42,7 +42,7 @@ class RandomMaxKPartition(BundleSetGenerationBehavior):
     creates a random partition of the submitted bundles with AT MOST as many subsets as there are carriers
     """
 
-    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool: Sequence,
+    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool: Sequence,
                              original_bundles):
         bundles = ut.random_max_k_partition(auction_pool, max_k=instance.num_carriers)
         return bundles  # todo GH decoding of a bundle pool!
@@ -55,7 +55,7 @@ class KMeansBundles(BundleSetGenerationBehavior):
     :return a List of lists, where each sublist contains the cluster members of a cluster
     """
 
-    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool: Iterable,
+    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool: Iterable,
                              original_bundles):
         request_midpoints = [ut.midpoint(instance, *instance.pickup_delivery_pair(sr)) for sr in auction_pool]
         # k_means = KMeans(n_clusters=instance.num_carriers, random_state=0).fit(request_midpoints)
@@ -64,51 +64,26 @@ class KMeansBundles(BundleSetGenerationBehavior):
 
 
 class GeneticAlgorithm(BundleSetGenerationBehavior):
-    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool: Sequence,
+    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool: Sequence,
                              original_bundles: List[int]):
         # parameters
         population_size = 100
         # n = len(auction_pool)  # will produce infeasible candidates for the WDP
-        n = instance.num_carriers  # to ensure a feasible candidate solution to the WDP
+        # to ensure a feasible candidate solution to the WDP
         num_generations = 100
         mutation_rate = 0.5
         # only a fraction of generation_gap is replaced in a new gen. the remaining individuals (generation overlap)
         # are the top (1-generation_gap)*100 % from the previous gen, measured by their fitness
         generation_gap = 0.9
 
-        # initial population
-        population = []
-        fitness = []
+        fitness, population = self.initialize_population(instance,
+                                                         solution,
+                                                         auction_pool,
+                                                         original_bundles,
+                                                         instance.num_carriers,
+                                                         population_size)
 
-        # add the original bundling as the first candidate - this cannot be infeasible
-        self._normalize_individual(original_bundles)
-        population.append(original_bundles)
-        fitness.append(bv.GHProxyValuation(instance, solution, original_bundles, auction_pool))
-
-        # initialize at least one k-means bundle that is also likely to be feasible
-        k_means_individual = list(KMeansBundles().execute(instance, solution, auction_pool, None))
-        self._normalize_individual(k_means_individual)
-        if k_means_individual not in population:
-            population.append(k_means_individual)
-            fitness.append(bv.GHProxyValuation(instance, solution, k_means_individual, auction_pool))
-
-        while len(population) < population_size - 1:
-            individual = ut.random_max_k_partition_idx(auction_pool, n)
-            self._normalize_individual(individual)
-            if individual in population:
-                continue
-            else:
-                population.append(individual)
-                fitness.append(bv.GHProxyValuation(instance, solution, individual, auction_pool))
-
-        # genetic algorithm
-        best = ut.argmax(fitness)
-        # print(f'Best in gen 1:\n'
-        #       f'Index: {best}\n'
-        #       f'Fitness: {fitness[best]}\n'
-        #       f'Chromosome: {population[best]}\n')
-
-        for generation_counter in tqdm.trange(1, num_generations, desc='Bundle Generation'):
+        for generation_counter in tqdm.trange(1, num_generations, desc='Bundle Generation', disable=False):
 
             # initialize new generation with the elites from the previous generation
             elites = ut.argsmax(fitness, int(population_size * (1 - generation_gap)))
@@ -123,26 +98,10 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
                 parent1 = population[parent1]
                 parent2 = population[parent2]
 
-                # crossover
-                crossover_func: Callable = random.choice([self._crossover_uniform, self._crossover_geo])
-                offspring: List[int] = crossover_func(instance, solution, auction_pool, parent1, parent2)
-
-                # mutation
-                if random.random() <= mutation_rate:
-                    mutation_func: Callable = random.choice(
-                        [
-                            self._mutation_move,
-                            self._mutation_create,
-                            self._mutation_join,
-                            # self._mutation_shift
-                        ])
-                    mutation_func(instance, solution, offspring)
-
-                # normalization IN PLACE
-                self._normalize_individual(offspring)
+                offspring = self.generate_offspring(instance, solution, auction_pool, parent1, parent2, mutation_rate)
 
                 # check for duplicates
-                if offspring in new_population:  # TODO using a hash function this can probably be sped up
+                if offspring in new_population:
                     continue
 
                 # fitness evaluation
@@ -158,26 +117,95 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
             fitness = new_fitness
             generation_counter += 1
 
-            best = ut.argmax(fitness)
+        # select the best bundles. leave space for at least the original bundles
+        limited_bundle_pool = self.generate_bundle_pool(auction_pool, fitness, population,
+                                                        ut.AUCTION_POOL_SIZE - (max(original_bundles) + 1))
 
-        # print(f'Best in gen {generation_counter}:\n'
-        #       f'Index: {best}\n'
-        #       f'Fitness: {fitness[best]}\n'
-        #       f'Chromosome: {population[best]}\n')
+        # add the original bundling as the final candidate - this cannot be infeasible -> incorrect assumption
+        # it can be infeasible when the routing algorithm in bidding is not able to find the solution from before the
+        # requests where retracted from the carrier
+        self._normalize_individual(original_bundles)
+        original_bundles = [np.array(auction_pool)[np.array(original_bundles) == bundle_idx].tolist()
+                            for bundle_idx in range(max(original_bundles) + 1)]
+        limited_bundle_pool.extend(original_bundles)
 
-        # create the set of bundles that is offered in the auction (carrier must solve routing to place bids on these)
+        return limited_bundle_pool
+
+    @staticmethod
+    def generate_bundle_pool(auction_pool, fitness, population: Sequence[Sequence[int]],
+                             pool_size=ut.AUCTION_POOL_SIZE):
+        """
+        create the set of bundles that is offered in the auction (carrier must solve routing to place bids on these)
+        pool_size may be exceeded to guarantee that ALL bundles of a candidate solution are in the pool (either all or
+        none can be in the solution).
+        """
         auction_pool_array = np.array(auction_pool)
         bundle_pool = []
-        population_sorted = (b for b, f in sorted(zip(population, fitness)))
-        while len(bundle_pool) < ut.NUM_BUNDLES_TO_AUCTION:
+
+        # select the top n candidates, where n = ut.NUM_BUNDLES_TO_AUCTION
+        population_sorted = (bundle for fit, bundle in sorted(zip(fitness, population), reverse=True))
+        while len(bundle_pool) < pool_size:
             candidate_solution = next(population_sorted)
             candidate_solution = np.array(candidate_solution)
-            for bundle_idx in range(max(candidate_solution)):
+            for bundle_idx in range(max(candidate_solution) + 1):
                 bundle = auction_pool_array[candidate_solution == bundle_idx].tolist()
                 if bundle not in bundle_pool:
                     bundle_pool.append(bundle)
 
         return bundle_pool
+
+    def generate_offspring(self, instance, solution, auction_pool, parent1, parent2, mutation_rate):
+        # crossover
+        crossover_func: Callable = random.choice([self._crossover_uniform, self._crossover_geo])
+        offspring: List[int] = crossover_func(instance, solution, auction_pool, parent1, parent2)
+        # mutation
+        if random.random() <= mutation_rate:
+            mutation_func: Callable = random.choice(
+                [
+                    self._mutation_move,
+                    self._mutation_create,
+                    self._mutation_join,
+                    # self._mutation_shift
+                ])
+            mutation_func(instance, solution, offspring)
+        # normalization IN PLACE
+        self._normalize_individual(offspring)
+        return offspring
+
+    def initialize_population(self, instance, solution, auction_pool, original_bundles, n, population_size):
+        """
+        initializes the a population of size population_size. this first generation includes the original bundles as
+        well as a k-means bundling.
+
+        :param instance:
+        :param solution:
+        :param auction_pool:
+        :param original_bundles:
+        :param n:
+        :param population_size:
+        :return: fitness and population
+        """
+        population = []
+        fitness = []
+
+        # initialize at least one k-means bundle that is also likely to be feasible
+        k_means_individual = list(KMeansBundles().execute(instance, solution, auction_pool, None))
+        self._normalize_individual(k_means_individual)
+        if k_means_individual not in population:
+            population.append(k_means_individual)
+            fitness.append(bv.GHProxyValuation(instance, solution, k_means_individual, auction_pool))
+
+        # fill the rest of the population with random individuals
+        while len(population) < population_size - 1:
+            individual = ut.random_max_k_partition_idx(auction_pool, n)
+            self._normalize_individual(individual)
+            if individual in population:
+                continue
+            else:
+                population.append(individual)
+                fitness.append(bv.GHProxyValuation(instance, solution, individual, auction_pool))
+
+        return fitness, population
 
     @staticmethod
     def _normalize_individual(individual: List[int]):
@@ -209,7 +237,7 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
         return parents
 
     @staticmethod
-    def _crossover_uniform(instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool, parent1, parent2):
+    def _crossover_uniform(instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool, parent1, parent2):
         """
         For each request, the corresponding bundle is randomly chosen from parent A or B. This corresponds to the
         uniform crossover of Michalewicz (1996), where only one child is produced.
@@ -220,7 +248,7 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
         return offspring
 
     @staticmethod
-    def _crossover_geo(instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool, parent1, parent2):
+    def _crossover_geo(instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool, parent1, parent2):
         """
         In this operator, we try to keep potentially good parts of existing bundles by combining the parents using
         geographic information. First, we calculate the center of each request, which is the midpoint between pickup
@@ -266,7 +294,7 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
         return offspring
 
     @staticmethod
-    def _mutation_move(instance: it.PDPInstance, solution: slt.GlobalSolution, offspring: List[int]):
+    def _mutation_move(instance: it.PDPInstance, solution: slt.CAHDSolution, offspring: List[int]):
         """
         A random number of randomly chosen positions is changed. However, the number of available bundles is not
         increased.
@@ -279,7 +307,7 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
         pass
 
     @staticmethod
-    def _mutation_create(instance: it.PDPInstance, solution: slt.GlobalSolution, offspring: List[int]):
+    def _mutation_create(instance: it.PDPInstance, solution: slt.CAHDSolution, offspring: List[int]):
         """
         A new bundle is created. We randomly chose one request and assign it to the new bundle. If by this the
         maximum number of bundles is exceeded, i.e., if there are more bundles than carriers (see Sect. 4),
@@ -290,7 +318,7 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
         offspring[random.randint(0, len(offspring) - 1)] = new_bundle_idx
 
         # merge two random bundles if the new exceeds the num_carriers
-        if new_bundle_idx > instance.num_carriers:
+        if new_bundle_idx >= instance.num_carriers:
             rnd_bundle_1, rnd_bundle_2 = random.sample(range(0, new_bundle_idx + 1), k=2)
             for i in range(len(offspring)):
                 if offspring[i] == rnd_bundle_1:
@@ -298,7 +326,7 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
         pass
 
     @staticmethod
-    def _mutation_join(instance: it.PDPInstance, solution: slt.GlobalSolution, offspring: List[int]):
+    def _mutation_join(instance: it.PDPInstance, solution: slt.CAHDSolution, offspring: List[int]):
         """
         Two randomly chosen bundles are merged. If the offspring has only a single bundle, nothing happens
         """
@@ -311,39 +339,13 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
         pass
 
     @staticmethod
-    def _mutation_shift(instance: it.PDPInstance, solution: slt.GlobalSolution, offspring: List[int]):
+    def _mutation_shift(instance: it.PDPInstance, solution: slt.CAHDSolution, offspring: List[int]):
         """
         for each of the given bundles in the candidate solution, the centroid is calculated. Then, requests are
         assigned to bundles according to their closeness to the bundle’s centroids.
         """
 
         pass
-
-
-class ProxyTest(BundleSetGenerationBehavior):
-    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.GlobalSolution, auction_pool: Sequence,
-                             original_bundles):
-        best_candidate_solution = None
-        best_proxy_valuation = 0
-
-        # candidate == auction pool
-        candidate = [auction_pool]
-        valuation = bv.GHProxyValuation(instance, solution, [auction_pool], auction_pool)
-        if valuation > best_proxy_valuation:
-            best_candidate_solution = candidate
-            best_proxy_valuation = valuation
-
-        # generate all partitions of size [2, 3, 4, ... instance.num_carriers] i.e. all possible candidate solutions
-        for k in range(2, instance.num_carriers + 1):
-            candidate_generator = algorithm_u(auction_pool, k)
-            for candidate in tqdm.tqdm(candidate_generator, total=stirling_second(len(auction_pool), instance.num_carriers)):
-                valuation = bv.GHProxyValuation(instance, solution, candidate, auction_pool)
-
-                if valuation > best_proxy_valuation:
-                    best_candidate_solution = candidate
-                    best_proxy_valuation = valuation
-
-        return best_candidate_solution
 
 
 def stirling_second(n, k):

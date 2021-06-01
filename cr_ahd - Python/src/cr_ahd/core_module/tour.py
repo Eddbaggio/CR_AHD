@@ -34,23 +34,14 @@ class Tour:
         self.insert_and_update(instance, solution, [0], [depot_index])
 
     def __str__(self):
-        # arrival_schedule: List[dt.datetime] = []
-        # service_schedule: List[dt.datetime] = []
-        # for i in range(len(self)):
-        #     if self.arrival_schedule[i] is None:
-        #         arrival_schedule.append(None)
-        #         service_schedule.append(None)
-        #     else:
-        #         arrival_schedule.append(self.arrival_schedule[i])
-        #         service_schedule.append(self.service_schedule[i])
-        return f'ID:\t\t\t{self.id_}\n' \
+        return f'Tour ID:\t{self.id_}\n' \
                f'Sequence:\t{self.routing_sequence}\n' \
                f'Arrival:\t{[x.strftime("%d-%H:%M:%S") for x in self._arrival_schedule]}\n' \
                f'Service:\t{[x.strftime("%d-%H:%M:%S") for x in self._service_schedule]}\n' \
                f'Distance:\t{round(self.sum_travel_distance, 2)}\n' \
                f'Duration:\t{self.sum_travel_duration}\n' \
                f'Revenue:\t{self.sum_revenue}\n' \
-               f'Profit:\t\t{self.sum_profit}'
+               f'Profit:\t\t{self.sum_profit}\n'
 
     def __len__(self):
         return len(self.routing_sequence)
@@ -454,7 +445,7 @@ def update_sequences_and_schedules(
         if arrival_time > tw_close[vertex]:
             vertex_type = "delivery" if num_carriers + num_requests <= vertex < num_carriers + 2 * num_requests else "pickup"
             message = f'arrival at vertex {vertex} ({vertex_type} ) in position {pos} at {arrival_time} too late, tw closes at {tw_close[vertex]}'
-            logger.error(message)
+            logger.debug(message)
             raise ut.ConstraintViolationError(message, message)
 
         # check load constraints

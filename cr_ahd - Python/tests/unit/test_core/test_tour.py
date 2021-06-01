@@ -15,7 +15,7 @@ import math
 
 def test__insert_no_update(inst_and_sol_gh_0_ass9_routed6):
     instance: it.PDPInstance
-    solution: slt.GlobalSolution
+    solution: slt.CAHDSolution
     instance, solution = inst_and_sol_gh_0_ass9_routed6
     c = 0
     t = 0
@@ -41,7 +41,7 @@ def test__insert_no_update(inst_and_sol_gh_0_ass9_routed6):
 
 def test_insert_and_update(inst_and_sol_gh_0_ass9_routed6):
     instance: it.PDPInstance
-    solution: slt.GlobalSolution
+    solution: slt.CAHDSolution
     instance, solution = inst_and_sol_gh_0_ass9_routed6
     c = 0
     t = 0
@@ -55,7 +55,7 @@ def test_insert_and_update(inst_and_sol_gh_0_ass9_routed6):
 
 def test__pop_no_update(inst_and_sol_gh_0_ass9_routed6):
     instance: it.PDPInstance
-    solution: slt.GlobalSolution
+    solution: slt.CAHDSolution
     instance, solution = inst_and_sol_gh_0_ass9_routed6
     c = 0
     t = 0
@@ -70,7 +70,7 @@ def test__pop_no_update(inst_and_sol_gh_0_ass9_routed6):
 
 def test__pop_and_update(inst_and_sol_gh_0_ass9_routed6):
     instance: it.PDPInstance
-    solution: slt.GlobalSolution
+    solution: slt.CAHDSolution
     instance, solution = inst_and_sol_gh_0_ass9_routed6
     c = 0
     t = 0
