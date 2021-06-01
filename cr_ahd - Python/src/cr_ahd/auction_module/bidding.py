@@ -4,6 +4,7 @@ from copy import deepcopy
 from typing import List, Sequence
 
 import tqdm
+import multiprocessing
 
 from src.cr_ahd.core_module import instance as it, solution as slt
 from src.cr_ahd.routing_module import tour_construction as cns, tour_improvement as imp
@@ -48,16 +49,27 @@ class CheapestInsertionDistanceIncrease(BiddingBehavior):
 
         # calculate the travel distance with the bundle's request included. Must happen from scratch to ensure the same
         # result as in the acceptance phase
+
+        # create a temporary copy to compute the correct bids
         tmp_carrier = instance.num_carriers
         tmp_carrier_ = deepcopy(solution.carriers[carrier])
+
+        # reset the temporary carrier's solution and start from scratch instead
+        assigned_requests = [i for i, x in enumerate(solution.request_to_carrier_assignment == tmp_carrier_.id_) if x]
+        tmp_carrier_.tours.clear()
+        tmp_carrier_.unrouted_requests.extend(assigned_requests)
         tmp_carrier_.unrouted_requests.extend(bundle)
+        tmp_carrier_.unrouted_requests = sorted(tmp_carrier_.unrouted_requests)
         solution.carriers.append(tmp_carrier_)
+
         try:
             construction = cns.CheapestPDPInsertion()
             while tmp_carrier_.unrouted_requests:
-                request, tour, pickup_pos, delivery_pos = \
-                    construction._carrier_cheapest_insertion(instance, solution, tmp_carrier,
-                                                             tmp_carrier_.unrouted_requests)
+                insertion = construction._carrier_cheapest_insertion(instance,
+                                                                     solution,
+                                                                     tmp_carrier,
+                                                                     tmp_carrier_.unrouted_requests[:1])
+                request, tour, pickup_pos, delivery_pos = insertion
 
                 # when for a given request no tour can be found, create a new tour and start over. This may raise
                 # a ConstraintViolationError if the carrier cannot initialize another new tour
@@ -72,10 +84,13 @@ class CheapestInsertionDistanceIncrease(BiddingBehavior):
                 imp.PDPMoveBestImpr().improve_carrier_solution_first_improvement(instance, solution, tmp_carrier)
 
             with_bundle = tmp_carrier_.sum_travel_distance()
+
         except ConstraintViolationError:
             with_bundle = float('inf')
+
         finally:
             solution.carriers.pop()  # del the temporary carrier copy
+
         return with_bundle - without_bundle
 
 

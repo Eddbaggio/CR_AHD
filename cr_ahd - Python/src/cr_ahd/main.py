@@ -37,35 +37,39 @@ def execute_all(instance: it.PDPInstance, plot=False):
         # slv.DynamicCollaborative,
         # slv.DynamicCollaborativeSingleAuction,
 
-        # slv.IsolatedPlanning,
         # slv.DynamicCollaborativeAHD,
+
+        slv.IsolatedPlanning,
         slv.CollaborativePlanning
     ]:
         solution = slt.CAHDSolution(instance)
-        if instance.num_carriers == 1 and 'Auction' in solver.__name__:
-            continue  # skip auction solvers for centralized instances
         logger.info(f'{instance.id_}: Solving via {solver.__name__} ...')
-        solver().execute(instance, solution)
-        logger.info(f'{instance.id_}: Successfully solved via {solver.__name__}')
-        if plot:
-            pl.plot_solution_2(
-                instance,
-                solution,
-                title=f'{instance.id_} with Solver "{solver.__name__} - Total profit: {solution.sum_profit()}"',
-                show=True
-            )
-        solution.write_to_json()
-        solutions.append(solution)
+        try:
+            solver().execute(instance, solution)
+            logger.info(f'{instance.id_}: Successfully solved via {solver.__name__}')
+            if plot:
+                pl.plot_solution_2(
+                    instance,
+                    solution,
+                    title=f'{instance.id_} with Solver "{solver.__name__} - Total profit: {solution.sum_profit()}"',
+                    show=True
+                )
+            solution.write_to_json()
+            solutions.append(solution)
+
+        except Exception as e:
+            logger.error(f'{e}\tFailed on instance {instance} with solver {solver.__name__}')
+
     return solutions
 
 
-def read_and_execute_all(path: Path):
+def read_and_execute_all(path: Path, plot=False):
     log.remove_all_file_handlers(logging.getLogger())
     log_file_path = ut.output_dir_GH.joinpath(f'{path.stem}_log.log')
     log.add_file_handler(logging.getLogger(), str(log_file_path))
 
     instance = it.read_gansterer_hartl_mv(path)
-    solutions = execute_all(instance)
+    solutions = execute_all(instance, plot)
     return solutions
 
 
@@ -111,10 +115,10 @@ if __name__ == '__main__':
     logger.info('START')
 
     # paths = [Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/test.dat')]
-    paths = list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir())[5:6]
+    paths = list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir())[:]
     solutions = []
     for path in paths:
-        solver_solutions = read_and_execute_all(path)  # does not include evaluation!
+        solver_solutions = read_and_execute_all(path, plot=False)
         solutions.append(solver_solutions)
     write_solutions_to_multiindex_df(solutions)
     logger.info('END')

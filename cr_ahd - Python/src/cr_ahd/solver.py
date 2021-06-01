@@ -230,18 +230,6 @@ class IsolatedPlanning(Solver):
             cns.CheapestPDPInsertion().construct(instance, solution)
             imp.PDPMoveBestImpr().improve_global_solution(instance, solution)
 
-        # unroute all requests to re-run a static routing, now that the time-windows are known
-        """for carrier_ in solution.carriers:
-            unrouted = [i for i, x in enumerate(solution.request_to_carrier_assignment == carrier_.id_) if x]
-            carrier_.unrouted_requests = list(unrouted)
-            carrier_.tours.clear()
-
-        # re-run a static routing
-        ini.FurthestDistance().execute(instance, solution)
-        cns.CheapestPDPInsertion().construct(instance, solution)
-        imp.PDPMoveBestImpr().improve_global_solution(instance, solution)
-        """
-
 
 class CollaborativePlanning(Solver):
     """
@@ -272,13 +260,32 @@ class CollaborativePlanning(Solver):
         if instance.num_carriers > 1:  # not for centralized instances
             au.AuctionD().execute(instance, solution)
 
-        # unroute all requests again
-        """for carrier_ in solution.carriers:
+        # unroute all requests again since in the auction the non-submitted requests were routed and i must start from
+        # scratch
+        for carrier_ in solution.carriers:
             unrouted = [i for i, x in enumerate(solution.request_to_carrier_assignment == carrier_.id_) if x]
             carrier_.unrouted_requests = list(unrouted)
             carrier_.tours.clear()
 
-        # build tours statically after the auction
-        ini.FurthestDistance().execute(instance, solution)"""
-        cns.CheapestPDPInsertion().construct(instance, solution)
-        imp.PDPMoveBestImpr().improve_global_solution(instance, solution)
+        # do the final, dynamic (!) route construction. Must be dynamic (as in acceptance phase) to be guaranteed to
+        # find the same solutions as in acceptance phase
+        construction = cns.CheapestPDPInsertion()
+        for carrier in range(instance.num_carriers):
+            carrier_ = solution.carriers[carrier]
+            while carrier_.unrouted_requests:
+                insertion = construction._carrier_cheapest_insertion(instance, solution, carrier,
+                                                                     carrier_.unrouted_requests[:1])
+
+                request, tour, pickup_pos, delivery_pos = insertion
+
+                # when for a given request no tour can be found, create a new tour and start over. This may raise
+                # a ConstraintViolationError if the carrier cannot initialize another new tour
+                if tour is None:
+                    construction._create_new_tour_with_request(instance, solution, carrier, request)
+
+                else:
+                    construction._execute_insertion(instance, solution, carrier, request, tour, pickup_pos,
+                                                    delivery_pos)
+
+                imp.PDPMoveBestImpr().improve_carrier_solution_first_improvement(instance, solution, carrier)
+

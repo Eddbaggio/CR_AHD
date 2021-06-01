@@ -130,6 +130,11 @@ class CheapestPDPInsertion(PDPInsertionConstruction):
         return best_request, best_tour, best_pickup_pos, best_delivery_pos
 
 
+# =====================================================================================================================
+# functions
+# =====================================================================================================================
+
+
 def tour_cheapest_insertion(pickup_vertex: int,
                             delivery_vertex: int,
                             routing_sequence: Sequence[int],

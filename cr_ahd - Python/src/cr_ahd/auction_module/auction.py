@@ -29,9 +29,7 @@ class Auction(ABC):
             # add the requests (that have not been submitted for auction) to the tours
             logger.debug(f'requests {auction_pool_requests} have been submitted to the auction pool')
             logger.debug(f'routing non-submitted requests {[c.unrouted_requests for c in solution.carriers]}')
-            # todo this must happen in the same dynamic/incremental way in which the original routing happened. However,
-            #  even then, it is not guaranteed that a solution will be found!
-            self._route_unsubmitted(instance, solution)
+            self._route_unsubmitted(instance, solution) # todo it is not guaranteed that this will find a feasible solution
 
             # Bundle Generation
             # todo bundles should be a list of bundle indices rather than a list of lists of request indices
@@ -40,8 +38,6 @@ class Auction(ABC):
 
             # Bidding
             logger.debug(f'Generating bids_matrix')
-            # todo this must happen in the same dynamic/incremental way in which the original routing happened. Here,
-            #  it is guaranteed that at least the original solution will be found for the original bundles
             bids_matrix = self._bid_generation(instance, solution, auction_pool_bundles)
 
             logger.debug(f'Bids {bids_matrix} have been created for bundles {auction_pool_bundles}')
@@ -162,15 +158,25 @@ class AuctionD(Auction):
         """
         happening in the same dynamic/incremental way of the acceptance phase
         """
-        while solution.unassigned_requests:
-            # assign the next request
-            request = solution.unassigned_requests[0]
-            carrier = instance.request_to_carrier_assignment[request]
-            solution.assign_requests_to_carriers([request], [carrier])
+        construction = cns.CheapestPDPInsertion()
+        for carrier in range(instance.num_carriers):
+            carrier_ = solution.carriers[carrier]
+            while carrier_.unrouted_requests:
+                insertion = construction._carrier_cheapest_insertion(instance, solution, carrier,
+                                                                     carrier_.unrouted_requests[:1])
 
-            # build tours with the assigned and tw-managed requests
-            cns.CheapestPDPInsertion().construct(instance, solution)
-            imp.PDPMoveBestImpr().improve_global_solution(instance, solution)
+                request, tour, pickup_pos, delivery_pos = insertion
+
+                # when for a given request no tour can be found, create a new tour and start over. This may raise
+                # a ConstraintViolationError if the carrier cannot initialize another new tour
+                if tour is None:
+                    construction._create_new_tour_with_request(instance, solution, carrier, request)
+
+                else:
+                    construction._execute_insertion(instance, solution, carrier, request, tour, pickup_pos,
+                                                    delivery_pos)
+
+                imp.PDPMoveBestImpr().improve_carrier_solution_first_improvement(instance, solution, carrier)
 
     def _bundle_generation(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool,
                            original_bundles):
