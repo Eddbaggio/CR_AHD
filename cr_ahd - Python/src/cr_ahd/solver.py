@@ -289,3 +289,71 @@ class CollaborativePlanning(Solver):
 
                 imp.PDPMoveBestImpr().improve_carrier_solution_first_improvement(instance, solution, carrier)
 
+
+class IsolatedPlanningNoTW(Solver):
+    def _solve(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
+        while solution.unassigned_requests:
+            # assign the next request
+            request = solution.unassigned_requests[0]
+            carrier = instance.request_to_carrier_assignment[request]
+            solution.assign_requests_to_carriers([request], [carrier])
+
+            # build tours with the assigned request
+            cns.CheapestPDPInsertion().construct(instance, solution)
+            imp.PDPMoveBestImpr().improve_global_solution(instance, solution)
+
+
+class CollaborativePlanningNoTW(Solver):
+    """
+    TWM is done one request at a time, i.e. the way it's supposed to be done.
+    Only a single auction after the acceptance phase
+    """
+
+    def _solve(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
+        while solution.unassigned_requests:
+            # assign the next request
+            request = solution.unassigned_requests[0]
+            carrier = instance.request_to_carrier_assignment[request]
+            solution.assign_requests_to_carriers([request], [carrier])
+
+            # build tours with the assigned and tw-managed requests
+            cns.CheapestPDPInsertion().construct(instance, solution)
+            imp.PDPMoveBestImpr().improve_global_solution(instance, solution)
+
+        # unroute all requests and run a single auction at the end
+        for carrier_ in solution.carriers:
+            unrouted = [i for i, x in enumerate(solution.request_to_carrier_assignment == carrier_.id_) if x]
+            carrier_.unrouted_requests = list(unrouted)
+            carrier_.tours.clear()
+
+        if instance.num_carriers > 1:  # not for centralized instances
+            au.AuctionD().execute(instance, solution)
+
+        # unroute all requests again since in the auction the non-submitted requests were routed and i must start from
+        # scratch
+        for carrier_ in solution.carriers:
+            unrouted = [i for i, x in enumerate(solution.request_to_carrier_assignment == carrier_.id_) if x]
+            carrier_.unrouted_requests = list(unrouted)
+            carrier_.tours.clear()
+
+        # do the final, dynamic (!) route construction. Must be dynamic (as in acceptance phase) to be guaranteed to
+        # find the same solutions as in acceptance phase
+        construction = cns.CheapestPDPInsertion()
+        for carrier in range(instance.num_carriers):
+            carrier_ = solution.carriers[carrier]
+            while carrier_.unrouted_requests:
+                insertion = construction._carrier_cheapest_insertion(instance, solution, carrier,
+                                                                     carrier_.unrouted_requests[:1])
+
+                request, tour, pickup_pos, delivery_pos = insertion
+
+                # when for a given request no tour can be found, create a new tour and start over. This may raise
+                # a ConstraintViolationError if the carrier cannot initialize another new tour
+                if tour is None:
+                    construction._create_new_tour_with_request(instance, solution, carrier, request)
+
+                else:
+                    construction._execute_insertion(instance, solution, carrier, request, tour, pickup_pos,
+                                                    delivery_pos)
+
+                imp.PDPMoveBestImpr().improve_carrier_solution_first_improvement(instance, solution, carrier)

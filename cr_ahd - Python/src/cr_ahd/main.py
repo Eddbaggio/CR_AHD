@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 import src.cr_ahd.solver as slv
 import src.cr_ahd.utility_module.cr_ahd_logging as log
-from src.cr_ahd.utility_module import utils as ut, plotting as pl
+from src.cr_ahd.utility_module import utils as ut, plotting as pl, evaluation as ev
 from src.cr_ahd.core_module import instance as it, solution as slt
 
 # TODO write pseudo codes for ALL the stuff that's happening
@@ -39,8 +39,10 @@ def execute_all(instance: it.PDPInstance, plot=False):
 
         # slv.DynamicCollaborativeAHD,
 
+        slv.IsolatedPlanningNoTW,
         slv.IsolatedPlanning,
-        slv.CollaborativePlanning
+        slv.CollaborativePlanning,
+        slv.CollaborativePlanningNoTW
     ]:
         solution = slt.CAHDSolution(instance)
         logger.info(f'{instance.id_}: Solving via {solver.__name__} ...')
@@ -115,10 +117,11 @@ if __name__ == '__main__':
     logger.info('START')
 
     # paths = [Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/test.dat')]
-    paths = list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir())[:]
+    paths = list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir())[:1]
     solutions = []
     for path in paths:
         solver_solutions = read_and_execute_all(path, plot=False)
         solutions.append(solver_solutions)
-    write_solutions_to_multiindex_df(solutions)
+    df = write_solutions_to_multiindex_df(solutions)
+    ev.bar_chart(df)
     logger.info('END')

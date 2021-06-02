@@ -1,17 +1,5 @@
-import itertools
-from contextlib import suppress
-from typing import List
-from pathlib import Path
-import json
-import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
-import plotly.graph_objects as go
 import plotly.express as px
-from bokeh.layouts import column
-from bokeh.models import ColumnDataSource, FactorRange
-from matplotlib.ticker import AutoMinorLocator
-from bokeh.plotting import figure, show, output_file
 
 import src.cr_ahd.utility_module.utils as ut
 
@@ -31,40 +19,53 @@ labels = {
     'DynamicSequentialInsertion': 'Dynamic  Sequential, no collaboration',
 }
 
-
-# =================================================================================================
-# BOKEH
-# =================================================================================================
-
-def bokeh_plot(solomon_list: List, attributes: List[str]):
-    df: pd.DataFrame = combine_eval_files(solomon_list).reset_index()
-    df.num_carriers = df.num_carriers.astype(str)
-    x_range = [(nc, sol) for nc in np.unique(df['num_carriers']) for sol in np.unique(df['solomon_base'])]
-    for col in attributes:
-        subplots = []
-        for name, group in df.groupby('solution_algorithm'):
-            p = figure(x_range=FactorRange(*x_range),
-                       sizing_mode='stretch_width')
-            grouped = group.groupby(['num_carriers', 'solomon_base'])
-            source = ColumnDataSource(grouped)
-            p.vbar(source=source,
-                   x='solomon_base_num_carriers',
-                   top=f'{col}_mean',
-                   width=0.9,
-                   legend_label=name,
-                   )
-            subplots.append(p)
-
-        path = ut.path_output_custom.joinpath(f'bokeh_{col}.html')
-        output_file(str(path), f'bokeh_{col}')
-        show(column(*subplots))
-    pass
+config = dict({'scrollZoom': True})
 
 
 # =================================================================================================
 # PLOTLY
 # =================================================================================================
 
+def bar_chart(df: pd.DataFrame,
+              values: str = 'sum_profit',
+              category='solution_algorithm',
+              color='solution_algorithm',
+              facet_row='n',
+              facet_col='rad',
+              sum_by=['carrier_id_', 'tour_id_'],
+              mean_by=['run'],
+              show: bool = True):
+    """
+
+    :param df: multi-index dataframe
+    :return:
+    """
+    multiindex = df.index.names
+    # sum up values for sum_by variables (e.g. tours or carriers)
+    df = df.groupby(list(set(multiindex) - set(sum_by))).sum()
+    # compute mean, e.g. over all the different runs
+    df = df.groupby(list(set(multiindex) - set(sum_by) - set(mean_by))).mean()
+    # prepare for use in plotly express
+    df = df.reset_index()
+    df = df.round(2)
+    fig = px.bar(df,
+                 x=category,
+                 y=values,
+                 title=f'',
+                 color=color,
+                 color_discrete_sequence=ut.univie_colors_100,
+                 facet_row=facet_row,
+                 facet_col=facet_col,
+                 text=values,
+                 template='plotly_dark',
+                 hover_data=['solution_algorithm', 'id_', 'dist', 'num_carriers', 'rad', 'n', 'sum_profit', 'num_routing_stops', 'sum_travel_distance', 'sum_travel_duration', 'sum_load', 'sum_revenue']
+                 )
+    fig.update_xaxes(categoryorder='total ascending')
+    if show:
+        fig.show(config=config)
+
+
+'''
 def plotly_bar_plot(solomon_list: List, attributes: List[str], ):
     df: pd.DataFrame = combine_eval_files(solomon_list)[attributes]
 
@@ -87,7 +88,7 @@ def plotly_bar_plot(solomon_list: List, attributes: List[str], ):
                         textangle=-90,
                         textfont_size=14
                         )
-        for v_line_x in np.arange(-0.5, 2+len(solomon_list), 2):
+        for v_line_x in np.arange(-0.5, 2 + len(solomon_list), 2):
             fig.add_vline(x=v_line_x, line_width=1, line_color="grey")
         fig.update_layout(title=f'Mean {labels[attr]}',
                           xaxis_title=f'{labels["num_carriers"]} // {labels["solomon_base"]}',
@@ -102,119 +103,10 @@ def plotly_bar_plot(solomon_list: List, attributes: List[str], ):
         fig.write_html(str(path), auto_open=True)
         # path = ut.path_output_custom.joinpath(f'plotly_bar_plot_{attr}.svg')
         # fig.write_image(str(path))
-    pass
-
-
-# =================================================================================================
-# MATPLOTLIB
-# =================================================================================================
-
-def bar_plot_with_errors(solomon_list: list, attributes: List[str], filter_conditions=None,
-                         fig_size: tuple = (10.5, 4.5)):
-    """
-    Reads and combines the evaluation csv files of each instance type in solomon_list. Filters for only the given
-    algorithms and saves an individual comparison bar plot for each given column.
-
-    :param filter_conditions: list of tuples that define values for equality(!) conditions that must hold for the
-    specified columns. Only rows that fulfill one of these conditions will be plotted
-    :param fig_size: Figure size (default is for A4 wide); (7, 4.5) for half slide PPT 16:9; ()
-    :param solomon_list: the solomon base instances that shall be compared
-    :param attributes: the columns for which an individual bar plot is saved
-    """
-    if filter_conditions is None:
-        filter_conditions = []
-    evaluation: pd.DataFrame = combine_eval_files(solomon_list)
-
-    for col in attributes:
-        grouped = evaluation[col].unstack('solomon_base').groupby(['solution_algorithm',
-                                                                   'num_carriers'])
-
-        # plotting parameters
-        n_filtered_groups = grouped.ngroups if filter_conditions == [] else len(filter_conditions)
-        width = 1 / (n_filtered_groups + 2)
-        ind = np.arange(len(solomon_list))
-        cmap = ut.univie_cmap  # univie_cmap_paired
-        fig: plt.Figure
-        ax: plt.Axes
-        fig, ax = plt.subplots()
-
-        # grouped.boxplot(rot=90, sharex=True, sharey=True, subplots=False)
-
-        # plotting
-        i = 0
-        for name, group in grouped:
-            if name in filter_conditions:
-                ax.bar(
-                    x=ind + i * width * 1.1,  # *1.1 for small gaps between bars, alternatively do width =0.9
-                    height=group.mean(),
-                    width=width,
-                    lw=1,
-                    color=cmap(i),
-                    # edgecolor=cmap(i * 2 + 1),
-                    label=name,
-                    yerr=group.std(),
-                    capsize=width * 15,
-                    error_kw=dict(elinewidth=width * 5,
-                                  # ecolor='#7F7F7F',
-                                  ),
-                )
-                i += 1
-
-        # x axis format
-        # ax.set_xlim(0 - 2 * width, grouped.ngroups + 6 * width)
-        ax.set_xticks(ind + width * (n_filtered_groups / 2 - 1))
-        ax.set_xticklabels(solomon_list)
-        ax.set_axisbelow(True)
-        minor_locator = AutoMinorLocator(2)
-        # ax.xaxis.set_minor_locator(minor_locator)
-        # ax.grid(which='minor')
-        ax.grid(which='major', axis='y')
-
-        # y axis format
-        ax.set_ylabel(col)
-
-        # legend, title, size, saving
-        ax.legend(
-            loc='upper center',
-            bbox_to_anchor=(0.5, -0.1),
-            fancybox=True,
-            shadow=True,
-            # ncol=5
-        )
-        ax.set_title(f'Mean + Std of {col} per algorithm ')
-        fig.set_size_inches(fig_size)
-        fig.savefig(ut.path_output_custom.joinpath(f'matplotlib_bar_plot_{col}.pdf'), bbox_inches='tight')
-        fig.savefig(ut.path_output_custom.joinpath(f'matplotlib_bar_plot_{col}.png'), bbox_inches='tight')
-        # plt.show()
-
-
-def combine_eval_files(solomon_list, save: bool = True):
-    """
-    iterates through the dir of the instances specified by the solomon_list
-
-    :param solomon_list:
-    :param save:
-    :return:
-    """
-    evaluation = pd.DataFrame()
-    for solomon in solomon_list:
-        file_name = next(ut.path_output_custom.joinpath(solomon).glob('*_eval.csv'))
-        df = pd.read_csv(file_name)
-        evaluation = evaluation.append(df)
-    evaluation = evaluation.set_index(['solomon_base', 'rand_copy', 'solution_algorithm', 'num_carriers'])
-    duration_columns = [col for col in evaluation.columns if 'duration' in col]
-    for col in duration_columns:
-        evaluation[col] = pd.to_timedelta(evaluation[col], unit='seconds', errors='raise')
-    if save:
-        evaluation.to_csv(ut.path_output_custom.joinpath('Evaluation').with_suffix('.csv'))
-        evaluation.to_excel(ut.path_output_custom.joinpath('Evaluation').with_suffix('.xlsx'), merge_cells=False)
-    return evaluation
-
+    pass'''
 
 if __name__ == '__main__':
-    solomon_list = ['C101', 'C201', 'R101', 'R201', 'RC101', 'RC201']
-    attributes = ['num_act_veh', 'distance', 'duration', ]
-    # bar_plot_with_errors(solomon_list, attributes)
-    # plotly_plot(solomon_list, attributes)
-    # bokeh_plot(solomon_list, attributes)
-    plotly_bar_plot(solomon_list, attributes)
+    df = pd.read_csv(
+        "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_#005.csv",
+        index_col=[0, 1, 2, 3, 4, 5, 6, 7, 8])
+    bar_chart(df)
