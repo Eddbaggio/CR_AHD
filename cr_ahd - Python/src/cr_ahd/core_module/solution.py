@@ -26,6 +26,8 @@ class CAHDSolution:
 
         self.carriers = [AHDSolution(c) for c in range(instance.num_carriers)]
 
+        # stuff that is filled during the solving
+        self.rejected_requests = []
         self.solution_algorithm = None
         self.auction_mechanism = None
 

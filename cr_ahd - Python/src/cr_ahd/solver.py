@@ -305,7 +305,6 @@ class IsolatedPlanningNoTW(Solver):
 
 class CollaborativePlanningNoTW(Solver):
     """
-    TWM is done one request at a time, i.e. the way it's supposed to be done.
     Only a single auction after the acceptance phase
     """
 

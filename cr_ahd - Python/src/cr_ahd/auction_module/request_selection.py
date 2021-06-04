@@ -144,13 +144,15 @@ class RequestSelectionBehavior_bundle(ABC):
                     best_bundle = bundle
                     best_bundle_valuation = bundle_valuation
 
-            # add the carrier's best bundle to the auction pool and to the original bundling
+            # retract requests from carrier and add the carrier's best bundle to auction pool & original bundling
             for request in best_bundle:
+
                 solution.carriers[carrier].unrouted_requests.remove(request)
                 solution.request_to_carrier_assignment[request] = np.nan
+                solution.unassigned_requests.append(request)
+
                 auction_pool.append(request)
                 original_bundles.append(carrier)
-                solution.unassigned_requests.append(request)
 
         return auction_pool, original_bundles
 

@@ -27,8 +27,8 @@ class Auction(ABC):
             # add the requests (that have not been submitted for auction) to the tours
             logger.debug(f'requests {auction_pool_requests} have been submitted to the auction pool')
             logger.debug(f'routing non-submitted requests {[c.unrouted_requests for c in solution.carriers]}')
-            self._route_unsubmitted(instance,
-                                    solution)  # todo it is not guaranteed that this will find a feasible solution
+            # todo it is not guaranteed that this will find a feasible solution -> why?
+            self._route_unsubmitted(instance, solution)
 
             # Bundle Generation
             # todo bundles should be a list of bundle indices rather than a list of lists of request indices

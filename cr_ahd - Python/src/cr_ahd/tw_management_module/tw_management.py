@@ -21,12 +21,18 @@ class TWManagementSingle:
                                                      f'handled at a time'
         request = carrier_.unrouted_requests[0]
         offer_set = two.FeasibleTW().execute(instance, solution, carrier, request)  # which TWs to offer?
-        selected_tw = tws.UnequalPreference().execute(offer_set, request)  # which TW is selected?
+        if offer_set:
+            selected_tw = tws.UnequalPreference().execute(offer_set, request)  # which TW is selected?
 
-        # set the TW open and close times
-        pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
-        solution.tw_open[delivery_vertex] = selected_tw.open
-        solution.tw_close[delivery_vertex] = selected_tw.close
+            # set the TW open and close times
+            pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
+            solution.tw_open[delivery_vertex] = selected_tw.open
+            solution.tw_close[delivery_vertex] = selected_tw.close
+
+        # in case no feasible TW exists for a given request
+        else:
+            logger.error(f'No feasible TW can be offered from Carrier {carrier} to request {request}')
+            solution.rejected_requests.append(request)
 
     pass
 

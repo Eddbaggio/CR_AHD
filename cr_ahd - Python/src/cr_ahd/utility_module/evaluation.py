@@ -44,23 +44,49 @@ def bar_chart(df: pd.DataFrame,
     # sum up values for sum_by variables (e.g. tours or carriers)
     df = df.groupby(list(set(multiindex) - set(sum_by))).sum()
     # compute mean, e.g. over all the different runs
-    df = df.groupby(list(set(multiindex) - set(sum_by) - set(mean_by))).mean()
+    if mean_by:
+        df = df.groupby(list(set(multiindex) - set(sum_by) - set(mean_by))).mean()
     # prepare for use in plotly express
     df = df.reset_index()
     df = df.round(2)
+
+    # hover text
+    hover_text = []
+    if facet_row is None:
+        hover_text.append('n')
+    if facet_col is None:
+        hover_text.append('rad')
+    if not mean_by:
+        hover_text.append('run')
+
+    # bar plot
     fig = px.bar(df,
                  x=category,
                  y=values,
-                 title=f'',
+                 title=f"<b>n</b>: Number of requests per carrier<br>"
+                       f"<b>rad</b>: Radius of the carriers' operational area around the depot<br>",
                  color=color,
                  color_discrete_sequence=ut.univie_colors_100,
                  facet_row=facet_row,
                  facet_col=facet_col,
                  text=values,
                  template='plotly_dark',
-                 hover_data=['solution_algorithm', 'id_', 'dist', 'num_carriers', 'rad', 'n', 'sum_profit', 'num_routing_stops', 'sum_travel_distance', 'sum_travel_duration', 'sum_load', 'sum_revenue']
+                 hover_data=hover_text
                  )
-    fig.update_xaxes(categoryorder='total ascending')
+
+    # legend for symbols
+    # fig.add_annotation(
+    #     text=f"n: Number of requests<br>per carrier<br><br>"
+    #          f"rad: Radius of the carriers'<br>operational area around the<br>depot",
+    #     xref='paper',
+    #     yref='paper',
+    #     x=1.15, y=0.5,
+    #     bordercolor='white',
+    #     borderwidth=1,
+    #     showarrow=False,
+    #     align='left'
+    # )
+
     if show:
         fig.show(config=config)
 
