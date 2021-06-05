@@ -68,7 +68,6 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
                              original_bundles: List[int]):
         # parameters
         population_size = 100
-        # n = len(auction_pool)  # will produce infeasible candidates for the WDP
         # to ensure a feasible candidate solution to the WDP
         num_generations = 100
         mutation_rate = 0.5
@@ -121,9 +120,7 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
         limited_bundle_pool = self.generate_bundle_pool(auction_pool, fitness, population,
                                                         ut.AUCTION_POOL_SIZE - (max(original_bundles) + 1))
 
-        # add the original bundling as the final candidate - this cannot be infeasible -> incorrect assumption
-        # it can be infeasible when the routing algorithm in bidding is not able to find the solution from before the
-        # requests where retracted from the carrier
+        # add the original bundling as the final candidate - this cannot be infeasible
         self._normalize_individual(original_bundles)
         original_bundles = [np.array(auction_pool)[np.array(original_bundles) == bundle_idx].tolist()
                             for bundle_idx in range(max(original_bundles) + 1)]

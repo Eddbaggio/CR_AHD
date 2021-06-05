@@ -55,11 +55,10 @@ class CheapestInsertionDistanceIncrease(BiddingBehavior):
         tmp_carrier_ = deepcopy(solution.carriers[carrier])
 
         # reset the temporary carrier's solution and start from scratch instead
-        assigned_requests = [i for i, x in enumerate(solution.request_to_carrier_assignment == tmp_carrier_.id_) if x]
         tmp_carrier_.tours.clear()
-        tmp_carrier_.unrouted_requests.extend(assigned_requests)
-        tmp_carrier_.unrouted_requests.extend(bundle)
-        tmp_carrier_.unrouted_requests = sorted(tmp_carrier_.unrouted_requests)
+        tmp_carrier_.assigned_requests.extend(bundle)
+        tmp_carrier_.assigned_requests.sort()  # must be sorted due to dynamism
+        tmp_carrier_.unrouted_requests.extend(tmp_carrier_.assigned_requests)
         solution.carriers.append(tmp_carrier_)
 
         try:

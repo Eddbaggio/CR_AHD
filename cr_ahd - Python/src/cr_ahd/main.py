@@ -39,10 +39,10 @@ def execute_all(instance: it.PDPInstance, plot=False):
 
         # slv.DynamicCollaborativeAHD,
 
-        slv.IsolatedPlanningNoTW,
+        # slv.IsolatedPlanningNoTW,
+        # slv.CollaborativePlanningNoTW,
         slv.IsolatedPlanning,
         slv.CollaborativePlanning,
-        slv.CollaborativePlanningNoTW
     ]:
         solution = slt.CAHDSolution(instance)
         logger.info(f'{instance.id_}: Solving via {solver.__name__} ...')
@@ -117,7 +117,7 @@ if __name__ == '__main__':
     logger.info('START')
 
     # paths = [Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/test.dat')]
-    paths = list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir())[:1]
+    paths = list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir())[:6]
     solutions = []
     for path in paths:
         solver_solutions = read_and_execute_all(path, plot=False)

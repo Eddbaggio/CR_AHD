@@ -72,6 +72,7 @@ class CAHDSolution:
         for r, c in zip(requests, carriers):
             self.request_to_carrier_assignment[r] = c
             self.unassigned_requests.remove(r)
+            self.carriers[c].assigned_requests.append(r)
             self.carriers[c].unrouted_requests.append(r)
 
     def as_dict(self):
@@ -105,12 +106,9 @@ class CAHDSolution:
 class AHDSolution:
     def __init__(self, carrier_index):
         self.id_ = carrier_index
-        # must be a list (instead of a set) because it must be sorted for bidding (could create a local list-copy
-        # though, if i really wanted)
+        self.assigned_requests: List = []
         self.unrouted_requests: List = []
         self.tours: List[tr.Tour] = []
-
-        # self.solution_algorithm = None
 
     def __str__(self):
         s = f'---// Carrier ID: {self.id_} //---'
@@ -161,9 +159,3 @@ class AHDSolution:
             'sum_revenue': self.sum_revenue(),
             'tour_summaries': {t.id_: t.summary() for t in self.tours}
         }
-
-
-def read_solution_and_summary_from_json(path: Path):
-    with open(path, mode='r') as f:
-        solution, summary = json.load(f).values()
-    return solution, summary

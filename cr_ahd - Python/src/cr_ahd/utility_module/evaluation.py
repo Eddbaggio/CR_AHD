@@ -71,7 +71,7 @@ def bar_chart(df: pd.DataFrame,
                  facet_col=facet_col,
                  text=values,
                  template='plotly_dark',
-                 hover_data=hover_text
+                 hover_data=hover_text,
                  )
 
     # legend for symbols

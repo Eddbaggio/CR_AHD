@@ -365,6 +365,7 @@ class PDPMoveBestImpr(PDPIntraTourLocalSearch, ABC):
         delta, old_pickup_pos, old_delivery_pos, new_pickup_pos, new_delivery_pos = move
         tour_ = solution.carriers[carrier].tours[tour]
 
+        # todo: better pop_no_update? saves time!
         pickup, delivery = tour_.pop_and_update(instance, solution, [old_pickup_pos, old_delivery_pos])
         tour_.insert_and_update(instance, solution, [new_pickup_pos, new_delivery_pos], [pickup, delivery])
 
@@ -508,6 +509,8 @@ class PDPExchangeMoveBest(PDPInterTourLocalSearch):
     def execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move):
         delta, old_tour, old_pickup_pos, old_delivery_pos, new_tour, new_pickup_pos, new_delivery_pos = move
         carrier_ = solution.carriers[carrier]
+
+        # todo: better pop_no_update? saves time!
         carrier_.tours[old_tour].pop_and_update(instance, solution, [old_pickup_pos, old_delivery_pos])
         carrier_.tours[new_tour].insert_and_update(instance, solution, [new_pickup_pos, new_delivery_pos],
                                                    [(carrier_.tours[old_tour].routing_sequence[old_pickup_pos]),

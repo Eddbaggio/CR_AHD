@@ -1,10 +1,12 @@
 import itertools
 import logging
+import re
 from abc import ABC, abstractmethod
 
 import numpy as np
 
 from src.cr_ahd.core_module import instance as it, solution as slt
+from src.cr_ahd.utility_module import utils as ut
 from src.cr_ahd.routing_module import tour_construction as cns
 
 logger = logging.getLogger(__name__)
@@ -19,7 +21,7 @@ def _abs_num_requests(carrier_: slt.AHDSolution, num_requests) -> int:
         return num_requests
     elif isinstance(num_requests, float):
         assert num_requests <= 1, 'If providing a float, must be <=1 to be converted to percentage'
-        return round(len(carrier_.unrouted_requests) * num_requests)
+        return round(len(carrier_.assigned_requests) * num_requests)
 
 
 class RequestSelectionBehavior_individual(ABC):
@@ -43,12 +45,15 @@ class RequestSelectionBehavior_individual(ABC):
             valuations = self._evaluate_requests(instance, solution, carrier)
             # pick the worst k evaluated requests (from ascending order)
             selected = [r for _, r in sorted(zip(valuations, solution.carriers[carrier].unrouted_requests))][:k]
+
             for s in selected:
-                solution.carriers[carrier].unrouted_requests.remove(s)
+                solution.carriers[carrier].assigned_requests.remove(s)
                 solution.request_to_carrier_assignment[s] = np.nan
+                solution.unassigned_requests.append(s)
+
                 auction_pool.append(s)
                 original_bundles.append(carrier)
-                solution.unassigned_requests.append(s)
+
         return auction_pool, original_bundles
 
     @abstractmethod
@@ -130,7 +135,8 @@ class RequestSelectionBehavior_bundle(ABC):
         original_bundles = []
 
         for carrier in range(instance.num_carriers):
-            k = _abs_num_requests(solution.carriers[carrier], num_requests)
+            carrier_ = solution.carriers[carrier]
+            k = _abs_num_requests(carrier_, num_requests)
 
             # make the bundles that shall be evaluated
             bundles = self._create_bundles(instance, solution, carrier, k)
@@ -144,13 +150,27 @@ class RequestSelectionBehavior_bundle(ABC):
                     best_bundle = bundle
                     best_bundle_valuation = bundle_valuation
 
-            # retract requests from carrier and add the carrier's best bundle to auction pool & original bundling
+            # carrier's best bundle: retract requests from their tours and add them to auction pool & original bundling
             for request in best_bundle:
 
-                solution.carriers[carrier].unrouted_requests.remove(request)
+                # find the request's tour:
+                pickup, delivery = instance.pickup_delivery_pair(request)
+                for t in carrier_.tours:
+                    if pickup in t.routing_sequence:
+                        tour_ = t
+                        break
+
+                # destroy & repair, i.e. remove the request from it's tour
+                pickup_pos = tour_.routing_sequence.index(pickup)
+                delivery_pos = tour_.routing_sequence.index(delivery)
+                tour_.pop_and_update(instance, solution, [pickup_pos, delivery_pos])
+
+                # retract the request from the carrier
+                carrier_.assigned_requests.remove(request)
                 solution.request_to_carrier_assignment[request] = np.nan
                 solution.unassigned_requests.append(request)
 
+                # update auction pool and original bundling candidate
                 auction_pool.append(request)
                 original_bundles.append(carrier)
 
@@ -171,7 +191,7 @@ class Cluster(RequestSelectionBehavior_bundle):
         """
         create all possible bundles of size k
         """
-        return itertools.combinations(solution.carriers[carrier].unrouted_requests, k)
+        return itertools.combinations(solution.carriers[carrier].assigned_requests, k)
 
     def _evaluate_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, bundle):
         """
