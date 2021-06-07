@@ -1,6 +1,7 @@
 import abc
 import logging.config
 import random
+from copy import deepcopy
 from typing import final
 
 from src.cr_ahd.auction_module import auction as au
@@ -12,17 +13,18 @@ logger = logging.getLogger(__name__)
 
 
 class Solver(abc.ABC):
-    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
+    def execute(self, instance: it.PDPInstance):
         """
         apply the concrete solution algorithm
         """
+        solution = slt.CAHDSolution(instance)
         random.seed(0)
 
         self._acceptance_phase(instance, solution)
         self._auction_phase(instance, solution)
 
         solution.solution_algorithm = self.__class__.__name__
-        pass
+        return solution
 
     def _acceptance_phase(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         while solution.unassigned_requests:
@@ -38,6 +40,7 @@ class Solver(abc.ABC):
             cns.CheapestPDPInsertion().construct(instance, solution)
             imp.PDPMoveBestImpr().improve_global_solution(instance, solution)
 
+    @abc.abstractmethod
     def _time_window_management(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
         pass
 
@@ -94,6 +97,41 @@ class CollaborativePlanning(Solver):
                                                     delivery_pos)
 
                 imp.PDPMoveBestImpr().improve_carrier_solution_first_improvement(instance, solution, carrier)
+
+    def _time_window_management(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
+        twm.TWManagementSingle().execute(instance, solution, carrier)
+
+
+class CentralizedPlanning(Solver):
+
+    def execute(self, instance: it.PDPInstance):
+
+        # copy and alter the underlying instance to make it a multi-depot, single-carrier instance
+        md_instance = deepcopy(instance)
+        md_instance.num_carriers = 1
+        md_instance.request_to_carrier_assignment = [0] * len(md_instance.request_to_carrier_assignment)
+
+        solution = slt.CAHDSolution(md_instance)
+        random.seed(0)
+
+        self._acceptance_phase(md_instance, solution)
+
+        solution.solution_algorithm = self.__class__.__name__
+        return solution
+
+    def _acceptance_phase(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
+        while solution.unassigned_requests:
+            request = solution.unassigned_requests[0]
+            carrier = instance.request_to_carrier_assignment[request]
+            solution.assign_requests_to_carriers([request], [carrier])
+
+            # find the tw for the request
+            self._time_window_management(instance, solution, 0)
+
+            # build tours with the assigned request
+            cns.CheapestPDPInsertion().construct(instance, solution)
+            imp.PDPMoveBestImpr().improve_global_solution(instance, solution)
+        pass
 
     def _time_window_management(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
         twm.TWManagementSingle().execute(instance, solution, carrier)

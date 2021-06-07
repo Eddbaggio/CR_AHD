@@ -265,8 +265,8 @@ class Tour:
 
     def insertion_feasibility_check(self, instance,
                                     solution,
-                                    insertion_positions: List[int],
-                                    insertion_vertices: List[int]):
+                                    insertion_positions: Sequence[int],
+                                    insertion_vertices: Sequence[int]):
         """
         check Time Window, Maximum Tour Length and Maximum Vehicle Load constraints for the route IF the
         insertion_vertices were inserted at the insertion_positions. Insertion is not actually performed!

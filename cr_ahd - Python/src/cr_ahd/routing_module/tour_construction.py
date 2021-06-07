@@ -81,16 +81,29 @@ class PDPInsertionConstruction(TourConstructionBehavior, ABC):
         )
 
     @staticmethod
-    def _create_new_tour_with_request(instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
-                                      request: int):
+    def _create_new_tour_with_request(instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
+        """
+        In case of a multi-depot problem, the pendulum tour with the highest profit for the given request is created
+        """
         carrier_ = solution.carriers[carrier]
-        if carrier_.num_tours() >= instance.carriers_max_num_tours:
+        if carrier_.num_tours() >= instance.carriers_max_num_tours * (instance.num_depots // instance.num_carriers):
             # logger.error(f'Max Vehicle Constraint violated!')
             raise ut.ConstraintViolationError(f'Cannot create new route with request {request} for carrier {carrier}.'
                                               f' Max. number of vehicles is {instance.carriers_max_num_tours}!')
-        rtmp = tr.Tour(carrier_.num_tours(), instance, solution, carrier_.id_)
-        rtmp.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(request))
-        carrier_.tours.append(rtmp)
+
+        # check all depots in case of a multi-depot instance to find the max profit pendulum tour
+        max_profit = -float('inf')
+        for depot in range(instance.num_depots // instance.num_carriers):
+
+            tour_ = tr.Tour(carrier_.num_tours(), instance, solution, depot_index=depot)
+            if tour_.insertion_feasibility_check(instance, solution, [1, 2], instance.pickup_delivery_pair(request)):
+                tour_.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(request))
+
+                if tour_.sum_profit > max_profit:
+                    max_profit = tour_.sum_profit
+                    best_tour_ = tour_
+
+        carrier_.tours.append(best_tour_)
         carrier_.unrouted_requests.remove(request)
         return
 

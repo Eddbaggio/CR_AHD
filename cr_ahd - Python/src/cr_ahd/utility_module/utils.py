@@ -146,7 +146,9 @@ def timer(func):
 
 def unique_path(directory, name_pattern) -> Path:
     """
-    construct a unique numbered file name based on a template
+    construct a unique numbered file name based on a template.
+    Example template: file_name + '_#{:03d}' + '.json'
+
     :param directory: directory which shall be the parent dir of the file
     :param name_pattern: pattern for the file name, with room for a counter
     :return: file path that is unique in the specified directory
@@ -346,6 +348,5 @@ TW_LENGTH = dt.timedelta(hours=2)
 ALL_TW = [TimeWindow(e, min(e + TW_LENGTH, END_TIME)) for e in datetime_range(START_TIME, END_TIME, freq=TW_LENGTH)]
 TIME_HORIZON = TimeWindow(START_TIME, END_TIME)
 SPEED_KMH = 60  # vehicle speed (set to 60 to treat distance = time)
-DYNAMIC_CYCLE_TIME = 5  # does not actually represent time but the number of requests being assigned each cycle
-NUM_REQUESTS_TO_SUBMIT = 0.6  # either relative (between 0 and 1) OR an absolute number <= DYNAMIC_CYCLE_TIME
-AUCTION_POOL_SIZE = 50  # 50, 100, 200, 300, 500
+NUM_REQUESTS_TO_SUBMIT = 4  # either relative (between 0 and 1) OR an absolute number <= DYNAMIC_CYCLE_TIME
+AUCTION_POOL_SIZE = 100  # 50, 100, 200, 300, 500

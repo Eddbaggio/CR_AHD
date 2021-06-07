@@ -18,11 +18,9 @@ class CAHDSolution:
         self.unassigned_requests = list(instance.requests)
         # the current REQUEST-to-carrier (not vertex-to-carrier) allocation, initialized with nan for all requests
         self.request_to_carrier_assignment = np.full(instance.num_requests, np.nan)
-        # TODO unassigned_requests and request_to_carrier_assignment contain redundant data.
-        #  unassigned_requests == np.where(np.isnan(request_to_carrier_assignment))
         # basically no apriori time windows for all VERTICES
-        self.tw_open = np.full(instance.num_carriers + 2 * instance.num_requests, ut.START_TIME).tolist()
-        self.tw_close = np.full(instance.num_carriers + 2 * instance.num_requests, ut.END_TIME).tolist()
+        self.tw_open = np.full(instance.num_depots + 2 * instance.num_requests, ut.START_TIME).tolist()
+        self.tw_close = np.full(instance.num_depots + 2 * instance.num_requests, ut.END_TIME).tolist()
 
         self.carriers = [AHDSolution(c) for c in range(instance.num_carriers)]
 

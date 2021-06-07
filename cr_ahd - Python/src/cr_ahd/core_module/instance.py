@@ -2,11 +2,11 @@ import datetime as dt
 import json
 import logging.config
 from pathlib import Path
-from typing import List, Tuple, Sequence
+from typing import Tuple, Sequence
 
 import numpy as np
 import pandas as pd
-from scipy.spatial.distance import pdist, squareform, cdist
+from scipy.spatial.distance import pdist, squareform
 
 import src.cr_ahd.utility_module.utils as ut
 
@@ -42,6 +42,7 @@ class PDPInstance:
         self.meta = dict((k.strip(), int(v.strip()))
                          for k, v in (item.split('=')
                                       for item in id_.split('+')))
+        self.num_depots = len(carrier_depots_x)
         self.num_carriers = len(carrier_depots_x)
         self.vehicles_max_load = max_vehicle_load
         self.vehicles_max_travel_distance = max_tour_length
@@ -90,42 +91,23 @@ class PDPInstance:
         if request >= self.num_requests:
             raise IndexError(
                 f'you asked for request {request} but instance {self.id_} only has {self.num_requests} requests')
-        return self.num_carriers + request, self.num_carriers + self.num_requests + request
+        return self.num_depots + request, self.num_depots + self.num_requests + request
 
     def request_from_vertex(self, vertex: int):
-        if vertex < self.num_carriers:
-            raise IndexError(f'you provided vertex {vertex} but that is a depot not a request vertex')
-        elif vertex >= self.num_carriers + 2 * self.num_requests:
+        if vertex < self.num_depots:
+            raise IndexError(f'you provided vertex {vertex} but that is a depot vertex, not a request vertex')
+        elif vertex >= self.num_depots + 2 * self.num_requests:
             raise IndexError(
-                f'you provided vertex {vertex} but there are only {self.num_carriers + 2 * self.num_requests} vertices')
-        elif vertex <= self.num_carriers + self.num_requests - 1:  # pickup vertex
-            return vertex - self.num_carriers
+                f'you provided vertex {vertex} but there are only {self.num_depots + 2 * self.num_requests} vertices')
+        elif vertex <= self.num_depots + self.num_requests - 1:  # pickup vertex
+            return vertex - self.num_depots
         else:  # delivery vertex
-            return vertex - self.num_carriers - self.num_requests
+            return vertex - self.num_depots - self.num_requests
 
     def coords(self, vertex: int):
         return ut.Coordinates(self.x_coords[vertex], self.y_coords[vertex])
 
-    '''
-    def to_centralized(self, depot_xy: tuple):
-        """
-        Convert the instance to a centralized instance, i.e. this function returns the same instance but with only a
-        single carrier whose depot is at the given depot_xy coordinates
-
-        :param depot_xy: coordinates of the central carrier's depot
-        :return: the same instance with just a single carrier
-        """
-        central_depot = vx.DepotVertex('d_central', *depot_xy, carrier_assignment='d0')
-        central_vehicles = []
-        for c in self.carriers:
-            central_vehicles.extend(c.vehicles)
-        central_carrier = cr.Carrier('c0', central_depot, central_vehicles)
-        centralized = PDPInstance(self.id_, self.requests, [central_carrier])
-        centralized.carriers[0].assign_requests(centralized.requests)
-        return centralized
-    '''
-
-    def write_instance_to_json(self):
+    def write_to_json(self):
         """
         Write the instance's data in a json format
 
@@ -143,11 +125,11 @@ class PDPInstance:
         return file_name
 
     def vertex_type(self, vertex: int):
-        if vertex < self.num_carriers:
+        if vertex < self.num_depots:
             return "depot"
-        elif vertex < self.num_carriers + self.num_requests:
+        elif vertex < self.num_depots + self.num_requests:
             return "pickup"
-        elif vertex < self.num_carriers + 2 * self.num_requests:
+        elif vertex < self.num_depots + 2 * self.num_requests:
             return "delivery"
         else:
             raise IndexError(f'Vertex index {vertex} out of range')
@@ -156,7 +138,7 @@ class PDPInstance:
 def read_gansterer_hartl_mv(path: Path, num_carriers=3) -> PDPInstance:
     """read an instance file as used in (Gansterer,M., & Hartl,R.F. (2016). Request evaluation strategies
     for carriers in auction-based collaborations. https://doi.org/10.1007/s00291-015-0411-1).
-    multiplies the max vehicle load by 10!
+    CAUTION:multiplies the max vehicle load by 10!
     """
     vrp_params = pd.read_csv(path, skiprows=1, nrows=3, delim_whitespace=True, header=None, squeeze=True, index_col=0)
     depots = pd.read_csv(path, skiprows=7, nrows=num_carriers, delim_whitespace=True, header=None, index_col=False,
@@ -167,7 +149,7 @@ def read_gansterer_hartl_mv(path: Path, num_carriers=3) -> PDPInstance:
     requests['service_time'] = dt.timedelta(0)
     return PDPInstance(path.stem,
                        vrp_params['V'].tolist(),
-                       (vrp_params['L'] * 10).tolist(),
+                       (vrp_params['L'] * 10).tolist(),  # todo can i solve the problems without *10 vehicle capacity?
                        vrp_params['T'].tolist(),
                        requests.index.tolist(),
                        requests['carrier_index'].tolist(),

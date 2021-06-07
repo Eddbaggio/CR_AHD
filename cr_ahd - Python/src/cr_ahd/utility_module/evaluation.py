@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pandas as pd
 import plotly.express as px
 
@@ -34,12 +36,16 @@ def bar_chart(df: pd.DataFrame,
               facet_col='rad',
               sum_by=['carrier_id_', 'tour_id_'],
               mean_by=['run'],
-              show: bool = True):
+              barmode='group',
+              show: bool = True,
+              html_path=None,
+              ):
     """
 
     :param df: multi-index dataframe
     :return:
     """
+    df = df.droplevel(['id_', 'dist', 'num_carriers'])
     multiindex = df.index.names
     # sum up values for sum_by variables (e.g. tours or carriers)
     df = df.groupby(list(set(multiindex) - set(sum_by))).sum()
@@ -47,7 +53,7 @@ def bar_chart(df: pd.DataFrame,
     if mean_by:
         df = df.groupby(list(set(multiindex) - set(sum_by) - set(mean_by))).mean()
     # prepare for use in plotly express
-    df = df.reset_index()
+    df: pd.DataFrame = df.reset_index()
     df = df.round(2)
 
     # hover text
@@ -70,25 +76,21 @@ def bar_chart(df: pd.DataFrame,
                  facet_row=facet_row,
                  facet_col=facet_col,
                  text=values,
-                 template='plotly_dark',
-                 hover_data=hover_text,
+                 template='plotly_white',
+                 hover_data=df.columns.values,
+                 barmode=barmode,
+                 category_orders={'solution_algorithm': ['IsolatedPlanningNoTW',
+                                                         'CollaborativePlanningNoTW',
+                                                         'IsolatedPlanning',
+                                                         'CollaborativePlanning',
+                                                         ]}
                  )
-
-    # legend for symbols
-    # fig.add_annotation(
-    #     text=f"n: Number of requests<br>per carrier<br><br>"
-    #          f"rad: Radius of the carriers'<br>operational area around the<br>depot",
-    #     xref='paper',
-    #     yref='paper',
-    #     x=1.15, y=0.5,
-    #     bordercolor='white',
-    #     borderwidth=1,
-    #     showarrow=False,
-    #     align='left'
-    # )
 
     if show:
         fig.show(config=config)
+
+    if html_path:
+        fig.write_html(html_path, )
 
 
 '''
@@ -133,6 +135,11 @@ def plotly_bar_plot(solomon_list: List, attributes: List[str], ):
 
 if __name__ == '__main__':
     df = pd.read_csv(
-        "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_#005.csv",
+        "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_#014.csv",
         index_col=[0, 1, 2, 3, 4, 5, 6, 7, 8])
-    bar_chart(df)
+    bar_chart(df,
+              category='run',
+              mean_by=None,
+              show=True,
+              # html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix()
+              )
