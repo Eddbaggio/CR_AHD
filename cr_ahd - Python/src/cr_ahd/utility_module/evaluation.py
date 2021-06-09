@@ -93,6 +93,52 @@ def bar_chart(df: pd.DataFrame,
         fig.write_html(html_path, )
 
 
+def boxplot(df: pd.DataFrame,
+            values: str = 'sum_profit',
+            category='solution_algorithm',
+            color='solution_algorithm',
+            facet_row='n',
+            facet_col='rad',
+            sum_by=['carrier_id_', 'tour_id_'],
+            show: bool = True,
+            html_path=None,
+            ):
+    df = df.droplevel(['id_', 'dist', 'num_carriers'])
+    multiindex = df.index.names
+
+    # sum up values for sum_by variables (e.g. tours or carriers)
+    df = df.groupby(list(set(multiindex) - set(sum_by))).sum()
+
+    # prepare for use in plotly express
+    df: pd.DataFrame = df.reset_index()
+    df = df.round(2)
+
+    # boxplot
+    fig = px.box(df,
+                 x=category,
+                 y=values,
+                 title=f"<b>n</b>: Number of requests per carrier<br>"
+                       f"<b>rad</b>: Radius of the carriers' operational area around the depot<br>",
+                 color=color,
+                 points='all',
+                 color_discrete_sequence=ut.univie_colors_100,
+                 facet_row=facet_row,
+                 facet_col=facet_col,
+                 template='plotly_white',
+                 hover_data=df.columns.values,
+                 category_orders={'solution_algorithm': ['IsolatedPlanningNoTW',
+                                                         'CollaborativePlanningNoTW',
+                                                         'IsolatedPlanning',
+                                                         'CollaborativePlanning',
+                                                         ]}
+                 )
+    if show:
+        fig.show(config=config)
+
+    if html_path:
+        fig.write_html(html_path, )
+
+
 '''
 def plotly_bar_plot(solomon_list: List, attributes: List[str], ):
     df: pd.DataFrame = combine_eval_files(solomon_list)[attributes]
@@ -135,11 +181,17 @@ def plotly_bar_plot(solomon_list: List, attributes: List[str], ):
 
 if __name__ == '__main__':
     df = pd.read_csv(
-        "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_#014.csv",
+        "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_#005.csv",
         index_col=[0, 1, 2, 3, 4, 5, 6, 7, 8])
-    bar_chart(df,
-              category='run',
-              mean_by=None,
-              show=True,
-              # html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix()
-              )
+    # bar_chart(df,
+    #           category='run',
+    #           mean_by=None,
+    #           show=True,
+    #           # html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix()
+    #           )
+    boxplot(df,
+            show=True,
+            category='n',
+            facet_col=None,
+            facet_row='rad'
+            )

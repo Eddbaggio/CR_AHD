@@ -82,7 +82,7 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
                                                          instance.num_carriers,
                                                          population_size)
 
-        for generation_counter in tqdm.trange(1, num_generations, desc='Bundle Generation', disable=False):
+        for generation_counter in tqdm.trange(1, num_generations, desc='Bundle Generation', disable=True):
 
             # initialize new generation with the elites from the previous generation
             elites = ut.argsmax(fitness, int(population_size * (1 - generation_gap)))

@@ -13,16 +13,21 @@ class CAHDSolution:
     def __init__(self, instance: it.PDPInstance):
         self.id_ = instance.id_
         self.meta = instance.meta
-        # REQUESTS that are not assigned to any carrier (went with a list rather than a set because when re-assigning
-        # requests, i need index-based access to the elements
+
+        # requests that are not assigned to any carrier
         self.unassigned_requests = list(instance.requests)
+
         # the current REQUEST-to-carrier (not vertex-to-carrier) allocation, initialized with nan for all requests
         self.request_to_carrier_assignment = np.full(instance.num_requests, np.nan)
+
         # basically no apriori time windows for all VERTICES
         self.tw_open = np.full(instance.num_depots + 2 * instance.num_requests, ut.START_TIME).tolist()
         self.tw_close = np.full(instance.num_depots + 2 * instance.num_requests, ut.END_TIME).tolist()
 
         self.carriers = [AHDSolution(c) for c in range(instance.num_carriers)]
+
+        # one depot per carrier, can be adjusted externally for multi-depot, single-carrier problems
+        self.carrier_depots = [[depot] for depot in range(instance.num_depots)]
 
         # stuff that is filled during the solving
         self.rejected_requests = []
@@ -82,6 +87,7 @@ class CAHDSolution:
             'id_': self.id_,
             'solution_algorithm': self.solution_algorithm,
             'num_carriers': self.num_carriers(),
+            'carrier_depots': self.carrier_depots,
             'sum_travel_distance': self.sum_travel_distance(),
             'sum_travel_duration': self.sum_travel_duration(),
             'sum_load': self.sum_load(),
@@ -104,6 +110,7 @@ class CAHDSolution:
 class AHDSolution:
     def __init__(self, carrier_index):
         self.id_ = carrier_index
+        # self.depots = [carrier_index]  # maybe it's better to store the depots in this class rather than in CAHD?!
         self.assigned_requests: List = []
         self.unrouted_requests: List = []
         self.tours: List[tr.Tour] = []

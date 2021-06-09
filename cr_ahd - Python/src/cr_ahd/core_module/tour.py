@@ -214,7 +214,7 @@ class Tour:
             revenue_sequence=self._revenue_sequence,
             arrival_schedule=self._arrival_schedule,
             service_schedule=self._service_schedule,
-            num_carriers=instance.num_carriers,
+            num_depots=instance.num_depots,
             num_requests=instance.num_requests,
             distance_matrix=instance._distance_matrix,
             vertex_load=instance.load,
@@ -282,7 +282,7 @@ class Tour:
                                            self.travel_distance_sequence,
                                            self.service_schedule,
                                            self.load_sequence,
-                                           instance.num_carriers,
+                                           instance.num_depots,
                                            instance.num_requests,
                                            instance._distance_matrix,
                                            instance.vehicles_max_travel_distance,
@@ -300,7 +300,7 @@ def insertion_feasibility_check(routing_sequence: Sequence[int],
                                 travel_distance_sequence: Sequence[float],
                                 service_schedule: Sequence[dt.datetime],
                                 load_sequence: Sequence[float],
-                                num_carriers: int,
+                                num_depots: int,
                                 num_requests: int,
                                 distance_matrix: Sequence[Sequence[float]],
                                 vehicles_max_travel_distance: float,
@@ -334,7 +334,7 @@ def insertion_feasibility_check(routing_sequence: Sequence[int],
         predecessor_vertex: int = tmp_routing_sequence[pos - 1]
 
         # check precedence if vertex is a delivery vertex
-        if num_carriers + num_requests <= vertex < num_carriers + 2 * num_requests:
+        if num_depots + num_requests <= vertex < num_depots + 2 * num_requests:
             precedence_vertex = vertex - num_requests
             if precedence_vertex not in tmp_routing_sequence[:pos]:
                 return False
@@ -395,7 +395,7 @@ def update_sequences_and_schedules(
         revenue_sequence: List[float],
         arrival_schedule: List[dt.datetime],
         service_schedule: List[dt.datetime],
-        num_carriers: int,
+        num_depots: int,
         num_requests: int,
         distance_matrix: Sequence[Sequence[float]],
         vertex_load: Sequence[float],
@@ -425,12 +425,12 @@ def update_sequences_and_schedules(
         predecessor_vertex: int = routing_sequence[pos - 1]
 
         # check precedence if the vertex is a delivery vertex
-        if num_carriers + num_requests <= vertex < num_carriers + 2 * num_requests:
+        if num_depots + num_requests <= vertex < num_depots + 2 * num_requests:
             precedence_vertex = vertex - num_requests
             if precedence_vertex not in routing_sequence[:pos]:
-                message = f'Precedence violated'
+                message = f'Precedence Violation: vertex {precedence_vertex} must precede {vertex}!'
                 logger.error(message)
-                raise ut.ConstraintViolationError(message, message)
+                raise ut.ConstraintViolationError(message)
 
         # check max distance constraints
         travel_dist = distance_matrix[predecessor_vertex][vertex]
@@ -438,12 +438,12 @@ def update_sequences_and_schedules(
         if total_travel_dist > vehicles_max_travel_distance:
             message = f'Distance {total_travel_dist} too long'
             logger.error(message)
-            raise ut.ConstraintViolationError(message, message)
+            raise ut.ConstraintViolationError(message)
 
         # check tw constraints
         arrival_time = service_schedule[pos - 1] + service_duration[predecessor_vertex] + ut.travel_time(travel_dist)
         if arrival_time > tw_close[vertex]:
-            vertex_type = "delivery" if num_carriers + num_requests <= vertex < num_carriers + 2 * num_requests else "pickup"
+            vertex_type = "delivery" if num_depots + num_requests <= vertex < num_depots + 2 * num_requests else "pickup"
             message = f'arrival at vertex {vertex} ({vertex_type} ) in position {pos} at {arrival_time} too late, tw closes at {tw_close[vertex]}'
             logger.debug(message)
             raise ut.ConstraintViolationError(message, message)
@@ -473,7 +473,7 @@ def pop_and_update(
         revenue_sequence: List[float],
         arrival_schedule: List[dt.datetime],
         service_schedule: List[dt.datetime],
-        num_carriers: int,
+        num_depots: int,
         num_requests: int,
         distance_matrix: Sequence[Sequence[float]],
         vertex_load: Sequence[float],
@@ -506,7 +506,7 @@ def pop_and_update(
         revenue_sequence=revenue_sequence,
         arrival_schedule=arrival_schedule,
         service_schedule=service_schedule,
-        num_carriers=num_carriers,
+        num_depots=num_depots,
         num_requests=num_requests,
         distance_matrix=distance_matrix,
         vertex_load=vertex_load,
@@ -580,7 +580,7 @@ def insert_and_update(
         service_schedule: List[dt.datetime],
         load_sequence: List[float],
         revenue_sequence: List[float],
-        num_carriers: int,
+        num_depots: int,
         num_requests: int,
         distance_matrix: Sequence[Sequence[float]],
         vertex_load: Sequence[float],
@@ -614,7 +614,7 @@ def insert_and_update(
             revenue_sequence=revenue_sequence,
             arrival_schedule=arrival_schedule,
             service_schedule=service_schedule,
-            num_carriers=num_carriers,
+            num_depots=num_depots,
             num_requests=num_requests,
             distance_matrix=distance_matrix,
             vertex_load=vertex_load,

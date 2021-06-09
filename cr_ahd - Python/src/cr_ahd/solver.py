@@ -82,8 +82,10 @@ class CollaborativePlanning(Solver):
         for carrier in range(instance.num_carriers):
             carrier_ = solution.carriers[carrier]
             while carrier_.unrouted_requests:
+                request = carrier_.unrouted_requests[0]
                 insertion = construction._carrier_cheapest_insertion(instance, solution, carrier,
-                                                                     carrier_.unrouted_requests[:1])
+                                                                     [request]  # one at a time
+                                                                     )
 
                 request, tour, pickup_pos, delivery_pos = insertion
 
@@ -105,13 +107,16 @@ class CollaborativePlanning(Solver):
 class CentralizedPlanning(Solver):
 
     def execute(self, instance: it.PDPInstance):
-
         # copy and alter the underlying instance to make it a multi-depot, single-carrier instance
         md_instance = deepcopy(instance)
         md_instance.num_carriers = 1
+        md_instance.carrier_depots = [[d for d in range(instance.num_depots)]]
         md_instance.request_to_carrier_assignment = [0] * len(md_instance.request_to_carrier_assignment)
 
+        # initialize and adjust the solution
         solution = slt.CAHDSolution(md_instance)
+        solution.carrier_depots = [[depot for depot in range(instance.num_depots)]]
+
         random.seed(0)
 
         self._acceptance_phase(md_instance, solution)

@@ -24,7 +24,7 @@ class BiddingBehavior(ABC):
 
         """
         bundle_bids = []
-        for b in tqdm.trange(len(bundles), desc='Bidding', disable=False):
+        for b in tqdm.trange(len(bundles), desc='Bidding', disable=True):
             carrier_bundle_bids = []
             for carrier in range(instance.num_carriers):
                 logger.debug(f'Carrier {carrier} generating bids for bundle {b}')
@@ -60,18 +60,22 @@ class CheapestInsertionDistanceIncrease(BiddingBehavior):
         tmp_carrier_.assigned_requests.sort()  # must be sorted due to dynamism
         tmp_carrier_.unrouted_requests.extend(tmp_carrier_.assigned_requests)
         solution.carriers.append(tmp_carrier_)
+        solution.carrier_depots.append(solution.carrier_depots[carrier])
 
         try:
             construction = cns.CheapestPDPInsertion()
             while tmp_carrier_.unrouted_requests:
+                request = tmp_carrier_.unrouted_requests[0]
                 insertion = construction._carrier_cheapest_insertion(instance,
                                                                      solution,
                                                                      tmp_carrier,
-                                                                     tmp_carrier_.unrouted_requests[:1])
+                                                                     [request]  # one at a time
+                                                                     )
                 request, tour, pickup_pos, delivery_pos = insertion
 
-                # when for a given request no tour can be found, create a new tour and start over. This may raise
-                # a ConstraintViolationError if the carrier cannot initialize another new tour
+                # when for a given request no tour can be found, create a new tour. This may raise a
+                # ConstraintViolationError if the carrier (a) would exceed fleet size constraints or (b) a pendulum
+                # tour would exceed time window constraints
                 if tour is None:
                     construction._create_new_tour_with_request(instance, solution, tmp_carrier, request)
 
@@ -89,6 +93,7 @@ class CheapestInsertionDistanceIncrease(BiddingBehavior):
 
         finally:
             solution.carriers.pop()  # del the temporary carrier copy
+            solution.carrier_depots.pop()  # del the tmp_carrier's depot
 
         return with_bundle - without_bundle
 

@@ -499,12 +499,13 @@ class PDPExchangeMoveBest(PDPInterTourLocalSearch):
         # TODO check ALL constraints
         delta, old_tour, old_pickup_pos, old_delivery_pos, new_tour, new_pickup_pos, new_delivery_pos = move
         carrier_ = solution.carriers[carrier]
-        return carrier_.tours[new_tour].insertion_feasibility_check(instance, solution,
-                                                                    [new_pickup_pos, new_delivery_pos],
-                                                                    [(carrier_.tours[old_tour].routing_sequence[
-                                                                        old_pickup_pos]),
-                                                                     (carrier_.tours[old_tour].routing_sequence[
-                                                                         old_delivery_pos])])
+        return carrier_.tours[new_tour].insertion_feasibility_check(
+            instance,
+            solution,
+            [new_pickup_pos, new_delivery_pos],
+            [(carrier_.tours[old_tour].routing_sequence[old_pickup_pos]),
+             (carrier_.tours[old_tour].routing_sequence[old_delivery_pos])]
+        )
 
     def execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move):
         delta, old_tour, old_pickup_pos, old_delivery_pos, new_tour, new_pickup_pos, new_delivery_pos = move

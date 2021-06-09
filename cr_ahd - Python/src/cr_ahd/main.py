@@ -46,21 +46,21 @@ def execute_all(instance: it.PDPInstance, plot=False):
         slv.CentralizedPlanning,
     ]:
         logger.info(f'{instance.id_}: Solving via {solver.__name__} ...')
-        # try:
-        solution = solver().execute(instance)
-        logger.info(f'{instance.id_}: Successfully solved via {solver.__name__}')
-        if plot:
-            pl.plot_solution_2(
-                instance,
-                solution,
-                title=f'{instance.id_} with Solver "{solver.__name__} - Total profit: {solution.sum_profit()}"',
-                show=True
-            )
-        solution.write_to_json()
-        solutions.append(solution)
+        try:
+            solution = solver().execute(instance)
+            logger.info(f'{instance.id_}: Successfully solved via {solver.__name__}')
+            if plot:
+                pl.plot_solution_2(
+                    instance,
+                    solution,
+                    title=f'{instance.id_} with Solver "{solver.__name__} - Total profit: {solution.sum_profit()}"',
+                    show=True
+                )
+            solution.write_to_json()
+            solutions.append(solution)
 
-        # except Exception as e:
-        #     logger.error(f'{e}\tFailed on instance {instance} with solver {solver.__name__}')
+        except Exception as e:
+            logger.error(f'{e}\tFailed on instance {instance} with solver {solver.__name__}')
 
     return solutions
 
@@ -77,7 +77,7 @@ def s_solve(path: Path, plot=False):
 def m_solve_multi_thread(instance_paths):
     with multiprocessing.Pool(6) as pool:
         solutions = list(
-            tqdm(pool.imap(s_solve, instance_paths), total=len(instance_paths), desc="Parallel Solving", disable=True))
+            tqdm(pool.imap(s_solve, instance_paths), total=len(instance_paths), desc="Parallel Solving", disable=False))
     return solutions
 
 
@@ -121,10 +121,10 @@ if __name__ == '__main__':
     logger.info('START')
 
     # paths = [Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/test.dat')]
-    paths = list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir())[:6]
+    paths = list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir())[:]
 
-    solutions = m_solve_single_thread(paths)
-    # solutions = m_solve_multi_thread(paths)
+    # solutions = m_solve_single_thread(paths)
+    solutions = m_solve_multi_thread(paths)
 
     df = write_solutions_to_multiindex_df(solutions)
     ev.bar_chart(df,

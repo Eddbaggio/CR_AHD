@@ -124,9 +124,9 @@ class FeasibleTW(TWOfferingBehavior):
 
         # can the carrier open a new tour and insert the request there? only checks the time window constraint.
         # it is assumed that load and max tour length are not exceeded with a single request
-        if carrier_.num_tours() < instance.carriers_max_num_tours * (instance.num_depots // instance.num_carriers):
+        if carrier_.num_tours() < instance.carriers_max_num_tours * (len(solution.carrier_depots[carrier])):
 
-            for depot in range(instance.num_depots // instance.num_carriers):
+            for depot in solution.carrier_depots[carrier]:
                 new_tour_feasible = True
                 service_time = ut.START_TIME
 

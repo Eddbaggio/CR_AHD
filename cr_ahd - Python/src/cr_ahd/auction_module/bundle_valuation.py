@@ -65,7 +65,7 @@ def bundle_vertex_to_centroid_travel_dist(instance: it.PDPInstance,
     for request in bundle:
         pickup, delivery = instance.pickup_delivery_pair(request)
         # the actual index for the distance matrix
-        idx = instance.num_carriers + 2 * instance.num_requests + bundle_idx
+        idx = instance.num_depots + 2 * instance.num_requests + bundle_idx
         travel_dist_to_centroid.append((extended_distance_matrix[pickup][idx], extended_distance_matrix[delivery][idx]))
     return travel_dist_to_centroid
 
@@ -141,7 +141,7 @@ def bundle_total_travel_distance(instance: it.PDPInstance,
 
     :param extended_distance_matrix: a replica of the instance's distance matrix, extended by all the distances to the centroids that exist in the candidate solution. these additional distances are positioned at the very end of the matrix; the centroids will have the corresponding indices starting at num_carriers + 2* num_requests
     """
-    num_bundles = len(extended_distance_matrix) - (instance.num_carriers + 2 * instance.num_requests)
+    num_bundles = len(extended_distance_matrix) - (instance.num_depots + 2 * instance.num_requests)
     tour_dict = {'routing_sequence': [],
                  'travel_distance_sequence': [],
                  'travel_duration_sequence': [],
@@ -150,7 +150,7 @@ def bundle_total_travel_distance(instance: it.PDPInstance,
                  'arrival_schedule': [],
                  'service_schedule': []}
     instance_dict = {
-        'num_carriers': instance.num_carriers,
+        'num_depots': instance.num_depots,
         'num_requests': instance.num_requests,
         'distance_matrix': extended_distance_matrix,  # using the extended version
         'vertex_load': instance.load + [0] * num_bundles,
@@ -274,5 +274,5 @@ def GHProxyValuation(instance: it.PDPInstance,
                                            centroids[:bundle_idx] + centroids[bundle_idx + 1:],
                                            radii[bundle_idx],
                                            radii[:bundle_idx] + radii[bundle_idx + 1:]))
-    
+
     return (min(isolations) * min(densities)) / (max(total_travel_distances) * max(candidate_solution)+1)

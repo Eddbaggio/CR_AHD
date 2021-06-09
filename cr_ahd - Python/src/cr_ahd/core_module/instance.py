@@ -51,9 +51,9 @@ class PDPInstance:
         self.x_coords = [*carrier_depots_x, *requests_pickup_x, *requests_delivery_x]
         self.y_coords = [*carrier_depots_y, *requests_pickup_y, *requests_delivery_y]
         self.request_to_carrier_assignment = requests_initial_carrier_assignment
-        self.revenue = [*[0] * (self.num_carriers + len(requests)), *requests_revenue]
-        self.load = [*[0] * self.num_carriers, *requests_pickup_load, *requests_delivery_load]
-        self.service_duration = [*[dt.timedelta(0)] * self.num_carriers, *requests_pickup_service_time,
+        self.revenue = [*[0] * (self.num_depots + len(requests)), *requests_revenue]
+        self.load = [*[0] * self.num_depots, *requests_pickup_load, *requests_delivery_load]
+        self.service_duration = [*[dt.timedelta(0)] * self.num_depots, *requests_pickup_service_time,
                                  *requests_delivery_service_time]
 
         # compute the distance matrix
@@ -64,7 +64,7 @@ class PDPInstance:
         logger.debug(f'{id_}: created')
 
     def __str__(self):
-        return f'Instance {self.id_} with {len(self.requests)} customers and {self.num_carriers} carriers'
+        return f'Instance {self.id_} with {len(self.requests)} customers, {self.num_carriers} carriers and {self.num_depots} depots'
 
     @property
     def id_(self):

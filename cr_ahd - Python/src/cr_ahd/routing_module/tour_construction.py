@@ -69,7 +69,7 @@ class PDPInsertionConstruction(TourConstructionBehavior, ABC):
             travel_distance_sequence=tour_.travel_distance_sequence,
             service_schedule=tour_.service_schedule,
             load_sequence=tour_.load_sequence,
-            num_carriers=instance.num_carriers,
+            num_depots=instance.num_depots,
             num_requests=instance.num_requests,
             distance_matrix=instance._distance_matrix,
             vehicles_max_travel_distance=instance.vehicles_max_travel_distance,
@@ -86,22 +86,27 @@ class PDPInsertionConstruction(TourConstructionBehavior, ABC):
         In case of a multi-depot problem, the pendulum tour with the highest profit for the given request is created
         """
         carrier_ = solution.carriers[carrier]
-        if carrier_.num_tours() >= instance.carriers_max_num_tours * (instance.num_depots // instance.num_carriers):
+        if carrier_.num_tours() >= instance.carriers_max_num_tours * len(solution.carrier_depots[carrier]):
             # logger.error(f'Max Vehicle Constraint violated!')
             raise ut.ConstraintViolationError(f'Cannot create new route with request {request} for carrier {carrier}.'
                                               f' Max. number of vehicles is {instance.carriers_max_num_tours}!')
 
         # check all depots in case of a multi-depot instance to find the max profit pendulum tour
         max_profit = -float('inf')
-        for depot in range(instance.num_depots // instance.num_carriers):
-
+        best_tour_ = False
+        for depot in solution.carrier_depots[carrier]:
             tour_ = tr.Tour(carrier_.num_tours(), instance, solution, depot_index=depot)
+
             if tour_.insertion_feasibility_check(instance, solution, [1, 2], instance.pickup_delivery_pair(request)):
                 tour_.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(request))
 
                 if tour_.sum_profit > max_profit:
                     max_profit = tour_.sum_profit
                     best_tour_ = tour_
+
+        if not best_tour_:
+            raise ut.ConstraintViolationError(f'Cannot create new route with request {request} for carrier {carrier}.'
+                                              f' Feasibility checks failed for all depots (most likely a TW problem)!')
 
         carrier_.tours.append(best_tour_)
         carrier_.unrouted_requests.remove(request)
@@ -154,7 +159,7 @@ def tour_cheapest_insertion(pickup_vertex: int,
                             travel_distance_sequence: Sequence[float],
                             service_schedule: Sequence[dt.datetime],
                             load_sequence: Sequence[float],
-                            num_carriers: int,
+                            num_depots: int,
                             num_requests: int,
                             distance_matrix: Sequence[Sequence[float]],
                             vehicles_max_travel_distance: float,
@@ -187,7 +192,7 @@ def tour_cheapest_insertion(pickup_vertex: int,
                                                   travel_distance_sequence=travel_distance_sequence,
                                                   service_schedule=service_schedule,
                                                   load_sequence=load_sequence,
-                                                  num_carriers=num_carriers,
+                                                  num_depots=num_depots,
                                                   num_requests=num_requests,
                                                   distance_matrix=distance_matrix,
                                                   vehicles_max_travel_distance=vehicles_max_travel_distance,
