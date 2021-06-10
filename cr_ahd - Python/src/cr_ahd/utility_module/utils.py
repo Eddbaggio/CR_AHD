@@ -350,3 +350,4 @@ TIME_HORIZON = TimeWindow(START_TIME, END_TIME)
 SPEED_KMH = 60  # vehicle speed (set to 60 to treat distance = time)
 NUM_REQUESTS_TO_SUBMIT = 4  # either relative (between 0 and 1) OR an absolute number <= DYNAMIC_CYCLE_TIME
 AUCTION_POOL_SIZE = 100  # 50, 100, 200, 300, 500
+

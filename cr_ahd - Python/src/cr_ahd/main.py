@@ -42,8 +42,8 @@ def execute_all(instance: it.PDPInstance, plot=False):
         # slv.IsolatedPlanningNoTW,
         # slv.CollaborativePlanningNoTW,
         slv.IsolatedPlanning,
-        slv.CollaborativePlanning,
-        slv.CentralizedPlanning,
+        # slv.CollaborativePlanning,
+        # slv.CentralizedPlanning,
     ]:
         logger.info(f'{instance.id_}: Solving via {solver.__name__} ...')
         try:
@@ -60,6 +60,7 @@ def execute_all(instance: it.PDPInstance, plot=False):
             solutions.append(solution)
 
         except Exception as e:
+            raise e
             logger.error(f'{e}\tFailed on instance {instance} with solver {solver.__name__}')
 
     return solutions
@@ -121,10 +122,10 @@ if __name__ == '__main__':
     logger.info('START')
 
     # paths = [Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/test.dat')]
-    paths = list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir())[:]
+    paths = list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir())[:4]
 
-    # solutions = m_solve_single_thread(paths)
-    solutions = m_solve_multi_thread(paths)
+    solutions = m_solve_single_thread(paths)
+    # solutions = m_solve_multi_thread(paths)
 
     df = write_solutions_to_multiindex_df(solutions)
     ev.bar_chart(df,

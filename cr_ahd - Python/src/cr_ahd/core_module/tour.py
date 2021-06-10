@@ -29,6 +29,10 @@ class Tour:
         self._arrival_schedule: List[dt.datetime] = []  # arrival time at each stop
         self._service_schedule: List[dt.datetime] = []  # start of service time at each stop
 
+        # details required for constant time feasibility checks
+        self._wait = []
+        self._max_shift = []
+
         # initialize depot to depot tour
         self.insert_and_update(instance, solution, [1], [depot_index])
         self.insert_and_update(instance, solution, [0], [depot_index])
@@ -64,20 +68,12 @@ class Tour:
         return sum(self._travel_distance_sequence)
 
     @property
-    def cumsum_travel_distance(self):
-        return np.cumsum(self.travel_distance_sequence)
-
-    @property
     def travel_duration_sequence(self):
         return tuple(self._travel_duration_sequence)
 
     @property
     def sum_travel_duration(self) -> dt.timedelta:
         return sum(self._travel_duration_sequence, dt.timedelta())
-
-    @property
-    def cumsum_travel_duration(self):
-        return np.cumsum(self.travel_duration_sequence)
 
     @property
     def load_sequence(self):
@@ -88,20 +84,12 @@ class Tour:
         return sum(self.load_sequence)
 
     @property
-    def cumsum_load(self):
-        return np.cumsum(self.load_sequence)
-
-    @property
     def revenue_sequence(self):
         return self._revenue_sequence
 
     @property
     def sum_revenue(self):
         return sum(self.revenue_sequence)
-
-    @property
-    def cumsum_revenue(self):
-        return np.cumsum(self.revenue_sequence)
 
     @property
     def profit_sequence(self):
@@ -296,10 +284,129 @@ class Tour:
                                            )
 
 
+# =====================================================================================================================
+# stand-alone functions that are independent from the instance and solution classes but accept the raw data instead
+# =====================================================================================================================
+
+def feasibility_check(instance,
+                      solution,
+                      carrier: int,
+                      original_tour: int,
+                      new_routing_sequence: Sequence[int],
+                      check_from_index: int
+                      ):
+    """
+    Tests a new routing sequence for feasibility. That new sequence is a modification of the original old_tour and is
+    usually obtained from a local search move.
+    Will NOT check for max vehicle distance as it is assumed that no move that requires a feasibility check
+    is detrimental for the total travel distance
+
+    :param instance:
+    :param solution:
+    :param carrier:
+    :param original_tour:
+    :param new_routing_sequence:
+    :param check_from_index:
+    :return:
+    """
+    old_tour_: Tour = solution.carriers[carrier].tours[original_tour]
+    return feasibility_check_raw(new_routing_sequence=new_routing_sequence,
+                                 travel_distance_sequence=old_tour_.travel_distance_sequence,
+                                 service_schedule=old_tour_.service_schedule,
+                                 load_sequence=old_tour_.load_sequence,
+                                 num_depots=instance.num_depots,
+                                 num_requests=instance.num_requests,
+                                 distance_matrix=instance._distance_matrix,
+                                 vehicles_max_travel_distance=instance.vehicles_max_travel_distance,
+                                 vertex_load=instance.load,
+                                 service_duration=instance.service_duration,
+                                 vehicles_max_load=instance.vehicles_max_load,
+                                 tw_open=solution.tw_open,
+                                 tw_close=solution.tw_close,
+                                 check_from_index=check_from_index,
+                                 )
+
+
+def feasibility_check_raw(new_routing_sequence: Sequence[int],
+                          travel_distance_sequence: Sequence[float],
+                          service_schedule: Sequence[dt.datetime],
+                          load_sequence: Sequence[float],
+                          num_depots: int,
+                          num_requests: int,
+                          distance_matrix: Sequence[Sequence[float]],
+                          vehicles_max_travel_distance: float,
+                          vertex_load: Sequence[int],
+                          service_duration: Sequence[dt.timedelta],
+                          vehicles_max_load: float,
+                          tw_open: Sequence[dt.datetime],
+                          tw_close: Sequence[dt.datetime],
+                          check_from_index: int,
+                          ):
+    """
+    Tests a new routing sequence for feasibility. That new sequence is a modification of the original old_tour and is
+    usually obtained from a local search move.
+
+    :param new_routing_sequence: the NEW routing sequence which should be tested for feasibility
+    :param travel_distance_sequence: the OLD sequence of travel distances
+    :param service_schedule: the OLD list of start-of-service times
+    :param load_sequence: the OLD sequence of load deltas
+    :param num_depots: the total number of depots in the instance
+    :param num_requests: the total number of requests in the instance
+    :param distance_matrix:
+    :param vehicles_max_travel_distance:
+    :param vertex_load: the list of all vertices' load amount
+    :param service_duration:
+    :param vehicles_max_load:
+    :param tw_open:
+    :param tw_close:
+    :param check_from_index: the index from which a feasibility check must start
+    :return:
+    """
+    # initialize the values that must be checked to their correct value at the check_from_index
+    total_travel_distance = sum(travel_distance_sequence[:check_from_index])
+    service_time = service_schedule[check_from_index - 1]
+    load = load_sequence[check_from_index - 1]
+
+    # iterate over the temporary tour and check all constraints, starting from the check_from_index
+    for pos in range(check_from_index, len(new_routing_sequence)):
+        vertex: int = new_routing_sequence[pos]
+        predecessor_vertex: int = new_routing_sequence[pos - 1]
+
+        # check precedence, only required if it's a delivery vertex due to the order in which the tour is checked
+        if num_depots + num_requests <= vertex < num_depots + 2 * num_requests:
+            precedence_vertex = vertex - num_requests
+            if precedence_vertex not in new_routing_sequence[:pos]:
+                return False
+
+        # max tour distance must not necessarily be checked since usually, only improving moves will be checked for
+        # feasibility. but for now I'll keep it in
+        travel_distance = distance_matrix[predecessor_vertex][vertex]
+        total_travel_distance += travel_distance
+        if total_travel_distance > vehicles_max_travel_distance:
+            return False
+
+        # check time windows
+        arrival_time = service_time + service_duration[predecessor_vertex] + ut.travel_time(travel_distance)
+        if arrival_time > tw_close[vertex]:
+            return False
+
+        # update the service time
+        service_time = max(arrival_time, tw_open[vertex])
+
+        # check max vehicle load
+        load += vertex_load[vertex]
+        if load > vehicles_max_load:
+            return False
+
+    return True
+
+
 def insertion_feasibility_check(routing_sequence: Sequence[int],
                                 travel_distance_sequence: Sequence[float],
                                 service_schedule: Sequence[dt.datetime],
                                 load_sequence: Sequence[float],
+                                # wait: Sequence[dt.timedelta],
+                                # max_shift: Sequence[dt.timedelta],
                                 num_depots: int,
                                 num_requests: int,
                                 distance_matrix: Sequence[Sequence[float]],
@@ -315,10 +422,41 @@ def insertion_feasibility_check(routing_sequence: Sequence[int],
     check Time Window, Maximum Tour Length and Maximum Vehicle Load constraints for the route IF the
     insertion_vertices were inserted at the insertion_positions. Insertion is not actually performed!
 
+    constant time insertion feasibility check for TW constraints NOT IMPLEMENTED!:
+    Vansteenwegen,P., Souffriau,W., Vanden Berghe,G., & van Oudheusden,D. (2009). Iterated local search for
+    the team orienteering problem with time windows. Computers & Operations Research, 36(12), 3281–3290.
+    https://doi.org/10.1016/j.cor.2009.03.008
+    TODO the paper does not consider pickup&delivery pairs. Move evaluation of more than one vertex cannot be done in
+     constant time as far as i can see
+    TODO what about the other constraints? Can they be checked in constant time?
 
     :return: True if all constraints are satisfied given the insertion; False otherwise
     """
-    assert all(insertion_positions[i] <= insertion_positions[i + 1] for i in range(len(insertion_positions) - 1))
+    # make sure the insertion positions are ordered
+    assert all(insertion_positions[i] < insertion_positions[i + 1] for i in range(len(insertion_positions) - 1))
+
+    """
+    # =========================
+    # todo the paper from which this is taken considers the TOPTW, thus only a single vertex (rather than PD pairs) 
+    #  have to be checked for feasibility
+    for pos, vertex in zip(insertion_positions, insertion_vertices):
+        predecessor_vertex = routing_sequence[pos - 1]  # i
+        successor_vertex = routing_sequence[pos + 1]  # k
+
+        # The total time consumption (Shift) to insert an extra visit j between visits i and k
+        shift = ut.travel_time(distance_matrix[predecessor_vertex][vertex]) \
+            + wait[pos] + service_duration[pos] \
+            + distance_matrix[vertex][successor_vertex] \
+            - ut.travel_time(distance_matrix[predecessor_vertex][successor_vertex])
+
+        # For a feasible insertion of j between i and k, shift should be limited to the sum of wait and max_shift_of 
+        # visit k
+        if shift > wait[pos + 1] + max_shift[pos + 1]:
+            return False
+
+    # =========================
+    """
+
     # create a temporary routing sequence to loop over that contains the new vertices
     tmp_routing_sequence = list(routing_sequence)
     for pos, vertex in zip(insertion_positions, insertion_vertices):

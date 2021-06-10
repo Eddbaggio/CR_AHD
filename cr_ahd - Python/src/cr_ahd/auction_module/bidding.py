@@ -84,7 +84,9 @@ class CheapestInsertionDistanceIncrease(BiddingBehavior):
                                                     delivery_pos)
 
                 # local search
-                imp.PDPMoveBestImpr().improve_carrier_solution_first_improvement(instance, solution, tmp_carrier)
+                imp.PDPMove().improve_carrier_solution(instance, solution, tmp_carrier, False)
+                imp.PDPTwoOpt().improve_carrier_solution(instance, solution, tmp_carrier, False)
+                imp.PDPRelocate().improve_carrier_solution(instance, solution, tmp_carrier, False)
 
             with_bundle = tmp_carrier_.sum_travel_distance()
 

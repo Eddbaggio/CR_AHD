@@ -9,8 +9,8 @@ def test_PDPTwoOptBest(inst_and_sol_gh_0_ass9_routed6):
     instance, solution = inst_and_sol_gh_0_ass9_routed6
     carrier = 0
     tour = 0
-    local_search = imp.PDPTwoOptBestImpr()
-    move = local_search.find_move(instance, solution, carrier, tour)
+    local_search = imp.PDPTwoOpt()
+    move = local_search.find_feasible_move(instance, solution, carrier, tour)
     best_delta, best_pos_i, best_pos_j = move
     assert best_delta == 0
     assert best_pos_i is None
@@ -22,8 +22,8 @@ def test_PDPMoveBest(inst_and_sol_gh_0_ass9_routed6):
     # pl.plot_solution_2(instance, solution, title="Before PDPMoveBest", show=True)
     carrier = 0
     tour = 0
-    local_search = imp.PDPMoveBestImpr()
-    move = local_search.find_move(instance, solution, carrier, tour)
+    local_search = imp.PDPMove()
+    move = local_search.find_feasible_move(instance, solution, carrier, tour)
     delta, old_pickup_pos, old_delivery_pos, new_pickup_pos, new_delivery_pos = move
     assert delta == pytest.approx(
         -(50 + math.sqrt(50 ** 2 + 50 ** 2) + math.sqrt(25 ** 2 + 100 ** 2)) + (50 + 50 + math.sqrt(25 ** 2 + 50 ** 2)))

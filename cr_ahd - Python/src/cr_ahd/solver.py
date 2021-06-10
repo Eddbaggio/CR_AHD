@@ -38,7 +38,9 @@ class Solver(abc.ABC):
 
             # build tours with the assigned request
             cns.CheapestPDPInsertion().construct(instance, solution)
-            imp.PDPMoveBestImpr().improve_global_solution(instance, solution)
+            imp.PDPMove().local_search(instance, solution)
+            imp.PDPTwoOpt().local_search(instance, solution)
+            imp.PDPRelocate().local_search(instance, solution)
 
     @abc.abstractmethod
     def _time_window_management(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
@@ -98,7 +100,10 @@ class CollaborativePlanning(Solver):
                     construction._execute_insertion(instance, solution, carrier, request, tour, pickup_pos,
                                                     delivery_pos)
 
-                imp.PDPMoveBestImpr().improve_carrier_solution_first_improvement(instance, solution, carrier)
+                imp.PDPMove().improve_carrier_solution(instance, solution, carrier, False)
+                imp.PDPTwoOpt().improve_carrier_solution(instance, solution, carrier, False)
+                imp.PDPRelocate().improve_carrier_solution(instance, solution, carrier, False)
+
 
     def _time_window_management(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
         twm.TWManagementSingle().execute(instance, solution, carrier)
@@ -135,7 +140,10 @@ class CentralizedPlanning(Solver):
 
             # build tours with the assigned request
             cns.CheapestPDPInsertion().construct(instance, solution)
-            imp.PDPMoveBestImpr().improve_global_solution(instance, solution)
+            imp.PDPMove().local_search(instance, solution)
+            imp.PDPTwoOpt().local_search(instance, solution)
+            imp.PDPRelocate().local_search(instance, solution)
+
         pass
 
     def _time_window_management(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
