@@ -472,16 +472,16 @@ class PDPRelocate(PDPInterTourLocalSearch):
 
         return tr.feasibility_check(instance, solution, carrier, new_tour, tmp_routing_sequence, check_from_index)
 
-
     def execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move):
         delta, old_tour, old_pickup_pos, old_delivery_pos, new_tour, new_pickup_pos, new_delivery_pos = move
         carrier_ = solution.carriers[carrier]
 
-        # todo: better pop_no_update? saves time!
-        carrier_.tours[old_tour].pop_and_update(instance, solution, [old_pickup_pos, old_delivery_pos])
-        carrier_.tours[new_tour].insert_and_update(instance, solution, [new_pickup_pos, new_delivery_pos],
-                                                   [(carrier_.tours[old_tour].routing_sequence[old_pickup_pos]),
-                                                    (carrier_.tours[old_tour].routing_sequence[old_delivery_pos])])
+        pickup, delivery = carrier_.tours[old_tour].pop_and_update(instance, solution,
+                                                                   [old_pickup_pos, old_delivery_pos])
+
+        carrier_.tours[new_tour].insert_and_update(instance, solution,
+                                                   [new_pickup_pos, new_delivery_pos],
+                                                   [pickup, delivery])
         pass
 
 # class ThreeOpt(TourImprovementBehavior):

@@ -42,8 +42,8 @@ def execute_all(instance: it.PDPInstance, plot=False):
         # slv.IsolatedPlanningNoTW,
         # slv.CollaborativePlanningNoTW,
         slv.IsolatedPlanning,
-        # slv.CollaborativePlanning,
-        # slv.CentralizedPlanning,
+        slv.CollaborativePlanning,
+        slv.CentralizedPlanning,
     ]:
         logger.info(f'{instance.id_}: Solving via {solver.__name__} ...')
         try:
