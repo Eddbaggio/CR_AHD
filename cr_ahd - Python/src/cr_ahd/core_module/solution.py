@@ -152,7 +152,7 @@ class AHDSolution:
             },
         }
 
-    def summary(self):
+    def summary(self) -> dict:
         return {
             # 'id_': self.id_,
             'num_tours': self.num_tours(),

@@ -56,6 +56,15 @@ univie_colors_100 = [
     '#94C154',  # hellgrün
     '#11897A',  # mintgrün
 ]
+
+
+def map_to_univie_colors(categories: Sequence):
+    colormap = {}
+    for cat, color in zip(categories, itertools.cycle(univie_colors_100)):
+        colormap[cat] = color
+    return colormap
+
+
 # alpha 80%
 univie_colors_60 = [
     '#6899CA',  # universitätsblau
@@ -350,4 +359,3 @@ TIME_HORIZON = TimeWindow(START_TIME, END_TIME)
 SPEED_KMH = 60  # vehicle speed (set to 60 to treat distance = time)
 NUM_REQUESTS_TO_SUBMIT = 4  # either relative (between 0 and 1) OR an absolute number <= DYNAMIC_CYCLE_TIME
 AUCTION_POOL_SIZE = 100  # 50, 100, 200, 300, 500
-

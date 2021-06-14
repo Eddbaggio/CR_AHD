@@ -60,7 +60,7 @@ def execute_all(instance: it.PDPInstance, plot=False):
             solutions.append(solution)
 
         except Exception as e:
-            raise e
+            # raise e
             logger.error(f'{e}\tFailed on instance {instance} with solver {solver.__name__}')
 
     return solutions
@@ -90,8 +90,10 @@ def m_solve_single_thread(instance_paths):
     return solutions
 
 
-def write_solutions_to_multiindex_df(solutions_per_instance: List[List[slt.CAHDSolution]]):
+def write_solution_summary_to_multiindex_df(solutions_per_instance: List[List[slt.CAHDSolution]],
+                                            aggregation_level: int = 0):
     """
+    :param aggregation_level: 0 for tour, i.e. no aggregation, 1 for carrier, 2 for algorithm+solution,
     :param solutions_per_instance: A List of Lists of solutions. First Axis: instance, Second Axis: solver
     """
     df = []
@@ -100,16 +102,17 @@ def write_solutions_to_multiindex_df(solutions_per_instance: List[List[slt.CAHDS
             for carrier in range(solution.num_carriers()):
                 for tour in range(solution.carriers[carrier].num_tours()):
                     d = solution.carriers[carrier].tours[tour].summary()
-                    d['id_'] = solution.id_
+                    # d['id_'] = solution.id_
                     d.update(solution.meta)
-                    d['num_carriers'] = solution.num_carriers()
+                    # d['num_carriers'] = solution.num_carriers()
                     d['solution_algorithm'] = solution.solution_algorithm
                     d['carrier_id_'] = carrier
                     d['tour_id_'] = tour
                     df.append(d)
     df = pd.DataFrame.from_records(df)
+    df = df.drop(columns=['dist'])
     df.set_index(
-        keys=['id_', 'run', 'dist', 'rad', 'n', 'num_carriers', 'solution_algorithm', 'carrier_id_', 'tour_id_'],
+        keys=['rad', 'n', 'run', 'solution_algorithm', 'carrier_id_', 'tour_id_'],
         inplace=True)
     for column in df.select_dtypes(include=['timedelta64']):
         df[column] = df[column].dt.total_seconds()
@@ -122,15 +125,15 @@ if __name__ == '__main__':
     logger.info('START')
 
     # paths = [Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/test.dat')]
-    paths = list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir())[:4]
+    paths = list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir())[:60]
 
-    solutions = m_solve_single_thread(paths)
-    # solutions = m_solve_multi_thread(paths)
+    # solutions = m_solve_single_thread(paths)
+    solutions = m_solve_multi_thread(paths)
 
-    df = write_solutions_to_multiindex_df(solutions)
-    ev.bar_chart(df,
-                 category='n',
-                 facet_col=None,
-                 facet_row='rad',
-                 html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix())
+    df = write_solution_summary_to_multiindex_df(solutions, 1)
+    # ev.bar_chart(df,
+    #              category='n',
+    #              facet_col=None,
+    #              facet_row='rad',
+    #              html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix())
     logger.info('END')

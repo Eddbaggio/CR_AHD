@@ -479,6 +479,11 @@ class PDPRelocate(PDPInterTourLocalSearch):
         pickup, delivery = carrier_.tours[old_tour].pop_and_update(instance, solution,
                                                                    [old_pickup_pos, old_delivery_pos])
 
+        # if it is now empty (i.e. depot -> depot), drop the old tour
+        if len(carrier_.tours[old_tour]) <= 2:
+            carrier_.tours.pop(old_tour)
+            # TODO must I update the tour.id_ ensure that there is no gap in the tour's ids? Nah, don't think so
+
         carrier_.tours[new_tour].insert_and_update(instance, solution,
                                                    [new_pickup_pos, new_delivery_pos],
                                                    [pickup, delivery])

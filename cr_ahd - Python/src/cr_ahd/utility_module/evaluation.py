@@ -2,6 +2,8 @@ from pathlib import Path
 
 import pandas as pd
 import plotly.express as px
+from plotly import graph_objects as go
+from plotly.subplots import make_subplots
 
 import src.cr_ahd.utility_module.utils as ut
 
@@ -27,43 +29,90 @@ config = dict({'scrollZoom': True})
 # =================================================================================================
 # PLOTLY
 # =================================================================================================
-
 def bar_chart(df: pd.DataFrame,
-              values: str = 'sum_profit',
-              category='solution_algorithm',
+              # agg_level='run',
+              values='sum_profit',
+              category='run',
               color='solution_algorithm',
               facet_row='n',
               facet_col='rad',
-              sum_by=['carrier_id_', 'tour_id_'],
-              mean_by=['run'],
               barmode='group',
               show: bool = True,
               html_path=None,
               ):
     """
+    MultiIndex Hierarchy is:
+    rad, n, run, solution_algorithm, carrier_id_, tour_id_
 
+    :param agg_level: to which level should the result be aggregated? 0: NotImplemented, 1:
     :param df: multi-index dataframe
     :return:
     """
-    df = df.droplevel(['id_', 'dist', 'num_carriers'])
-    multiindex = df.index.names
-    # sum up values for sum_by variables (e.g. tours or carriers)
-    df = df.groupby(list(set(multiindex) - set(sum_by))).sum()
-    # compute mean, e.g. over all the different runs
-    if mean_by:
-        df = df.groupby(list(set(multiindex) - set(sum_by) - set(mean_by))).mean()
+
+    df['num_tours'] = 1
+
+    # group and aggregate
+    # sum up tour statistics and num_tours
+    grouped = df.groupby(level=list(range(4)))
+    df = grouped.sum()
+
+    # average over levels
+    grouped = df.groupby(level=[x for x in [facet_col, facet_row, color, category] if x])
+    df = grouped.mean()
+
     # prepare for use in plotly express
     df: pd.DataFrame = df.reset_index()
     df = df.round(2)
 
-    # hover text
-    hover_text = []
-    if facet_row is None:
-        hover_text.append('n')
-    if facet_col is None:
-        hover_text.append('rad')
-    if not mean_by:
-        hover_text.append('run')
+    '''
+    # bar plot
+    fig = make_subplots(rows=df[facet_row].nunique(),
+                        cols=df[facet_col].nunique(),
+                        specs=[[{"secondary_y": True}] * df[facet_col].nunique()] * df[facet_row].nunique(),
+                        column_titles=[f'{facet_col}={val}' for val in df[facet_col].unique()],
+                        row_titles=[f'{facet_row}={val}' for val in df[facet_row].unique()],
+                        shared_xaxes='all',
+                        shared_yaxes='all',
+                        vertical_spacing=0.1,
+                        horizontal_spacing=0.1,
+                        # subplot_titles=("Plot 1", "Plot 2", ...)
+                        )
+    colormap = ut.map_to_univie_colors(df[color].unique())
+
+    for col_idx, col in enumerate(df[facet_col].unique(), start=1):
+        for row_idx, row in enumerate(df[facet_row].unique(), start=1):
+            for legend_idx, legend_group in enumerate(df[color].unique()):
+                data = df.loc[(df[facet_col] == col) & (df[facet_row] == row) & (df[color] == legend_group)]
+                fig.add_bar(
+                    x=data[category],
+                    y=data[values],
+                    marker=dict(color=colormap[legend_group], opacity=0.6),
+                    text=data[values],
+                    row=row_idx,
+                    col=col_idx,
+                    name=legend_group,
+                    legendgroup=legend_group,
+                )
+
+                fig.add_scatter(
+                    x=data[category] - 0.2 + legend_idx * 0.5,
+                    y=data['num_tours'],
+                    mode='markers',
+                    marker=dict(color=colormap[legend_group],
+                                size=10,
+                                opacity=1),
+                    row=row_idx,
+                    col=col_idx,
+                    name=legend_group,
+                    legendgroup=legend_group,
+                    showlegend=False,
+                    secondary_y=True,
+
+                )
+
+    # fig.update_yaxes(range=[0, 10], secondary_y=True)
+    fig.update_layout(title_text=f'{values}', template='plotly_white')
+    '''
 
     # bar plot
     fig = px.bar(df,
@@ -79,11 +128,11 @@ def bar_chart(df: pd.DataFrame,
                  template='plotly_white',
                  hover_data=df.columns.values,
                  barmode=barmode,
-                 category_orders={'solution_algorithm': ['IsolatedPlanningNoTW',
-                                                         'CollaborativePlanningNoTW',
-                                                         'IsolatedPlanning',
-                                                         'CollaborativePlanning',
-                                                         ]}
+                 category_orders={'solution_algorithm': [
+                     'IsolatedPlanning',
+                     'CollaborativePlanning',
+                     'CentralizedPlanning'
+                 ]}
                  )
 
     if show:
@@ -92,106 +141,22 @@ def bar_chart(df: pd.DataFrame,
     if html_path:
         fig.write_html(html_path, )
 
-
-def boxplot(df: pd.DataFrame,
-            values: str = 'sum_profit',
-            category='solution_algorithm',
-            color='solution_algorithm',
-            facet_row='n',
-            facet_col='rad',
-            sum_by=['carrier_id_', 'tour_id_'],
-            show: bool = True,
-            html_path=None,
-            ):
-    df = df.droplevel(['id_', 'dist', 'num_carriers'])
-    multiindex = df.index.names
-
-    # sum up values for sum_by variables (e.g. tours or carriers)
-    df = df.groupby(list(set(multiindex) - set(sum_by))).sum()
-
-    # prepare for use in plotly express
-    df: pd.DataFrame = df.reset_index()
-    df = df.round(2)
-
-    # boxplot
-    fig = px.box(df,
-                 x=category,
-                 y=values,
-                 title=f"<b>n</b>: Number of requests per carrier<br>"
-                       f"<b>rad</b>: Radius of the carriers' operational area around the depot<br>",
-                 color=color,
-                 points='all',
-                 color_discrete_sequence=ut.univie_colors_100,
-                 facet_row=facet_row,
-                 facet_col=facet_col,
-                 template='plotly_white',
-                 hover_data=df.columns.values,
-                 category_orders={'solution_algorithm': ['IsolatedPlanningNoTW',
-                                                         'CollaborativePlanningNoTW',
-                                                         'IsolatedPlanning',
-                                                         'CollaborativePlanning',
-                                                         ]}
-                 )
-    if show:
-        fig.show(config=config)
-
-    if html_path:
-        fig.write_html(html_path, )
-
-
-'''
-def plotly_bar_plot(solomon_list: List, attributes: List[str], ):
-    df: pd.DataFrame = combine_eval_files(solomon_list)[attributes]
-
-    for attr in attributes:
-        attr_df = df[attr].unstack('solution_algorithm').reset_index('rand_copy', drop=True).groupby(level=[0, 1])
-        attr_df = attr_df.agg(lambda x: x.mean())  # workaround to aggregate also timedelta values
-        if attr == 'duration':
-            for col in attr_df:
-                attr_df[col] = attr_df[col] + pd.to_datetime('1970/01/01')
-        fig = go.Figure()
-        colors = itertools.cycle([ut.univie_colors_100[0]] + ut.univie_colors_100[2:])
-        for col in attr_df.columns:
-            fig.add_bar(x=list(zip(*attr_df.index)),
-                        y=attr_df[col],
-                        name=labels[col],
-                        marker_color=next(colors),
-                        hovertemplate='%{y:.2f}',
-                        texttemplate='%{y:.0f}',
-                        textposition='outside',
-                        textangle=-90,
-                        textfont_size=14
-                        )
-        for v_line_x in np.arange(-0.5, 2 + len(solomon_list), 2):
-            fig.add_vline(x=v_line_x, line_width=1, line_color="grey")
-        fig.update_layout(title=f'Mean {labels[attr]}',
-                          xaxis_title=f'{labels["num_carriers"]} // {labels["solomon_base"]}',
-                          yaxis_title=f'{labels[attr]}',
-                          # line break with <br>, but then its outside the plot, needed to adjust margins then
-                          template='plotly_white',
-                          uniformtext_minsize=14, uniformtext_mode='show')
-
-        # multicategory axis not supported by plotly express
-        # fig = px.bar(attr_df, x=attr_df.index.names, y=attr_df.columns)
-        path = ut.path_output_custom.joinpath(f'plotly_bar_plot_{attr}.html')
-        fig.write_html(str(path), auto_open=True)
-        # path = ut.path_output_custom.joinpath(f'plotly_bar_plot_{attr}.svg')
-        # fig.write_image(str(path))
-    pass'''
 
 if __name__ == '__main__':
     df = pd.read_csv(
-        "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_#005.csv",
-        index_col=[0, 1, 2, 3, 4, 5, 6, 7, 8])
-    # bar_chart(df,
-    #           category='run',
-    #           mean_by=None,
-    #           show=True,
-    #           # html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix()
-    #           )
-    boxplot(df,
-            show=True,
-            category='n',
-            facet_col=None,
-            facet_row='rad'
-            )
+        "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home "
+        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_#017.csv",
+        index_col=list(range(6)))
+    bar_chart(df,
+              show=True,
+              category='n',
+              facet_row='rad',
+              facet_col=None
+              # html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix()
+              )
+    # boxplot(df,
+    #         show=True,
+    #         category='n',
+    #         facet_col=None,
+    #         facet_row='rad'
+    #         )
