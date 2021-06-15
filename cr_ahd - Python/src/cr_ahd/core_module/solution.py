@@ -30,7 +30,6 @@ class CAHDSolution:
         self.carrier_depots = [[depot] for depot in range(instance.num_depots)]
 
         # stuff that is filled during the solving
-        self.rejected_requests = []
         self.solution_algorithm = None
         self.auction_mechanism = None
 
@@ -69,7 +68,9 @@ class CAHDSolution:
 
     def num_routing_stops(self):
         return sum(c.num_routing_stops() for c in self.carriers)
-        pass
+
+    def acceptance_rate(self):
+        return sum([c.acceptance_rate for c in self.carriers])/self.num_carriers()
 
     def assign_requests_to_carriers(self, requests: Sequence[int], carriers: Sequence[int]):
         for r, c in zip(requests, carriers):
@@ -94,6 +95,7 @@ class CAHDSolution:
             'sum_revenue': self.sum_revenue(),
             'num_tours': self.num_tours(),
             'num_routing_stops': self.num_routing_stops(),
+            'acceptance_rate': self.acceptance_rate(),
             'carrier_summaries': {c.id_: c.summary() for c in self.carriers}
         }
 
@@ -112,6 +114,9 @@ class AHDSolution:
         self.id_ = carrier_index
         # self.depots = [carrier_index]  # maybe it's better to store the depots in this class rather than in CAHD?!
         self.assigned_requests: List = []
+        self.accepted_requests: List = []
+        self.rejected_requests: List = []
+        self.acceptance_rate: float = 0
         self.unrouted_requests: List = []
         self.tours: List[tr.Tour] = []
 
@@ -162,5 +167,6 @@ class AHDSolution:
             'sum_travel_duration': self.sum_travel_duration(),
             'sum_load': self.sum_load(),
             'sum_revenue': self.sum_revenue(),
+            'acceptance_rate': self.acceptance_rate,
             'tour_summaries': {t.id_: t.summary() for t in self.tours}
         }

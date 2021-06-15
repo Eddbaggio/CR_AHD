@@ -89,7 +89,8 @@ class PDPInsertionConstruction(TourConstructionBehavior, ABC):
         if carrier_.num_tours() >= instance.carriers_max_num_tours * len(solution.carrier_depots[carrier]):
             # logger.error(f'Max Vehicle Constraint violated!')
             raise ut.ConstraintViolationError(f'Cannot create new route with request {request} for carrier {carrier}.'
-                                              f' Max. number of vehicles is {instance.carriers_max_num_tours}!')
+                                              f' Max. number of vehicles is {instance.carriers_max_num_tours}!'
+                                              f' ({instance.id_})')
 
         # check all depots in case of a multi-depot instance to find the max profit pendulum tour
         max_profit = -float('inf')

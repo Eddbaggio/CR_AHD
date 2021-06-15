@@ -76,7 +76,7 @@ class CollaborativePlanning(Solver):
         # unroute all requests to imitate acceptance phase dynamism
         for carrier_ in solution.carriers:
             carrier_.tours.clear()
-            carrier_.unrouted_requests = carrier_.assigned_requests
+            carrier_.unrouted_requests = carrier_.accepted_requests[:]
 
         # do the final, dynamic (!) route construction. Must be dynamic (as in acceptance phase) to be guaranteed to
         # find at least the same solutions as in acceptance phase

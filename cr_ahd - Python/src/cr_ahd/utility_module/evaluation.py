@@ -30,35 +30,29 @@ config = dict({'scrollZoom': True})
 # PLOTLY
 # =================================================================================================
 def bar_chart(df: pd.DataFrame,
-              # agg_level='run',
-              values='sum_profit',
-              category='run',
-              color='solution_algorithm',
-              facet_row='n',
-              facet_col='rad',
+              values,
+              category,
+              color,
+              facet_row,
+              facet_col,
               barmode='group',
               show: bool = True,
               html_path=None,
               ):
     """
     MultiIndex Hierarchy is:
-    rad, n, run, solution_algorithm, carrier_id_, tour_id_
+    rad, n, run, solution_algorithm, carrier_id_
 
-    :param agg_level: to which level should the result be aggregated? 0: NotImplemented, 1:
     :param df: multi-index dataframe
     :return:
     """
 
-    df['num_tours'] = 1
-
     # group and aggregate
-    # sum up tour statistics and num_tours
-    grouped = df.groupby(level=list(range(4)))
-    df = grouped.sum()
-
-    # average over levels
-    grouped = df.groupby(level=[x for x in [facet_col, facet_row, color, category] if x])
-    df = grouped.mean()
+    # sum over necessary levels and values
+    grouped = df.groupby([x for x in [facet_col, facet_row, color, category] if x])
+    agg_dict = {col: sum for col in df.columns}
+    agg_dict['acceptance_rate'] = 'mean'
+    df = grouped.agg(agg_dict)
 
     # prepare for use in plotly express
     df: pd.DataFrame = df.reset_index()
@@ -145,13 +139,15 @@ def bar_chart(df: pd.DataFrame,
 if __name__ == '__main__':
     df = pd.read_csv(
         "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home "
-        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_#017.csv",
-        index_col=list(range(6)))
+        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_carrier_#004.csv",
+        index_col=['rad', 'n', 'run', 'solution_algorithm', 'carrier_id_'])
     bar_chart(df,
+              values='sum_profit',
+              category='run',
+              color='solution_algorithm',
+              facet_col='rad',
+              facet_row='n',
               show=True,
-              category='n',
-              facet_row='rad',
-              facet_col=None
               # html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix()
               )
     # boxplot(df,

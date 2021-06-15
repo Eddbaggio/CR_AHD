@@ -40,13 +40,15 @@ class Auction(ABC):
             # Winner Determination
             winner_bundles, bundle_winners = self._winner_determination(instance, solution, auction_pool_requests,
                                                                         auction_pool_bundles, bids_matrix)
-
+            # assign the bundles to the corresponding winner
             for bundle, winner in zip(winner_bundles, bundle_winners):
                 solution.assign_requests_to_carriers(bundle, [winner] * len(bundle))
+                solution.carriers[winner].accepted_requests.extend(bundle)
 
             # must be sorted to obtain the acceptance phase's solutions also in the final routing
             for carrier_ in solution.carriers:
                 carrier_.assigned_requests.sort()
+                carrier_.accepted_requests.sort()
                 carrier_.unrouted_requests.sort()
         else:
             logger.warning(f'No requests have been submitted!')

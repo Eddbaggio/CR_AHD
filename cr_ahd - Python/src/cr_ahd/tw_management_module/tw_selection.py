@@ -12,7 +12,13 @@ logger = logging.getLogger(__name__)
 class TWSelectionBehavior(abc.ABC):
     # TODO maybe in the future, i have to store also time window preferences / tw selection behavior in the instance
     def execute(self, tw_offer_set: List[TimeWindow], request: int):
-        selected_tw = self.select_tw(tw_offer_set, request)
+        # may yield False if no TW fits the preference
+        if tw_offer_set:
+            selected_tw = self.select_tw(tw_offer_set, request)
+
+        # if no TW could be offered
+        else:
+            selected_tw = False
         return selected_tw
 
     @abc.abstractmethod
@@ -37,14 +43,19 @@ class UnequalPreference(TWSelectionBehavior):
     def select_tw(self, tw_offer_set, request: int):
         # preference can either be for early (10%) or late (90%) time windows
         pref = random.random()
+
+        # early preference
         if pref <= 0.1:
-            early_tw = [tw for tw in tw_offer_set if
-                        tw.close <= dt.datetime(1, 1, 1, 0) + (END_TIME - dt.datetime(1, 1, 1, 0)) / 2]
-            return random.choice(early_tw)
+            attractive_tws = [tw for tw in tw_offer_set if
+                              tw.close <= dt.datetime(1, 1, 1, 0) + (END_TIME - dt.datetime(1, 1, 1, 0)) / 2]
+        # late preference
         else:
-            late_tw = [tw for tw in tw_offer_set if
-                       tw.open >= dt.datetime(1, 1, 1, 0) + (END_TIME - dt.datetime(1, 1, 1, 0)) / 2]
-            return random.choice(late_tw)
+            attractive_tws = [tw for tw in tw_offer_set if
+                              tw.open >= dt.datetime(1, 1, 1, 0) + (END_TIME - dt.datetime(1, 1, 1, 0)) / 2]
+        if attractive_tws:
+            return random.choice(attractive_tws)
+        else:
+            return False
 
 
 class EarlyPreference(TWSelectionBehavior):

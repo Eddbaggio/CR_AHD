@@ -57,8 +57,10 @@ class CheapestInsertionDistanceIncrease(BiddingBehavior):
         # reset the temporary carrier's solution and start from scratch instead
         tmp_carrier_.tours.clear()
         tmp_carrier_.assigned_requests.extend(bundle)
+        tmp_carrier_.accepted_requests.extend(bundle)
         tmp_carrier_.assigned_requests.sort()  # must be sorted due to dynamism
-        tmp_carrier_.unrouted_requests.extend(tmp_carrier_.assigned_requests)
+        tmp_carrier_.accepted_requests.sort()  # must be sorted due to dynamism
+        tmp_carrier_.unrouted_requests.extend(tmp_carrier_.accepted_requests)
         solution.carriers.append(tmp_carrier_)
         solution.carrier_depots.append(solution.carrier_depots[carrier])
 

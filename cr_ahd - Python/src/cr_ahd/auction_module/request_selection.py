@@ -48,6 +48,7 @@ class RequestSelectionBehavior_individual(ABC):
 
             for s in selected:
                 solution.carriers[carrier].assigned_requests.remove(s)
+                solution.carriers[carrier].accepted_requests.remove(s)
                 solution.request_to_carrier_assignment[s] = np.nan
                 solution.unassigned_requests.append(s)
 
@@ -167,6 +168,7 @@ class RequestSelectionBehavior_bundle(ABC):
 
                 # retract the request from the carrier
                 carrier_.assigned_requests.remove(request)
+                carrier_.accepted_requests.remove(request)
                 solution.request_to_carrier_assignment[request] = np.nan
                 solution.unassigned_requests.append(request)
 
@@ -191,7 +193,7 @@ class Cluster(RequestSelectionBehavior_bundle):
         """
         create all possible bundles of size k
         """
-        return itertools.combinations(solution.carriers[carrier].assigned_requests, k)
+        return itertools.combinations(solution.carriers[carrier].accepted_requests, k)
 
     def _evaluate_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, bundle):
         """

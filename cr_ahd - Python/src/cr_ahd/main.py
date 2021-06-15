@@ -60,7 +60,7 @@ def execute_all(instance: it.PDPInstance, plot=False):
             solutions.append(solution)
 
         except Exception as e:
-            # raise e
+            raise e
             logger.error(f'{e}\tFailed on instance {instance} with solver {solver.__name__}')
 
     return solutions
@@ -91,33 +91,48 @@ def m_solve_single_thread(instance_paths):
 
 
 def write_solution_summary_to_multiindex_df(solutions_per_instance: List[List[slt.CAHDSolution]],
-                                            aggregation_level: int = 0):
+                                            agg_level='tour'):
     """
-    :param aggregation_level: 0 for tour, i.e. no aggregation, 1 for carrier, 2 for algorithm+solution,
     :param solutions_per_instance: A List of Lists of solutions. First Axis: instance, Second Axis: solver
     """
     df = []
     for instance_solutions in solutions_per_instance:
         for solution in instance_solutions:
             for carrier in range(solution.num_carriers()):
-                for tour in range(solution.carriers[carrier].num_tours()):
-                    d = solution.carriers[carrier].tours[tour].summary()
-                    # d['id_'] = solution.id_
-                    d.update(solution.meta)
-                    # d['num_carriers'] = solution.num_carriers()
-                    d['solution_algorithm'] = solution.solution_algorithm
+
+                if agg_level == 'carrier':
+                    d = solution.carriers[carrier].summary()
                     d['carrier_id_'] = carrier
-                    d['tour_id_'] = tour
+                    d.pop('tour_summaries')
+                    d.update(solution.meta)
+                    d['solution_algorithm'] = solution.solution_algorithm
                     df.append(d)
+
+                elif agg_level == 'tour':
+                    for tour in range(solution.carriers[carrier].num_tours()):
+                        d = solution.carriers[carrier].tours[tour].summary()
+                        d.update(solution.meta)
+                        d['solution_algorithm'] = solution.solution_algorithm
+                        d['carrier_id_'] = carrier
+                        d['tour_id_'] = tour
+                        df.append(d)
+
     df = pd.DataFrame.from_records(df)
     df = df.drop(columns=['dist'])
-    df.set_index(
-        keys=['rad', 'n', 'run', 'solution_algorithm', 'carrier_id_', 'tour_id_'],
-        inplace=True)
+
+    # set the multiindex
+    index = ['rad', 'n', 'run', 'solution_algorithm', 'carrier_id_']
+    if agg_level == 'tour':
+        index += ['tour_id_']
+    df.set_index(keys=index, inplace=True)
+
+    # convert timedelta to seconds
     for column in df.select_dtypes(include=['timedelta64']):
         df[column] = df[column].dt.total_seconds()
-    df.to_csv(ut.unique_path(ut.output_dir_GH, 'evaluation' + '_#{:03d}' + '.csv'))
-    df.to_excel(ut.unique_path(ut.output_dir_GH, 'evaluation' + '_#{:03d}' + '.xlsx'), merge_cells=False)
+
+    # write to disk
+    df.to_csv(ut.unique_path(ut.output_dir_GH, 'evaluation_' + agg_level + '_#{:03d}' + '.csv'))
+    df.to_excel(ut.unique_path(ut.output_dir_GH, 'evaluation_' + agg_level + '_#{:03d}' + '.xlsx'), merge_cells=False)
     return df
 
 
@@ -125,15 +140,18 @@ if __name__ == '__main__':
     logger.info('START')
 
     # paths = [Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/test.dat')]
-    paths = list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir())[:60]
+    paths = list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir())[:12]
 
     # solutions = m_solve_single_thread(paths)
     solutions = m_solve_multi_thread(paths)
 
-    df = write_solution_summary_to_multiindex_df(solutions, 1)
-    # ev.bar_chart(df,
-    #              category='n',
-    #              facet_col=None,
-    #              facet_row='rad',
-    #              html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix())
+    df = write_solution_summary_to_multiindex_df(solutions, 'carrier')
+    ev.bar_chart(df,
+                 values='sum_profit',
+                 category='run',
+                 color='solution_algorithm',
+                 facet_col='rad',
+                 facet_row='n',
+                 show=True,
+                 html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix())
     logger.info('END')
