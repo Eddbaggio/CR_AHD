@@ -48,8 +48,7 @@ class PDPInsertionConstruction(TourConstructionBehavior, ABC):
                            request, tour, pickup_pos, delivery_pos):
 
         pickup, delivery = instance.pickup_delivery_pair(request)
-        solution.carriers[carrier].tours[tour].insert_and_update(instance, solution,
-                                                                 [pickup_pos, delivery_pos],
+        solution.carriers[carrier].tours[tour].insert_and_update(instance, solution, [pickup_pos, delivery_pos],
                                                                  [pickup, delivery])
         solution.carriers[carrier].unrouted_requests.remove(request)
 
@@ -69,6 +68,8 @@ class PDPInsertionConstruction(TourConstructionBehavior, ABC):
             travel_distance_sequence=tour_.travel_distance_sequence,
             service_schedule=tour_.service_schedule,
             load_sequence=tour_.load_sequence,
+            wait_sequence=tour_._wait_sequence,
+            max_shift_sequence=tour_._max_shift_sequence,
             num_depots=instance.num_depots,
             num_requests=instance.num_requests,
             distance_matrix=instance._distance_matrix,
@@ -160,6 +161,8 @@ def tour_cheapest_insertion(pickup_vertex: int,
                             travel_distance_sequence: Sequence[float],
                             service_schedule: Sequence[dt.datetime],
                             load_sequence: Sequence[float],
+                            wait_sequence: Sequence[dt.timedelta],
+                            max_shift_sequence: Sequence[dt.timedelta],
                             num_depots: int,
                             num_requests: int,
                             distance_matrix: Sequence[Sequence[float]],
@@ -193,6 +196,8 @@ def tour_cheapest_insertion(pickup_vertex: int,
                                                   travel_distance_sequence=travel_distance_sequence,
                                                   service_schedule=service_schedule,
                                                   load_sequence=load_sequence,
+                                                  wait_sequence=wait_sequence,
+                                                  max_shift_sequence=max_shift_sequence,
                                                   num_depots=num_depots,
                                                   num_requests=num_requests,
                                                   distance_matrix=distance_matrix,

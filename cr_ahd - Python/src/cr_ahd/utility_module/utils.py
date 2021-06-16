@@ -350,10 +350,10 @@ def datetime_range(start: dt.datetime, end: dt.datetime, freq: dt.timedelta, inc
 
 
 random.seed(0)
-START_TIME = dt.datetime.min
-END_TIME = dt.datetime.min + dt.timedelta(minutes=3390)
+START_TIME: dt.datetime = dt.datetime.min
+END_TIME: dt.datetime = dt.datetime.min + dt.timedelta(minutes=3390)
 # END_TIME = dt.datetime.min + dt.timedelta(days=1)
-TW_LENGTH = dt.timedelta(hours=2)
+TW_LENGTH: dt.timedelta = dt.timedelta(hours=2)
 ALL_TW = [TimeWindow(e, min(e + TW_LENGTH, END_TIME)) for e in datetime_range(START_TIME, END_TIME, freq=TW_LENGTH)]
 TIME_HORIZON = TimeWindow(START_TIME, END_TIME)
 SPEED_KMH = 60  # vehicle speed (set to 60 to treat distance = time)

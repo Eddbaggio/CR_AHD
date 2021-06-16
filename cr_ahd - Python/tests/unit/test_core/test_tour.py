@@ -47,7 +47,7 @@ def test_insert_and_update(inst_and_sol_gh_0_ass9_routed6):
     t = 0
     tour = solution.carriers[c].tours[t]
     distance_before = tour.sum_travel_distance
-    tour.insert_and_update(instance, solution, [1, 6], [5, 20])
+    tour.insert_and_update([1, 6],, [5, 20],
     assert tour.routing_sequence == (0, 5, 4, 19, 3, 18, 20, 0)
     assert tour.sum_travel_distance == pytest.approx(
         distance_before + 200 - math.sqrt(25 ** 2 + 50 ** 2) - math.sqrt(100 ** 2 + 25 ** 2))
@@ -76,7 +76,7 @@ def test__pop_and_update(inst_and_sol_gh_0_ass9_routed6):
     t = 0
     tour = solution.carriers[c].tours[t]
     travel_dist_before = tour.sum_travel_distance
-    tour.pop_and_update(instance, solution, [1, 2])
+    tour.pop_and_update(instance, solution, [1, 2],,
     assert tour.routing_sequence == (0, 3, 18, 0)
     assert tour.sum_travel_distance == pytest.approx(
         travel_dist_before - math.sqrt(25 ** 2 + 50 ** 2) - 50 - math.sqrt(50 ** 2 + 50 ** 2) + math.sqrt(

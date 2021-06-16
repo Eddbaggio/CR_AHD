@@ -3,8 +3,6 @@ from abc import ABC, abstractmethod
 from typing import final
 
 from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
-from src.cr_ahd.routing_module import tour_construction as cns
-from src.cr_ahd.utility_module import utils as ut
 
 logger = logging.getLogger(__name__)
 
@@ -484,9 +482,7 @@ class PDPRelocate(PDPInterTourLocalSearch):
             carrier_.tours.pop(old_tour)
             # TODO must I update the tour.id_ ensure that there is no gap in the tour's ids? Nah, don't think so
 
-        carrier_.tours[new_tour].insert_and_update(instance, solution,
-                                                   [new_pickup_pos, new_delivery_pos],
-                                                   [pickup, delivery])
+        carrier_.tours[new_tour].insert_and_update(instance, solution, [new_pickup_pos, new_delivery_pos], [pickup, delivery])
         pass
 
 # class ThreeOpt(TourImprovementBehavior):

@@ -19,37 +19,40 @@ class TourInitializationBehavior(ABC):
         carrier_ = solution.carriers[carrier]
         assert carrier_.unrouted_requests
 
+        # create (potentially multiple) initial pendulum tour(s)
+        num_pendulum_tours = instance.carriers_max_num_tours
+        # TODO the num_pendulum_tours should probably not be fixed, but be dependent on the size of the max clique
+        for pendulum_tour in range(num_pendulum_tours):
 
+            best_request = None
+            best_depot = None
+            best_evaluation = -float('inf')
 
-        best_request = None
-        best_depot = None
-        best_evaluation = -float('inf')
+            for request in carrier_.unrouted_requests:
 
-        for request in carrier_.unrouted_requests:
+                depot_and_evaluations = []
+                for depot in solution.carrier_depots[carrier]:
+                    evaluation = self._request_evaluation(*instance.pickup_delivery_pair(request),
+                                                          **{'x_depot': instance.x_coords[depot],
+                                                             'y_depot': instance.y_coords[depot],
+                                                             'x_coords': instance.x_coords,
+                                                             'y_coords': instance.y_coords,
+                                                             })
+                    depot_and_evaluations.append((depot, evaluation))
 
-            depot_and_evaluations = []
-            for depot in solution.carrier_depots[carrier]:
-                evaluation = self._request_evaluation(*instance.pickup_delivery_pair(request),
-                                                      **{'x_depot': instance.x_coords[depot],
-                                                         'y_depot': instance.y_coords[depot],
-                                                         'x_coords': instance.x_coords,
-                                                         'y_coords': instance.y_coords,
-                                                         })
-                depot_and_evaluations.append((depot, evaluation))
+                depot, evaluation = min(depot_and_evaluations, key=lambda x: x[1])
 
-            depot, evaluation = min(depot_and_evaluations, key=lambda x: x[1])
+                # update the best known seed
+                if evaluation > best_evaluation:
+                    best_request = request
+                    best_depot = depot
+                    best_evaluation = evaluation
 
-            # update the best known seed
-            if evaluation > best_evaluation:
-                best_request = request
-                best_depot = depot
-                best_evaluation = evaluation
-
-        # create the pendulum tour
-        tour = tr.Tour(carrier_.num_tours(), instance, solution, best_depot)
-        tour.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(best_request))
-        carrier_.tours.append(tour)
-        carrier_.unrouted_requests.remove(best_request)
+            # create the pendulum tour
+            tour = tr.Tour(carrier_.num_tours(), instance, solution, best_depot)
+            tour.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(best_request))
+            carrier_.tours.append(tour)
+            carrier_.unrouted_requests.remove(best_request)
         pass
 
     @abstractmethod

@@ -184,8 +184,8 @@ def bundle_total_travel_distance(instance: it.PDPInstance,
             seed_idx = request_idx
             best_evaluation = evaluation
     tmp_bundle = np.delete(tmp_bundle, seed_idx)
-    tr.insert_and_update(indices=(1, 2), vertices=instance.pickup_delivery_pair(seed),
-                         **tour_dict, **instance_dict, **solution_dict)
+    tr.insert_and_update(indices=(1, 2), vertices=instance.pickup_delivery_pair(seed), **tour_dict, **instance_dict,
+                         **solution_dict)
 
     # construction
     while tmp_bundle.any():
@@ -209,8 +209,8 @@ def bundle_total_travel_distance(instance: it.PDPInstance,
             elif delta == float('inf'):
                 return float('inf')
         tr.insert_and_update(indices=(best_pickup_pos, best_delivery_pos),
-                             vertices=instance.pickup_delivery_pair(best_request),
-                             **tour_dict, **instance_dict, **solution_dict)
+                             vertices=instance.pickup_delivery_pair(best_request), **tour_dict, **instance_dict,
+                             **solution_dict)
         tmp_bundle = np.delete(tmp_bundle, best_request_idx)
 
     return sum(tour_dict['travel_distance_sequence'])
