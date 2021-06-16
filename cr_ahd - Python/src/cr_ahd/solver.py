@@ -21,6 +21,7 @@ class Solver(abc.ABC):
         random.seed(0)
 
         self._acceptance_phase(instance, solution)
+        self._static_routing(instance, solution)  # not required if request selection is route-independent (such as in the cluster RS)?
         self._auction_phase(instance, solution)
 
         solution.solution_algorithm = self.__class__.__name__
@@ -46,6 +47,14 @@ class Solver(abc.ABC):
     def _time_window_management(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
         pass
 
+    def _static_routing(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
+        solution.clear_carrier_routes()
+        ini.FurthestDistance().execute(instance, solution)
+        cns.CheapestPDPInsertion().construct(instance, solution)
+        imp.PDPMove().local_search(instance, solution)
+        imp.PDPTwoOpt().local_search(instance, solution)
+        imp.PDPRelocate().local_search(instance, solution)
+
     def _auction_phase(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         """
         includes request selection, bundle generation, bidding, winner determination and also the final routing
@@ -69,44 +78,16 @@ class CollaborativePlanning(Solver):
     """
 
     def _auction_phase(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
-
         if instance.num_carriers > 1:  # not for centralized instances
             au.AuctionD().execute(instance, solution)
 
-        # unroute all requests to imitate acceptance phase dynamism
-        for carrier_ in solution.carriers:
-            carrier_.tours.clear()
-            carrier_.unrouted_requests = carrier_.accepted_requests[:]
-
-        # do the final, dynamic (!) route construction. Must be dynamic (as in acceptance phase) to be guaranteed to
-        # find at least the same solutions as in acceptance phase
-        construction = cns.CheapestPDPInsertion()
-        for carrier in range(instance.num_carriers):
-            carrier_ = solution.carriers[carrier]
-            while carrier_.unrouted_requests:
-                request = carrier_.unrouted_requests[0]
-                insertion = construction._carrier_cheapest_insertion(instance, solution, carrier,
-                                                                     [request]  # one at a time
-                                                                     )
-
-                request, tour, pickup_pos, delivery_pos = insertion
-
-                # when for a given request no tour can be found, create a new tour and start over. This may raise
-                # a ConstraintViolationError if the carrier cannot initialize another new tour
-                if tour is None:
-                    construction._create_new_tour_with_request(instance, solution, carrier, request)
-
-                else:
-                    construction._execute_insertion(instance, solution, carrier, request, tour, pickup_pos,
-                                                    delivery_pos)
-
-                imp.PDPMove().improve_carrier_solution(instance, solution, carrier, False)
-                imp.PDPTwoOpt().improve_carrier_solution(instance, solution, carrier, False)
-                imp.PDPRelocate().improve_carrier_solution(instance, solution, carrier, False)
-
+        # do a final, static routing
+        self._static_routing(instance, solution)
+        pass
 
     def _time_window_management(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
         twm.TWManagementSingle().execute(instance, solution, carrier)
+        pass
 
 
 class CentralizedPlanning(Solver):
@@ -125,28 +106,14 @@ class CentralizedPlanning(Solver):
         random.seed(0)
 
         self._acceptance_phase(md_instance, solution)
+        self._static_routing(md_instance, solution)
 
         solution.solution_algorithm = self.__class__.__name__
         return solution
 
-    def _acceptance_phase(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
-        while solution.unassigned_requests:
-            request = solution.unassigned_requests[0]
-            carrier = instance.request_to_carrier_assignment[request]
-            solution.assign_requests_to_carriers([request], [carrier])
-
-            # find the tw for the request
-            self._time_window_management(instance, solution, 0)
-
-            # build tours with the assigned request
-            cns.CheapestPDPInsertion().construct(instance, solution)
-            imp.PDPMove().local_search(instance, solution)
-            imp.PDPTwoOpt().local_search(instance, solution)
-            imp.PDPRelocate().local_search(instance, solution)
-
-        pass
-
     def _time_window_management(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
+        # use only the single, centralized carrier
+        carrier = 0
         twm.TWManagementSingle().execute(instance, solution, carrier)
 
 

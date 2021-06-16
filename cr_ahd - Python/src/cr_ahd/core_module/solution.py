@@ -79,6 +79,11 @@ class CAHDSolution:
             self.carriers[c].assigned_requests.append(r)
             self.carriers[c].unrouted_requests.append(r)
 
+    def clear_carrier_routes(self):
+        """delete all existing routes and move all accepted requests to the list of unrouted requests"""
+        for carrier_ in self.carriers:
+            carrier_.clear_routes()
+
     def as_dict(self):
         """The solution as a nested python dictionary"""
         return {carrier.id_: carrier.as_dict() for carrier in self.carriers}
@@ -170,3 +175,7 @@ class AHDSolution:
             'acceptance_rate': self.acceptance_rate,
             'tour_summaries': {t.id_: t.summary() for t in self.tours}
         }
+
+    def clear_routes(self):
+        self.unrouted_requests = self.accepted_requests[:]
+        self.tours.clear()

@@ -116,15 +116,23 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
             fitness = new_fitness
             generation_counter += 1
 
-        # select the best bundles. leave space for at least the original bundles
-        limited_bundle_pool = self.generate_bundle_pool(auction_pool, fitness, population,
-                                                        ut.AUCTION_POOL_SIZE - (max(original_bundles) + 1))
+        # set the auction pool size in such a way that there's space for the original bundles if they are not part of
+        # of the final population yet
+        auction_pool_size = ut.AUCTION_POOL_SIZE
+        for ob in original_bundles:
+            if ob in population:
+                auction_pool_size -= 1
 
-        # add the original bundling as the final candidate - this cannot be infeasible
+        # select the best bundles
+        limited_bundle_pool = self.generate_bundle_pool(auction_pool, fitness, population,auction_pool_size)
+
+        # add the original bundling as the final candidates if they are not contained yet - this cannot be infeasible
         self._normalize_individual(original_bundles)
         original_bundles = [np.array(auction_pool)[np.array(original_bundles) == bundle_idx].tolist()
                             for bundle_idx in range(max(original_bundles) + 1)]
-        limited_bundle_pool.extend(original_bundles)
+        for ob in original_bundles:
+            if ob not in limited_bundle_pool:
+                limited_bundle_pool.append(ob)
 
         return limited_bundle_pool
 

@@ -180,7 +180,7 @@ def tour_cheapest_insertion(pickup_vertex: int,
 
     for pickup_pos in range(1, len(routing_sequence)):
         # TODO I only have to check those positions that would not violate the TWs of the other nodes, thus I can
-        #  potentially start even later than i+1. There are functions somewhere that do this, afaik
+        #  potentially start even later than i+1. I created functions somewhere that do this, as far as i can remember
         for delivery_pos in range(pickup_pos + 1, len(routing_sequence) + 1):
             delta = tr.insertion_distance_delta(
                 routing_sequence=routing_sequence,

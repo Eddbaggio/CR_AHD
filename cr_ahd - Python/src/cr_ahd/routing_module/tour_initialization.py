@@ -1,8 +1,4 @@
 from abc import ABC, abstractmethod
-import datetime as dt
-from collections import Sequence
-
-from scipy.spatial.distance import pdist
 
 from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
 from src.cr_ahd.utility_module import utils as ut
@@ -21,23 +17,39 @@ class TourInitializationBehavior(ABC):
 
     def _initialize_carrier(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
         carrier_ = solution.carriers[carrier]
-        if carrier_.unrouted_requests:
-            best_request = None
-            best_evaluation = -float('inf')
-            for request in carrier_.unrouted_requests:
+        assert carrier_.unrouted_requests
+
+
+
+        best_request = None
+        best_depot = None
+        best_evaluation = -float('inf')
+
+        for request in carrier_.unrouted_requests:
+
+            depot_and_evaluations = []
+            for depot in solution.carrier_depots[carrier]:
                 evaluation = self._request_evaluation(*instance.pickup_delivery_pair(request),
-                                                      **{'x_depot': instance.x_coords[carrier],
-                                                         'y_depot': instance.y_coords[carrier],
+                                                      **{'x_depot': instance.x_coords[depot],
+                                                         'y_depot': instance.y_coords[depot],
                                                          'x_coords': instance.x_coords,
                                                          'y_coords': instance.y_coords,
                                                          })
-                if evaluation > best_evaluation:
-                    best_request = request
-                    best_evaluation = evaluation
-            tour = tr.Tour(carrier_.num_tours(), instance, solution, carrier)
-            tour.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(best_request))
-            carrier_.tours.append(tour)
-            carrier_.unrouted_requests.remove(best_request)
+                depot_and_evaluations.append((depot, evaluation))
+
+            depot, evaluation = min(depot_and_evaluations, key=lambda x: x[1])
+
+            # update the best known seed
+            if evaluation > best_evaluation:
+                best_request = request
+                best_depot = depot
+                best_evaluation = evaluation
+
+        # create the pendulum tour
+        tour = tr.Tour(carrier_.num_tours(), instance, solution, best_depot)
+        tour.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(best_request))
+        carrier_.tours.append(tour)
+        carrier_.unrouted_requests.remove(best_request)
         pass
 
     @abstractmethod

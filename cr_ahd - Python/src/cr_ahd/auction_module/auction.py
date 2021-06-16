@@ -6,7 +6,7 @@ import src.cr_ahd.utility_module.utils as ut
 from src.cr_ahd.auction_module import request_selection as rs, bundle_generation as bg, bidding as bd, \
     winner_determination as wd
 from src.cr_ahd.core_module import instance as it, solution as slt
-from src.cr_ahd.routing_module import tour_construction as cns, tour_improvement as imp
+from src.cr_ahd.routing_module import tour_construction as cns, tour_improvement as imp, tour_initialization as ini
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +26,16 @@ class Auction(ABC):
         if auction_pool_requests:
             logger.debug(f'requests {auction_pool_requests} have been submitted to the auction pool')
 
+            # re-run a static routing with the non-submitted requests
+            solution.clear_carrier_routes()
+            ini.FurthestDistance().execute(instance, solution)
+            cns.CheapestPDPInsertion().construct(instance, solution)
+            imp.PDPMove().local_search(instance, solution)
+            imp.PDPTwoOpt().local_search(instance, solution)
+            imp.PDPRelocate().local_search(instance, solution)
+
             # Bundle Generation
-            # todo maybe bundles should be a list of bundle indices rather than a list of lists of request indices?
+            # TODO maybe bundles should be a list of bundle indices rather than a list of lists of request indices?
             auction_pool_bundles = self._bundle_generation(instance, solution, auction_pool_requests, original_bundles)
             logger.debug(f'bundles {auction_pool_bundles} have been created')
 
@@ -147,7 +155,7 @@ class AuctionD(Auction):
         return bg.GeneticAlgorithm().execute(instance, solution, auction_pool, original_bundles)
 
     def _bid_generation(self, instance: it.PDPInstance, solution: slt.CAHDSolution, bundles):
-        return bd.Profit().execute(instance, solution, bundles)
+        return bd.StaticProfit().execute(instance, solution, bundles)
 
     def _winner_determination(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool: Sequence[int],
                               bundles: Sequence[Sequence[int]], bids_matrix: Sequence[Sequence[float]]):

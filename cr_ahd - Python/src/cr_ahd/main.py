@@ -42,8 +42,8 @@ def execute_all(instance: it.PDPInstance, plot=False):
         # slv.IsolatedPlanningNoTW,
         # slv.CollaborativePlanningNoTW,
         slv.IsolatedPlanning,
-        slv.CollaborativePlanning,
-        slv.CentralizedPlanning,
+        # slv.CollaborativePlanning,
+        # slv.CentralizedPlanning,
     ]:
         logger.info(f'{instance.id_}: Solving via {solver.__name__} ...')
         try:
@@ -140,10 +140,10 @@ if __name__ == '__main__':
     logger.info('START')
 
     # paths = [Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/test.dat')]
-    paths = list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir())[:12]
+    paths = list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir())[1:2]
 
-    # solutions = m_solve_single_thread(paths)
-    solutions = m_solve_multi_thread(paths)
+    solutions = m_solve_single_thread(paths)
+    # solutions = m_solve_multi_thread(paths)
 
     df = write_solution_summary_to_multiindex_df(solutions, 'carrier')
     ev.bar_chart(df,
