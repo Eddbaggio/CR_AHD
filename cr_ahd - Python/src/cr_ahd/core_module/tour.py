@@ -20,10 +20,19 @@ class Tour:
 
         self.id_ = id_
         self._routing_sequence: List[int] = []  # sequence of vertices
+
+        # sequences and sums
         self._travel_distance_sequence: List[float] = []  # sequence of arc distance costs
+        self._sum_travel_distance: float = 0.0
         self._travel_duration_sequence: List[dt.timedelta] = []  # sequence of arc duration costs
+        self._sum_travel_duration: dt.timedelta = dt.timedelta(0)
         self._load_sequence: List[float] = []  # the delta of the fill level of the vehicle (positive or negative)
+        self._sum_load: float = 0.0
         self._revenue_sequence: List[float] = []  # the collected revenue
+        self._sum_revenue: float = 0.0
+        self._sum_profit: float = 0.0
+
+        # schedules
         self._arrival_schedule: List[dt.datetime] = []  # arrival time at each stop
         self._service_schedule: List[dt.datetime] = []  # start of service time at each stop
 
@@ -40,10 +49,10 @@ class Tour:
                f'Sequence:\t{self.routing_sequence}\n' \
                f'Arrival:\t{[x.strftime("%d-%H:%M:%S") for x in self._arrival_schedule]}\n' \
                f'Service:\t{[x.strftime("%d-%H:%M:%S") for x in self._service_schedule]}\n' \
-               f'Distance:\t{round(self.sum_travel_distance, 2)}\n' \
-               f'Duration:\t{self.sum_travel_duration}\n' \
-               f'Revenue:\t{self.sum_revenue}\n' \
-               f'Profit:\t\t{self.sum_profit}\n'
+               f'Distance:\t{round(self._sum_travel_distance, 2)}\n' \
+               f'Duration:\t{self._sum_travel_duration}\n' \
+               f'Revenue:\t{self._sum_revenue}\n' \
+               f'Profit:\t\t{self._sum_profit}\n'
 
     def __len__(self):
         return len(self.routing_sequence)
@@ -62,40 +71,20 @@ class Tour:
         return tuple(self._travel_distance_sequence)
 
     @property
-    def sum_travel_distance(self) -> float:
-        return sum(self._travel_distance_sequence)
-
-    @property
     def travel_duration_sequence(self):
         return tuple(self._travel_duration_sequence)
-
-    @property
-    def sum_travel_duration(self) -> dt.timedelta:
-        return sum(self._travel_duration_sequence, dt.timedelta())
 
     @property
     def load_sequence(self):
         return tuple(self._load_sequence)
 
     @property
-    def sum_load(self):
-        return sum(self.load_sequence)
-
-    @property
     def revenue_sequence(self):
         return self._revenue_sequence
 
     @property
-    def sum_revenue(self):
-        return sum(self.revenue_sequence)
-
-    @property
     def profit_sequence(self):
         raise NotImplementedError
-
-    @property
-    def sum_profit(self):
-        return self.sum_revenue - self.sum_travel_distance
 
     @property
     def arrival_schedule(self):
@@ -119,12 +108,12 @@ class Tour:
     def summary(self):
         return {
             # 'id_': self.id_,
-            'sum_profit': self.sum_profit,
+            'sum_profit': self._sum_profit,
             'num_routing_stops': self.num_routing_stops,
-            'sum_travel_distance': self.sum_travel_distance,
-            'sum_travel_duration': self.sum_travel_duration,
-            'sum_load': self.sum_load,  # should always be 0
-            'sum_revenue': self.sum_revenue,
+            'sum_travel_distance': self._sum_travel_distance,
+            'sum_travel_duration': self._sum_travel_duration,
+            'sum_load': self._sum_load,  # should always be 0
+            'sum_revenue': self._sum_revenue,
         }
 
     def _insert_no_update(self, index: int, vertex: int):
@@ -201,26 +190,26 @@ class Tour:
         or removal index. """
 
         # class method is just a wrapper around the function that is independent of the instance and solution class
-        update_sequences_and_schedules(routing_sequence=self.routing_sequence,
-                                       travel_distance_sequence=self._travel_distance_sequence,
-                                       travel_duration_sequence=self._travel_duration_sequence,
-                                       arrival_schedule=self._arrival_schedule,
-                                       service_schedule=self._service_schedule,
-                                       load_sequence=self._load_sequence,
-                                       revenue_sequence=self._revenue_sequence,
-                                       wait_sequence=self._wait_sequence,
-                                       max_shift_sequence=self._max_shift_sequence,
-                                       num_depots=instance.num_depots,
-                                       num_requests=instance.num_requests,
-                                       distance_matrix=instance._distance_matrix,
-                                       vertex_load=instance.load,
-                                       revenue=instance.revenue,
-                                       service_duration=instance.service_duration,
-                                       vehicles_max_travel_distance=instance.vehicles_max_travel_distance,
-                                       vehicles_max_load=instance.vehicles_max_load,
-                                       tw_open=solution.tw_open,
-                                       tw_close=solution.tw_close,
-                                       index=index)
+        multi_insertion_update(routing_sequence=self.routing_sequence,
+                               travel_distance_sequence=self._travel_distance_sequence,
+                               travel_duration_sequence=self._travel_duration_sequence,
+                               arrival_schedule=self._arrival_schedule,
+                               service_schedule=self._service_schedule,
+                               load_sequence=self._load_sequence,
+                               revenue_sequence=self._revenue_sequence,
+                               wait_sequence=self._wait_sequence,
+                               max_shift_sequence=self._max_shift_sequence,
+                               num_depots=instance.num_depots,
+                               num_requests=instance.num_requests,
+                               distance_matrix=instance._distance_matrix,
+                               vertex_load=instance.load,
+                               revenue=instance.revenue,
+                               service_duration=instance.service_duration,
+                               vehicles_max_travel_distance=instance.vehicles_max_travel_distance,
+                               vehicles_max_load=instance.vehicles_max_load,
+                               tw_open=solution.tw_open,
+                               tw_close=solution.tw_close,
+                               index=index)
         logger.debug(f'tour {self.id_} updated from index {index}')
         pass
 
@@ -275,7 +264,7 @@ class Tour:
         """
 
         # wrapper around the version that is independent of instance and solution classes
-        return insertion_feasibility_check(
+        return multi_insertion_feasibility_check(
             routing_sequence=self.routing_sequence,
             travel_distance_sequence=self.travel_distance_sequence,
             service_schedule=self.service_schedule,
@@ -414,24 +403,93 @@ def feasibility_check_raw(new_routing_sequence: Sequence[int],
     return True
 
 
-def insertion_feasibility_check(routing_sequence: Sequence[int],
-                                travel_distance_sequence: Sequence[float],
-                                service_schedule: Sequence[dt.datetime],
-                                load_sequence: Sequence[float],
-                                wait_sequence: Sequence[dt.timedelta],
-                                # TODO with the help of wait_sequence and max_shift, insertion feasibility of a single vertex can be computed in constant time, I think
-                                max_shift_sequence: Sequence[dt.timedelta],
-                                num_depots: int,
-                                num_requests: int,
-                                distance_matrix: Sequence[Sequence[float]],
-                                vehicles_max_travel_distance: float,
-                                vertex_load: Sequence[int],
-                                service_duration: Sequence[dt.timedelta],
-                                vehicles_max_load: float,
-                                tw_open: Sequence[dt.datetime],
-                                tw_close: Sequence[dt.datetime],
-                                insertion_positions: Sequence[int],
-                                insertion_vertices: Sequence[int]):
+def single_insertion_feasibility_check(routing_sequence: Sequence[int],
+                                       travel_distance_sequence: List[float],
+                                       sum_travel_distance: float,
+                                       travel_duration_sequence: List[dt.timedelta],
+                                       sum_travel_duration: float,
+                                       arrival_schedule: List[dt.datetime],
+                                       service_schedule: List[dt.datetime],
+                                       load_sequence: List[float],
+                                       sum_load: float,
+                                       revenue_sequence: List[float],
+                                       sum_revenue: float,
+                                       sum_profit: float,
+                                       wait_sequence: List[dt.timedelta],
+                                       max_shift_sequence: List[dt.timedelta],
+                                       num_depots: int,
+                                       num_requests: int,
+                                       distance_matrix: Sequence[Sequence[float]],
+                                       vertex_load: Sequence[float],
+                                       revenue: Sequence[float],
+                                       service_duration: Sequence[dt.timedelta],
+                                       vehicles_max_travel_distance: float,
+                                       vehicles_max_load: float,
+                                       tw_open: Sequence[dt.datetime],
+                                       tw_close: Sequence[dt.datetime],
+                                       insertion_pos: int,
+                                       insertion_vertex: int
+                                       ):
+    """
+    Following: Lu,Q., & Dessouky,M.M. (2006). A new insertion-based construction heuristic for solving the pickup and
+    delivery problem with time windows. European Journal of Operational Research, 175(2), 672–687.
+    https://doi.org/10.1016/j.ejor.2005.05.012
+
+    :return: True if the insertion of the insertion_vertex at insertion_position is feasible, False otherwise
+    """
+    raise NotImplementedError
+    # not certain whether this works
+
+    i = routing_sequence[insertion_pos - 1]
+    j = insertion_vertex
+    k = routing_sequence[insertion_pos + 1]
+
+    travel_time_i_j = ut.travel_time(distance_matrix[i][j])
+    travel_time_j_k = ut.travel_time(distance_matrix[j][k])
+
+    # check precedence if vertex is a delivery vertex
+    if num_depots + num_requests <= j < num_depots + 2 * num_requests:
+        precedence_vertex = j - num_requests
+        if precedence_vertex not in routing_sequence[:insertion_pos]:
+            return False
+
+    # check max tour distance
+    insertion_distance = distance_matrix[i][j] + distance_matrix[j][k]
+    if sum_travel_distance + insertion_distance > vehicles_max_travel_distance:
+        return False
+
+    # check time windows
+    arrival_time = service_schedule[insertion_pos - 1] + service_duration[j] + travel_time_i_j
+    tw_cond1 = arrival_time <= tw_close[j]
+    tw_cond2 = max(arrival_time, tw_open[j]) + service_duration[j] + travel_time_j_k <= service_schedule[
+        insertion_pos + 1] + wait_sequence[insertion_pos + 1] + max_shift_sequence[insertion_pos + 1]
+    if not tw_cond1 or not tw_cond2:
+        return False
+
+    # check max vehicle load
+    if sum_load + vertex_load[j] > vehicles_max_load:
+        return False
+
+    return True
+
+
+def multi_insertion_feasibility_check(routing_sequence: Sequence[int],
+                                      travel_distance_sequence: Sequence[float],
+                                      service_schedule: Sequence[dt.datetime],
+                                      load_sequence: Sequence[float],
+                                      wait_sequence: Sequence[dt.timedelta],
+                                      max_shift_sequence: Sequence[dt.timedelta],
+                                      num_depots: int,
+                                      num_requests: int,
+                                      distance_matrix: Sequence[Sequence[float]],
+                                      vehicles_max_travel_distance: float,
+                                      vertex_load: Sequence[int],
+                                      service_duration: Sequence[dt.timedelta],
+                                      vehicles_max_load: float,
+                                      tw_open: Sequence[dt.datetime],
+                                      tw_close: Sequence[dt.datetime],
+                                      insertion_positions: Sequence[int],
+                                      insertion_vertices: Sequence[int]):
     """
     check Time Window, Maximum Tour Length and Maximum Vehicle Load constraints for the route IF the
     insertion_vertices were inserted at the insertion_positions. Insertion is not actually performed!
@@ -509,26 +567,150 @@ def insertion_distance_delta(routing_sequence: Sequence[int],
     return delta
 
 
-def update_sequences_and_schedules(routing_sequence: Sequence[int],
-                                   travel_distance_sequence: List[float],
-                                   travel_duration_sequence: List[dt.timedelta],
-                                   arrival_schedule: List[dt.datetime],
-                                   service_schedule: List[dt.datetime],
-                                   load_sequence: List[float],
-                                   revenue_sequence: List[float],
-                                   wait_sequence: List[dt.timedelta],
-                                   max_shift_sequence: List[dt.timedelta],
-                                   num_depots: int,
-                                   num_requests: int,
-                                   distance_matrix: Sequence[Sequence[float]],
-                                   vertex_load: Sequence[float],
-                                   revenue: Sequence[float],
-                                   service_duration: Sequence[dt.timedelta],
-                                   vehicles_max_travel_distance: float,
-                                   vehicles_max_load: float,
-                                   tw_open: Sequence[dt.datetime],
-                                   tw_close: Sequence[dt.datetime],
-                                   index: int = 1):
+def single_insertion_update(routing_sequence: Sequence[int],
+                            travel_distance_sequence: List[float],
+                            sum_travel_distance: float,
+                            travel_duration_sequence: List[dt.timedelta],
+                            sum_travel_duration: float,
+                            arrival_schedule: List[dt.datetime],
+                            service_schedule: List[dt.datetime],
+                            load_sequence: List[float],
+                            sum_load: float,
+                            revenue_sequence: List[float],
+                            sum_revenue: float,
+                            sum_profit: float,
+                            wait_sequence: List[dt.timedelta],
+                            max_shift_sequence: List[dt.timedelta],
+                            num_depots: int,
+                            num_requests: int,
+                            distance_matrix: Sequence[Sequence[float]],
+                            vertex_load: Sequence[float],
+                            revenue: Sequence[float],
+                            service_duration: Sequence[dt.timedelta],
+                            vehicles_max_travel_distance: float,
+                            vehicles_max_load: float,
+                            tw_open: Sequence[dt.datetime],
+                            tw_close: Sequence[dt.datetime],
+                            insertion_pos: int,
+                            ):
+    """
+    Use after insertion of a new vertex into a tour. Assumes that the insertion was feasible, no more checks are made!
+
+
+    Vansteenwegen,P., Souffriau,W., Vanden Berghe,G., & van Oudheusden,D. (2009). Iterated local search for the team
+    orienteering problem with time windows. Computers & Operations Research, 36(12), 3281–3290.
+    https://doi.org/10.1016/j.cor.2009.03.008
+
+
+    :param routing_sequence:
+    :param travel_distance_sequence:
+    :param sum_travel_distance:
+    :param travel_duration_sequence:
+    :param sum_travel_duration:
+    :param arrival_schedule:
+    :param service_schedule:
+    :param load_sequence:
+    :param sum_load:
+    :param revenue_sequence:
+    :param sum_revenue:
+    :param sum_profit:
+    :param wait_sequence:
+    :param max_shift_sequence:
+    :param num_depots:
+    :param num_requests:
+    :param distance_matrix:
+    :param vertex_load:
+    :param revenue:
+    :param service_duration:
+    :param vehicles_max_travel_distance:
+    :param vehicles_max_load:
+    :param tw_open:
+    :param tw_close:
+    :return:
+    """
+    raise NotImplementedError
+
+    pos = insertion_pos
+    i = routing_sequence[pos - 1]
+    j = routing_sequence[pos]
+    k = routing_sequence[pos + 1]
+
+    # dist_shift: total distance consumption of inserting j in between i and k
+    dist_shift_j = distance_matrix[i][j] + distance_matrix[j][k] - distance_matrix[i][k]
+
+    # time_shift: total time consumption of inserting j in between i and k
+    time_shift_j = ut.travel_time(dist_shift_j) + wait_sequence[pos] + service_duration[j]
+
+    # update totals
+    sum_travel_distance += dist_shift_j
+    sum_travel_duration += time_shift_j
+    sum_load += vertex_load[j]
+    sum_revenue += revenue[j]
+    sum_profit += revenue[j] - dist_shift_j
+
+    # update visits AFTER the insertion
+    wait_sequence[pos+1] = max(dt.timedelta(0), wait_sequence[k] - time_shift_j)
+    arrival_schedule[pos + 1] = arrival_schedule[pos + 1] + time_shift_j
+
+    time_shift_k = max(dt.timedelta(0), time_shift_j - wait_sequence[pos+1])
+    service_schedule[pos + 1] = service_schedule[pos + 1] + time_shift_k
+    max_shift_sequence[pos + 1] = max_shift_sequence[pos + 1] - time_shift_k
+
+    pos += 1
+
+    while time_shift_k > dt.timedelta(0):
+        i = routing_sequence[pos - 1]
+        j = routing_sequence[pos]
+        k = routing_sequence[pos + 1]
+
+        # dist_shift: total distance consumption of inserting j in between i and k
+        dist_shift_j = distance_matrix[i][j] + distance_matrix[j][k] - distance_matrix[i][k]
+
+        # time_shift: total time consumption of inserting j in between i and k
+        time_shift_j = ut.travel_time(dist_shift_j) + wait_sequence[pos] + service_duration[j]
+
+        wait_sequence[pos+1] = max(dt.timedelta(0), wait_sequence[k] - time_shift_j)
+        arrival_schedule[pos + 1] = arrival_schedule[pos + 1] + time_shift_j
+
+        time_shift_k = max(dt.timedelta(0), time_shift_j - wait_sequence[pos+1])
+        service_schedule[pos + 1] = service_schedule[pos + 1] + time_shift_k
+        max_shift_sequence[pos + 1] = max_shift_sequence[pos + 1] - time_shift_k
+
+        pos += 1
+
+    # update max_shift for visits BEFORE the insertion
+    for pos in range(insertion_pos, -1, -1):
+        i = routing_sequence[pos]
+        max_shift_sequence[pos] = min(tw_close[i] - service_schedule[pos],
+                                      wait_sequence[pos + 1] + max_shift_sequence[pos + 1])
+
+        # if for vertex i, the max_shift is limited by its tw closing, the insertion has no impact on a visit before i
+        if max_shift_sequence[pos] == tw_close[i] - service_schedule[pos]:
+            break
+
+    pass
+
+
+def multi_insertion_update(routing_sequence: Sequence[int],
+                           travel_distance_sequence: List[float],
+                           travel_duration_sequence: List[dt.timedelta],
+                           arrival_schedule: List[dt.datetime],
+                           service_schedule: List[dt.datetime],
+                           load_sequence: List[float],
+                           revenue_sequence: List[float],
+                           wait_sequence: List[dt.timedelta],
+                           max_shift_sequence: List[dt.timedelta],
+                           num_depots: int,
+                           num_requests: int,
+                           distance_matrix: Sequence[Sequence[float]],
+                           vertex_load: Sequence[float],
+                           revenue: Sequence[float],
+                           service_duration: Sequence[dt.timedelta],
+                           vehicles_max_travel_distance: float,
+                           vehicles_max_load: float,
+                           tw_open: Sequence[dt.datetime],
+                           tw_close: Sequence[dt.datetime],
+                           index: int = 1):
     """update schedules from the given index to the end of routing sequence. index should be the same as the insertion
     or removal index."""
 
@@ -641,26 +823,26 @@ def pop_and_update(indices: Sequence[int],
             wait_sequence=wait_sequence,
             max_shift_sequence=max_shift_sequence,
             index=index))
-    update_sequences_and_schedules(routing_sequence=routing_sequence,
-                                   travel_distance_sequence=travel_distance_sequence,
-                                   travel_duration_sequence=travel_duration_sequence,
-                                   arrival_schedule=arrival_schedule,
-                                   service_schedule=service_schedule,
-                                   load_sequence=load_sequence,
-                                   revenue_sequence=revenue_sequence,
-                                   wait_sequence=wait_sequence,
-                                   max_shift_sequence=max_shift_sequence,
-                                   num_depots=num_depots,
-                                   num_requests=num_requests,
-                                   distance_matrix=distance_matrix,
-                                   vertex_load=vertex_load,
-                                   revenue=revenue,
-                                   service_duration=service_duration,
-                                   vehicles_max_travel_distance=vehicles_max_travel_distance,
-                                   vehicles_max_load=vehicles_max_load,
-                                   tw_open=tw_open,
-                                   tw_close=tw_close,
-                                   index=indices[0])
+    multi_insertion_update(routing_sequence=routing_sequence,
+                           travel_distance_sequence=travel_distance_sequence,
+                           travel_duration_sequence=travel_duration_sequence,
+                           arrival_schedule=arrival_schedule,
+                           service_schedule=service_schedule,
+                           load_sequence=load_sequence,
+                           revenue_sequence=revenue_sequence,
+                           wait_sequence=wait_sequence,
+                           max_shift_sequence=max_shift_sequence,
+                           num_depots=num_depots,
+                           num_requests=num_requests,
+                           distance_matrix=distance_matrix,
+                           vertex_load=vertex_load,
+                           revenue=revenue,
+                           service_duration=service_duration,
+                           vehicles_max_travel_distance=vehicles_max_travel_distance,
+                           vehicles_max_load=vehicles_max_load,
+                           tw_open=tw_open,
+                           tw_close=tw_close,
+                           index=indices[0])
     # the popped objects are in reverse order to the input indices, thus reverse again
     return reversed(popped)
 
@@ -764,23 +946,23 @@ def insert_and_update(routing_sequence: List[int],
             vertex=vertex,
         )
     if len(routing_sequence) > 1:
-        update_sequences_and_schedules(routing_sequence=routing_sequence,
-                                       travel_distance_sequence=travel_distance_sequence,
-                                       travel_duration_sequence=travel_duration_sequence,
-                                       arrival_schedule=arrival_schedule,
-                                       service_schedule=service_schedule,
-                                       load_sequence=load_sequence,
-                                       revenue_sequence=revenue_sequence,
-                                       wait_sequence=wait_sequence,
-                                       max_shift_sequence=max_shift_sequence,
-                                       num_depots=num_depots,
-                                       num_requests=num_requests,
-                                       distance_matrix=distance_matrix,
-                                       vertex_load=vertex_load,
-                                       revenue=revenue,
-                                       service_duration=service_duration,
-                                       vehicles_max_travel_distance=vehicles_max_travel_distance,
-                                       vehicles_max_load=vehicles_max_load,
-                                       tw_open=tw_open,
-                                       tw_close=tw_close,
-                                       index=indices[0])
+        multi_insertion_update(routing_sequence=routing_sequence,
+                               travel_distance_sequence=travel_distance_sequence,
+                               travel_duration_sequence=travel_duration_sequence,
+                               arrival_schedule=arrival_schedule,
+                               service_schedule=service_schedule,
+                               load_sequence=load_sequence,
+                               revenue_sequence=revenue_sequence,
+                               wait_sequence=wait_sequence,
+                               max_shift_sequence=max_shift_sequence,
+                               num_depots=num_depots,
+                               num_requests=num_requests,
+                               distance_matrix=distance_matrix,
+                               vertex_load=vertex_load,
+                               revenue=revenue,
+                               service_duration=service_duration,
+                               vehicles_max_travel_distance=vehicles_max_travel_distance,
+                               vehicles_max_load=vehicles_max_load,
+                               tw_open=tw_open,
+                               tw_close=tw_close,
+                               index=indices[0])
