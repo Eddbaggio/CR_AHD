@@ -343,7 +343,7 @@ def single_insertion_feasibility_check(routing_sequence: Sequence[int],
 
     # condition 1: service of j must fit the time window of j
     arrival_time_j = service_schedule[insertion_index - 1] + service_duration[i] + travel_time_i_j
-    tw_cond1 = arrival_time_j + service_duration[j] <= tw_close[j]
+    tw_cond1 = arrival_time_j <= tw_close[j]
 
     # condition 2: time_shift_j must be limited to the sum of wait_k + max_shift_k
     wait_j = max(dt.timedelta(0), tw_open[j] - arrival_time_j)
@@ -413,15 +413,18 @@ def multi_insertion_feasibility_check(routing_sequence: List[int],
     )
 
     # check all insertions sequentially
-    for pos, vertex in zip(insertion_indices, insertion_vertices):
+    for idx, (pos, vertex) in enumerate(zip(insertion_indices, insertion_vertices)):
         input_dict['insertion_index'] = pos
         input_dict['insertion_vertex'] = vertex
 
         if single_insertion_feasibility_check(**input_dict):
 
-            # insert the current vertex at the current pos inside the copied route sequence & update the input dict
-            updated = single_insert_and_update(**input_dict)
-            input_dict.update(updated)
+            # if there are more insertions to check, insert the current vertex at the current pos inside the copied
+            # route sequence & update the input dict
+            if idx < len(insertion_indices) - 1:
+                updated = single_insert_and_update(**input_dict)
+                input_dict.update(updated)
+
         else:
             return False
 
@@ -501,7 +504,7 @@ def single_insert_and_update(routing_sequence: List[int],
     time_shift_k = max(dt.timedelta(0), time_shift_j - wait_sequence[pos + 1])
 
     # update waiting time at k
-    wait_sequence[pos + 1] = max(dt.timedelta(0), wait_sequence[pos + 1] - time_shift_j)  # TODO should this be done before or after computing time_shift_k?
+    wait_sequence[pos + 1] = max(dt.timedelta(0), wait_sequence[pos + 1] - time_shift_j)
 
     # update start of service at k
     service_schedule[pos + 1] = service_schedule[pos + 1] + time_shift_k
@@ -511,8 +514,8 @@ def single_insert_and_update(routing_sequence: List[int],
 
     pos += 1
 
-    # update arrival, service, wait, max_shift and shift for all visits after j until shift == 0
-    while time_shift_k > dt.timedelta(0):  # and pos+1 < len(routing_sequence):
+    # update arrival, service, wait, max_shift and shift for all visits after j until shift == 0 or the end is reached
+    while time_shift_k > dt.timedelta(0) and pos+1 < len(routing_sequence):
         time_shift_j = time_shift_k
 
         arrival_schedule[pos + 1] = arrival_schedule[pos + 1] + time_shift_j
@@ -528,9 +531,9 @@ def single_insert_and_update(routing_sequence: List[int],
         max_shift_sequence[pos] = min(tw_close[i] - service_schedule[pos],
                                       wait_sequence[pos + 1] + max_shift_sequence[pos + 1])
 
-        # if for vertex i, the max_shift is limited by its tw closing, the insertion has no impact on a visit before i
-        if max_shift_sequence[pos] == tw_close[i] - service_schedule[pos]:
-            break
+        # if for vertex i, the max_shift does not change the insertion has no impact on a visit before i
+        # if max_shift_sequence[pos] == old_max_shift:
+        #     break
 
     # return the updated sums, sequences and schedules
     return dict(
@@ -686,7 +689,7 @@ def single_pop_and_update(routing_sequence: List[int],
     pos += 1
 
     # update arrival, service, wait, max_shift and shift for all visits after j until shift == 0
-    while time_shift_k < dt.timedelta(0):
+    while time_shift_k < dt.timedelta(0) and pos < len(routing_sequence):
         time_shift_j = time_shift_k
         k = routing_sequence[pos]
 
@@ -703,9 +706,9 @@ def single_pop_and_update(routing_sequence: List[int],
         max_shift_sequence[pos] = min(tw_close[i] - service_schedule[pos],
                                       wait_sequence[pos + 1] + max_shift_sequence[pos + 1])
 
-        # if for vertex i, the max_shift is limited by its tw closing, the insertion has no impact on a visit before i
-        if max_shift_sequence[pos] == tw_close[i] - service_schedule[pos]:
-            break
+        # if for vertex i, the max_shift does not change the insertion has no impact on a visit before i
+        # if max_shift_sequence[pos] == old_max_shift:
+        #     break
 
     return j, dict(
         routing_sequence=routing_sequence,
