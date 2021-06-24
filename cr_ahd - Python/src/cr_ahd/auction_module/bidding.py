@@ -4,7 +4,6 @@ from copy import deepcopy
 from typing import List, Sequence
 
 import tqdm
-import multiprocessing
 
 from src.cr_ahd.core_module import instance as it, solution as slt
 from src.cr_ahd.routing_module import tour_construction as cns, tour_improvement as imp, tour_initialization as ini

@@ -258,28 +258,81 @@ class Tour:
         >> [0, 1, 4, 3, 2, 0]
         """
         for k in range(1, j - i):
-            popped = self._pop_no_update(i + 1)
-            self._multi_insert_no_update(j - k + 1, popped)
-        try:
-            self.update_sequences_and_schedules(instance, solution, i)  # maybe the new routing sequence is infeasible
-        except ut.InsertionError as e:
-            self.reverse_section(instance, solution, i, j)  # undo all the reversal
-            raise e
+            popped = self.pop_and_update(instance, solution, i + 1)
+            self.insert_and_update(instance, solution, j - k + 1, popped)
 
-    def insertion_distance_delta(self, instance, insertion_indices: List[int], vertices: List[int]):
+    def pop_distance_delta(self, instance, pop_indices: Sequence[int]):
+        """
+        :return: the negative delta that is obtained by popping the pop_indices from the routing sequence. NOTE: does
+        not actually remove/pop the vertices
+        """
+
+        delta = 0
+
+        # easy for single insertion
+        if len(pop_indices) == 1:
+
+            j_pos = pop_indices[0]
+            i_vertex = self.routing_sequence[j_pos - 1]
+            j_vertex = self.routing_sequence[j_pos]
+            k_vertex = self.routing_sequence[j_pos + 1]
+
+            delta += instance.distance([i_vertex], [k_vertex])
+            delta -= instance.distance([i_vertex, j_vertex], [j_vertex, k_vertex])
+
+        # must ensure that no edges are counted twice. Naive implementation with a tmp_routing_sequence
+        # TODO pretty sure this could be done without a temporary copy to save time
+        else:
+            assert all(pop_indices[i] < pop_indices[i + 1] for i in range(len(pop_indices) - 1))
+
+            tmp_routing_sequence = list(self.routing_sequence)
+
+            for j_pos in reversed(pop_indices):
+                i_vertex = tmp_routing_sequence[j_pos - 1]
+                j_vertex = tmp_routing_sequence.pop(j_pos)
+                k_vertex = tmp_routing_sequence[j_pos]
+
+                delta += instance.distance([i_vertex], [k_vertex])
+                delta -= instance.distance([i_vertex, j_vertex], [j_vertex, k_vertex])
+
+        return delta
+
+    def insert_distance_delta(self, instance, insertion_indices: List[int], vertices: List[int]):
         """
         returns the distance surplus that is obtained by inserting the insertion_vertices at the insertion_positions.
         NOTE: Does NOT perform a feasibility check and does NOT actually insert the vertices!
 
         """
+        delta = 0
 
-        # class method is just a wrapper around the function that is independent of the instance and solution class
-        return single_insertion_distance_delta(
-            routing_sequence=self.routing_sequence,
-            distance_matrix=instance._distance_matrix,
-            insertion_indices=insertion_indices,
-            vertices=vertices
-        )
+        # easy for single insertion
+        if len(insertion_indices) == 1:
+
+            j_pos = insertion_indices[0]
+            i_vertex = self.routing_sequence[j_pos - 1]
+            j_vertex = vertices[0]
+            k_vertex = self.routing_sequence[j_pos]
+
+            delta += instance.distance([i_vertex, j_vertex], [j_vertex, k_vertex])
+            delta -= instance.distance([i_vertex], [k_vertex])
+
+        # must ensure that no edges are counted twice. Naive implementation with a tmp_routing_sequence
+        # TODO pretty sure this could be done without a temporary copy and all the insertions to save time
+        else:
+            assert all(insertion_indices[i] < insertion_indices[i + 1] for i in range(len(insertion_indices) - 1))
+
+            tmp_routing_sequence = list(self.routing_sequence)
+
+            for j_pos, j_vertex in zip(insertion_indices, vertices):
+                tmp_routing_sequence.insert(j_pos, j_vertex)
+
+                i_vertex = tmp_routing_sequence[j_pos - 1]
+                k_vertex = tmp_routing_sequence[j_pos + 1]
+
+                delta += instance.distance([i_vertex, j_vertex], [j_vertex, k_vertex])
+                delta -= instance.distance([i_vertex], [k_vertex])
+
+        return delta
 
 
 # =====================================================================================================================
@@ -477,7 +530,8 @@ def single_insert_and_update(routing_sequence: List[int],
     k = routing_sequence[pos + 1]
 
     # calculate arrival, start of service and wait for j
-    arrival_schedule.insert(pos, service_schedule[pos - 1] + service_duration[i] + ut.travel_time(distance_matrix[i][j]))
+    arrival_schedule.insert(pos,
+                            service_schedule[pos - 1] + service_duration[i] + ut.travel_time(distance_matrix[i][j]))
     service_schedule.insert(pos, max(tw_open[j], arrival_schedule[pos]))
     wait_sequence.insert(pos, max(dt.timedelta(0), tw_open[j] - arrival_schedule[pos]))
     max_shift_sequence.insert(pos, dt.timedelta(0))  # will be updated further down
@@ -515,7 +569,7 @@ def single_insert_and_update(routing_sequence: List[int],
     pos += 1
 
     # update arrival, service, wait, max_shift and shift for all visits after j until shift == 0 or the end is reached
-    while time_shift_k > dt.timedelta(0) and pos+1 < len(routing_sequence):
+    while time_shift_k > dt.timedelta(0) and pos + 1 < len(routing_sequence):
         time_shift_j = time_shift_k
 
         arrival_schedule[pos + 1] = arrival_schedule[pos + 1] + time_shift_j
@@ -701,7 +755,7 @@ def single_pop_and_update(routing_sequence: List[int],
         pos += 1
 
     # update max_shift for visits PRECEDING the removed vertex j
-    for pos in range(pop_pos-1, -1, -1):
+    for pos in range(pop_pos - 1, -1, -1):
         i = routing_sequence[pos]
         max_shift_sequence[pos] = min(tw_close[i] - service_schedule[pos],
                                       wait_sequence[pos + 1] + max_shift_sequence[pos + 1])
@@ -781,32 +835,3 @@ def multi_pop_and_update(routing_sequence: List[int],
 
     # reverse the popped array again to return things in the expected order
     return reversed(popped), updated_sums
-
-
-def single_insertion_distance_delta(routing_sequence: Sequence[int],
-                                    distance_matrix: Sequence[Sequence[float]],
-                                    insertion_indices: Sequence[int],
-                                    vertices: Sequence[int]
-                                    ):
-    """
-
-    :param routing_sequence:
-    :param distance_matrix:
-    :param insertion_indices:
-    :param vertices:
-    :return:
-    """
-    # assure that insertion_indices are sorted
-    assert all(insertion_indices[i] <= insertion_indices[i + 1] for i in range(len(insertion_indices) - 1))
-
-    tmp_routing_sequence = list(routing_sequence)
-    delta = 0
-    for pos, vertex in zip(insertion_indices, vertices):
-        predecessor_vertex = tmp_routing_sequence[pos - 1]
-        successor_vertex = tmp_routing_sequence[pos]
-        tmp_routing_sequence.insert(pos, vertex)
-        delta += distance_matrix[predecessor_vertex][vertex] + \
-                 distance_matrix[vertex][successor_vertex] - \
-                 distance_matrix[predecessor_vertex][successor_vertex]
-
-    return delta

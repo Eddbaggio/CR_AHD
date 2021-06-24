@@ -124,7 +124,7 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
                 auction_pool_size -= 1
 
         # select the best bundles
-        limited_bundle_pool = self.generate_bundle_pool(auction_pool, fitness, population,auction_pool_size)
+        limited_bundle_pool = self.generate_bundle_pool(auction_pool, fitness, population, auction_pool_size)
 
         # add the original bundling as the final candidates if they are not contained yet - this cannot be infeasible
         self._normalize_individual(original_bundles)

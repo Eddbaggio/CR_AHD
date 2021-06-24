@@ -69,29 +69,23 @@ class PDPInsertionConstruction(TourConstructionBehavior, ABC):
         tour_: tr.Tour = solution.carriers[carrier].tours[tour]
         pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(unrouted_request)
 
-        return tour_cheapest_insertion(pickup_vertex=pickup_vertex,
-                                       delivery_vertex=delivery_vertex,
-                                       routing_sequence=tour_.routing_sequence,
-                                       sum_travel_distance=tour_.sum_travel_distance,
-                                       sum_travel_duration=tour_.sum_travel_duration,
-                                       arrival_schedule=tour_.arrival_schedule,
-                                       service_schedule=tour_.service_schedule,
-                                       sum_load=tour_.sum_load,
-                                       sum_revenue=tour_.sum_revenue,
-                                       sum_profit=tour_.sum_profit,
-                                       wait_sequence=tour_._wait_sequence,
-                                       max_shift_sequence=tour_._max_shift_sequence,
-                                       num_depots=instance.num_depots,
-                                       num_requests=instance.num_requests,
-                                       distance_matrix=instance._distance_matrix,
-                                       vertex_load=instance.load,
-                                       revenue=instance.revenue,
-                                       service_duration=instance.service_duration,
-                                       vehicles_max_travel_distance=instance.vehicles_max_travel_distance,
-                                       vehicles_max_load=instance.vehicles_max_load,
-                                       tw_open=solution.tw_open,
-                                       tw_close=solution.tw_close,
-                                       )
+        best_delta = float('inf')
+        best_pickup_position = None
+        best_delivery_position = None
+
+        for pickup_pos in range(1, len(tour_)):
+            for delivery_pos in range(pickup_pos + 1, len(tour_) + 1):
+                delta = tour_.insert_distance_delta(instance, [pickup_pos, delivery_pos],
+                                                    [pickup_vertex, delivery_vertex])
+                if delta < best_delta:
+
+                    if tour_.insertion_feasibility_check(instance, solution, [pickup_pos, delivery_pos],
+                                                         [pickup_vertex, delivery_vertex]):
+                        best_delta = delta
+                        best_pickup_position = pickup_pos
+                        best_delivery_position = delivery_pos
+
+        return best_delta, best_pickup_position, best_delivery_position
 
     @staticmethod
     def _create_new_tour_with_request(instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
