@@ -57,7 +57,7 @@ class PDPInstance:
                                  *requests_delivery_service_time]
 
         # compute the distance matrix
-        # TODO do I need to round the distances due to floating point precision? YES!
+        # need to round the distances due to floating point precision!
         self._distance_matrix = np.ceil(
             squareform(pdist(np.array(list(zip(self.x_coords, self.y_coords))), 'euclidean')))
         # self._distance_matrix = squareform(pdist(np.array(list(zip(self.x_coords, self.y_coords))), 'euclidean'))

@@ -152,9 +152,9 @@ class FeasibleTW(TWOfferingBehavior):
         for tour_ in carrier_.tours:
             for pickup_pos in range(1, len(tour_)):
                 for delivery_pos in range(pickup_pos + 1, len(tour_) + 1):
-                    if tour_.multi_insertion_feasibility_check(instance, solution,
-                                                               [pickup_pos, delivery_pos],
-                                                               [pickup_vertex, delivery_vertex]):
+                    if tour_.insertion_feasibility_check(instance, solution,
+                                                         [pickup_pos, delivery_pos],
+                                                         [pickup_vertex, delivery_vertex]):
                         # undo the setting of the time window and return
                         solution.tw_open[delivery_vertex] = ut.START_TIME
                         solution.tw_close[delivery_vertex] = ut.END_TIME

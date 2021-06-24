@@ -39,14 +39,14 @@ def inst_and_sol_gh_0_ass9_routed6(inst_and_sol_gh_0_ass9):
     tour = tr.Tour(0, instance, solution, carrier)
     solution.carriers[carrier].tours.append(tour)
     for request in solution.carriers[carrier].unrouted_requests[:2]:
-        tour.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(request))
+        tour.multi_insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(request))
         solution.carriers[carrier].unrouted_requests.remove(request)
 
     # carrier 1
     carrier = 1
     tour = tr.Tour(0, instance, solution, carrier)
     solution.carriers[carrier].tours.append(tour)
-    tour.insert_and_update(instance, solution, [1, 2, 3, 4], [9, 8, 24, 23])
+    tour.multi_insert_and_update(instance, solution, [1, 2, 3, 4], [9, 8, 24, 23])
     solution.carriers[carrier].unrouted_requests.remove(5)
     solution.carriers[carrier].unrouted_requests.remove(6)
 
@@ -55,7 +55,7 @@ def inst_and_sol_gh_0_ass9_routed6(inst_and_sol_gh_0_ass9):
     tour = tr.Tour(0, instance, solution, carrier)
     solution.carriers[carrier].tours.append(tour)
     for request in solution.carriers[carrier].unrouted_requests[:2]:
-        tour.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(request))
+        tour.multi_insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(request))
         solution.carriers[carrier].unrouted_requests.remove(request)
     return instance, solution
 
@@ -180,7 +180,7 @@ def inst_sol_circular_ass_routed_generator(instance_generator_circular: Callable
             if carrier == 1:
                 routed_vertices = sorted(routed_vertices)
 
-            tour_.insert_and_update(inst, sol, ins_indices, routed_vertices)
+            tour_.multi_insert_and_update(inst, sol, ins_indices, routed_vertices)
 
         return inst, sol
 

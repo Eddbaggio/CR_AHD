@@ -117,11 +117,11 @@ class PDPMove(PDPIntraTourLocalSearch, ABC):
 
         # initialize the best known solution
         best_delta = 0
-        best_old_pickup_pos = None
-        best_old_delivery_pos = None
+        best_pickup = None
+        best_delivery = None
         best_new_pickup_pos = None
         best_new_delivery_pos = None
-        best_move = (best_delta, best_old_pickup_pos, best_old_delivery_pos, best_new_pickup_pos, best_new_delivery_pos)
+        best_move = (best_delta, best_pickup, best_delivery, best_new_pickup_pos, best_new_delivery_pos)
 
         # test all requests
         for old_pickup_pos in range(1, len(tour_) - 2):
@@ -134,83 +134,87 @@ class PDPMove(PDPIntraTourLocalSearch, ABC):
             pickup, delivery = instance.pickup_delivery_pair(instance.request_from_vertex(vertex))
             old_delivery_pos = tour_.routing_sequence.index(delivery)
 
+            delta = 0
+
+            # savings of removing request vertices from their current positions
+            for old_pos in (old_delivery_pos, old_pickup_pos):
+                predecessor = tour_.routing_sequence[old_pos - 1]
+                vertex = tour_.routing_sequence[old_pos]
+                successor = tour_.routing_sequence[old_pos + 1]
+                delta -= instance.distance([predecessor, vertex], [vertex, successor])
+                delta += instance.distance([predecessor], [successor])
+
+            # pop
+            tour_.pop_and_update(instance, solution, (old_pickup_pos, old_delivery_pos))
+
             # check all possible new insertions for pickup and delivery vertex of the request
             for new_pickup_pos in range(1, len(tour_) - 2):
                 for new_delivery_pos in range(new_pickup_pos + 1, len(tour_) - 1):
                     if new_pickup_pos == old_pickup_pos and new_delivery_pos == old_delivery_pos:
                         continue
 
-                    # create a temporary copy to loop over
-                    tmp_routing_sequence = list(tour_.routing_sequence)
-
-                    delta = 0
-
-                    # savings of removing request vertices from their current positions
-                    for old_pos in (old_delivery_pos, old_pickup_pos):
-                        vertex = tmp_routing_sequence[old_pos]
-                        predecessor = tmp_routing_sequence[old_pos - 1]
-                        successor = tmp_routing_sequence[old_pos + 1]
-                        delta -= instance.distance([predecessor, vertex], [vertex, successor])
-                        delta += instance.distance([predecessor], [successor])
-                        tmp_routing_sequence.pop(old_pos)
-
                     # cost for inserting request vertices in the new positions
+                    insertion_shift = 0
                     for vertex, new_pos in zip((pickup, delivery), (new_pickup_pos, new_delivery_pos)):
-                        predecessor = tmp_routing_sequence[new_pos - 1]
-                        successor = tmp_routing_sequence[new_pos]
+                        predecessor = tour_.routing_sequence[new_pos - 1 + insertion_shift]
+                        successor = tour_.routing_sequence[new_pos + insertion_shift]
                         delta += instance.distance([predecessor, vertex], [vertex, successor])
                         delta -= instance.distance([predecessor], [successor])
-                        tmp_routing_sequence.insert(new_pos, vertex)
+                        insertion_shift += 1
 
                     # is the current move an improvement?
                     if delta < best_delta:
-                        move = (delta, old_pickup_pos, old_delivery_pos, new_pickup_pos, new_delivery_pos)
+                        move = (delta, pickup, delivery, new_pickup_pos, new_delivery_pos)
 
                         # is the improving move feasible?
                         if self.feasibility_check(instance, solution, carrier, tour, move):
 
-                            # best improvement: update the best known solution and continue
-                            if best_improvement:
-                                best_delta = delta
-                                best_move = move
+                            best_move = move
 
-                            # first improvement: return the move
-                            else:
+                            # first improvement: repair & return the move
+                            if not best_improvement:
+                                tour_.insert_and_update(instance,
+                                                        solution,
+                                                        (old_pickup_pos, old_delivery_pos),
+                                                        (pickup, delivery))
                                 return move
+
+                            # best improvement: update the best known solution and continue
+                            else:
+                                best_delta = delta
+
+
+            # repair
+            tour_.insert_and_update(instance, solution, (old_pickup_pos, old_delivery_pos), (pickup, delivery))
+
+        # if best improvement (or no improvement was found), return best move
         return best_move
 
     def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, tour: int, move):
-        delta, old_pickup_pos, old_delivery_pos, new_pickup_pos, new_delivery_pos = move
+        """
+        receives a destroyed tour in which a certain request has been removed. Checks insertion at another place
+        """
+
+        delta, pickup_vertex, delivery_vertex, new_pickup_pos, new_delivery_pos = move
         assert delta < 0, f'Move is non-improving'
+        assert delivery_vertex == pickup_vertex + instance.num_requests
         tour_ = solution.carriers[carrier].tours[tour]
 
-        # create a temporary routing sequence to loop over the one that contains the new vertices
-        tmp_routing_sequence = list(tour_.routing_sequence)
-        delivery = tmp_routing_sequence.pop(old_delivery_pos)
-        pickup = tmp_routing_sequence.pop(old_pickup_pos)
-        tmp_routing_sequence.insert(new_pickup_pos, pickup)
-        tmp_routing_sequence.insert(new_delivery_pos, delivery)
-
-        # find the index from which constraints must be checked
-        check_from_index = min(old_pickup_pos, old_delivery_pos, new_pickup_pos, new_delivery_pos)
-
-        return tr.feasibility_check(instance, solution, carrier, tour, tmp_routing_sequence, check_from_index)
+        return tour_.insertion_feasibility_check(instance, solution, [new_pickup_pos, new_delivery_pos],
+                                                 [pickup_vertex, delivery_vertex])
 
     def execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, tour: int, move):
-        delta, old_pickup_pos, old_delivery_pos, new_pickup_pos, new_delivery_pos = move
+        delta, pickup_vertex, delivery_vertex, new_pickup_pos, new_delivery_pos = move
         tour_ = solution.carriers[carrier].tours[tour]
 
-        # todo: better pop_no_update? saves time!
-        pickup, delivery = tour_.pop_and_update(instance, solution, [old_pickup_pos, old_delivery_pos])
-        tour_.insert_and_update(instance, solution, [new_pickup_pos, new_delivery_pos], [pickup, delivery])
-
-        pass
+        tour_.insert_and_update(instance, solution, [new_pickup_pos, new_delivery_pos],
+                                [pickup_vertex, delivery_vertex])
 
 
 class PDPTwoOpt(PDPIntraTourLocalSearch):
     def find_feasible_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, tour: int,
                            best_improvement: bool):
-        t = solution.carriers[carrier].tours[tour]
+        tour_ = solution.carriers[carrier].tours[tour]
 
         # initialize the best known solution
         best_pos_i = None
@@ -219,18 +223,18 @@ class PDPTwoOpt(PDPIntraTourLocalSearch):
         best_move = (best_delta, best_pos_i, best_pos_j)
 
         # iterate over all moves
-        for i in range(0, len(t) - 3):
-            for j in range(i + 2, len(t) - 1):
+        for i in range(0, len(tour_) - 3):
+            for j in range(i + 2, len(tour_) - 1):
 
                 delta = 0
 
                 # savings of removing the edges (i, i+1) and (j, j+1)
-                delta -= instance.distance([t.routing_sequence[i], t.routing_sequence[j]],
-                                           [t.routing_sequence[i + 1], t.routing_sequence[j + 1]])
+                delta -= instance.distance([tour_.routing_sequence[i], tour_.routing_sequence[j]],
+                                           [tour_.routing_sequence[i + 1], tour_.routing_sequence[j + 1]])
 
                 # cost of adding the edges (i, j) and (i+1, j+1)
-                delta += instance.distance([t.routing_sequence[i], t.routing_sequence[i + 1]],
-                                           [t.routing_sequence[j], t.routing_sequence[j + 1]])
+                delta += instance.distance([tour_.routing_sequence[i], tour_.routing_sequence[i + 1]],
+                                           [tour_.routing_sequence[j], tour_.routing_sequence[j + 1]])
 
                 # is the current move an improvement?
                 if delta < best_delta:
@@ -255,50 +259,52 @@ class PDPTwoOpt(PDPIntraTourLocalSearch):
         assert delta < 0, f'Move is non-improving'
         tour_ = solution.carriers[carrier].tours[tour]
 
-        # old implementation, may be a bit faster but for now I'll stick to the naive approach
-        # also I was not able to follow this old code today and thus, there might be critical bugs
-        """
-        # check the section-to-be-reverted in reverse order (
-        tmp_routing_section_reversed = [i, *range(j, i, -1), *range(j + 1, len(tour_))]
-        for rev_idx in range(len(tmp_routing_section_reversed) - 1):
-            vertex = tour_.routing_sequence[tmp_routing_section_reversed[rev_idx + 1]]
-            predecessor = tour_.routing_sequence[tmp_routing_section_reversed[rev_idx]]
-
-            # time window check
-            if solution.tw_close[vertex] < solution.tw_open[predecessor]:
-                return False
-            else:
-                dist = instance.distance([predecessor], [vertex])
-                arrival = arrival + ut.travel_time(dist)
-                arrival = max(solution.tw_open[predecessor], arrival)
-                if arrival > solution.tw_close[vertex]:
-                    return False
-
-            # precedence must only be checked if j is a delivery vertex
-            if instance.vertex_type(vertex) == "delivery":
-                pickup, _ = instance.pickup_delivery_pair(instance.request_from_vertex(vertex))
-                for l in range(i + 1, j):
-                    if tour_.routing_sequence[l] == pickup:
-                        return False
-
-            # load check
-            load += instance.load[vertex]
-            if load > instance.vehicles_max_load:
-                return False
-
-        # if no feasibility check failed
-        return True
-        """
-
         # create a temporary routing sequence to loop over the one that contains the reversed section
         tmp_routing_sequence = list(tour_.routing_sequence)
-        tmp_routing_sequence = tmp_routing_sequence[:i + 1] + tmp_routing_sequence[j:i:-1] + tmp_routing_sequence[
-                                                                                             j + 1:]
+        pop_indices = [x for x in tmp_routing_sequence[i:j]]
+        popped, _ = tr.multi_pop_and_update(routing_sequence=tmp_routing_sequence,
+                                            sum_travel_distance=tour_.sum_travel_distance,
+                                            sum_travel_duration=tour_.sum_travel_duration,
+                                            arrival_schedule=tour_.arrival_schedule,
+                                            service_schedule=tour_.service_schedule,
+                                            sum_load=tour_.sum_load,
+                                            sum_revenue=tour_.sum_revenue,
+                                            sum_profit=tour_.sum_profit,
+                                            wait_sequence=tour_.wait_sequence,
+                                            max_shift_sequence=tour_.max_shift_sequence,
+                                            distance_matrix=instance._distance_matrix,
+                                            vertex_load=instance.load,
+                                            revenue=instance.revenue,
+                                            service_duration=instance.service_duration,
+                                            tw_open=solution.tw_open,
+                                            tw_close=solution.tw_close,
+                                            pop_indices=pop_indices)
 
-        # find the index from which constraints must be checked
-        check_from_index = i
+        return tr.multi_insertion_feasibility_check(
+            routing_sequence=tour_.routing_sequence,
+            sum_travel_distance=tour_.sum_travel_distance,
+            sum_travel_duration=tour_.sum_travel_duration,
+            arrival_schedule=tour_.arrival_schedule,
+            service_schedule=tour_.service_schedule,
+            sum_load=tour_.sum_load,
+            sum_revenue=tour_.sum_revenue,
+            sum_profit=tour_.sum_profit,
+            wait_sequence=tour_.wait_sequence,
+            max_shift_sequence=tour_.max_shift_sequence,
+            num_depots=instance.num_depots,
+            num_requests=instance.num_requests,
+            distance_matrix=instance._distance_matrix,
+            vertex_load=instance.load,
+            revenue=instance.revenue,
+            service_duration=instance.service_duration,
+            vehicles_max_travel_distance=instance.vehicles_max_travel_distance,
+            vehicles_max_load=instance.vehicles_max_load,
+            tw_open=solution.tw_open,
+            tw_close=solution.tw_close,
+            insertion_indices=range(i, j),
+            insertion_vertices=reversed(popped),
 
-        return tr.feasibility_check(instance, solution, carrier, tour, tmp_routing_sequence, check_from_index)
+        )
 
     def execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, tour: int, move):
         _, i, j = move
@@ -430,7 +436,7 @@ class PDPRelocate(PDPInterTourLocalSearch):
                     # check all possible new insertions for pickup and delivery vertex of the request
                     for new_pickup_pos in range(1, len(new_tour_) - 1):
                         for new_delivery_pos in range(new_pickup_pos + 1, len(new_tour_)):
-                            delta += new_tour_.insertion_distance_delta(
+                            delta += new_tour_.single_insertion_distance_delta(
                                 instance, [new_pickup_pos, new_delivery_pos], [pickup, delivery])
 
                             # is the current move an improvement?
@@ -474,15 +480,16 @@ class PDPRelocate(PDPInterTourLocalSearch):
         delta, old_tour, old_pickup_pos, old_delivery_pos, new_tour, new_pickup_pos, new_delivery_pos = move
         carrier_ = solution.carriers[carrier]
 
-        pickup, delivery = carrier_.tours[old_tour].pop_and_update(instance, solution,
-                                                                   [old_pickup_pos, old_delivery_pos])
+        (pickup, delivery), _ = carrier_.tours[old_tour].pop_and_update(instance, solution,
+                                                                        [old_pickup_pos, old_delivery_pos])
 
         # if it is now empty (i.e. depot -> depot), drop the old tour
         if len(carrier_.tours[old_tour]) <= 2:
             carrier_.tours.pop(old_tour)
             # TODO must I update the tour.id_ ensure that there is no gap in the tour's ids? Nah, don't think so
 
-        carrier_.tours[new_tour].insert_and_update(instance, solution, [new_pickup_pos, new_delivery_pos], [pickup, delivery])
+        carrier_.tours[new_tour].multi_insert_and_update(instance, solution, [new_pickup_pos, new_delivery_pos],
+                                                         [pickup, delivery])
         pass
 
 # class ThreeOpt(TourImprovementBehavior):

@@ -40,8 +40,8 @@ class Solver(abc.ABC):
             # build tours with the assigned request
             cns.CheapestPDPInsertion().construct(instance, solution)
             imp.PDPMove().local_search(instance, solution)
-            imp.PDPTwoOpt().local_search(instance, solution)
-            imp.PDPRelocate().local_search(instance, solution)
+            # imp.PDPTwoOpt().local_search(instance, solution)
+            # imp.PDPRelocate().local_search(instance, solution)
 
     @abc.abstractmethod
     def _time_window_management(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
