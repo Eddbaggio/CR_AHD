@@ -126,7 +126,7 @@ class AHDSolution:
         self.tours: List[tr.Tour] = []
 
     def __str__(self):
-        s = f'---// Carrier ID: {self.id_} //---'
+        s = f'---// Carrier ID: {self.id_} //---\tProfit={self.sum_profit()}'
         s += '\n'
         for tour_ in self.tours:
             s += str(tour_)

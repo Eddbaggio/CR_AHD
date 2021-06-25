@@ -127,12 +127,14 @@ class Tour:
     def as_dict(self):
         return {
             'routing_sequence': self.routing_sequence,
-            'travel_distance_sequence': self.travel_distance_sequence,
-            'travel_duration_sequence': self.travel_duration_sequence,
+            # 'travel_distance_sequence': self.travel_distance_sequence,
+            # 'travel_duration_sequence': self.travel_duration_sequence,
             'arrival_schedule': self.arrival_schedule,
+            'wait_sequence': self._wait_sequence,
+            '_max_shift_sequence': self._max_shift_sequence,
             'service_schedule': self.service_schedule,
-            'load_schedule': self.load_sequence,
-            'revenue_schedule': self.revenue_sequence,
+            # 'load_schedule': self.load_sequence,
+            # 'revenue_schedule': self.revenue_sequence,
         }
 
     def summary(self):
@@ -218,7 +220,7 @@ class Tour:
         self._sum_revenue = updated_sums['sum_revenue']
         self._sum_profit = updated_sums['sum_profit']
 
-    def pop_and_update(self, instance, solution, pop_indices):
+    def pop_and_update(self, instance, solution, pop_indices:Sequence[int]):
         popped, updated_sums = multi_pop_and_update(routing_sequence=self._routing_sequence,
                                                     sum_travel_distance=self.sum_travel_distance,
                                                     sum_travel_duration=self.sum_travel_duration,
@@ -257,9 +259,11 @@ class Tour:
         >> print (tour.sequence) \n
         >> [0, 1, 4, 3, 2, 0]
         """
+
+        # TODO if i update for each pop and insertion anyway than i can better use proper lists as input
         for k in range(1, j - i):
-            popped = self.pop_and_update(instance, solution, i + 1)
-            self.insert_and_update(instance, solution, j - k + 1, popped)
+            popped = self.pop_and_update(instance, solution, [i + 1])
+            self.insert_and_update(instance, solution, [j - k + 1], popped)
 
     def pop_distance_delta(self, instance, pop_indices: Sequence[int]):
         """

@@ -21,8 +21,11 @@ class Solver(abc.ABC):
         random.seed(0)
 
         self._acceptance_phase(instance, solution)
+        print(f'{solution.sum_profit()}\tAfter Acceptance Phase')
         self._static_routing(instance, solution)  # not required if request selection is route-independent (such as in the cluster RS)?
+        print(f'{solution.sum_profit()}\tAfter Static Routing')
         self._auction_phase(instance, solution)
+        print(f'{solution.sum_profit()}\tAfter Auction')
 
         solution.solution_algorithm = self.__class__.__name__
         return solution
@@ -49,7 +52,7 @@ class Solver(abc.ABC):
 
     def _static_routing(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         solution.clear_carrier_routes()
-        ini.FurthestDistance().execute(instance, solution)
+        ini.MaxCliqueTourInitializationBehavior().execute(instance, solution)
         cns.CheapestPDPInsertion().construct(instance, solution)
         imp.PDPMove().local_search(instance, solution)
         imp.PDPTwoOpt().local_search(instance, solution)

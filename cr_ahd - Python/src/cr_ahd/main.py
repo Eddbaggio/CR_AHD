@@ -60,8 +60,8 @@ def execute_all(instance: it.PDPInstance, plot=False):
             solutions.append(solution)
 
         except Exception as e:
-            raise e
-            logger.error(f'{e}\tFailed on instance {instance} with solver {solver.__name__}')
+            # raise e
+            logger.error(f'{e}\nFailed on instance {instance} with solver {solver.__name__}')
 
     return solutions
 
@@ -140,7 +140,7 @@ if __name__ == '__main__':
     logger.info('START')
 
     # paths = [Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/test.dat')]
-    paths = list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir())[:1]
+    paths = list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir())[1:2]
 
     solutions = m_solve_single_thread(paths)
     # solutions = m_solve_multi_thread(paths)
