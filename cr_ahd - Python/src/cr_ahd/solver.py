@@ -3,7 +3,7 @@ import logging.config
 import random
 from copy import deepcopy
 from typing import final
-
+import src.cr_ahd.utility_module.utils as ut
 from src.cr_ahd.auction_module import auction as au
 from src.cr_ahd.core_module import instance as it, solution as slt
 from src.cr_ahd.routing_module import tour_construction as cns, tour_improvement as imp, tour_initialization as ini
@@ -20,17 +20,16 @@ class Solver(abc.ABC):
         solution = slt.CAHDSolution(instance)
         random.seed(0)
 
-        self._acceptance_phase(instance, solution)
-        print(f'{solution.sum_profit()}\tAfter Acceptance Phase')
-        self._static_routing(instance, solution)  # not required if request selection is route-independent (such as in the cluster RS)?
-        print(f'{solution.sum_profit()}\tAfter Static Routing')
-        self._auction_phase(instance, solution)
-        print(f'{solution.sum_profit()}\tAfter Auction')
+        solution = self._acceptance_phase(instance, solution)
+        # not required if request selection is route-independent (such as in the cluster RS)?
+        solution = self._static_routing(instance, solution)
+        solution = self._auction_phase(instance, solution)
 
         solution.solution_algorithm = self.__class__.__name__
         return solution
 
     def _acceptance_phase(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
+        solution = deepcopy(solution)
         while solution.unassigned_requests:
             # assign the next request
             request = solution.unassigned_requests[0]
@@ -43,20 +42,31 @@ class Solver(abc.ABC):
             # build tours with the assigned request
             cns.CheapestPDPInsertion().construct(instance, solution)
             imp.PDPMove().local_search(instance, solution)
-            imp.PDPTwoOpt().local_search(instance, solution)
             imp.PDPRelocate().local_search(instance, solution)
+            imp.PDPTwoOpt().local_search(instance, solution)
+
+        ut.validate_solution(instance, solution)
+        return solution
 
     @abc.abstractmethod
     def _time_window_management(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
         pass
 
     def _static_routing(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
+        solution = deepcopy(solution)
         solution.clear_carrier_routes()
+
+        # create seed tours
         ini.MaxCliqueTourInitializationBehavior().execute(instance, solution)
+        # construct initial solution
         cns.CheapestPDPInsertion().construct(instance, solution)
+        # improve initial solution
         imp.PDPMove().local_search(instance, solution)
-        imp.PDPTwoOpt().local_search(instance, solution)
         imp.PDPRelocate().local_search(instance, solution)
+        imp.PDPTwoOpt().local_search(instance, solution)
+
+        ut.validate_solution(instance, solution)
+        return solution
 
     def _auction_phase(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         """
@@ -66,12 +76,20 @@ class Solver(abc.ABC):
         :param solution:
         :return:
         """
-        pass
+        return solution
 
 
 class IsolatedPlanning(Solver):
     def _time_window_management(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
         twm.TWManagementSingle().execute(instance, solution, carrier)
+
+
+class IsolatedPlanningNoReopt(Solver):
+    def _time_window_management(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
+        twm.TWManagementSingle().execute(instance, solution, carrier)
+
+    def _static_routing(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
+        return solution
 
 
 class CollaborativePlanning(Solver):
@@ -81,12 +99,13 @@ class CollaborativePlanning(Solver):
     """
 
     def _auction_phase(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
+        solution = deepcopy(solution)
         if instance.num_carriers > 1:  # not for centralized instances
             au.AuctionD().execute(instance, solution)
 
         # do a final, static routing
         self._static_routing(instance, solution)
-        pass
+        return solution
 
     def _time_window_management(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
         twm.TWManagementSingle().execute(instance, solution, carrier)

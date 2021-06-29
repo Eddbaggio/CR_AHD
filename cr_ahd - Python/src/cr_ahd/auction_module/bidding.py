@@ -108,8 +108,8 @@ class StaticProfit(BiddingBehavior):
 
             # local search
             imp.PDPMove().improve_carrier_solution(instance, solution, tmp_carrier, False)
-            imp.PDPTwoOpt().improve_carrier_solution(instance, solution, tmp_carrier, False)
             imp.PDPRelocate().improve_carrier_solution(instance, solution, tmp_carrier, False)
+            imp.PDPTwoOpt().improve_carrier_solution(instance, solution, tmp_carrier, False)
 
             with_bundle = solution.carriers[tmp_carrier].sum_profit()
 

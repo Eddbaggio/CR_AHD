@@ -12,11 +12,6 @@ import src.cr_ahd.utility_module.cr_ahd_logging as log
 from src.cr_ahd.utility_module import utils as ut, plotting as pl, evaluation as ev
 from src.cr_ahd.core_module import instance as it, solution as slt
 
-# TODO write pseudo codes for ALL the stuff that's happening
-# TODO: describe what THIS file is for and how it works exactly
-# TODO local search: best improvement vs. first improvement!!
-# TODO Better construction heuristic, better local search, metaheuristic
-
 logging.config.dictConfig(log.LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
 
@@ -29,23 +24,13 @@ def execute_all(instance: it.PDPInstance, plot=False):
     solutions = []
 
     for solver in [
-        # slv.Static,
-        # slv.StaticCollaborative,
-        # slv.StaticCollaborativeAHD,
-
-        # slv.Dynamic,
-        # slv.DynamicCollaborative,
-        # slv.DynamicCollaborativeSingleAuction,
-
-        # slv.DynamicCollaborativeAHD,
-
-        # slv.IsolatedPlanningNoTW,
-        # slv.CollaborativePlanningNoTW,
         slv.IsolatedPlanning,
+        # slv.IsolatedPlanningNoReopt,
         # slv.CollaborativePlanning,
         # slv.CentralizedPlanning,
     ]:
         logger.info(f'{instance.id_}: Solving via {solver.__name__} ...')
+        fails = 0
         try:
             solution = solver().execute(instance)
             logger.info(f'{instance.id_}: Successfully solved via {solver.__name__}')
@@ -60,8 +45,10 @@ def execute_all(instance: it.PDPInstance, plot=False):
             solutions.append(solution)
 
         except Exception as e:
-            # raise e
+            raise e
             logger.error(f'{e}\nFailed on instance {instance} with solver {solver.__name__}')
+            solution = slt.CAHDSolution(instance)  # create an empty solution for failed instances?!
+            fails += 1
 
     return solutions
 
@@ -140,7 +127,10 @@ if __name__ == '__main__':
     logger.info('START')
 
     # paths = [Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/test.dat')]
-    paths = list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir())[1:2]
+    paths = sorted(
+        list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
+        key=ut.natural_sort_key)
+    paths = paths[13:14]
 
     solutions = m_solve_single_thread(paths)
     # solutions = m_solve_multi_thread(paths)
@@ -154,4 +144,5 @@ if __name__ == '__main__':
                  facet_row='n',
                  show=True,
                  html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix())
+    print(df)
     logger.info('END')

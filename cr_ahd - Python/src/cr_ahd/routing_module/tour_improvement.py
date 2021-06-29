@@ -308,8 +308,8 @@ class PDPTwoOpt(PDPIntraTourLocalSearch):
             vehicles_max_load=instance.vehicles_max_load,
             tw_open=solution.tw_open,
             tw_close=solution.tw_close,
-            insertion_indices=range(i, j),
-            insertion_vertices=reversed(list(popped)),
+            insertion_indices=range(i+1, j+1),
+            insertion_vertices=list(reversed(popped)),
 
         )
 

@@ -34,7 +34,7 @@ class CAHDSolution:
         self.auction_mechanism = None
 
     def __str__(self):
-        s = f'Solution {self.id_}'
+        s = f'Solution {self.id_}\nProfit={round(self.sum_profit(), 2)}'
         s += '\n'
         for c in self.carriers:
             s += str(c)
@@ -126,7 +126,8 @@ class AHDSolution:
         self.tours: List[tr.Tour] = []
 
     def __str__(self):
-        s = f'---// Carrier ID: {self.id_} //---\tProfit={self.sum_profit()}'
+        s = f'---// Carrier ID: {self.id_} //---' \
+            f'\tProfit={round(self.sum_profit(), 2)}, Acceptance Rate={round(self.acceptance_rate, 2)}'
         s += '\n'
         for tour_ in self.tours:
             s += str(tour_)

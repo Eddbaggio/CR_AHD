@@ -838,4 +838,4 @@ def multi_pop_and_update(routing_sequence: List[int],
         sum_profit = updated_sums['sum_profit']
 
     # reverse the popped array again to return things in the expected order
-    return reversed(popped), updated_sums
+    return list(reversed(popped)), updated_sums

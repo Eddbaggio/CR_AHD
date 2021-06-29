@@ -31,8 +31,8 @@ class Auction(ABC):
             ini.FurthestDistance().execute(instance, solution)
             cns.CheapestPDPInsertion().construct(instance, solution)
             imp.PDPMove().local_search(instance, solution)
-            imp.PDPTwoOpt().local_search(instance, solution)
             imp.PDPRelocate().local_search(instance, solution)
+            imp.PDPTwoOpt().local_search(instance, solution)
 
             # Bundle Generation
             # TODO maybe bundles should be a list of bundle indices rather than a list of lists of request indices?

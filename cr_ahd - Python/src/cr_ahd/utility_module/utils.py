@@ -3,12 +3,15 @@ import itertools
 import json
 import math
 import random
+import re
 import time
 import datetime as dt
 from collections import namedtuple
 from pathlib import Path
 from typing import List, Sequence
 
+import tqdm
+from tqdm import tqdm, trange
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -347,6 +350,45 @@ def datetime_range(start: dt.datetime, end: dt.datetime, freq: dt.timedelta, inc
     :return:
     """
     return (start + x * freq for x in range(((end - start) // freq) + include_end))
+
+
+def natural_sort_key(s, _nsre=re.compile('([0-9]+)')):
+    return [int(text) if text.isdigit() else text.lower()
+            for text in _nsre.split(str(s))]
+
+
+def validate_solution(instance, solution):
+    assert solution.num_carriers() > 0
+
+    for carrier in trange(len(solution.carriers), desc=f'Solution validation', disable=True):
+        carrier_ = solution.carriers[carrier]
+
+        for tour_ in carrier_.tours:
+            assert tour_.routing_sequence[0] == solution.carrier_depots[carrier][0]
+            assert tour_.routing_sequence[-1] == solution.carrier_depots[carrier][0]
+
+            assert tour_._sum_load == 0
+            assert tour_._sum_travel_distance <= instance.vehicles_max_travel_distance
+            assert tour_._sum_revenue > 0
+            assert round(tour_._sum_profit, 4) == round(tour_._sum_revenue - tour_._sum_travel_distance, 4)
+
+            for i in trange(1, len(tour_.routing_sequence), desc=f'Tour {tour_.id_}', disable=True):
+                predecessor = tour_.routing_sequence[i - 1]
+                vertex = tour_.routing_sequence[i]
+                # routing and service time constraint
+                assert tour_.arrival_schedule[i] == tour_.service_schedule[i - 1] + instance.service_duration[
+                    predecessor] + travel_time(instance.distance([predecessor], [vertex]))
+                # waiting times
+                assert tour_.service_schedule[i] == tour_.arrival_schedule[i] + tour_._wait_sequence[i]
+                # tw constraint
+                assert solution.tw_open[vertex] <= tour_.service_schedule[i] <= solution.tw_close[vertex]
+                # precedence constraint
+                if instance.vertex_type(vertex) == 'pickup':
+                    assert vertex + instance.num_requests in tour_.routing_sequence[i:]
+                elif instance.vertex_type(vertex) == 'delivery':
+                    assert vertex - instance.num_requests in tour_.routing_sequence[:i]
+                else:
+                    assert vertex == solution.carrier_depots[carrier][0]
 
 
 random.seed(0)

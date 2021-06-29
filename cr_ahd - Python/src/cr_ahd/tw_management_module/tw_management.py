@@ -20,6 +20,7 @@ class TWManagementSingle:
         request = carrier_.unrouted_requests[0]
         offer_set = two.FeasibleTW().execute(instance, solution, carrier, request)  # which TWs to offer?
         selected_tw = tws.UnequalPreference().execute(offer_set, request)  # which TW is selected?
+        # selected_tw = tws.UnequalPreference().execute(offer_set, request)  # which TW is selected?
 
         if selected_tw:
 
