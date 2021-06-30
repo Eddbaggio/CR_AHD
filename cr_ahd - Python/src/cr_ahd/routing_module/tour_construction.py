@@ -27,8 +27,8 @@ class PDPInsertionConstruction(TourConstructionBehavior, ABC):
             while solution.carriers[carrier].unrouted_requests:
 
                 request, tour, pickup_pos, delivery_pos = \
-                    self._carrier_cheapest_insertion(instance, solution, carrier,
-                                                     solution.carriers[carrier].unrouted_requests)
+                    self._carrier_insertion_construction(instance, solution, carrier,
+                                                         solution.carriers[carrier].unrouted_requests)
 
                 # when for a given request no tour can be found, create a new tour and start over
                 if tour is None:
@@ -40,8 +40,8 @@ class PDPInsertionConstruction(TourConstructionBehavior, ABC):
         pass
 
     @abstractmethod
-    def _carrier_cheapest_insertion(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
-                                    requests: Sequence[int]) -> Tuple[int, int, int, int]:
+    def _carrier_insertion_construction(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
+                                        requests: Sequence[int]) -> Tuple[int, int, int, int]:
         """
 
         :return: tuple of (request, tour, pickup_pos, delivery_pos) for the insertion operation
@@ -61,13 +61,14 @@ class PDPInsertionConstruction(TourConstructionBehavior, ABC):
         solution.carriers[carrier].unrouted_requests.remove(request)
 
     @staticmethod
-    def _tour_cheapest_insertion(instance: it.PDPInstance,
-                                 solution: slt.CAHDSolution,
-                                 carrier: int, tour: int,
-                                 unrouted_request: int):
+    def _tour_cheapest_dist_insertion(instance: it.PDPInstance,
+                                      solution: slt.CAHDSolution,
+                                      carrier: int,
+                                      tour: int,
+                                      request: int):
         """Find the cheapest insertions for pickup and delivery for a given tour"""
         tour_: tr.Tour = solution.carriers[carrier].tours[tour]
-        pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(unrouted_request)
+        pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
 
         best_delta = float('inf')
         best_pickup_position = None
@@ -123,12 +124,12 @@ class PDPInsertionConstruction(TourConstructionBehavior, ABC):
 
 class CheapestPDPInsertion(PDPInsertionConstruction):
     """
-    For each request, identify its cheapest insertion. Compare the collected insertion costs and insert the cheapest
-    over all requests.
+    For each request, identify its cheapest insertion based on distance delta. Compare the collected insertion costs
+    and insert the cheapest over all requests.
     """
 
-    def _carrier_cheapest_insertion(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
-                                    requests: Sequence[int]):
+    def _carrier_insertion_construction(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
+                                        requests: Sequence[int]):
         logger.debug(f'Cheapest Insertion tour construction for carrier {carrier}:')
         carrier_ = solution.carriers[carrier]
         best_delta = float('inf')
@@ -144,8 +145,8 @@ class CheapestPDPInsertion(PDPInsertionConstruction):
             for tour in range(carrier_.num_tours()):
 
                 # cheapest way to fit request into tour
-                delta, pickup_pos, delivery_pos = self._tour_cheapest_insertion(instance, solution, carrier, tour,
-                                                                                request)
+                delta, pickup_pos, delivery_pos = self._tour_cheapest_dist_insertion(instance, solution, carrier, tour,
+                                                                                     request)
                 if delta < best_delta:
                     best_delta = delta
                     best_request = request
@@ -162,77 +163,73 @@ class CheapestPDPInsertion(PDPInsertionConstruction):
         return best_request, best_tour, best_pickup_pos, best_delivery_pos
 
 
-# =====================================================================================================================
-# functions
-# =====================================================================================================================
+class LuDessoukyPDPInsertion(PDPInsertionConstruction):
+    """insertion costs are based on temporal aspects as seen in Lu,Q., & Dessouky,M.M. (2006). A new insertion-based
+    construction heuristic for solving the pickup and delivery problem with time windows. European Journal of
+    Operational Research, 175(2), 672–687. https://doi.org/10.1016/j.ejor.2005.05.012 """
 
+    def _carrier_insertion_construction(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
+                                        requests: Sequence[int]) -> Tuple[int, int, int, int]:
+        logger.debug(f'Cheapest Insertion tour construction for carrier {carrier}:')
+        carrier_ = solution.carriers[carrier]
+        best_delta = dt.timedelta.max
+        best_request = None
+        best_pickup_pos = None
+        best_delivery_pos = None
+        best_tour = None
 
-def tour_cheapest_insertion(pickup_vertex: int,
-                            delivery_vertex: int,
-                            routing_sequence: List[int],
-                            sum_travel_distance: float,
-                            sum_travel_duration: dt.timedelta,
-                            arrival_schedule: List[dt.datetime],
-                            service_schedule: List[dt.datetime],
-                            sum_load: float,
-                            sum_revenue: float,
-                            sum_profit: float,
-                            wait_sequence: List[dt.timedelta],
-                            max_shift_sequence: List[dt.timedelta],
-                            num_depots,
-                            num_requests,
-                            distance_matrix: Sequence[Sequence[float]],
-                            vertex_load: Sequence[float],
-                            revenue: Sequence[float],
-                            service_duration: Sequence[dt.timedelta],
-                            vehicles_max_travel_distance,
-                            vehicles_max_load,
-                            tw_open: Sequence[dt.datetime],
-                            tw_close: Sequence[dt.datetime],
-                            **kwargs
-                            ):
-    """
-    finds the cheapest insertion position for the pickup & delivery pair for the given tour
-    independent of PDPInstance class and CAHDSolution class
-    """
-    best_delta = float('inf')
-    best_pickup_position = None
-    best_delivery_position = None
+        for request in requests:
 
-    for pickup_pos in range(1, len(routing_sequence)):
-        for delivery_pos in range(pickup_pos + 1, len(routing_sequence) + 1):
-            delta = tr.single_insertion_distance_delta(routing_sequence=routing_sequence,
-                                                       distance_matrix=distance_matrix,
-                                                       insertion_indices=[pickup_pos, delivery_pos],
-                                                       vertices=[pickup_vertex, delivery_vertex],
-                                                       )
-            if delta < best_delta:
+            best_delta_for_r = dt.timedelta.max
 
-                if tr.multi_insertion_feasibility_check(routing_sequence=routing_sequence,
-                                                        sum_travel_distance=sum_travel_distance,
-                                                        sum_travel_duration=sum_travel_duration,
-                                                        arrival_schedule=arrival_schedule,
-                                                        service_schedule=service_schedule,
-                                                        sum_load=sum_load,
-                                                        sum_revenue=sum_revenue,
-                                                        sum_profit=sum_profit,
-                                                        wait_sequence=wait_sequence,
-                                                        max_shift_sequence=max_shift_sequence,
-                                                        num_depots=num_depots,
-                                                        num_requests=num_requests,
-                                                        distance_matrix=distance_matrix,
-                                                        vehicles_max_travel_distance=vehicles_max_travel_distance,
-                                                        vertex_load=vertex_load,
-                                                        revenue=revenue,
-                                                        service_duration=service_duration,
-                                                        vehicles_max_load=vehicles_max_load,
-                                                        tw_open=tw_open,
-                                                        tw_close=tw_close,
-                                                        insertion_indices=[pickup_pos, delivery_pos],
-                                                        insertion_vertices=[pickup_vertex, delivery_vertex]
-                                                        ):
+            for tour in range(carrier_.num_tours()):
+
+                # cheapest way to fit request into tour based on max_shift decrease
+                delta, pickup_pos, delivery_pos = self._lu_dessouky_c(instance, solution, carrier, tour, request)
+                if delta < best_delta:
                     best_delta = delta
-                    best_pickup_position = pickup_pos
-                    best_delivery_position = delivery_pos
+                    best_request = request
+                    best_pickup_pos = pickup_pos
+                    best_delivery_pos = delivery_pos
+                    best_tour = tour
+                if delta < best_delta_for_r:
+                    best_delta_for_r = delta
 
-    return best_delta, best_pickup_position, best_delivery_position
+            # if no feasible insertion for the current request was found, immediately return None for the tour,
+            if best_delta_for_r == dt.timedelta.max:
+                return request, None, None, None
+
+        return best_request, best_tour, best_pickup_pos, best_delivery_pos
+
+    def _lu_dessouky_c(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, tour: int,
+                       request: int):
+        """Find the insertions for pickup and delivery for a given tour that have the best C value"""
+
+        tour_: tr.Tour = solution.carriers[carrier].tours[tour]
+        pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
+
+        best_delta = dt.timedelta.max
+        best_pickup_position = None
+        best_delivery_position = None
+
+        for pickup_pos in range(1, len(tour_)):
+
+            for delivery_pos in range(pickup_pos + 1, len(tour_) + 1):
+                # c1 + c2 + c3 = max_shift_delta; i.e. the decrease in max_shift due to the insertions
+                delta = tour_.insert_max_shift_delta(instance, solution,
+                                                     [pickup_pos, delivery_pos],
+                                                     [pickup_vertex, delivery_vertex])
+
+                if delta < best_delta:
+
+                    # todo is feasibility check faster than insert_max_shift_delta computation? yes -> check
+                    #  feasibility before delta!
+                    if tour_.insertion_feasibility_check(instance, solution,
+                                                         [pickup_pos, delivery_pos],
+                                                         [pickup_vertex,
+                                                          delivery_vertex]):
+                        best_delta = delta
+                        best_pickup_position = pickup_pos
+                        best_delivery_position = delivery_pos
+
+        return best_delta, best_pickup_position, best_delivery_position

@@ -88,8 +88,8 @@ class HighestInsertionCostDistance(RequestSelectionBehavior_individual):
             best_delta_for_r = float('inf')
             for tour in range(carrier_.num_tours()):
                 # cheapest way to fit request into tour
-                delta, _, _ = cns.CheapestPDPInsertion()._tour_cheapest_insertion(instance, solution, carrier, tour,
-                                                                                  request)
+                delta, _, _ = cns.CheapestPDPInsertion()._tour_cheapest_dist_insertion(instance, solution, carrier, tour,
+                                                                                       request)
                 if delta < best_delta_for_r:
                     best_delta_for_r = delta
             # if no feasible insertion for the current request was found, attempt to create a new tour, if that's not

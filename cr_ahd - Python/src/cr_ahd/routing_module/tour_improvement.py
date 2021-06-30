@@ -7,11 +7,9 @@ from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
 logger = logging.getLogger(__name__)
 
 
-# TODO implement a best-improvement vs first-improvement mechanism on the parent-class level. e.g. as a self.best:bool
 class LocalSearchBehavior(ABC):
 
-    def local_search(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
-                     best_improvement: bool = False):
+    def local_search(self, instance: it.PDPInstance, solution: slt.CAHDSolution, best_improvement: bool = False):
         for carrier in range(instance.num_carriers):
             self.improve_carrier_solution(instance, solution, carrier, best_improvement)
         pass
@@ -308,7 +306,7 @@ class PDPTwoOpt(PDPIntraTourLocalSearch):
             vehicles_max_load=instance.vehicles_max_load,
             tw_open=solution.tw_open,
             tw_close=solution.tw_close,
-            insertion_indices=range(i+1, j+1),
+            insertion_indices=range(i + 1, j + 1),
             insertion_vertices=list(reversed(popped)),
 
         )

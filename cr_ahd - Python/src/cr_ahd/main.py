@@ -25,7 +25,7 @@ def execute_all(instance: it.PDPInstance, plot=False):
 
     for solver in [
         slv.IsolatedPlanning,
-        # slv.IsolatedPlanningNoReopt,
+        slv.IsolatedPlanningNoReopt,
         # slv.CollaborativePlanning,
         # slv.CentralizedPlanning,
     ]:
@@ -45,7 +45,7 @@ def execute_all(instance: it.PDPInstance, plot=False):
             solutions.append(solution)
 
         except Exception as e:
-            raise e
+            # raise e
             logger.error(f'{e}\nFailed on instance {instance} with solver {solver.__name__}')
             solution = slt.CAHDSolution(instance)  # create an empty solution for failed instances?!
             fails += 1
@@ -130,10 +130,10 @@ if __name__ == '__main__':
     paths = sorted(
         list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
         key=ut.natural_sort_key)
-    paths = paths[13:14]
+    paths = paths[:48]
 
-    solutions = m_solve_single_thread(paths)
-    # solutions = m_solve_multi_thread(paths)
+    # solutions = m_solve_single_thread(paths)
+    solutions = m_solve_multi_thread(paths)
 
     df = write_solution_summary_to_multiindex_df(solutions, 'carrier')
     ev.bar_chart(df,
@@ -144,5 +144,6 @@ if __name__ == '__main__':
                  facet_row='n',
                  show=True,
                  html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix())
-    print(df)
+    with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+        print(df)
     logger.info('END')

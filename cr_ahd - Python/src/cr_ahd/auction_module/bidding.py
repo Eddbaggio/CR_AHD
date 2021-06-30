@@ -89,10 +89,10 @@ class StaticProfit(BiddingBehavior):
         try:
             ini.FurthestDistance()._initialize_carrier(instance, solution, tmp_carrier)
             while tmp_carrier_.unrouted_requests:
-                insertion = construction._carrier_cheapest_insertion(instance,
-                                                                     solution,
-                                                                     tmp_carrier,
-                                                                     solution.carriers[tmp_carrier].unrouted_requests)
+                insertion = construction._carrier_insertion_construction(instance,
+                                                                         solution,
+                                                                         tmp_carrier,
+                                                                         solution.carriers[tmp_carrier].unrouted_requests)
                 request, tour, pickup_pos, delivery_pos = insertion
 
                 # when for a given request no tour can be found, create a new tour. This may raise a

@@ -216,7 +216,11 @@ class MaxCliqueTourInitializationBehavior(ABC):
         max_max_degree = 0
 
         # [1] choose each node as the initial node once
-        # for i_idx, i_node in enumerate(g_nodes):
+
+        """
+        for i_idx, i_node in enumerate(g_nodes):
+        """
+
         marked = [False] * len(g_nodes)
 
         """
@@ -269,8 +273,10 @@ class MaxCliqueTourInitializationBehavior(ABC):
                     # mark j
                     marked[j] = True
 
-                    # max_clique = clique
-            # max_max_degree = unmarked_max_degree
+                    """
+                    max_clique = clique
+            max_max_degree = unmarked_max_degree
+            """
 
         return g_nodes
 

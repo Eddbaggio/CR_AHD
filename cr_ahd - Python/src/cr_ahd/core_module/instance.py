@@ -53,8 +53,7 @@ class PDPInstance:
         self.request_to_carrier_assignment = requests_initial_carrier_assignment
         self.revenue = [*[0] * (self.num_depots + len(requests)), *requests_revenue]
         self.load = [*[0] * self.num_depots, *requests_pickup_load, *requests_delivery_load]
-        self.service_duration = [*[dt.timedelta(0)] * self.num_depots, *requests_pickup_service_time,
-                                 *requests_delivery_service_time]
+        self.service_duration = (*[dt.timedelta(0)] * self.num_depots, *requests_pickup_service_time, *requests_delivery_service_time)
 
         # compute the distance matrix
         # need to round the distances due to floating point precision!
@@ -146,7 +145,8 @@ def read_gansterer_hartl_mv(path: Path, num_carriers=3) -> PDPInstance:
     cols = ['carrier_index', 'pickup_x', 'pickup_y', 'delivery_x', 'delivery_y', 'revenue', 'load']
     requests = pd.read_csv(path, skiprows=10 + num_carriers, delim_whitespace=True, names=cols, index_col=False,
                            float_precision='round_trip')
-    requests['service_time'] = dt.timedelta(0)
+    requests['pickup_service_time'] = dt.timedelta(0)
+    requests['delivery_service_time'] = dt.timedelta(0)
     return PDPInstance(path.stem,
                        vrp_params['V'].tolist(),
                        (vrp_params['L'] * 10).tolist(),  # todo can i solve the problems without *10 vehicle capacity?
@@ -158,8 +158,8 @@ def read_gansterer_hartl_mv(path: Path, num_carriers=3) -> PDPInstance:
                        requests['delivery_x'].tolist(),
                        requests['delivery_y'].tolist(),
                        requests['revenue'].tolist(),
-                       requests['service_time'].tolist(),
-                       requests['service_time'].tolist(),
+                       [x.to_pytimedelta() for x in requests['pickup_service_time']],
+                       [x.to_pytimedelta() for x in requests['delivery_service_time']],
                        requests['load'].tolist(),
                        (-requests['load']).tolist(),
                        depots['x'].tolist(),

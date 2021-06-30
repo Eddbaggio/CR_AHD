@@ -220,7 +220,7 @@ class Tour:
         self._sum_revenue = updated_sums['sum_revenue']
         self._sum_profit = updated_sums['sum_profit']
 
-    def pop_and_update(self, instance, solution, pop_indices:Sequence[int]):
+    def pop_and_update(self, instance, solution, pop_indices: Sequence[int]):
         popped, updated_sums = multi_pop_and_update(routing_sequence=self._routing_sequence,
                                                     sum_travel_distance=self.sum_travel_distance,
                                                     sum_travel_duration=self.sum_travel_duration,
@@ -321,7 +321,7 @@ class Tour:
             delta -= instance.distance([i_vertex], [k_vertex])
 
         # must ensure that no edges are counted twice. Naive implementation with a tmp_routing_sequence
-        # TODO pretty sure this could be done without a temporary copy and all the insertions to save time
+        # TODO pretty sure this could be done without a temporary copy + all the insertions to save time
         else:
             assert all(insertion_indices[i] < insertion_indices[i + 1] for i in range(len(insertion_indices) - 1))
 
@@ -337,6 +337,31 @@ class Tour:
                 delta -= instance.distance([i_vertex], [k_vertex])
 
         return delta
+
+    def insert_max_shift_delta(self, instance, solution, insertion_indices: List[int], insertion_vertices: List[int]):
+        """returns the waiting time and max_shift time that would be assigned to insertion_vertices if they were
+        inserted before insertion_indices """
+
+        return multi_insert_max_shift_delta(
+            routing_sequence=self.routing_sequence,
+            sum_travel_distance=self.sum_travel_distance,
+            sum_travel_duration=self.sum_travel_duration,
+            arrival_schedule=self.arrival_schedule,
+            service_schedule=self.service_schedule,
+            sum_load=self.sum_load,
+            sum_revenue=self.sum_revenue,
+            sum_profit=self.sum_profit,
+            wait_sequence=self._wait_sequence,
+            max_shift_sequence=self._max_shift_sequence,
+            distance_matrix=instance._distance_matrix,
+            vertex_load=instance.load,
+            revenue=instance.revenue,
+            service_duration=instance.service_duration,
+            tw_open=solution.tw_open,
+            tw_close=solution.tw_close,
+            insertion_indices=insertion_indices,
+            insertion_vertices=insertion_vertices,
+        )
 
 
 # =====================================================================================================================
@@ -632,11 +657,6 @@ def multi_insert_and_update(routing_sequence: List[int],
 
     """
 
-    # since the insertion of one vertex extends the tour, the index for the next vertex to be inserted is shifted by one
-    # TODO check whether this shift_index is required or whether the client calling the function has already considered
-    #  the shift and supplied the indices accordingly?
-    # index_shift = 0
-
     for index, vertex in zip(insertion_indices, insertion_vertices):
         updated_sums = single_insert_and_update(routing_sequence=routing_sequence,
                                                 sum_travel_distance=sum_travel_distance,
@@ -654,7 +674,7 @@ def multi_insert_and_update(routing_sequence: List[int],
                                                 service_duration=service_duration,
                                                 tw_open=tw_open,
                                                 tw_close=tw_close,
-                                                insertion_index=index,  # + index_shift,
+                                                insertion_index=index,
                                                 insertion_vertex=vertex
                                                 )
 
@@ -839,3 +859,121 @@ def multi_pop_and_update(routing_sequence: List[int],
 
     # reverse the popped array again to return things in the expected order
     return list(reversed(popped)), updated_sums
+
+
+def single_insert_max_shift_delta(routing_sequence: List[int],
+                                  arrival_schedule: List[dt.datetime],
+                                  wait_sequence: List[dt.timedelta],
+                                  max_shift_sequence: List[dt.timedelta],
+                                  distance_matrix: Sequence[Sequence[float]],
+                                  service_duration: Sequence[dt.timedelta],
+                                  tw_open: Sequence[dt.datetime],
+                                  tw_close: Sequence[dt.datetime],
+                                  insertion_index: int,
+                                  insertion_vertex: int,
+                                  **kwargs
+                                  ):
+    """returns the change in max_shift time that would be observed if insertion_vertex was placed before
+    insertion_index """
+
+    # [1] compute wait_j and max_shift_j
+    predecessor = routing_sequence[insertion_index - 1]
+    successor = routing_sequence[insertion_index]
+    arrival_j = max(arrival_schedule[insertion_index - 1], tw_open[predecessor]) + service_duration[
+        predecessor] + ut.travel_time(distance_matrix[predecessor][insertion_vertex])
+    wait_j = max(dt.timedelta(0), tw_open[insertion_vertex] - arrival_j)
+    delta_ = ut.travel_time(distance_matrix[predecessor][insertion_vertex]) + \
+             ut.travel_time(distance_matrix[insertion_vertex][successor]) - \
+             ut.travel_time(distance_matrix[predecessor][successor]) + \
+             service_duration[insertion_vertex] + \
+             wait_j
+    max_shift_j = min(tw_close[insertion_vertex] - max(arrival_j, tw_open[insertion_vertex]),
+                      wait_sequence[insertion_index] + max_shift_sequence[insertion_index] - delta_)
+
+    # [2] algorithm 4.2 for max_shift delta of PRECEDING visits:
+    # Lu,Q., & Dessouky,M.M. (2006). A new insertion-based construction heuristic for solving
+    # the pickup and delivery problem with time windows. European Journal of Operational Research, 175(2),
+    # 672–687. https://doi.org/10.1016/j.ejor.2005.05.012
+
+    beta = wait_j + max_shift_j
+    predecessors_max_shift_delta = dt.timedelta(0)
+    k = insertion_index - 1
+
+    while True:
+        if beta >= max_shift_sequence[k] or k == 1:
+            break
+
+        if k == insertion_index - 1:
+            predecessors_max_shift_delta = max_shift_sequence[k] - beta
+
+        elif wait_sequence[k + 1] > dt.timedelta(0):
+            predecessors_max_shift_delta += min(max_shift_sequence[k] - beta, wait_sequence[k + 1])
+
+        beta += wait_sequence[k]
+        k -= 1
+
+    # [3] delta in max_shift of insertion_vertex itself
+    vertex_max_shift_delta = tw_close[insertion_vertex] - max(arrival_j, tw_open[insertion_vertex]) - max_shift_j
+
+    # [4] delta in max_shift of succeeding vertices, i.e. the travel time delta
+    successors_max_shift_delta = ut.travel_time(distance_matrix[predecessor][insertion_vertex] +
+                                                distance_matrix[insertion_vertex][successor] -
+                                                distance_matrix[predecessor][successor])
+
+    return predecessors_max_shift_delta + vertex_max_shift_delta + successors_max_shift_delta  # c1 + c2 + c3
+
+
+def multi_insert_max_shift_delta(routing_sequence: Sequence[int],
+                                 sum_travel_distance: float,
+                                 sum_travel_duration: dt.timedelta,
+                                 arrival_schedule: Sequence[dt.datetime],
+                                 service_schedule: Sequence[dt.datetime],
+                                 sum_load: float,
+                                 sum_revenue: float,
+                                 sum_profit: float,
+                                 wait_sequence: Sequence[dt.timedelta],
+                                 max_shift_sequence: Sequence[dt.timedelta],
+                                 distance_matrix: Sequence[Sequence[float]],
+                                 vertex_load: Sequence[float],
+                                 revenue: Sequence[float],
+                                 service_duration: Sequence[dt.timedelta],
+                                 tw_open: Sequence[dt.datetime],
+                                 tw_close: Sequence[dt.datetime],
+                                 insertion_indices: Sequence[int],
+                                 insertion_vertices: Sequence[int]):
+    """returns the waiting time and max_shift time that would be assigned to insertion_vertices if they were inserted
+    before insertion_indices"""
+    input_dict = dict(
+        routing_sequence=list(routing_sequence[:]),  # copy!
+        sum_travel_distance=sum_travel_distance,
+        sum_travel_duration=sum_travel_duration,
+        arrival_schedule=list(arrival_schedule[:]),  # copy!
+        service_schedule=list(service_schedule[:]),  # copy!
+        sum_load=sum_load,
+        sum_revenue=sum_revenue,
+        sum_profit=sum_profit,
+        wait_sequence=list(wait_sequence[:]),  # copy!
+        max_shift_sequence=list(max_shift_sequence[:]),  # copy!
+        distance_matrix=distance_matrix,
+        vertex_load=vertex_load,
+        revenue=revenue,
+        service_duration=service_duration,
+        tw_open=tw_open,
+        tw_close=tw_close,
+        insertion_index=None,
+        insertion_vertex=None,
+    )
+
+    total_max_shift_delta = dt.timedelta(0)
+    for idx, (index, vertex) in enumerate(zip(insertion_indices, insertion_vertices)):
+        input_dict['insertion_index'] = index
+        input_dict['insertion_vertex'] = vertex
+        max_shift_delta = single_insert_max_shift_delta(**input_dict)
+        total_max_shift_delta += max_shift_delta
+
+        # if there are more vertices that must be considered, insert the current vertex at the current pos
+        if idx < len(insertion_indices) - 1:
+            updated = single_insert_and_update(**input_dict)
+            input_dict.update(updated)
+
+    return total_max_shift_delta
