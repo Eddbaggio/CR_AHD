@@ -5,6 +5,7 @@ import numpy as np
 
 from src.cr_ahd.core_module import instance as it, tour as tr
 from src.cr_ahd.utility_module import utils as ut
+import datetime as dt
 
 
 class CAHDSolution:
@@ -48,7 +49,7 @@ class CAHDSolution:
         return sum(c.sum_travel_distance() for c in self.carriers)
 
     def sum_travel_duration(self):
-        return np.sum([c.sum_travel_duration() for c in self.carriers])
+        return sum((c.sum_travel_duration() for c in self.carriers), dt.timedelta(0))
 
     def sum_load(self):
         return sum(c.sum_load() for c in self.carriers)
@@ -140,7 +141,7 @@ class AHDSolution:
         return sum(t.sum_travel_distance for t in self.tours)
 
     def sum_travel_duration(self):
-        return np.sum([t.sum_travel_duration for t in self.tours])
+        return sum((t.sum_travel_duration for t in self.tours), dt.timedelta(0))
 
     def sum_load(self):
         return sum(t.sum_load for t in self.tours)

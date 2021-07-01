@@ -41,3 +41,8 @@ class TWManagementSingle:
 
         carrier_.acceptance_rate = len(carrier_.accepted_requests)/len(carrier_.assigned_requests)
 
+        if selected_tw:
+            return True
+        else:
+            return False
+

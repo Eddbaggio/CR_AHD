@@ -6,7 +6,7 @@ from typing import List, Sequence
 import tqdm
 
 from src.cr_ahd.core_module import instance as it, solution as slt
-from src.cr_ahd.routing_module import tour_construction as cns, tour_improvement as imp, tour_initialization as ini
+from src.cr_ahd.routing_module import tour_construction as cns, local_search as imp, tour_initialization as ini
 from src.cr_ahd.utility_module.utils import ConstraintViolationError
 
 logger = logging.getLogger(__name__)
@@ -89,10 +89,10 @@ class StaticProfit(BiddingBehavior):
         try:
             ini.FurthestDistance()._initialize_carrier(instance, solution, tmp_carrier)
             while tmp_carrier_.unrouted_requests:
-                insertion = construction._carrier_insertion_construction(instance,
-                                                                         solution,
-                                                                         tmp_carrier,
-                                                                         solution.carriers[tmp_carrier].unrouted_requests)
+                insertion = construction.best_insertion_for_carrier(instance,
+                                                                    solution,
+                                                                    tmp_carrier,
+                                                                    solution.carriers[tmp_carrier].unrouted_requests)
                 request, tour, pickup_pos, delivery_pos = insertion
 
                 # when for a given request no tour can be found, create a new tour. This may raise a
@@ -100,11 +100,11 @@ class StaticProfit(BiddingBehavior):
                 # tour would exceed time window constraints
 
                 if tour is None:
-                    construction._create_new_tour_with_request(instance, solution, tmp_carrier, request)
+                    construction.create_new_tour_with_request(instance, solution, tmp_carrier, request)
 
                 else:
-                    construction._execute_insertion(instance, solution, tmp_carrier, request, tour, pickup_pos,
-                                                    delivery_pos)
+                    construction.execute_insertion(instance, solution, tmp_carrier, request, tour, pickup_pos,
+                                                   delivery_pos)
 
             # local search
             imp.PDPMove().improve_carrier_solution(instance, solution, tmp_carrier, False)

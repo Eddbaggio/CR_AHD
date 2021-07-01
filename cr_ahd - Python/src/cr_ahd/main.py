@@ -4,13 +4,14 @@ import multiprocessing
 from pathlib import Path
 from typing import List
 
+import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
 import src.cr_ahd.solver as slv
 import src.cr_ahd.utility_module.cr_ahd_logging as log
-from src.cr_ahd.utility_module import utils as ut, plotting as pl, evaluation as ev
 from src.cr_ahd.core_module import instance as it, solution as slt
+from src.cr_ahd.utility_module import utils as ut, plotting as pl, evaluation as ev
 
 logging.config.dictConfig(log.LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
@@ -48,6 +49,9 @@ def execute_all(instance: it.PDPInstance, plot=False):
             # raise e
             logger.error(f'{e}\nFailed on instance {instance} with solver {solver.__name__}')
             solution = slt.CAHDSolution(instance)  # create an empty solution for failed instances?!
+            solution.solution_algorithm = str(solver.__name__)
+            solution.write_to_json()
+            solutions.append(solution)
             fails += 1
 
     return solutions
@@ -145,5 +149,12 @@ if __name__ == '__main__':
                  show=True,
                  html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix())
     with pd.option_context('display.max_rows', None, 'display.max_columns', None):
-        print(df)
+
+        grouped = df.groupby(['rad', 'n', 'run', 'solution_algorithm']).aggregate(
+            {'num_tours': sum, 'sum_profit': sum, 'acceptance_rate': np.mean})
+
+        print(grouped[['num_tours', 'sum_profit', 'acceptance_rate']])
+
+        for name, group in grouped.groupby('solution_algorithm'):
+            print(f'{group["num_tours"].astype(bool).sum(axis=0)}/{len(group)} solved by {name}')
     logger.info('END')

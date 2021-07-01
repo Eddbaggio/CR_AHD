@@ -1,7 +1,7 @@
 import math
 
 import pytest
-from src.cr_ahd.routing_module import tour_improvement as imp
+from src.cr_ahd.routing_module import local_search as imp
 from src.cr_ahd.utility_module import plotting as pl
 
 
@@ -10,7 +10,7 @@ def test_PDPTwoOptBest(inst_and_sol_gh_0_ass9_routed6):
     carrier = 0
     tour = 0
     local_search = imp.PDPTwoOpt()
-    move = local_search.find_feasible_move(instance, solution, carrier, tour, False)
+    move = local_search.find_feasible_move(instance, solution, carrier, False)
     best_delta, best_pos_i, best_pos_j = move
     assert best_delta == 0
     assert best_pos_i is None
@@ -23,7 +23,7 @@ def test_PDPMoveBest(inst_and_sol_gh_0_ass9_routed6):
     carrier = 0
     tour = 0
     local_search = imp.PDPMove()
-    move = local_search.find_feasible_move(instance, solution, carrier, tour, False)
+    move = local_search.find_feasible_move(instance, solution, carrier, False)
     delta, old_pickup_pos, old_delivery_pos, new_pickup_pos, new_delivery_pos = move
     assert delta == pytest.approx(
         -(50 + math.sqrt(50 ** 2 + 50 ** 2) + math.sqrt(25 ** 2 + 100 ** 2)) + (50 + 50 + math.sqrt(25 ** 2 + 50 ** 2)))

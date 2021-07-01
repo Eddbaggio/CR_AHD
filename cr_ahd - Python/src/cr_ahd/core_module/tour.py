@@ -287,7 +287,7 @@ class Tour:
         # must ensure that no edges are counted twice. Naive implementation with a tmp_routing_sequence
         # TODO pretty sure this could be done without a temporary copy to save time
         else:
-            assert all(pop_indices[i] < pop_indices[i + 1] for i in range(len(pop_indices) - 1))
+            assert all(pop_indices[i] < pop_indices[i + 1] for i in range(len(pop_indices) - 1)), f'Pop indices {pop_indices} are not in correct order'
 
             tmp_routing_sequence = list(self.routing_sequence)
 

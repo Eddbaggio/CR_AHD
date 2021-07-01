@@ -6,7 +6,7 @@ from copy import deepcopy
 import src.cr_ahd.utility_module.utils as ut
 from src.cr_ahd.auction_module import auction as au
 from src.cr_ahd.core_module import instance as it, solution as slt
-from src.cr_ahd.routing_module import tour_construction as cns, tour_improvement as imp, tour_initialization as ini
+from src.cr_ahd.routing_module import tour_construction as cns, tour_initialization as ini, metaheuristics as mh
 from src.cr_ahd.tw_management_module import tw_management as twm
 
 logger = logging.getLogger(__name__)
@@ -37,19 +37,17 @@ class Solver(abc.ABC):
             solution.assign_requests_to_carriers([request], [carrier])
 
             # find the tw for the request
-            self._time_window_management(instance, solution, carrier)
+            accepted = self._time_window_management(instance, solution, carrier)
 
-            # build tours with the assigned request
-            cns.LuDessoukyPDPInsertion().construct(instance, solution)
-            imp.PDPMove().local_search(instance, solution)
-            imp.PDPRelocate().local_search(instance, solution)
-            imp.PDPTwoOpt().local_search(instance, solution)
+            # build tours with the assigned request if it was accepted
+            if accepted:
+                cns.LuDessoukyPDPInsertion().construct_dynamic(instance, solution, carrier)
 
         ut.validate_solution(instance, solution)
         return solution
 
     def _time_window_management(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
-        twm.TWManagementSingle().execute(instance, solution, carrier)
+        return twm.TWManagementSingle().execute(instance, solution, carrier)
 
     def _static_routing(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         solution = deepcopy(solution)
@@ -57,12 +55,9 @@ class Solver(abc.ABC):
 
         # create seed tours
         ini.MaxCliqueTourInitializationBehavior().execute(instance, solution)
-        # construct initial solution
-        cns.LuDessoukyPDPInsertion().construct(instance, solution)
-        # improve initial solution
-        imp.PDPMove().local_search(instance, solution)
-        imp.PDPRelocate().local_search(instance, solution)
-        imp.PDPTwoOpt().local_search(instance, solution)
+
+        # construct_static initial solution
+        cns.LuDessoukyPDPInsertion().construct_static(instance, solution)
 
         ut.validate_solution(instance, solution)
         return solution

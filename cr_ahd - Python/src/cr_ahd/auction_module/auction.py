@@ -6,7 +6,7 @@ import src.cr_ahd.utility_module.utils as ut
 from src.cr_ahd.auction_module import request_selection as rs, bundle_generation as bg, bidding as bd, \
     winner_determination as wd
 from src.cr_ahd.core_module import instance as it, solution as slt
-from src.cr_ahd.routing_module import tour_construction as cns, tour_improvement as imp, tour_initialization as ini
+from src.cr_ahd.routing_module import tour_construction as cns, local_search as imp, tour_initialization as ini
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ class Auction(ABC):
             # re-run a static routing with the non-submitted requests
             solution.clear_carrier_routes()
             ini.FurthestDistance().execute(instance, solution)
-            cns.CheapestPDPInsertion().construct(instance, solution)
+            cns.CheapestPDPInsertion().construct_static(instance, solution)
             imp.PDPMove().local_search(instance, solution)
             imp.PDPRelocate().local_search(instance, solution)
             imp.PDPTwoOpt().local_search(instance, solution)
@@ -124,7 +124,7 @@ class AuctionC(Auction):
         return rs.LowestProfit().execute(instance, solution, ut.NUM_REQUESTS_TO_SUBMIT)
 
     def _route_unsubmitted(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
-        cns.CheapestPDPInsertion().construct(instance, solution)
+        cns.CheapestPDPInsertion().construct_static(instance, solution)
 
     def _bundle_generation(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool,
                            original_bundles):
