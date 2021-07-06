@@ -17,7 +17,7 @@ class TourInitializationBehavior(ABC):
     """
 
     def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
-        for carrier in range(instance.num_carriers):
+        for carrier in range(len(solution.carriers)):
             self._initialize_carrier(instance, solution, carrier)
         pass
 
@@ -58,6 +58,7 @@ class TourInitializationBehavior(ABC):
             tour.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(best_request))
             carrier_.tours.append(tour)
             carrier_.unrouted_requests.remove(best_request)
+            carrier_.routed_requests.append(best_request)
         pass
 
     @abstractmethod
@@ -128,7 +129,7 @@ class MaxCliqueTourInitialization(ABC):
     """
 
     def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
-        for carrier in range(instance.num_carriers):
+        for carrier in range(len(solution.carriers)):
             self._initialize_carrier(instance, solution, carrier)
         pass
 
@@ -155,6 +156,7 @@ class MaxCliqueTourInitialization(ABC):
                 tour.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(seed))
                 carrier_.tours.append(tour)
                 carrier_.unrouted_requests.pop(i)
+                carrier_.routed_requests.append(seed)
 
         pass
 

@@ -26,11 +26,8 @@ class Auction(ABC):
         if auction_pool_requests:
             logger.debug(f'requests {auction_pool_requests} have been submitted to the auction pool')
 
-            # re-run a static routing with the non-submitted requests
-            # solution.clear_carrier_routes()
-            # ini.MaxCliqueTourInitialization().execute(instance, solution)
-            # cns.TimeShiftRegretInsertion().construct_static(instance, solution)
-            mh.PDPVariableNeighborhoodDescent().execute(instance, solution)
+            # improve the "reduced" routes
+            # mh.PDPVariableNeighborhoodDescent().execute(instance, solution)
 
             # Bundle Generation
             # TODO maybe bundles should be a list of bundle indices rather than a list of lists of request indices?
@@ -78,65 +75,6 @@ class Auction(ABC):
         pass
 
 
-'''
-class AuctionA(Auction):
-    """
-    Request Selection Behavior: Highest Insertion Cost Distance
-    Bundle Generation Behavior: Random Partition
-    Bidding Behavior: I1 Travel Distance Increase
-    Winner Determination Behavior: Lowest Bid
-    """
-
-    def _run_auction(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
-        submitted_requests = rs.HighestInsertionCostDistance().execute(instance, ut.NUM_REQUESTS_TO_SUBMIT)
-        bundle_set = bg.RandomPartition(instance.distance_matrix).execute(submitted_requests)
-        bids = bd.I1TravelDistanceIncrease().execute(bundle_set, instance.carriers)
-        wd.LowestBid().execute(bids)
-
-
-class AuctionB(Auction):
-    """
-    Request Selection Behavior: Cluster (Gansterer & Hartl 2016)
-    Bundle Generation Behavior: Random Partition
-    Bidding Behavior: I1 Travel Distance Increase
-    Winner Determination Behavior: Lowest Bid
-    """
-
-    def _run_auction(self, instance: it.PDPInstance, solution: slt.GlobalSolution):
-        submitted_requests = rs.Cluster().execute(instance, ut.NUM_REQUESTS_TO_SUBMIT)
-        bundle_set = bg.RandomPartition(instance.distance_matrix).execute(submitted_requests)
-        bids = bd.I1TravelDistanceIncrease().execute(bundle_set, instance.carriers)
-        wd.LowestBid().execute(bids)
-
-
-
-class AuctionC(Auction):
-    """
-    Request Selection Behavior: Lowest Profit \n
-    Bundle Generation Behavior: Genetic Algorithm by Gansterer & Hartl \n
-    Bidding Behavior: Profit \n
-    Winner Determination Behavior: Gurobi - Set Packing Problem
-    """
-
-    def _request_selection(self, instance: it.PDPInstance, solution: slt.CAHDSolution, num_request_to_submit: int):
-        return rs.LowestProfit().execute(instance, solution, ut.NUM_REQUESTS_TO_SUBMIT)
-
-    def _route_unsubmitted(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
-        cns.CheapestPDPInsertion().construct_static(instance, solution)
-
-    def _bundle_generation(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool,
-                           original_bundles):
-        return bg.GeneticAlgorithm().execute(instance, solution, auction_pool, original_bundles)
-
-    def _bid_generation(self, instance: it.PDPInstance, solution: slt.CAHDSolution, bundles):
-        return bd.Profit().execute(instance, solution, bundles)
-
-    def _winner_determination(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool: Sequence[int],
-                              bundles: Sequence[Sequence[int]], bids_matrix: Sequence[Sequence[float]]):
-        return wd.MaxBidGurobiCAP1().execute(instance, solution, auction_pool, bundles, bids_matrix)
-'''
-
-
 class AuctionD(Auction):
     """
     Request Selection Behavior: Cluster \n
@@ -153,7 +91,7 @@ class AuctionD(Auction):
         return bg.GeneticAlgorithm().execute(instance, solution, auction_pool, original_bundles)
 
     def _bid_generation(self, instance: it.PDPInstance, solution: slt.CAHDSolution, bundles):
-        return bd.StaticProfit().execute(instance, solution, bundles)
+        return bd.DynamicReOpt().execute(instance, solution, bundles)
 
     def _winner_determination(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool: Sequence[int],
                               bundles: Sequence[Sequence[int]], bids_matrix: Sequence[Sequence[float]]):

@@ -121,13 +121,15 @@ class AHDSolution:
         self.assigned_requests: List = []
         self.accepted_requests: List = []
         self.rejected_requests: List = []
-        self.acceptance_rate: float = 0
         self.unrouted_requests: List = []
+        self.routed_requests: List = []
+        self.acceptance_rate: float = 0
         self.tours: List[tr.Tour] = []
 
     def __str__(self):
         s = f'---// Carrier ID: {self.id_} //---' \
-            f'\tProfit={round(self.sum_profit(), 2)}, Acceptance Rate={round(self.acceptance_rate, 2)}'
+            f'\tProfit={round(self.sum_profit(), 4)}, Acceptance Rate={round(self.acceptance_rate, 2)}, ' \
+            f'Assigned={self.assigned_requests}, Accepted={self.accepted_requests},Unrouted={self.unrouted_requests}'
         s += '\n'
         for tour_ in self.tours:
             s += str(tour_)
@@ -179,4 +181,5 @@ class AHDSolution:
 
     def clear_routes(self):
         self.unrouted_requests = self.accepted_requests[:]
+        self.routed_requests.clear()
         self.tours.clear()

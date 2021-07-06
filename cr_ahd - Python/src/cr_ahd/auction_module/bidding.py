@@ -6,7 +6,7 @@ from typing import List, Sequence
 import tqdm
 
 from src.cr_ahd.core_module import instance as it, solution as slt
-from src.cr_ahd.routing_module import tour_construction as cns, tour_initialization as ini
+from src.cr_ahd.routing_module import tour_construction as cns, tour_initialization as ini, metaheuristics as mh
 from src.cr_ahd.utility_module.utils import ConstraintViolationError
 
 logger = logging.getLogger(__name__)
@@ -29,26 +29,20 @@ class BiddingBehavior(ABC):
             for carrier in range(instance.num_carriers):
                 logger.debug(f'Carrier {carrier} generating bids for bundle {b}')
 
-                value_without_bundle = self._value_without_bundle(instance, solution, carrier)
-
-                # create & append a temporary copy of the carrier which will be used to compute the bid
-                tmp_carrier, tmp_carrier_ = self._create_tmp_carrier_copy(instance, solution, bundles[b], carrier)
-
-                value_with_bundle = self._value_with_bundle(instance, solution, bundles[b], tmp_carrier)
+                value_without_bundle = solution.carriers[carrier].sum_profit()
+                value_with_bundle = self._value_with_bundle(instance, solution, bundles[b], carrier)
                 bid = value_with_bundle - value_without_bundle
-                carrier_bundle_bids.append(bid)
 
-                solution.carriers.pop()  # del the temporary carrier copy
-                solution.carrier_depots.pop()  # del the tmp_carrier's depot
+                carrier_bundle_bids.append(bid)
 
             bundle_bids.append(carrier_bundle_bids)
         solution.bidding_behavior = self.__class__.__name__
         return bundle_bids
 
-    def _create_tmp_carrier_copy(self, instance: it.PDPInstance, solution: slt.CAHDSolution, bundle: Sequence[int],
-                                 carrier: int):
+    def _create_tmp_carrier_copy_with_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
+                                             bundle: Sequence[int], carrier: int):
         # create a temporary copy to compute the correct bids
-        tmp_carrier = instance.num_carriers
+        tmp_carrier = instance.num_carriers  # ID
         tmp_carrier_ = deepcopy(solution.carriers[carrier])
 
         # add the bundle to the carriers assigned and accepted requests
@@ -67,29 +61,53 @@ class BiddingBehavior(ABC):
         return tmp_carrier, tmp_carrier_
 
     @abstractmethod
-    def _value_without_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
+    def _value_with_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, bundle: Sequence[int],
+                           carrier: int):
         pass
 
-    @abstractmethod
+
+class DynamicReOpt(BiddingBehavior):
     def _value_with_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, bundle: Sequence[int],
-                           tmp_carrier: int):
-        pass
+                           carrier: int):
+
+        # create temporary copy of the carrier
+        tmp_carrier, tmp_carrier_ = self._create_tmp_carrier_copy_with_bundle(instance, solution, bundle, carrier)
+
+        # assign and insert requests of the bundle
+        try:
+            while tmp_carrier_.unrouted_requests:
+                cns.MinTravelDistanceInsertion().construct_dynamic(instance, solution, tmp_carrier)
+            mh.PDPVariableNeighborhoodDescent().execute(instance, solution, [tmp_carrier])
+            with_bundle = tmp_carrier_.sum_profit()
+
+        except ConstraintViolationError:
+            with_bundle = -float('inf')
+
+        finally:
+            solution.carriers.pop()  # del the temporary carrier copy
+            solution.carrier_depots.pop()  # del the tmp_carrier's depot
+
+        return with_bundle
 
 
 class StaticProfit(BiddingBehavior):
-    def _value_without_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
-
-        return solution.carriers[carrier].sum_profit()
 
     def _value_with_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, bundle: Sequence[int],
-                           tmp_carrier: int):
+                           carrier: int):
+
+        # create & append a temporary copy of the carrier which will be used to compute the bid
+        tmp_carrier, tmp_carrier_ = self._create_tmp_carrier_copy_with_bundle(instance, solution, bundle, carrier)
+
         try:
             ini.MaxCliqueTourInitialization()._initialize_carrier(instance, solution, tmp_carrier)
-            cns.TimeShiftRegretInsertion().construct_static(instance, solution)
+            cns.MinTravelDistanceInsertion().construct_static(instance, solution)
             with_bundle = solution.carriers[tmp_carrier].sum_profit()
 
         except ConstraintViolationError:
             with_bundle = -float('inf')
 
-        return with_bundle
+        finally:
+            solution.carriers.pop()  # del the temporary carrier copy
+            solution.carrier_depots.pop()  # del the tmp_carrier's depot
 
+        return with_bundle

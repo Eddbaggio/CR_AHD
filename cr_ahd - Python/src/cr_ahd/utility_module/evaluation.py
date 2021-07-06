@@ -130,7 +130,7 @@ def bar_chart(df: pd.DataFrame,
                      'CentralizedPlanning'
                  ]}
                  )
-    fig.update_yaxes(range=[0, 8000])
+    fig.update_yaxes(range=[0, 10000])
     if show:
         fig.show(config=config)
 

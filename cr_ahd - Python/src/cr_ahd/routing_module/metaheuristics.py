@@ -15,6 +15,7 @@ class PDPMetaHeuristic(abc.ABC):
         self.neighborhoods = [ls.PDPMove,
                               ls.PDPTwoOpt,
                               ls.PDPRelocate,  # inter-tour
+                              # ls.PDPRelocate2,  # inter-tour
                               ]
         self.improved = False
         self.stopping_criterion = False
@@ -97,7 +98,7 @@ class PDPSequentialNeighborhoodDescent(PDPMetaHeuristic):
 
     def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None):
         if carriers is None:
-            carriers = range(instance.num_carriers)
+            carriers = range(len(solution.carriers))
 
         for carrier in carriers:
             for k in range(len(self.neighborhoods)):
@@ -132,7 +133,7 @@ class PDPSequentialNeighborhoodDescent(PDPMetaHeuristic):
 class PDPVariableNeighborhoodDescent(PDPMetaHeuristic):
     def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None):
         if carriers is None:
-            carriers = range(instance.num_carriers)
+            carriers = range(len(solution.carriers))
 
         for carrier in carriers:
             k = 0
@@ -169,7 +170,7 @@ class PDPSimulatedAnnealing(PDPMetaHeuristic):
 
     def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None):
         if carriers is None:
-            carriers = range(instance.num_carriers)
+            carriers = range(len(solution.carriers))
         raise NotImplementedError('Metaheuristics should modify the solution in place. This has not yet been fixed for SA')
         best_solution = deepcopy(solution)
         tentative_solution = deepcopy(solution)

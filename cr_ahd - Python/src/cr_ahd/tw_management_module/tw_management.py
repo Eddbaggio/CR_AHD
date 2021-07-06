@@ -13,11 +13,8 @@ class TWManagementSingle:
     execute function! Requests must also be assigned one at a time
     """
 
-    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
+    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
         carrier_ = solution.carriers[carrier]
-        assert len(carrier_.unrouted_requests) == 1, f'For the "Single" version of the TWM, only one request can be' \
-                                                     f'handled at a time'
-        request = carrier_.unrouted_requests[0]
         offer_set = two.FeasibleTW().execute(instance, solution, carrier, request)  # which TWs to offer?
         selected_tw = tws.UnequalPreference().execute(offer_set, request)  # which TW is selected?
         # selected_tw = tws.UnequalPreference().execute(offer_set, request)  # which TW is selected?
@@ -39,10 +36,9 @@ class TWManagementSingle:
             carrier_.rejected_requests.append(request)
             carrier_.unrouted_requests.pop(0)
 
-        carrier_.acceptance_rate = len(carrier_.accepted_requests)/len(carrier_.assigned_requests)
+        carrier_.acceptance_rate = len(carrier_.accepted_requests) / len(carrier_.assigned_requests)
 
         if selected_tw:
             return True
         else:
             return False
-

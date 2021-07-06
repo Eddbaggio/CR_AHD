@@ -338,7 +338,7 @@ def plot_solution_2(instance: it.PDPInstance, solution: slt.CAHDSolution, title=
     # ]
     edges = []
 
-    for c in range(instance.num_carriers):
+    for c in range(len(solution.carriers)):
         scatter_traces, edge_traces = _add_carrier_solution(fig, instance, solution, c)
         scatters.append(scatter_traces)
         edges.append(edge_traces)
@@ -350,7 +350,7 @@ def plot_solution_2(instance: it.PDPInstance, solution: slt.CAHDSolution, title=
 
     # custom buttons to hide edges
     button_dicts = []
-    for c in range(instance.num_carriers):
+    for c in range(len(solution.carriers)):
         for t in range(solution.carriers[c].num_tours()):
             button_dicts.append(
                 dict(label=f'Carrier {c}, Tour {t}',
@@ -376,7 +376,7 @@ def plot_solution_2(instance: it.PDPInstance, solution: slt.CAHDSolution, title=
 
     fig.update_layout(updatemenus=
                       [dict(type='buttons',
-                            y=c / instance.num_carriers,
+                            y=c / len(solution.carriers),
                             yanchor='auto',
                             active=-1,
                             buttons=button_dicts

@@ -23,17 +23,22 @@ def execute_all(instance: it.PDPInstance, plot=False):
     :return: evaluation metrics (Instance.evaluation_metrics) of all the solutions obtained
     """
     solutions = []
+    iso_sol = False
 
     for solver in [
         slv.IsolatedPlanning,
-        # slv.IsolatedPlanningNoReopt,
         slv.CollaborativePlanning,
         slv.CentralizedPlanning,
     ]:
         logger.info(f'{instance.id_}: Solving via {solver.__name__} ...')
         fails = 0
         try:
-            solution = solver().execute(instance)
+            if solver.__name__ == 'CollaborativePlanning' and iso_sol:
+                solution = solver().execute(instance, iso_sol)
+            else:
+                solution = solver().execute(instance)
+            if solver.__name__ == 'IsolatedPlanning':
+                iso_sol = solution
             logger.info(f'{instance.id_}: Successfully solved via {solver.__name__}')
             if plot:
                 pl.plot_solution_2(
@@ -76,7 +81,7 @@ def m_solve_multi_thread(instance_paths):
 def m_solve_single_thread(instance_paths):
     solutions = []
     for path in tqdm(instance_paths, disable=True):
-        solver_solutions = s_solve(path, plot=False)
+        solver_solutions = s_solve(path, plot=True)
         solutions.append(solver_solutions)
     return solutions
 
@@ -134,14 +139,14 @@ if __name__ == '__main__':
     paths = sorted(
         list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
         key=ut.natural_sort_key)
-    paths = paths[:48]
+    paths = paths[3:4]
 
     solutions = m_solve_single_thread(paths)
     # solutions = m_solve_multi_thread(paths)
 
     df = write_solution_summary_to_multiindex_df(solutions, 'carrier')
     ev.bar_chart(df,
-                 title='VND 4th',
+                 title='Only PDPMove and PDP2Opt',
                  values='sum_profit',
                  category='run',
                  color='solution_algorithm',

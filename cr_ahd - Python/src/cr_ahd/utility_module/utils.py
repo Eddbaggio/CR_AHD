@@ -364,8 +364,8 @@ def validate_solution(instance, solution):
         carrier_ = solution.carriers[carrier]
 
         for tour_ in carrier_.tours:
-            assert tour_.routing_sequence[0] == solution.carrier_depots[carrier][0]
-            assert tour_.routing_sequence[-1] == solution.carrier_depots[carrier][0]
+            assert tour_.routing_sequence[0] in solution.carrier_depots[carrier]
+            assert tour_.routing_sequence[-1] in solution.carrier_depots[carrier]
 
             assert tour_._sum_load == 0
             assert tour_._sum_travel_distance <= instance.vehicles_max_travel_distance
@@ -388,7 +388,7 @@ def validate_solution(instance, solution):
                 elif instance.vertex_type(vertex) == 'delivery':
                     assert vertex - instance.num_requests in tour_.routing_sequence[:i]
                 else:
-                    assert vertex == solution.carrier_depots[carrier][0]
+                    assert vertex in solution.carrier_depots[carrier]
 
 
 random.seed(0)

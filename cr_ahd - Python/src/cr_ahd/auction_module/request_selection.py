@@ -169,6 +169,7 @@ class RequestSelectionBehavior_bundle(ABC):
                 # retract the request from the carrier
                 carrier_.assigned_requests.remove(request)
                 carrier_.accepted_requests.remove(request)
+                carrier_.routed_requests.remove(request)
                 solution.request_to_carrier_assignment[request] = np.nan
                 solution.unassigned_requests.append(request)
 

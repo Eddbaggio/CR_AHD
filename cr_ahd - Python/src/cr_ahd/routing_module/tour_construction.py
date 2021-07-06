@@ -28,32 +28,33 @@ class PDPParallelInsertionConstruction(ABC):
                 else:
                     self.execute_insertion(instance, solution, carrier, request, tour, pickup_pos, delivery_pos)
 
-                # metaheuristic every 4th request
+                """# metaheuristic every 4th request
                 if i % 4 == 0:
                     # for fairness with the dynamic version, run local search after each insertion
                     # mh.PDPSequentialNeighborhoodDescent().execute(instance, solution)
                     mh.PDPVariableNeighborhoodDescent().execute(instance, solution)
                     # mh.PDPSimulatedAnnealing().execute(instance, solution, [carrier])
-                i += 1
+                i += 1"""
 
         pass
 
     def construct_dynamic(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
         """take the single (!) unrouted customer of the given carrier and insert it in the best position"""
         carrier_ = solution.carriers[carrier]
-        assert len(carrier_.unrouted_requests) == 1
+        # assert len(carrier_.unrouted_requests) == 1  # TODO I only removed this line because of the final routing. In the acceptance phase this condition must hold but not in the final routing
         request = carrier_.unrouted_requests[0]
-        delta, tour, pickup_pos, delivery_pos = self.best_insertion_for_request(instance, solution, carrier, request)
+        insertion_criteria, tour, pickup_pos, delivery_pos = self.best_insertion_for_request(instance, solution,
+                                                                                             carrier, request)
         if tour is None:
             self.create_new_tour_with_request(instance, solution, carrier, request)
         else:
             self.execute_insertion(instance, solution, carrier, request, tour, pickup_pos, delivery_pos)
 
-        # metaheuristic every 4th request
-        if len(carrier_.assigned_requests) % 4 == 0:
+        """# metaheuristic every 4th request
+        if len(carrier_.routed_requests) % 5 == 0:
             # mh.PDPSequentialNeighborhoodDescent().execute(instance, solution)
-            mh.PDPVariableNeighborhoodDescent().execute(instance, solution)
-            # mh.PDPSimulatedAnnealing().execute(instance, solution, [carrier])
+            mh.PDPVariableNeighborhoodDescent().execute(instance, solution, [carrier])
+            # mh.PDPSimulatedAnnealing().execute(instance, solution, [carrier])"""
         pass
 
     def best_insertion_for_carrier(
@@ -136,6 +137,7 @@ class PDPParallelInsertionConstruction(ABC):
                                                                  [pickup_pos, delivery_pos],
                                                                  [pickup, delivery])
         solution.carriers[carrier].unrouted_requests.remove(request)
+        solution.carriers[carrier].routed_requests.append(request)
 
     @staticmethod
     def create_new_tour_with_request(instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
@@ -168,6 +170,7 @@ class PDPParallelInsertionConstruction(ABC):
 
         carrier_.tours.append(best_tour_)
         carrier_.unrouted_requests.remove(request)
+        carrier_.routed_requests.append(request)
         return
 
 
@@ -227,8 +230,8 @@ class MinTimeShiftInsertion(PDPParallelInsertionConstruction):
 
                 if delta < best_delta:
 
-                    # todo is feasibility check faster than insert_max_shift_delta computation? yes -> check
-                    #  feasibility before delta!
+                    # todo is feasibility check faster than insert_max_shift_delta computation? if yes -> check
+                    #  feasibility BEFORE delta!
                     if tour_.insertion_feasibility_check(instance, solution,
                                                          [pickup_pos, delivery_pos],
                                                          [pickup_vertex,
@@ -292,6 +295,7 @@ class TravelDistanceRegretInsertion(PDPParallelInsertionConstruction):
     # gotta override this method for regret measures
     def best_insertion_for_request(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
                                    request: int):
+        # steal the regret implementation from time shift
         return TimeShiftRegretInsertion().best_insertion_for_request(instance, solution, carrier, request)
 
     def best_insertion_for_request_in_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
