@@ -6,7 +6,7 @@ from typing import List, Sequence
 import tqdm
 
 from src.cr_ahd.core_module import instance as it, solution as slt
-from src.cr_ahd.routing_module import tour_construction as cns, local_search as imp, tour_initialization as ini
+from src.cr_ahd.routing_module import tour_construction as cns, tour_initialization as ini
 from src.cr_ahd.utility_module.utils import ConstraintViolationError
 
 logger = logging.getLogger(__name__)
@@ -83,37 +83,13 @@ class StaticProfit(BiddingBehavior):
 
     def _value_with_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, bundle: Sequence[int],
                            tmp_carrier: int):
-        tmp_carrier_ = solution.carriers[tmp_carrier]
-        construction = cns.CheapestPDPInsertion()
-
         try:
-            ini.FurthestDistance()._initialize_carrier(instance, solution, tmp_carrier)
-            while tmp_carrier_.unrouted_requests:
-                insertion = construction.best_insertion_for_carrier(instance,
-                                                                    solution,
-                                                                    tmp_carrier,
-                                                                    solution.carriers[tmp_carrier].unrouted_requests)
-                request, tour, pickup_pos, delivery_pos = insertion
-
-                # when for a given request no tour can be found, create a new tour. This may raise a
-                # ConstraintViolationError if the carrier (a) would exceed fleet size constraints or (b) a pendulum
-                # tour would exceed time window constraints
-
-                if tour is None:
-                    construction.create_new_tour_with_request(instance, solution, tmp_carrier, request)
-
-                else:
-                    construction.execute_insertion(instance, solution, tmp_carrier, request, tour, pickup_pos,
-                                                   delivery_pos)
-
-            # local search
-            imp.PDPMove().improve_carrier_solution(instance, solution, tmp_carrier, False)
-            imp.PDPRelocate().improve_carrier_solution(instance, solution, tmp_carrier, False)
-            imp.PDPTwoOpt().improve_carrier_solution(instance, solution, tmp_carrier, False)
-
+            ini.MaxCliqueTourInitialization()._initialize_carrier(instance, solution, tmp_carrier)
+            cns.TimeShiftRegretInsertion().construct_static(instance, solution)
             with_bundle = solution.carriers[tmp_carrier].sum_profit()
 
-        except ConstraintViolationError as e:
+        except ConstraintViolationError:
             with_bundle = -float('inf')
 
         return with_bundle
+

@@ -26,9 +26,9 @@ def execute_all(instance: it.PDPInstance, plot=False):
 
     for solver in [
         slv.IsolatedPlanning,
-        slv.IsolatedPlanningNoReopt,
-        # slv.CollaborativePlanning,
-        # slv.CentralizedPlanning,
+        # slv.IsolatedPlanningNoReopt,
+        slv.CollaborativePlanning,
+        slv.CentralizedPlanning,
     ]:
         logger.info(f'{instance.id_}: Solving via {solver.__name__} ...')
         fails = 0
@@ -46,7 +46,7 @@ def execute_all(instance: it.PDPInstance, plot=False):
             solutions.append(solution)
 
         except Exception as e:
-            # raise e
+            raise e
             logger.error(f'{e}\nFailed on instance {instance} with solver {solver.__name__}')
             solution = slt.CAHDSolution(instance)  # create an empty solution for failed instances?!
             solution.solution_algorithm = str(solver.__name__)
@@ -136,11 +136,12 @@ if __name__ == '__main__':
         key=ut.natural_sort_key)
     paths = paths[:48]
 
-    # solutions = m_solve_single_thread(paths)
-    solutions = m_solve_multi_thread(paths)
+    solutions = m_solve_single_thread(paths)
+    # solutions = m_solve_multi_thread(paths)
 
     df = write_solution_summary_to_multiindex_df(solutions, 'carrier')
     ev.bar_chart(df,
+                 title='VND 4th',
                  values='sum_profit',
                  category='run',
                  color='solution_algorithm',

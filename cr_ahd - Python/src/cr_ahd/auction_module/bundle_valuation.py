@@ -173,7 +173,7 @@ def bundle_total_travel_distance(instance: it.PDPInstance,
 
     # furthest distance seed request
     best_evaluation = -float('inf')
-    initialization = ini.FurthestDistance()
+    initialization = ini.FurthestDistanceTourInitialization()
     tmp_bundle = bundle[:]
     for request_idx, request in enumerate(tmp_bundle):
         evaluation = initialization._request_evaluation(*instance.pickup_delivery_pair(request),

@@ -37,6 +37,8 @@ def bar_chart(df: pd.DataFrame,
               facet_row,
               facet_col,
               barmode='group',
+              title: str = f"<b>n</b>: Number of requests per carrier<br>"
+                           f"<b>rad</b>: Radius of the carriers' operational area around the depot<br>",
               show: bool = True,
               html_path=None,
               ):
@@ -113,8 +115,7 @@ def bar_chart(df: pd.DataFrame,
     fig = px.bar(df,
                  x=category,
                  y=values,
-                 title=f"<b>n</b>: Number of requests per carrier<br>"
-                       f"<b>rad</b>: Radius of the carriers' operational area around the depot<br>",
+                 title=title,
                  color=color,
                  color_discrete_sequence=ut.univie_colors_100,
                  facet_row=facet_row,
@@ -129,7 +130,7 @@ def bar_chart(df: pd.DataFrame,
                      'CentralizedPlanning'
                  ]}
                  )
-    fig.update_yaxes(range=[0, 10000])
+    fig.update_yaxes(range=[0, 8000])
     if show:
         fig.show(config=config)
 

@@ -10,21 +10,12 @@ from src.cr_ahd.routing_module import metaheuristics as mh
 logger = logging.getLogger(__name__)
 
 
-class TourConstructionBehavior(ABC):
-
-    def __init__(self):
-        pass
-
-    @abstractmethod
-    def construct_static(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
-        pass
-
-
-class PDPInsertionConstruction(TourConstructionBehavior, ABC):
+class PDPParallelInsertionConstruction(ABC):
     def construct_static(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
 
-        for carrier in range(instance.num_carriers):
+        for carrier in range(len(solution.carriers)):
 
+            i = 0
             while solution.carriers[carrier].unrouted_requests:
                 request, tour, pickup_pos, delivery_pos = self.best_insertion_for_carrier(instance, solution, carrier)
 
@@ -37,8 +28,13 @@ class PDPInsertionConstruction(TourConstructionBehavior, ABC):
                 else:
                     self.execute_insertion(instance, solution, carrier, request, tour, pickup_pos, delivery_pos)
 
-                # for fairness with the dynamic version, run local search after each insertion
-                mh.PDPGradientMultiNeighborhoodDescent().execute(instance, solution)
+                # metaheuristic every 4th request
+                if i % 4 == 0:
+                    # for fairness with the dynamic version, run local search after each insertion
+                    # mh.PDPSequentialNeighborhoodDescent().execute(instance, solution)
+                    mh.PDPVariableNeighborhoodDescent().execute(instance, solution)
+                    # mh.PDPSimulatedAnnealing().execute(instance, solution, [carrier])
+                i += 1
 
         pass
 
@@ -53,8 +49,11 @@ class PDPInsertionConstruction(TourConstructionBehavior, ABC):
         else:
             self.execute_insertion(instance, solution, carrier, request, tour, pickup_pos, delivery_pos)
 
-        mh.PDPGradientMultiNeighborhoodDescent().execute(instance, solution)
-
+        # metaheuristic every 4th request
+        if len(carrier_.assigned_requests) % 4 == 0:
+            # mh.PDPSequentialNeighborhoodDescent().execute(instance, solution)
+            mh.PDPVariableNeighborhoodDescent().execute(instance, solution)
+            # mh.PDPSimulatedAnnealing().execute(instance, solution, [carrier])
         pass
 
     def best_insertion_for_carrier(
@@ -67,9 +66,6 @@ class PDPInsertionConstruction(TourConstructionBehavior, ABC):
         a tuple of (request, tour, pickup_pos, delivery_pos). "Best" in this case is defined by the inheriting class
         (e.g. lowest distance increase or smallest time shift)
 
-        :param instance:
-        :param solution:
-        :param carrier:
         :return: the best found insertion as a tuple of (request, tour, pickup_pos, delivery_pos)
         """
         logger.debug(f'Cheapest Insertion tour construction for carrier {carrier}:')
@@ -127,6 +123,7 @@ class PDPInsertionConstruction(TourConstructionBehavior, ABC):
     @abstractmethod
     def best_insertion_for_request_in_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
                                            tour: int, request: int) -> Tuple[float, int, int]:
+        """returns an insertion move as a tuple of (delta, pickup_position, delivery_position)"""
         pass
 
     @staticmethod
@@ -174,7 +171,7 @@ class PDPInsertionConstruction(TourConstructionBehavior, ABC):
         return
 
 
-class CheapestPDPInsertion(PDPInsertionConstruction):
+class MinTravelDistanceInsertion(PDPParallelInsertionConstruction):
     """
     For each request, identify its cheapest insertion based on distance delta. Compare the collected insertion costs
     and insert the cheapest over all requests.
@@ -204,7 +201,7 @@ class CheapestPDPInsertion(PDPInsertionConstruction):
         return best_delta, best_pickup_position, best_delivery_position
 
 
-class LuDessoukyPDPInsertion(PDPInsertionConstruction):
+class MinTimeShiftInsertion(PDPParallelInsertionConstruction):
     """insertion costs are based on temporal aspects as seen in Lu,Q., & Dessouky,M.M. (2006). A new insertion-based
     construction heuristic for solving the pickup and delivery problem with time windows. European Journal of
     Operational Research, 175(2), 672–687. https://doi.org/10.1016/j.ejor.2005.05.012 """
@@ -248,3 +245,56 @@ class LuDessoukyPDPInsertion(PDPInsertionConstruction):
 
         # return the best_delta
         return best_delta, best_pickup_pos, best_delivery_pos
+
+
+class TimeShiftRegretInsertion(PDPParallelInsertionConstruction):
+    # gotta override this method for regret measures
+    def best_insertion_for_request(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
+                                   request: int):
+        """For the given request, finds the best combination of (a) tour, (b) pickup position and (c) delivery position
+         for the best insertion. Best, in this case, is defined by the inheriting class (e.g. lowest cost increase or
+         least time shift).
+
+         :returns: delta, tour, pickup_position, delivery_position of the best found insertion
+         """
+        best_delta = float('inf')
+        best_tour = None
+        best_pickup_pos = None
+        best_delivery_pos = None
+
+        best_insertion_for_request_in_tour = []
+
+        for tour in range(solution.carriers[carrier].num_tours()):
+
+            delta, pickup_pos, delivery_pos = self.best_insertion_for_request_in_tour(instance, solution, carrier, tour,
+                                                                                      request)
+            best_insertion_for_request_in_tour.append((delta, pickup_pos, delivery_pos))
+
+            if delta < best_delta:
+                best_delta = delta
+                best_tour = tour
+                best_pickup_pos = pickup_pos
+                best_delivery_pos = delivery_pos
+
+        if best_delta < float('inf'):
+            regret = sum([(delta - best_delta) for delta in [move[0] for move in best_insertion_for_request_in_tour]])
+            # return the negative of the regret, since the LARGEST regret is to be inserted first
+            return -regret, best_tour, best_pickup_pos, best_delivery_pos
+        else:
+            return best_delta, best_tour, best_pickup_pos, best_delivery_pos
+
+    def best_insertion_for_request_in_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
+                                           tour: int, request: int) -> Tuple[float, int, int]:
+        return MinTimeShiftInsertion().best_insertion_for_request_in_tour(instance, solution, carrier, tour, request)
+
+
+class TravelDistanceRegretInsertion(PDPParallelInsertionConstruction):
+    # gotta override this method for regret measures
+    def best_insertion_for_request(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
+                                   request: int):
+        return TimeShiftRegretInsertion().best_insertion_for_request(instance, solution, carrier, request)
+
+    def best_insertion_for_request_in_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
+                                           tour: int, request: int) -> Tuple[float, int, int]:
+        return MinTravelDistanceInsertion().best_insertion_for_request_in_tour(instance, solution, carrier, tour,
+                                                                               request)

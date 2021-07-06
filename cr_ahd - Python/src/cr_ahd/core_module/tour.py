@@ -900,7 +900,7 @@ def single_insert_max_shift_delta(routing_sequence: List[int],
     k = insertion_index - 1
 
     while True:
-        if beta >= max_shift_sequence[k] or k == 1:
+        if beta >= max_shift_sequence[k] or k == 0:
             break
 
         if k == insertion_index - 1:
@@ -915,7 +915,7 @@ def single_insert_max_shift_delta(routing_sequence: List[int],
     # [3] delta in max_shift of insertion_vertex itself
     vertex_max_shift_delta = tw_close[insertion_vertex] - max(arrival_j, tw_open[insertion_vertex]) - max_shift_j
 
-    # [4] delta in max_shift of succeeding vertices, i.e. the travel time delta
+    # [4] delta in max_shift of succeeding vertices, which is exactly the travel time delta
     successors_max_shift_delta = ut.travel_time(distance_matrix[predecessor][insertion_vertex] +
                                                 distance_matrix[insertion_vertex][successor] -
                                                 distance_matrix[predecessor][successor])

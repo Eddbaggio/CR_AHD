@@ -6,7 +6,7 @@ import src.cr_ahd.utility_module.utils as ut
 from src.cr_ahd.auction_module import request_selection as rs, bundle_generation as bg, bidding as bd, \
     winner_determination as wd
 from src.cr_ahd.core_module import instance as it, solution as slt
-from src.cr_ahd.routing_module import tour_construction as cns, local_search as imp, tour_initialization as ini
+from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh, tour_initialization as ini
 
 logger = logging.getLogger(__name__)
 
@@ -27,12 +27,10 @@ class Auction(ABC):
             logger.debug(f'requests {auction_pool_requests} have been submitted to the auction pool')
 
             # re-run a static routing with the non-submitted requests
-            solution.clear_carrier_routes()
-            ini.FurthestDistance().execute(instance, solution)
-            cns.CheapestPDPInsertion().construct_static(instance, solution)
-            imp.PDPMove().local_search(instance, solution)
-            imp.PDPRelocate().local_search(instance, solution)
-            imp.PDPTwoOpt().local_search(instance, solution)
+            # solution.clear_carrier_routes()
+            # ini.MaxCliqueTourInitialization().execute(instance, solution)
+            # cns.TimeShiftRegretInsertion().construct_static(instance, solution)
+            mh.PDPVariableNeighborhoodDescent().execute(instance, solution)
 
             # Bundle Generation
             # TODO maybe bundles should be a list of bundle indices rather than a list of lists of request indices?

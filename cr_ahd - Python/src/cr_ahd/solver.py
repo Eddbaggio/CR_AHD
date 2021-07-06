@@ -6,14 +6,15 @@ from copy import deepcopy
 import src.cr_ahd.utility_module.utils as ut
 from src.cr_ahd.auction_module import auction as au
 from src.cr_ahd.core_module import instance as it, solution as slt
-from src.cr_ahd.routing_module import tour_construction as cns, tour_initialization as ini, metaheuristics as mh
+from src.cr_ahd.routing_module import tour_construction as cns, tour_initialization as ini
 from src.cr_ahd.tw_management_module import tw_management as twm
 
 logger = logging.getLogger(__name__)
 
 
 class Solver(abc.ABC):
-    def execute(self, instance: it.PDPInstance):
+    # TODO include starting_solution
+    def execute(self, instance: it.PDPInstance, starting_solution: slt.CAHDSolution = None):
         """
         apply the concrete solution algorithm
         """
@@ -41,7 +42,8 @@ class Solver(abc.ABC):
 
             # build tours with the assigned request if it was accepted
             if accepted:
-                cns.LuDessoukyPDPInsertion().construct_dynamic(instance, solution, carrier)
+                # solution = cns.MinTimeShiftInsertion().construct_dynamic(instance, solution, carrier)
+                cns.TimeShiftRegretInsertion().construct_dynamic(instance, solution, carrier)
 
         ut.validate_solution(instance, solution)
         return solution
@@ -54,10 +56,11 @@ class Solver(abc.ABC):
         solution.clear_carrier_routes()
 
         # create seed tours
-        ini.MaxCliqueTourInitializationBehavior().execute(instance, solution)
+        ini.MaxCliqueTourInitialization().execute(instance, solution)
 
         # construct_static initial solution
-        cns.LuDessoukyPDPInsertion().construct_static(instance, solution)
+        # solution = cns.MinTimeShiftInsertion().construct_static(instance, solution)
+        cns.TimeShiftRegretInsertion().construct_static(instance, solution)
 
         ut.validate_solution(instance, solution)
         return solution
@@ -100,7 +103,7 @@ class CollaborativePlanning(Solver):
 
 class CentralizedPlanning(Solver):
 
-    def execute(self, instance: it.PDPInstance):
+    def execute(self, instance: it.PDPInstance, starting_solution: slt.CAHDSolution = None):
         # copy and alter the underlying instance to make it a multi-depot, single-carrier instance
         md_instance = deepcopy(instance)
         md_instance.num_carriers = 1
