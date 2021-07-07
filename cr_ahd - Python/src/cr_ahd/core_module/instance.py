@@ -58,7 +58,7 @@ class PDPInstance:
         # compute the distance matrix
         # need to round the distances due to floating point precision!
         self._distance_matrix = np.ceil(
-            squareform(pdist(np.array(list(zip(self.x_coords, self.y_coords))), 'euclidean')))
+            squareform(pdist(np.array(list(zip(self.x_coords, self.y_coords))), 'euclidean'))).astype('int')
         # self._distance_matrix = squareform(pdist(np.array(list(zip(self.x_coords, self.y_coords))), 'euclidean'))
         logger.debug(f'{id_}: created')
 
@@ -149,21 +149,21 @@ def read_gansterer_hartl_mv(path: Path, num_carriers=3) -> PDPInstance:
     requests['delivery_service_time'] = dt.timedelta(0)
     return PDPInstance(path.stem,
                        vrp_params['V'].tolist(),
-                       (vrp_params['L'] * 10).tolist(),  # todo can i solve the problems without *10 vehicle capacity?
+                       (vrp_params['L'] * ut.LOAD_CAPACITY_SCALING).tolist(),  # todo can i solve the problems without *10 vehicle capacity?
                        vrp_params['T'].tolist(),
                        requests.index.tolist(),
                        requests['carrier_index'].tolist(),
-                       requests['pickup_x'].tolist(),
-                       requests['pickup_y'].tolist(),
-                       requests['delivery_x'].tolist(),
-                       requests['delivery_y'].tolist(),
-                       requests['revenue'].tolist(),
+                       (requests['pickup_x']*ut.DISTANCE_SCALING).tolist(),
+                       (requests['pickup_y']*ut.DISTANCE_SCALING).tolist(),
+                       (requests['delivery_x']*ut.DISTANCE_SCALING).tolist(),
+                       (requests['delivery_y']*ut.DISTANCE_SCALING).tolist(),
+                       (requests['revenue']*ut.REVENUE_SCALING).tolist(),
                        [x.to_pytimedelta() for x in requests['pickup_service_time']],
                        [x.to_pytimedelta() for x in requests['delivery_service_time']],
                        requests['load'].tolist(),
                        (-requests['load']).tolist(),
-                       depots['x'].tolist(),
-                       depots['y'].tolist(),
+                       (depots['x']*ut.DISTANCE_SCALING).tolist(),
+                       (depots['y']*ut.DISTANCE_SCALING).tolist(),
                        )
 
 

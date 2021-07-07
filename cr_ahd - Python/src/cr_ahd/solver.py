@@ -5,7 +5,7 @@ from copy import deepcopy
 
 import src.cr_ahd.utility_module.utils as ut
 from src.cr_ahd.auction_module import auction as au
-from src.cr_ahd.core_module import instance as it, solution as slt
+from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
 from src.cr_ahd.routing_module import tour_construction as cns, tour_initialization as ini, metaheuristics as mh
 from src.cr_ahd.tw_management_module import tw_management as twm
 
@@ -119,6 +119,11 @@ class CentralizedPlanning(Solver):
         solution = slt.CAHDSolution(md_instance)
         solution.carrier_depots = [[depot for depot in range(instance.num_depots)]]
 
+        # initialize an empty tour for each depot
+        for depot in solution.carrier_depots[0]:
+            tour = tr.Tour(depot, instance, solution, depot)
+            solution.carriers[0].tours.append(tour)
+
         random.seed(0)  # TODO what is this for?
 
         solution = self._acceptance_phase(md_instance, solution)
@@ -136,9 +141,9 @@ class CentralizedPlanning(Solver):
 
 class IsolatedPlanningNoTW(IsolatedPlanning):
     def _time_window_management(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
-        pass
+        return twm.TWManagementNoTW().execute(instance, solution, carrier, request)
 
 
 class CollaborativePlanningNoTW(CollaborativePlanning):
     def _time_window_management(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
-        pass
+        return twm.TWManagementNoTW().execute(instance, solution, carrier, request)

@@ -51,6 +51,9 @@ class CAHDSolution:
     def sum_travel_duration(self):
         return sum((c.sum_travel_duration() for c in self.carriers), dt.timedelta(0))
 
+    # def sum_wait_duration(self):
+    #     return sum((c.sum_wait_duration() for c in self.carriers), dt.timedelta(0))
+
     def sum_load(self):
         return sum(c.sum_load() for c in self.carriers)
 
@@ -96,6 +99,7 @@ class CAHDSolution:
             'carrier_depots': self.carrier_depots,
             'sum_travel_distance': self.sum_travel_distance(),
             'sum_travel_duration': self.sum_travel_duration(),
+            # 'sum_wait_duration': self.sum_wait_duration(),
             'sum_load': self.sum_load(),
             'sum_revenue': self.sum_revenue(),
             'num_tours': self.num_tours(),
@@ -145,6 +149,9 @@ class AHDSolution:
     def sum_travel_duration(self):
         return sum((t.sum_travel_duration for t in self.tours), dt.timedelta(0))
 
+    # def sum_wait_duration(self):
+    #     return sum((t.sum_wait_duration for t in self.tours), dt.timedelta(0))
+
     def sum_load(self):
         return sum(t.sum_load for t in self.tours)
 
@@ -173,6 +180,7 @@ class AHDSolution:
             'sum_profit': self.sum_profit(),
             'sum_travel_distance': self.sum_travel_distance(),
             'sum_travel_duration': self.sum_travel_duration(),
+            # 'sum_wait_duration': self.sum_wait_duration(),
             'sum_load': self.sum_load(),
             'sum_revenue': self.sum_revenue(),
             'acceptance_rate': self.acceptance_rate,

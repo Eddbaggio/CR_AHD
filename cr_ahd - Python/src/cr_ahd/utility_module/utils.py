@@ -367,31 +367,32 @@ def validate_solution(instance, solution):
             assert tour_.routing_sequence[0] in solution.carrier_depots[carrier]
             assert tour_.routing_sequence[-1] in solution.carrier_depots[carrier]
 
-            assert tour_._sum_load == 0
-            assert tour_._sum_travel_distance <= instance.vehicles_max_travel_distance
-            assert tour_._sum_revenue > 0
-            assert round(tour_._sum_profit, 4) == round(tour_._sum_revenue - tour_._sum_travel_distance, 4)
-
+            assert tour_._sum_load == 0, instance.id_
+            assert tour_._sum_travel_distance <= instance.vehicles_max_travel_distance, instance.id_
+            assert round(tour_._sum_profit, 4) == round(tour_._sum_revenue - tour_._sum_travel_distance, 4), f'{instance.id_}: {round(tour_._sum_profit, 4)}!={round(tour_._sum_revenue - tour_._sum_travel_distance, 4)}'
             for i in trange(1, len(tour_.routing_sequence), desc=f'Tour {tour_.id_}', disable=True):
                 predecessor = tour_.routing_sequence[i - 1]
                 vertex = tour_.routing_sequence[i]
                 # routing and service time constraint
                 assert tour_.arrival_schedule[i] == tour_.service_schedule[i - 1] + instance.service_duration[
-                    predecessor] + travel_time(instance.distance([predecessor], [vertex]))
+                    predecessor] + travel_time(instance.distance([predecessor], [vertex])), instance.id_
                 # waiting times
-                assert tour_.service_schedule[i] == tour_.arrival_schedule[i] + tour_._wait_sequence[i]
+                assert tour_.service_schedule[i] == tour_.arrival_schedule[i] + tour_._wait_sequence[i], instance.id_
                 # tw constraint
-                assert solution.tw_open[vertex] <= tour_.service_schedule[i] <= solution.tw_close[vertex]
+                assert solution.tw_open[vertex] <= tour_.service_schedule[i] <= solution.tw_close[vertex], instance.id_
                 # precedence constraint
                 if instance.vertex_type(vertex) == 'pickup':
-                    assert vertex + instance.num_requests in tour_.routing_sequence[i:]
+                    assert vertex + instance.num_requests in tour_.routing_sequence[i:], instance.id_
                 elif instance.vertex_type(vertex) == 'delivery':
-                    assert vertex - instance.num_requests in tour_.routing_sequence[:i]
+                    assert vertex - instance.num_requests in tour_.routing_sequence[:i], instance.id_
                 else:
-                    assert vertex in solution.carrier_depots[carrier]
+                    assert vertex in solution.carrier_depots[carrier], instance.id_
 
 
 random.seed(0)
+DISTANCE_SCALING = 1
+REVENUE_SCALING = DISTANCE_SCALING
+LOAD_CAPACITY_SCALING = 10
 START_TIME: dt.datetime = dt.datetime.min
 END_TIME: dt.datetime = dt.datetime.min + dt.timedelta(minutes=3390)
 # END_TIME = dt.datetime.min + dt.timedelta(days=1)

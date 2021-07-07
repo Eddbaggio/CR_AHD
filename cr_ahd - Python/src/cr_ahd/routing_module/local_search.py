@@ -308,7 +308,7 @@ class PDPRelocate2(LocalSearchBehavior):
                 vertex_1 = old_tour_.routing_sequence[old_pickup_pos_1]
 
                 # skip if its a delivery_1 vertex_1
-                if instance.vertex_type(vertex_1) == "delivery_1":
+                if instance.vertex_type(vertex_1) == "delivery":
                     continue  # skip if its a delivery_1 vertex_1
 
                 pickup_1, delivery_1 = instance.pickup_delivery_pair(instance.request_from_vertex(vertex_1))
@@ -318,7 +318,7 @@ class PDPRelocate2(LocalSearchBehavior):
                     vertex_2 = old_tour_.routing_sequence[old_pickup_pos_2]
 
                     # skip if its a delivery_1 vertex_1
-                    if instance.vertex_type(vertex_2) == "delivery_2":
+                    if instance.vertex_type(vertex_2) == "delivery":
                         continue  # skip if its a delivery_2 vertex_2
 
                     pickup_2, delivery_2 = instance.pickup_delivery_pair(instance.request_from_vertex(vertex_2))
@@ -387,10 +387,17 @@ class PDPRelocate2(LocalSearchBehavior):
 
     def execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move):
         delta, old_tour, old_pickup_pos_1, old_delivery_pos_1, new_tour_1, new_pickup_pos_1, new_delivery_pos_1, \
-        old_pickup_pos_2, old_delivery_pos_2, new_tour_2, new_pickup_pos_2, new_delivery_pos_2 = move
+            old_pickup_pos_2, old_delivery_pos_2, new_tour_2, new_pickup_pos_2, new_delivery_pos_2 = move
+
         old_tour_ = solution.carriers[carrier].tours[old_tour]
-        pickup_1, delivery_1 = old_tour_.pop_and_update(instance, solution, [old_pickup_pos_1, old_delivery_pos_1])
-        pickup_2, delivery_2 = old_tour_.pop_and_update(instance, solution, [old_pickup_pos_2, old_delivery_pos_2])
+
+        pickup_1 = old_tour_.routing_sequence[old_pickup_pos_1]
+        delivery_1 = old_tour_.routing_sequence[old_delivery_pos_1]
+        pickup_2 = old_tour_.routing_sequence[old_pickup_pos_2]
+        delivery_2 = old_tour_.routing_sequence[old_delivery_pos_2]
+
+        old_tour_.pop_and_update(instance, solution,
+                                 sorted((old_pickup_pos_1, old_delivery_pos_1, old_pickup_pos_2, old_delivery_pos_2)))
         solution.carriers[carrier].tours[new_tour_1].insert_and_update(instance, solution,
                                                                        [new_pickup_pos_1, new_delivery_pos_1],
                                                                        [pickup_1, delivery_1])

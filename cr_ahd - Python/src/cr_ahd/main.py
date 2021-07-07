@@ -26,8 +26,10 @@ def execute_all(instance: it.PDPInstance, plot=False):
     iso_sol = False
 
     for solver in [
-        slv.IsolatedPlanning,
-        slv.CollaborativePlanning,
+        # slv.IsolatedPlanningNoTW,
+        # slv.IsolatedPlanning,
+        # slv.CollaborativePlanning,
+        # slv.CollaborativePlanningNoTW,
         slv.CentralizedPlanning,
     ]:
         logger.info(f'{instance.id_}: Solving via {solver.__name__} ...')
@@ -41,17 +43,13 @@ def execute_all(instance: it.PDPInstance, plot=False):
                 iso_sol = solution
             logger.info(f'{instance.id_}: Successfully solved via {solver.__name__}')
             if plot:
-                pl.plot_solution_2(
-                    instance,
-                    solution,
-                    title=f'{instance.id_} with Solver "{solver.__name__} - Total profit: {solution.sum_profit()}"',
-                    show=True
-                )
+                pl.plot_solution_2(instance, solution, show=True,
+                                   title=f'{instance.id_} with Solver "{solver.__name__} - Total profit: {solution.sum_profit()}"')
             solution.write_to_json()
             solutions.append(solution)
 
         except Exception as e:
-            raise e
+            # raise e
             logger.error(f'{e}\nFailed on instance {instance} with solver {solver.__name__}')
             solution = slt.CAHDSolution(instance)  # create an empty solution for failed instances?!
             solution.solution_algorithm = str(solver.__name__)
@@ -81,7 +79,7 @@ def m_solve_multi_thread(instance_paths):
 def m_solve_single_thread(instance_paths):
     solutions = []
     for path in tqdm(instance_paths, disable=True):
-        solver_solutions = s_solve(path, plot=True)
+        solver_solutions = s_solve(path, plot=False)
         solutions.append(solver_solutions)
     return solutions
 
@@ -139,14 +137,14 @@ if __name__ == '__main__':
     paths = sorted(
         list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
         key=ut.natural_sort_key)
-    paths = paths[3:4]
+    paths = paths[:6]
 
-    solutions = m_solve_single_thread(paths)
-    # solutions = m_solve_multi_thread(paths)
+    # solutions = m_solve_single_thread(paths)
+    solutions = m_solve_multi_thread(paths)
 
     df = write_solution_summary_to_multiindex_df(solutions, 'carrier')
     ev.bar_chart(df,
-                 title='Only PDPMove and PDP2Opt',
+                 title='Move, 2Opt; 4 requests submitted',
                  values='sum_profit',
                  category='run',
                  color='solution_algorithm',
@@ -154,7 +152,10 @@ if __name__ == '__main__':
                  facet_row='n',
                  show=True,
                  html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix())
-    with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+
+    ev.print_top_level_stats(df)
+
+    with pd.option_context('display.max_rows', None, 'display.max_columns', None, 'display.width', 0):
 
         grouped = df.groupby(['rad', 'n', 'run', 'solution_algorithm']).aggregate(
             {'num_tours': sum, 'sum_profit': sum, 'acceptance_rate': np.mean})

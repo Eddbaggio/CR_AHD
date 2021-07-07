@@ -14,7 +14,7 @@ class PDPMetaHeuristic(abc.ABC):
     def __init__(self):
         self.neighborhoods = [ls.PDPMove,
                               ls.PDPTwoOpt,
-                              ls.PDPRelocate,  # inter-tour
+                              # ls.PDPRelocate,  # inter-tour
                               # ls.PDPRelocate2,  # inter-tour
                               ]
         self.improved = False
@@ -159,6 +159,35 @@ class PDPVariableNeighborhoodDescent(PDPMetaHeuristic):
             return False
 
 
+class PDPVariableNeighborhoodDescentFirst(PDPMetaHeuristic):
+    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None):
+        if carriers is None:
+            carriers = range(len(solution.carriers))
+
+        for carrier in carriers:
+            k = 0
+            while k < len(self.neighborhoods):
+                neighborhood = self.neighborhoods[k]()
+                move_generator = neighborhood.feasible_move_generator(instance, solution, carrier)
+                try:
+                    while True:
+                        move = next(move_generator)
+                        if self.acceptance_criterion(instance, solution, carrier, move):
+                            neighborhood.execute_move(instance, solution, carrier, move)
+                            self.trajectory.append(move)
+                            k = 0
+                            break
+                except StopIteration:
+                    k += 1
+        pass
+
+    def acceptance_criterion(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move: tuple):
+        if move[0] < 0:
+            return True
+        else:
+            return False
+
+
 class PDPSimulatedAnnealing(PDPMetaHeuristic):
     def __init__(self):
         super().__init__()
@@ -171,7 +200,8 @@ class PDPSimulatedAnnealing(PDPMetaHeuristic):
     def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None):
         if carriers is None:
             carriers = range(len(solution.carriers))
-        raise NotImplementedError('Metaheuristics should modify the solution in place. This has not yet been fixed for SA')
+        raise NotImplementedError(
+            'Metaheuristics should modify the solution in place. This has not yet been fixed for SA')
         best_solution = deepcopy(solution)
         tentative_solution = deepcopy(solution)
 
@@ -215,7 +245,7 @@ class PDPSimulatedAnnealing(PDPMetaHeuristic):
         carrier_ = solution.carriers[carrier]
         obj = carrier_.sum_profit()
         acceptance_probability = 0.5
-        self.parameters['initial_temp'] = -(obj*start_temp_control_param)/log(acceptance_probability)
+        self.parameters['initial_temp'] = -(obj * start_temp_control_param) / log(acceptance_probability)
         self.parameters['temp'] = self.parameters['initial_temp']
 
     def acceptance_criterion(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move: tuple):

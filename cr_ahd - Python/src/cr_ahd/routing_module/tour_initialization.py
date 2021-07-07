@@ -149,7 +149,7 @@ class MaxCliqueTourInitialization(ABC):
         if seed_idx is not None:
             assert len(seed_idx) <= instance.carriers_max_num_tours
 
-            # create the pendulum tours, popping the seeds of the list of unrouted requires reverse traversal
+            # create the pendulum tours, popping the seeds off the list of unrouted requires reverse traversal
             for i in sorted(seed_idx, reverse=True):
                 seed = carrier_.unrouted_requests[i]
                 tour = tr.Tour(carrier_.num_tours(), instance, solution, solution.carrier_depots[carrier][0])
