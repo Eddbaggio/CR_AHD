@@ -48,12 +48,17 @@ class PDPInstance:
         self.vehicles_max_travel_distance = max_tour_length
         self.carriers_max_num_tours = max_num_tours_per_carrier
         self.requests = requests
+        self.num_requests = len(self.requests)
+        assert self.num_requests % self.num_carriers == 0
+        self.num_requests_per_carrier = self.num_requests // self.num_carriers
         self.x_coords = [*carrier_depots_x, *requests_pickup_x, *requests_delivery_x]
         self.y_coords = [*carrier_depots_y, *requests_pickup_y, *requests_delivery_y]
         self.request_to_carrier_assignment = requests_initial_carrier_assignment
         self.revenue = [*[0] * (self.num_depots + len(requests)), *requests_revenue]
         self.load = [*[0] * self.num_depots, *requests_pickup_load, *requests_delivery_load]
-        self.service_duration = (*[dt.timedelta(0)] * self.num_depots, *requests_pickup_service_time, *requests_delivery_service_time)
+        self.service_duration = (*[dt.timedelta(0)] * self.num_depots,
+                                 *requests_pickup_service_time,
+                                 *requests_delivery_service_time)
 
         # compute the distance matrix
         # need to round the distances due to floating point precision!
@@ -68,11 +73,6 @@ class PDPInstance:
     @property
     def id_(self):
         return self._id_
-
-    @property
-    def num_requests(self):
-        """The number of requests"""
-        return len(self.requests)
 
     def distance(self, i: Sequence[int], j: Sequence[int]):
         """
@@ -149,21 +149,22 @@ def read_gansterer_hartl_mv(path: Path, num_carriers=3) -> PDPInstance:
     requests['delivery_service_time'] = dt.timedelta(0)
     return PDPInstance(path.stem,
                        vrp_params['V'].tolist(),
-                       (vrp_params['L'] * ut.LOAD_CAPACITY_SCALING).tolist(),  # todo can i solve the problems without *10 vehicle capacity?
+                       (vrp_params['L'] * ut.LOAD_CAPACITY_SCALING).tolist(),
+                       # todo can i solve the problems without *10 vehicle capacity?
                        vrp_params['T'].tolist(),
                        requests.index.tolist(),
                        requests['carrier_index'].tolist(),
-                       (requests['pickup_x']*ut.DISTANCE_SCALING).tolist(),
-                       (requests['pickup_y']*ut.DISTANCE_SCALING).tolist(),
-                       (requests['delivery_x']*ut.DISTANCE_SCALING).tolist(),
-                       (requests['delivery_y']*ut.DISTANCE_SCALING).tolist(),
-                       (requests['revenue']*ut.REVENUE_SCALING).tolist(),
+                       (requests['pickup_x'] * ut.DISTANCE_SCALING).tolist(),
+                       (requests['pickup_y'] * ut.DISTANCE_SCALING).tolist(),
+                       (requests['delivery_x'] * ut.DISTANCE_SCALING).tolist(),
+                       (requests['delivery_y'] * ut.DISTANCE_SCALING).tolist(),
+                       (requests['revenue'] * ut.REVENUE_SCALING).tolist(),
                        [x.to_pytimedelta() for x in requests['pickup_service_time']],
                        [x.to_pytimedelta() for x in requests['delivery_service_time']],
                        requests['load'].tolist(),
                        (-requests['load']).tolist(),
-                       (depots['x']*ut.DISTANCE_SCALING).tolist(),
-                       (depots['y']*ut.DISTANCE_SCALING).tolist(),
+                       (depots['x'] * ut.DISTANCE_SCALING).tolist(),
+                       (depots['y'] * ut.DISTANCE_SCALING).tolist(),
                        )
 
 

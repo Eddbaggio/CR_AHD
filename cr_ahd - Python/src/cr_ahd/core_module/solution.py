@@ -21,8 +21,8 @@ class CAHDSolution:
         self.request_to_carrier_assignment = np.full(instance.num_requests, np.nan)
 
         # basically no apriori time windows for all VERTICES
-        self.tw_open = np.full(instance.num_depots + 2 * instance.num_requests, ut.START_TIME).tolist()
-        self.tw_close = np.full(instance.num_depots + 2 * instance.num_requests, ut.END_TIME).tolist()
+        self.tw_open: List = np.full(instance.num_depots + 2 * instance.num_requests, ut.START_TIME).tolist()
+        self.tw_close: List = np.full(instance.num_depots + 2 * instance.num_requests, ut.END_TIME).tolist()
 
         self.carriers = [AHDSolution(c) for c in range(instance.num_carriers)]
 
@@ -40,10 +40,6 @@ class CAHDSolution:
             s += str(c)
             s += '\n'
         return s
-
-    @property
-    def unrouted_requests(self):
-        return set().union(*[c.unrouted_requests for c in self.carriers])
 
     def sum_travel_distance(self):
         return sum(c.sum_travel_distance() for c in self.carriers)
@@ -73,7 +69,7 @@ class CAHDSolution:
         return sum(c.num_routing_stops() for c in self.carriers)
 
     def acceptance_rate(self):
-        return sum([c.acceptance_rate for c in self.carriers])/self.num_carriers()
+        return sum([c.acceptance_rate for c in self.carriers]) / self.num_carriers()
 
     def assign_requests_to_carriers(self, requests: Sequence[int], carriers: Sequence[int]):
         for r, c in zip(requests, carriers):

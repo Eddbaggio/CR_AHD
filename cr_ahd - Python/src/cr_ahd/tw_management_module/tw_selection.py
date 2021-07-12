@@ -14,12 +14,10 @@ class TWSelectionBehavior(abc.ABC):
     def execute(self, tw_offer_set: List[TimeWindow], request: int):
         # may yield False if no TW fits the preference
         if tw_offer_set:
-            selected_tw = self.select_tw(tw_offer_set, request)
-
+            return self.select_tw(tw_offer_set, request)
         # if no TW could be offered
         else:
-            selected_tw = False
-        return selected_tw
+            return False
 
     @abc.abstractmethod
     def select_tw(self, tw_offer_set, request: int):

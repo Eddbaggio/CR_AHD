@@ -46,8 +46,10 @@ class PDPParallelInsertionConstruction(ABC):
         insertion_criteria, tour, pickup_pos, delivery_pos = self.best_insertion_for_request(instance, solution,
                                                                                              carrier, request)
         if tour is None:
+            # print(f'{request}: new tour')
             self.create_new_tour_with_request(instance, solution, carrier, request)
         else:
+            # print(f'{request}: t{carrier_.tours[tour].routing_sequence[0]} {pickup_pos, delivery_pos}')
             self.execute_insertion(instance, solution, carrier, request, tour, pickup_pos, delivery_pos)
 
         """# metaheuristic every 4th request

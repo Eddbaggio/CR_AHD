@@ -11,6 +11,7 @@ from tqdm import tqdm
 import src.cr_ahd.solver as slv
 import src.cr_ahd.utility_module.cr_ahd_logging as log
 from src.cr_ahd.core_module import instance as it, solution as slt
+from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh
 from src.cr_ahd.utility_module import utils as ut, plotting as pl, evaluation as ev
 
 logging.config.dictConfig(log.LOGGING_CONFIG)
@@ -25,22 +26,28 @@ def execute_all(instance: it.PDPInstance, plot=False):
     solutions = []
     iso_sol = False
 
+    construction_method = cns.MinTravelDistanceInsertion()
+    improvement_method = mh.PDPVariableNeighborhoodDescent()
+
     for solver in [
-        # slv.IsolatedPlanningNoTW,
+        slv.IsolatedPlanningNoTW,
         # slv.IsolatedPlanning,
+        slv.CollaborativePlanningNoTW,
         # slv.CollaborativePlanning,
-        # slv.CollaborativePlanningNoTW,
-        slv.CentralizedPlanning,
+        # slv.CentralizedPlanning,
     ]:
         logger.info(f'{instance.id_}: Solving via {solver.__name__} ...')
         fails = 0
         try:
-            if solver.__name__ == 'CollaborativePlanning' and iso_sol:
-                solution = solver().execute(instance, iso_sol)
-            else:
-                solution = solver().execute(instance)
-            if solver.__name__ == 'IsolatedPlanning':
+            if solver.__name__ == 'IsolatedPlanningNoTW':
+                solution = solver(construction_method, improvement_method).execute(instance)
                 iso_sol = solution
+            else:
+                # for the collaborative and centralized solvers, some data from the isolated planning is needed
+                # Collab: can take the isolated planning as a starting solution and will then only do the auction
+                # Central: will copy the time windows for a fair comparison
+                solution = solver(construction_method, improvement_method).execute(instance, iso_sol)
+
             logger.info(f'{instance.id_}: Successfully solved via {solver.__name__}')
             if plot:
                 pl.plot_solution_2(instance, solution, show=True,
@@ -49,7 +56,7 @@ def execute_all(instance: it.PDPInstance, plot=False):
             solutions.append(solution)
 
         except Exception as e:
-            # raise e
+            raise e
             logger.error(f'{e}\nFailed on instance {instance} with solver {solver.__name__}')
             solution = slt.CAHDSolution(instance)  # create an empty solution for failed instances?!
             solution.solution_algorithm = str(solver.__name__)
@@ -76,16 +83,15 @@ def m_solve_multi_thread(instance_paths):
     return solutions
 
 
-def m_solve_single_thread(instance_paths):
+def m_solve_single_thread(instance_paths, plot=False):
     solutions = []
     for path in tqdm(instance_paths, disable=True):
-        solver_solutions = s_solve(path, plot=False)
+        solver_solutions = s_solve(path, plot=plot)
         solutions.append(solver_solutions)
     return solutions
 
 
-def write_solution_summary_to_multiindex_df(solutions_per_instance: List[List[slt.CAHDSolution]],
-                                            agg_level='tour'):
+def write_solution_summary_to_multiindex_df(solutions_per_instance: List[List[slt.CAHDSolution]], agg_level='tour'):
     """
     :param solutions_per_instance: A List of Lists of solutions. First Axis: instance, Second Axis: solver
     """
@@ -137,14 +143,14 @@ if __name__ == '__main__':
     paths = sorted(
         list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
         key=ut.natural_sort_key)
-    paths = paths[:6]
+    paths = paths[:48]
 
-    # solutions = m_solve_single_thread(paths)
+    # solutions = m_solve_single_thread(paths, plot=False)
     solutions = m_solve_multi_thread(paths)
 
     df = write_solution_summary_to_multiindex_df(solutions, 'carrier')
     ev.bar_chart(df,
-                 title='Move, 2Opt; 4 requests submitted',
+                 title='NO TIME WINDOWS, VND(Move+2opt); 4 requests submitted;',
                  values='sum_profit',
                  category='run',
                  color='solution_algorithm',
@@ -160,7 +166,7 @@ if __name__ == '__main__':
         grouped = df.groupby(['rad', 'n', 'run', 'solution_algorithm']).aggregate(
             {'num_tours': sum, 'sum_profit': sum, 'acceptance_rate': np.mean})
 
-        print(grouped[['num_tours', 'sum_profit', 'acceptance_rate']])
+        # print(grouped[['num_tours', 'sum_profit', 'acceptance_rate']])
 
         for name, group in grouped.groupby('solution_algorithm'):
             print(f'{group["num_tours"].astype(bool).sum(axis=0)}/{len(group)} solved by {name}')

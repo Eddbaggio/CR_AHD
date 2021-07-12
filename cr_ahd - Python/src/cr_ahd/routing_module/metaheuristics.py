@@ -23,7 +23,7 @@ class PDPMetaHeuristic(abc.ABC):
         self.history = []  # collection of e.g. visited neighbors, accepted moves, ...
         self.trajectory = []  # collection of all accepted & executed moves
 
-    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
+    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None):
         pass
         # TODO this was a poor attempt at implementing a general method that works for any metaheuristic
         # best_solution = deepcopy(solution)
@@ -90,10 +90,16 @@ class PDPMetaHeuristic(abc.ABC):
         pass
 
 
+class NoMetaheuristic(PDPMetaHeuristic):
+    """Placeholder for cases in which no improvement is wanted"""
+
+    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None):
+        pass
+
+
 class PDPSequentialNeighborhoodDescent(PDPMetaHeuristic):
     """
-    As a the most basic "metaheuristic". Whether or not solutions are accepted should then happen on this level. Here:
-    always accept only improving solutions
+    Sequentially exhaust each neighborhood. Only improvements are accepted
     """
 
     def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None):
@@ -125,6 +131,45 @@ class PDPSequentialNeighborhoodDescent(PDPMetaHeuristic):
         if move is None:
             return False
         elif move[0] < 0:
+            return True
+        else:
+            return False
+
+
+class PDPRandomNeighborhoodDescent(PDPMetaHeuristic):
+    """
+    randomly select a neighborhood for the next improving move
+    """
+    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None):
+        raise NotImplementedError
+        if carriers is None:
+            carriers = range(len(solution.carriers))
+
+        for carrier in carriers:
+
+            # start in a random neighborhood
+            eligible_neighborhoods = list(range(len(self.neighborhoods)))
+            k = random.choice(eligible_neighborhoods)
+
+            while eligible_neighborhoods:
+                neighborhood = self.neighborhoods[k]()
+                all_moves = [move for move in neighborhood.feasible_move_generator(instance, solution, carrier)]
+                if any(all_moves):
+                    best_move = min(all_moves, key=lambda x: x[0])
+                    # if a move is accepted in the current neighborhood
+                    if self.acceptance_criterion(instance, solution, carrier, best_move):
+                        neighborhood.execute_move(instance, solution, carrier, best_move)
+                        self.trajectory.append(best_move)
+                        k = 0
+                    else:
+                        eligible_neighborhoods.remove(k)
+                        k = random.choice(eligible_neighborhoods)
+                else:
+                    k += 1
+        pass
+
+    def acceptance_criterion(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move: tuple):
+        if move[0] < 0:
             return True
         else:
             return False

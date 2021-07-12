@@ -165,3 +165,73 @@ class FeasibleTW(TWOfferingBehavior):
         solution.tw_open[delivery_vertex] = ut.START_TIME
         solution.tw_close[delivery_vertex] = ut.END_TIME
         return -1
+
+
+class FeasibleTWOriginalDepot(TWOfferingBehavior):
+    def _evaluate_time_window(
+            self,
+            instance: it.PDPInstance,
+            solution: slt.CAHDSolution,
+            carrier: int,
+            request: int,
+            tw: ut.TimeWindow
+    ):
+        """
+        This method works for the a multi-depot problem with only a single carrier and assures that requests are
+        allocated to their original depot!
+
+        :return: 1 if TW is feasible, -1 else
+        """
+        # instance must have 1 depot per carrier (collab) or only one carrier (multi-depot)
+        assert instance.num_carriers == 1
+
+        carrier_ = solution.carriers[carrier]
+        pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
+        solution.tw_open[delivery_vertex] = tw.open
+        solution.tw_close[delivery_vertex] = tw.close
+        original_depot = request // instance.num_requests_per_carrier
+
+        # can the carrier open a new tour and insert the request there? only checks the time window constraint.
+        # it is assumed that load and max tour length are not exceeded with a single request
+        num_tours_at_original_depot = sum((1 for t in carrier_.tours if t.routing_sequence[0] == original_depot))
+        if num_tours_at_original_depot < instance.carriers_max_num_tours:
+
+            new_tour_feasible = True
+            service_time = ut.START_TIME
+
+            for predecessor_vertex, vertex in zip([original_depot, pickup_vertex, delivery_vertex],
+                                                  [pickup_vertex, delivery_vertex, original_depot]):
+
+                dist = instance.distance([predecessor_vertex], [vertex])
+                arrival_time = service_time + instance.service_duration[predecessor_vertex] + ut.travel_time(dist)
+
+                if arrival_time > solution.tw_close[vertex]:
+                    new_tour_feasible = False
+                    break
+
+                service_time = max(arrival_time, solution.tw_open[vertex])
+
+            if new_tour_feasible:
+                # undo the setting of the time window and return
+                solution.tw_open[delivery_vertex] = ut.START_TIME
+                solution.tw_close[delivery_vertex] = ut.END_TIME
+                return 1
+
+        # if no new tour can be built, can the request be inserted into one of the existing eligible ones?
+        eligible_tours = [t for t in carrier_.tours if t.routing_sequence[0] == original_depot]
+        for tour_ in eligible_tours:
+            for pickup_pos in range(1, len(tour_)):
+                for delivery_pos in range(pickup_pos + 1, len(tour_) + 1):
+                    if tour_.insertion_feasibility_check(instance, solution,
+                                                         [pickup_pos, delivery_pos],
+                                                         [pickup_vertex, delivery_vertex]):
+                        # undo the setting of the time window and return
+                        solution.tw_open[delivery_vertex] = ut.START_TIME
+                        solution.tw_close[delivery_vertex] = ut.END_TIME
+                        return 1
+
+        # if request cannot be inserted anywhere return negative valuation
+        # undo the setting of the time window and return
+        solution.tw_open[delivery_vertex] = ut.START_TIME
+        solution.tw_close[delivery_vertex] = ut.END_TIME
+        return -1

@@ -297,7 +297,7 @@ def _make_tour_edges(instance: it.PDPInstance, solution: slt.CAHDSolution, carri
 
 
 def _add_carrier_solution(fig: go.Figure, instance, solution: slt.CAHDSolution, carrier: int):
-    carrier_solution = solution.carriers[carrier]
+    carrier_ = solution.carriers[carrier]
     scatter_traces = []
     edge_traces = []
 
@@ -305,7 +305,7 @@ def _add_carrier_solution(fig: go.Figure, instance, solution: slt.CAHDSolution, 
     fig.add_trace(depot_scatter)
     scatter_traces.append(depot_scatter)
 
-    for tour in range(carrier_solution.num_tours()):
+    for tour in range(carrier_.num_tours()):
         tour_scatter = _make_tour_scatter(instance, solution, carrier, tour)
         fig.add_trace(tour_scatter)
         scatter_traces.append(tour_scatter)
@@ -315,7 +315,7 @@ def _add_carrier_solution(fig: go.Figure, instance, solution: slt.CAHDSolution, 
             fig.add_annotation(edge)
         edge_traces.append(edges)
 
-    if carrier_solution.unrouted_requests:
+    if carrier_.unrouted_requests:
         unrouted_scatter = _make_unrouted_scatter(instance, solution, carrier)
         fig.add_trace(unrouted_scatter)
         scatter_traces.append(unrouted_scatter)

@@ -13,6 +13,12 @@ logger = logging.getLogger(__name__)
 
 
 class BiddingBehavior(ABC):
+    def __init__(self,
+                 construction_method: cns.PDPParallelInsertionConstruction,
+                 improvement_method: mh.PDPMetaHeuristic):
+        self.construction_method = construction_method
+        self.improvement_method = improvement_method
+
     def execute(self,
                 instance: it.PDPInstance,
                 solution: slt.CAHDSolution,
@@ -76,8 +82,8 @@ class DynamicReOpt(BiddingBehavior):
         # assign and insert requests of the bundle
         try:
             while tmp_carrier_.unrouted_requests:
-                cns.MinTravelDistanceInsertion().construct_dynamic(instance, solution, tmp_carrier)
-            mh.PDPVariableNeighborhoodDescent().execute(instance, solution, [tmp_carrier])
+                self.construction_method.construct_dynamic(instance, solution, tmp_carrier)
+            self.improvement_method.execute(instance, solution, [tmp_carrier])
             with_bundle = tmp_carrier_.sum_profit()
 
         except ConstraintViolationError:
@@ -100,7 +106,8 @@ class StaticProfit(BiddingBehavior):
 
         try:
             ini.MaxCliqueTourInitialization()._initialize_carrier(instance, solution, tmp_carrier)
-            cns.MinTravelDistanceInsertion().construct_static(instance, solution)
+            self.construction_method.construct_static(instance, solution)
+            self.improvement_method.execute(instance, solution, [tmp_carrier])
             with_bundle = solution.carriers[tmp_carrier].sum_profit()
 
         except ConstraintViolationError:

@@ -12,6 +12,12 @@ logger = logging.getLogger(__name__)
 
 
 class Auction(ABC):
+    def __init__(self,
+                 construction_method: cns.PDPParallelInsertionConstruction,
+                 improvement_method: mh.PDPMetaHeuristic):
+        self.construction_method = construction_method
+        self.improvement_method = improvement_method
+
     def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         logger.debug(f'running auction {self.__class__.__name__}')
         self._run_auction(instance, solution)
@@ -27,7 +33,7 @@ class Auction(ABC):
             logger.debug(f'requests {auction_pool_requests} have been submitted to the auction pool')
 
             # improve the "reduced" routes
-            # mh.PDPVariableNeighborhoodDescent().execute(instance, solution)
+            self.improvement_method.execute(instance, solution)
 
             # Bundle Generation
             # TODO maybe bundles should be a list of bundle indices rather than a list of lists of request indices?
@@ -91,7 +97,8 @@ class AuctionD(Auction):
         return bg.GeneticAlgorithm().execute(instance, solution, auction_pool, original_bundles)
 
     def _bid_generation(self, instance: it.PDPInstance, solution: slt.CAHDSolution, bundles):
-        return bd.DynamicReOpt().execute(instance, solution, bundles)
+        return bd.DynamicReOpt(construction_method=self.construction_method,
+                               improvement_method=self.improvement_method).execute(instance, solution, bundles)
 
     def _winner_determination(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool: Sequence[int],
                               bundles: Sequence[Sequence[int]], bids_matrix: Sequence[Sequence[float]]):
