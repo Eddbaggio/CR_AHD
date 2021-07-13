@@ -43,9 +43,7 @@ def execute_all(instance: it.PDPInstance, plot=False):
                 solution = solver(construction_method, improvement_method).execute(instance)
                 iso_sol = solution
             else:
-                # for the collaborative and centralized solvers, some data from the isolated planning is needed
                 # Collab: can take the isolated planning as a starting solution and will then only do the auction
-                # Central: will copy the time windows for a fair comparison
                 solution = solver(construction_method, improvement_method).execute(instance, iso_sol)
 
             logger.info(f'{instance.id_}: Successfully solved via {solver.__name__}')
@@ -143,7 +141,7 @@ if __name__ == '__main__':
     paths = sorted(
         list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
         key=ut.natural_sort_key)
-    paths = paths[:48]
+    paths = paths[5:6]
 
     # solutions = m_solve_single_thread(paths, plot=False)
     solutions = m_solve_multi_thread(paths)

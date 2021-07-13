@@ -137,7 +137,7 @@ def bar_chart(df: pd.DataFrame,
                  width=width,
                  height=height,
                  )
-    # fig.update_yaxes(range=[0, 10000])
+    fig.update_yaxes(range=[0, 12000])
     fig.update_xaxes(type='category')
     if show:
         fig.show(config=config)

@@ -52,7 +52,7 @@ class KMeansBundles(BundleSetGenerationBehavior):
     """
     creates a k-means partitions of the submitted requests. generates exactly as many clusters as there are carriers.
 
-    :return a List of lists, where each sublist contains the cluster members of a cluster
+    :return
     """
 
     def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool: Iterable,
@@ -116,17 +116,12 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
             fitness = new_fitness
             generation_counter += 1
 
-        # set the auction pool size in such a way that there's space for the original bundles if they are not part of
-        # of the final population yet
-        auction_pool_size = ut.AUCTION_POOL_SIZE
-        for ob in original_bundles:
-            if ob in population:
-                auction_pool_size -= 1
-
         # select the best bundles
+        auction_pool_size = ut.AUCTION_POOL_SIZE
         limited_bundle_pool = self.generate_bundle_pool(auction_pool, fitness, population, auction_pool_size)
 
-        # add the original bundling as the final candidates if they are not contained yet - this cannot be infeasible
+        # add each of the original bundles if it is not contained yet - this cannot be infeasible
+        # this might exceed the auction_pool_size even more than self.generate_bundle_pool
         self._normalize_individual(original_bundles)
         original_bundles = [np.array(auction_pool)[np.array(original_bundles) == bundle_idx].tolist()
                             for bundle_idx in range(max(original_bundles) + 1)]
@@ -201,7 +196,8 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
             fitness.append(bv.GHProxyValuation(instance, solution, k_means_individual, auction_pool))
 
         # fill the rest of the population with random individuals
-        while len(population) < population_size - 1:
+        i = 1
+        while i < population_size:
             individual = ut.random_max_k_partition_idx(auction_pool, n)
             self._normalize_individual(individual)
             if individual in population:
@@ -209,6 +205,7 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
             else:
                 population.append(individual)
                 fitness.append(bv.GHProxyValuation(instance, solution, individual, auction_pool))
+                i += 1
 
         return fitness, population
 
