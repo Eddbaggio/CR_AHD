@@ -24,16 +24,16 @@ def execute_all(instance: it.PDPInstance, plot=False):
     :return: evaluation metrics (Instance.evaluation_metrics) of all the solutions obtained
     """
     solutions = []
-    iso_sol = False
 
     construction_method = cns.MinTravelDistanceInsertion()
     improvement_method = mh.PDPVariableNeighborhoodDescent()
+    # improvement_method = mh.NoMetaheuristic()
 
     for solver in [
         slv.IsolatedPlanningNoTW,
-        # slv.IsolatedPlanning,
+        slv.IsolatedPlanning,
         slv.CollaborativePlanningNoTW,
-        # slv.CollaborativePlanning,
+        slv.CollaborativePlanning,
         # slv.CentralizedPlanning,
     ]:
         logger.info(f'{instance.id_}: Solving via {solver.__name__} ...')
@@ -41,10 +41,16 @@ def execute_all(instance: it.PDPInstance, plot=False):
         try:
             if solver.__name__ == 'IsolatedPlanningNoTW':
                 solution = solver(construction_method, improvement_method).execute(instance)
-                iso_sol = solution
-            else:
+                sol_iso_no_tw = solution
+            elif solver.__name__ == 'CollaborativePlanningNoTW':
                 # Collab: can take the isolated planning as a starting solution and will then only do the auction
-                solution = solver(construction_method, improvement_method).execute(instance, iso_sol)
+                solution = solver(construction_method, improvement_method).execute(instance, sol_iso_no_tw)
+            elif solver.__name__ == 'IsolatedPlanning':
+                solution = solver(construction_method, improvement_method).execute(instance)
+                sol_iso = solution
+            elif solver.__name__ == 'CollaborativePlanning':
+                # Collab: can take the isolated planning as a starting solution and will then only do the auction
+                solution = solver(construction_method, improvement_method).execute(instance, sol_iso)
 
             logger.info(f'{instance.id_}: Successfully solved via {solver.__name__}')
             if plot:
@@ -54,7 +60,7 @@ def execute_all(instance: it.PDPInstance, plot=False):
             solutions.append(solution)
 
         except Exception as e:
-            raise e
+            # raise e
             logger.error(f'{e}\nFailed on instance {instance} with solver {solver.__name__}')
             solution = slt.CAHDSolution(instance)  # create an empty solution for failed instances?!
             solution.solution_algorithm = str(solver.__name__)
@@ -141,14 +147,14 @@ if __name__ == '__main__':
     paths = sorted(
         list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
         key=ut.natural_sort_key)
-    paths = paths[5:6]
+    paths = paths[:24]
 
     # solutions = m_solve_single_thread(paths, plot=False)
     solutions = m_solve_multi_thread(paths)
 
     df = write_solution_summary_to_multiindex_df(solutions, 'carrier')
     ev.bar_chart(df,
-                 title='NO TIME WINDOWS, VND(Move+2opt); 4 requests submitted;',
+                 title='VND(Move+2opt); 4 requests submitted;',
                  values='sum_profit',
                  category='run',
                  color='solution_algorithm',

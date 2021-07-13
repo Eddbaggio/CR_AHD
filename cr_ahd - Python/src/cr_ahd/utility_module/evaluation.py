@@ -131,7 +131,7 @@ def bar_chart(df: pd.DataFrame,
                      'IsolatedPlanning',
                      'CollaborativePlanningNoTW',
                      'CollaborativePlanning',
-                     'CentralizedPlanning'
+                     # 'CentralizedPlanning'
                  ],
                      'rad': [150, 200, 300]},
                  width=width,

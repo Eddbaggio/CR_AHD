@@ -1,5 +1,5 @@
 import datetime as dt
-from typing import Sequence, List, Tuple
+from typing import Sequence, Tuple
 
 import numpy as np
 from scipy.spatial.distance import squareform, pdist
@@ -139,7 +139,9 @@ def bundle_total_travel_distance(instance: it.PDPInstance,
     BEFORE: used bundle centroid as depot\n
     NOW: uses bundle member as depot, because the former version may lead to infeasibility.
 
-    :param extended_distance_matrix: a replica of the instance's distance matrix, extended by all the distances to the centroids that exist in the candidate solution. these additional distances are positioned at the very end of the matrix; the centroids will have the corresponding indices starting at num_carriers + 2* num_requests
+    :param extended_distance_matrix: a replica of the instance's distance matrix, extended by all the distances to
+    the centroids that exist in the candidate solution. these additional distances are positioned at the very end of
+    the matrix; the centroids will have the corresponding indices starting at num_carriers + 2* num_requests
     """
     num_bundles = len(extended_distance_matrix) - (instance.num_depots + 2 * instance.num_requests)
     tour_dict = {'routing_sequence': [],
@@ -247,8 +249,8 @@ def GHProxyValuation(instance: it.PDPInstance,
     densities = []
     total_travel_distances = []
     for bundle_idx in range(num_bundles):
+        # todo make the functions called below work with the GH decoding of bundles directly?
         # recreate the bundle
-        # todo make the functions below work with the GH decoding of bundles directly?
         bundle = auction_pool_array[candidate_solution == bundle_idx]
 
         # compute the radius
@@ -275,4 +277,4 @@ def GHProxyValuation(instance: it.PDPInstance,
                                            radii[bundle_idx],
                                            radii[:bundle_idx] + radii[bundle_idx + 1:]))
 
-    return (min(isolations) * min(densities)) / (max(total_travel_distances) * max(candidate_solution)+1)
+    return (min(isolations) * min(densities)) / (max(total_travel_distances) * max(candidate_solution) + 1)

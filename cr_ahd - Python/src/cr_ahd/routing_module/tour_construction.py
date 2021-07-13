@@ -39,7 +39,8 @@ class PDPParallelInsertionConstruction(ABC):
         pass
 
     def construct_dynamic(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
-        """take the single (!) unrouted customer of the given carrier and insert it in the best position"""
+        """take the single (!) unrouted customer of the given carrier and insert it in the best position
+        alters the solution IN PLACE"""
         carrier_ = solution.carriers[carrier]
         # assert len(carrier_.unrouted_requests) == 1  # TODO I only removed this line because of the final routing. In the acceptance phase this condition must hold but not in the final routing
         request = carrier_.unrouted_requests[0]

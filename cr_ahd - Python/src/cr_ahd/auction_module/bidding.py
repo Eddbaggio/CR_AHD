@@ -100,7 +100,7 @@ class StaticProfit(BiddingBehavior):
 
     def _value_with_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, bundle: Sequence[int],
                            carrier: int):
-
+        raise NotImplementedError('static routing does not find feasible solutions')
         # create & append a temporary copy of the carrier which will be used to compute the bid
         tmp_carrier, tmp_carrier_ = self._create_tmp_carrier_copy_with_bundle(instance, solution, bundle, carrier)
 

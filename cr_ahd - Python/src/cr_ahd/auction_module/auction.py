@@ -32,9 +32,6 @@ class Auction(ABC):
         if auction_pool_requests:
             logger.debug(f'requests {auction_pool_requests} have been submitted to the auction pool')
 
-            # improve the "reduced" routes
-            self.improvement_method.execute(instance, solution)
-
             # Bundle Generation
             # TODO maybe bundles should be a list of bundle indices rather than a list of lists of request indices?
             auction_pool_bundles = self._bundle_generation(instance, solution, auction_pool_requests, original_bundles)

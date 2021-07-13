@@ -31,7 +31,7 @@ class Solver(abc.ABC):
         random.seed(0)
 
         solution = self._acceptance_phase(instance, solution)
-        self._improvement_phase(instance, solution)
+        solution = self._improvement_phase(instance, solution)
         solution = self._auction_phase(instance, solution)
 
         solution.solution_algorithm = self.__class__.__name__
@@ -60,8 +60,9 @@ class Solver(abc.ABC):
         return twm.TWManagementSingle().execute(instance, solution, carrier, request)
 
     def _improvement_phase(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
+        solution = deepcopy(solution)
         self.improvement_method.execute(instance, solution)
-        pass
+        return solution
 
     def _static_routing(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         raise RuntimeError('static routing is omitted atm since it does not yield improvements over the dynamic routes')
@@ -109,7 +110,7 @@ class CollaborativePlanning(Solver):
         for carrier in range(solution.num_carriers()):
             while solution.carriers[carrier].unrouted_requests:
                 self.construction_method.construct_dynamic(instance, solution, carrier)
-            self._improvement_phase(instance, solution)
+        solution = self._improvement_phase(instance, solution)
         return solution
 
 
@@ -133,7 +134,7 @@ class CentralizedPlanning(Solver):
             # carrier will always be 0 for centralized
             cns.MinTravelDistanceInsertion().construct_dynamic(instance, solution, 0)
 
-        self._improvement_phase(md_instance, solution)
+        solution = self._improvement_phase(md_instance, solution)
 
         solution.solution_algorithm = self.__class__.__name__
         return solution

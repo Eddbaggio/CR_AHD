@@ -1,12 +1,10 @@
 import itertools
 import logging
-import re
 from abc import ABC, abstractmethod
 
 import numpy as np
 
 from src.cr_ahd.core_module import instance as it, solution as slt
-from src.cr_ahd.utility_module import utils as ut
 from src.cr_ahd.routing_module import tour_construction as cns
 
 logger = logging.getLogger(__name__)
@@ -24,7 +22,10 @@ def _abs_num_requests(carrier_: slt.AHDSolution, num_requests) -> int:
         return round(len(carrier_.assigned_requests) * num_requests)
 
 
-class RequestSelectionBehavior_individual(ABC):
+class RequestSelectionBehaviorIndividual(ABC):
+    """
+    select (for each carrier) a set of bundles based on their individual evaluation of some quality criterion
+    """
     def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, num_requests):
         """
         select a set of requests based on the concrete selection behavior. will retract the requests from the carrier
@@ -67,7 +68,7 @@ class RequestSelectionBehavior_individual(ABC):
         pass
 
 
-class Random(RequestSelectionBehavior_individual):
+class Random(RequestSelectionBehaviorIndividual):
     """
     returns a random selection of unrouted requests
     """
@@ -76,7 +77,7 @@ class Random(RequestSelectionBehavior_individual):
         return np.random.random(len(solution.carriers[carrier].unrouted_requests))
 
 
-class HighestInsertionCostDistance(RequestSelectionBehavior_individual):
+class HighestInsertionCostDistance(RequestSelectionBehaviorIndividual):
     """given the current set of routes, returns the n unrouted requests that have the HIGHEST Insertion distance cost.
      NOTE: since routes may not be final, the current highest-marginal-cost request might not have been chosen at an
      earlier or later stage!"""
@@ -103,7 +104,7 @@ class HighestInsertionCostDistance(RequestSelectionBehavior_individual):
         return evaluation
 
 
-class LowestProfit(RequestSelectionBehavior_individual):
+class LowestProfit(RequestSelectionBehaviorIndividual):
     def _evaluate_requests(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
         raise NotImplementedError
         # this is a wrong implementation of mProfit (Gansterer & Hartl / Berger & Bierwirth). It SHOULD be:
@@ -118,7 +119,7 @@ class LowestProfit(RequestSelectionBehavior_individual):
         return [rev + cost for rev, cost in zip(revenue, ins_cost)]
 
 
-class PackedTW(RequestSelectionBehavior_individual):
+class PackedTW(RequestSelectionBehaviorIndividual):
     """
     offer requests from TW slots that are closest to their limit. this way carrier increases flexibility rather than
     profitability
@@ -130,7 +131,11 @@ class PackedTW(RequestSelectionBehavior_individual):
 # BUNDLE-BASED EVALUATION
 # =====================================================================================================================
 
-class RequestSelectionBehavior_bundle(ABC):
+class RequestSelectionBehaviorBundle(ABC):
+    """
+    Select (vor each carrier) a set of bundles based on their combined evaluation of a given measure (e.g. spatial
+    proximity)
+    """
     def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, num_requests):
         auction_pool = []
         original_bundles = []
@@ -188,7 +193,7 @@ class RequestSelectionBehavior_bundle(ABC):
         pass
 
 
-class Cluster(RequestSelectionBehavior_bundle):
+class Cluster(RequestSelectionBehaviorBundle):
 
     def _create_bundles(self, instance, solution, carrier, k):
         """
