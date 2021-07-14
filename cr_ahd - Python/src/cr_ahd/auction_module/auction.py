@@ -32,6 +32,12 @@ class Auction(ABC):
         if auction_pool_requests:
             logger.debug(f'requests {auction_pool_requests} have been submitted to the auction pool')
 
+            # clear the solution and do a dynamic re-optimization to get proper value_without_bundle values in bidding
+            solution.clear_carrier_routes()
+            for carrier in range(len(solution.carriers)):
+                self.construction_method.construct_dynamic(instance, solution, carrier)
+            self.improvement_method.execute(instance, solution)
+
             # Bundle Generation
             # TODO maybe bundles should be a list of bundle indices rather than a list of lists of request indices?
             auction_pool_bundles = self._bundle_generation(instance, solution, auction_pool_requests, original_bundles)

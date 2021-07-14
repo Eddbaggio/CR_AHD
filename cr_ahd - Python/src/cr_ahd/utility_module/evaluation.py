@@ -1,3 +1,4 @@
+import warnings
 from pathlib import Path
 from typing import Sequence
 
@@ -157,44 +158,70 @@ def print_top_level_stats(df: pd.DataFrame):
                                                                              'num_tours': sum,
                                                                              'acceptance_rate': 'mean',
                                                                              })
-        print('=============/ instance type, run, algorithm /=============')
+
+        print('=============/ stats per instance-algorithm combination /=============')
         print(grouped, '\n')
+
+        print('=============/ number of solved instances per algorithm /=============')
+        for name, group in grouped.groupby('solution_algorithm'):
+            print(f'{group["num_tours"].astype(bool).sum(axis=0)}/{len(group)} solved by {name}')
+        print('\n')
 
         # aggregate the 20 runs
-        grouped = grouped.groupby(['rad', 'n', 'solution_algorithm']).agg('mean')
-        print('=============/ instance type, algorithm /=============')
-        print(grouped, '\n')
+        print('=============/ average over runs  /=============')
+        print(grouped.groupby(['rad', 'n', 'solution_algorithm']).agg('mean'), '\n')
 
-        # csv
-        bar_chart = grouped.groupby('n')
-        print('=============/ CSV: rad and algorithm /=============')
-        for name, group in bar_chart:
-            print(f'Group: n={name}')
-            print(group.reset_index('n')['sum_profit'].unstack('solution_algorithm')[
-                      ['IsolatedPlanning',
-                       'CollaborativePlanning',
-                       # 'CentralizedPlanning',
-                       ]].to_csv(), '\n')
+        # # csv
+        # bar_chart = grouped.groupby('n')
+        # print('=============/ CSV: rad and algorithm /=============')
+        # for name, group in bar_chart:
+        #     print(f'Group: n={name}')
+        #     print(group.reset_index('n')['sum_profit'].unstack('solution_algorithm')[
+        #               ['IsolatedPlanning',
+        #                'CollaborativePlanning',
+        #                'IsolatedPlanningNoTW',
+        #                'CollaborativePlanningNoTW',
+        #                # 'CentralizedPlanning',
+        #                ]].to_csv(), '\n')
 
         # aggregate the instance types
-        grouped = grouped.groupby(['solution_algorithm'])
-        for name, group in grouped:
-            print(f'{group["num_tours"].astype(bool).sum(axis=0)}/{len(group)} solved by {name}')
-        print('=============/ algorithm /=============')
-        grouped = grouped.agg('mean')
-        print(grouped, '\n')
 
         # collaboration gain
         print('=============/ collaboration gains /=============')
-        for stat in ['sum_profit', 'num_tours']:
-            gain = grouped.loc['CollaborativePlanning', stat] / grouped.loc['IsolatedPlanning', stat] - 1
-            print(f'Collaboration gain ({stat}): {gain}')
+        g = grouped.groupby('solution_algorithm').agg('mean')
+        for pair in [('CollaborativePlanning', 'IsolatedPlanning'),
+                     ('CollaborativePlanningNoTW', 'IsolatedPlanningNoTW')]:
+            print(f'{pair[0]} & {pair[1]}:')
+            for stat in ['sum_profit', 'num_tours']:
+                try:
+                    gain = g.loc[pair[0], stat] / g.loc[pair[1], stat] - 1
+                    print(f'\tCollaboration gain {stat}: {gain}')
+                except:
+                    continue
+
+        print('=============/ consistency check: collaborative better than isolated? /=============')
+        for name, group in grouped.groupby(['rad', 'n', 'run'], as_index=False):
+            d = group.reset_index(['rad', 'n', 'run'], True)
+            try:
+                assert d.loc['CollaborativePlanning', 'sum_profit'] >= d.loc[
+                    'IsolatedPlanning', 'sum_profit']
+            except AssertionError:
+                warnings.warn(f'{name}: Collaborative is worse than Isolated!')
+            except KeyError:
+                None
+            try:
+                assert d.loc['CollaborativePlanningNoTW', 'sum_profit'] >= d.loc[
+                    'IsolatedPlanningNoTW', 'sum_profit']
+            except AssertionError:
+                warnings.warn(f'{name}: CollaborativeNoTW is worse than IsolatedNoTW!')
+            except KeyError:
+                None
 
 
 if __name__ == '__main__':
     df = pd.read_csv(
         "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home "
-        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_carrier_#118.csv",
+        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_carrier_#176.csv",
         index_col=['rad', 'n', 'run', 'solution_algorithm', 'carrier_id_'])
     print_top_level_stats(df)
     # bar_chart(df,

@@ -31,9 +31,9 @@ def execute_all(instance: it.PDPInstance, plot=False):
 
     for solver in [
         slv.IsolatedPlanningNoTW,
-        slv.IsolatedPlanning,
+        # slv.IsolatedPlanning,
         slv.CollaborativePlanningNoTW,
-        slv.CollaborativePlanning,
+        # slv.CollaborativePlanning,
         # slv.CentralizedPlanning,
     ]:
         logger.info(f'{instance.id_}: Solving via {solver.__name__} ...')
@@ -147,7 +147,7 @@ if __name__ == '__main__':
     paths = sorted(
         list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
         key=ut.natural_sort_key)
-    paths = paths[:24]
+    paths = paths[118:119]
 
     # solutions = m_solve_single_thread(paths, plot=False)
     solutions = m_solve_multi_thread(paths)
@@ -165,13 +165,4 @@ if __name__ == '__main__':
 
     ev.print_top_level_stats(df)
 
-    with pd.option_context('display.max_rows', None, 'display.max_columns', None, 'display.width', 0):
-
-        grouped = df.groupby(['rad', 'n', 'run', 'solution_algorithm']).aggregate(
-            {'num_tours': sum, 'sum_profit': sum, 'acceptance_rate': np.mean})
-
-        # print(grouped[['num_tours', 'sum_profit', 'acceptance_rate']])
-
-        for name, group in grouped.groupby('solution_algorithm'):
-            print(f'{group["num_tours"].astype(bool).sum(axis=0)}/{len(group)} solved by {name}')
     logger.info('END')

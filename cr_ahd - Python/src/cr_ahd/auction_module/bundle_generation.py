@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 class BundleSetGenerationBehavior(ABC):
     def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool: Sequence, original_bundles):
+        # random.seed(0)
         bundle_set = self._generate_bundle_set(instance, solution, auction_pool, original_bundles)
         solution.bundle_generation = self.__class__.__name__
         return bundle_set
