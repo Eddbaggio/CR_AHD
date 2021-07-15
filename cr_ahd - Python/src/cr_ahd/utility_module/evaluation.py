@@ -221,7 +221,7 @@ def print_top_level_stats(df: pd.DataFrame):
 if __name__ == '__main__':
     df = pd.read_csv(
         "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home "
-        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_carrier_#176.csv",
+        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_carrier_#188.csv",
         index_col=['rad', 'n', 'run', 'solution_algorithm', 'carrier_id_'])
     print_top_level_stats(df)
     # bar_chart(df,

@@ -357,6 +357,17 @@ def natural_sort_key(s, _nsre=re.compile('([0-9]+)')):
             for text in _nsre.split(str(s))]
 
 
+def indices_to_nested_lists(indices: Sequence[int], elements: Sequence):
+    result = []
+    for i in range(max(indices)+1):
+        sublist = []
+        for j in range(len(elements)):
+            if indices[j] == i:
+                sublist.append(elements[j])
+        result.append(sublist)
+    return result
+
+
 def validate_solution(instance, solution):
     assert solution.num_carriers() > 0
 
@@ -369,7 +380,8 @@ def validate_solution(instance, solution):
 
             assert tour_._sum_load == 0, instance.id_
             assert tour_._sum_travel_distance <= instance.vehicles_max_travel_distance, instance.id_
-            assert round(tour_._sum_profit, 4) == round(tour_._sum_revenue - tour_._sum_travel_distance, 4), f'{instance.id_}: {round(tour_._sum_profit, 4)}!={round(tour_._sum_revenue - tour_._sum_travel_distance, 4)}'
+            assert round(tour_._sum_profit, 4) == round(tour_._sum_revenue - tour_._sum_travel_distance,
+                                                        4), f'{instance.id_}: {round(tour_._sum_profit, 4)}!={round(tour_._sum_revenue - tour_._sum_travel_distance, 4)}'
             for i in trange(1, len(tour_.routing_sequence), desc=f'Tour {tour_.id_}', disable=True):
                 predecessor = tour_.routing_sequence[i - 1]
                 vertex = tour_.routing_sequence[i]

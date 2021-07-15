@@ -11,30 +11,19 @@ logger = logging.getLogger(__name__)
 
 
 class PDPParallelInsertionConstruction(ABC):
-    def construct_static(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
+    def construct_static(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
+        carrier_ = solution.carriers[carrier]
+        while carrier_.unrouted_requests:
+            request, tour, pickup_pos, delivery_pos = self.best_insertion_for_carrier(instance, solution, carrier)
 
-        for carrier in range(len(solution.carriers)):
+            # when for a given request no tour can be found, create a new tour and start over
+            # this will fail if max_num_vehicles is exceeded
+            if tour is None:
+                self.create_new_tour_with_request(instance, solution, carrier, request)
 
-            i = 0
-            while solution.carriers[carrier].unrouted_requests:
-                request, tour, pickup_pos, delivery_pos = self.best_insertion_for_carrier(instance, solution, carrier)
-
-                # when for a given request no tour can be found, create a new tour and start over
-                # this will fail if max_num_vehicles is exceeded
-                if tour is None:
-                    self.create_new_tour_with_request(instance, solution, carrier, request)
-
-                # otherwise insert as suggested
-                else:
-                    self.execute_insertion(instance, solution, carrier, request, tour, pickup_pos, delivery_pos)
-
-                """# metaheuristic every 4th request
-                if i % 4 == 0:
-                    # for fairness with the dynamic version, run local search after each insertion
-                    # mh.PDPSequentialNeighborhoodDescent().execute(instance, solution)
-                    mh.PDPVariableNeighborhoodDescent().execute(instance, solution)
-                    # mh.PDPSimulatedAnnealing().execute(instance, solution, [carrier])
-                i += 1"""
+            # otherwise insert as suggested
+            else:
+                self.execute_insertion(instance, solution, carrier, request, tour, pickup_pos, delivery_pos)
 
         pass
 
@@ -53,11 +42,6 @@ class PDPParallelInsertionConstruction(ABC):
             # print(f'{request}: t{carrier_.tours[tour].routing_sequence[0]} {pickup_pos, delivery_pos}')
             self.execute_insertion(instance, solution, carrier, request, tour, pickup_pos, delivery_pos)
 
-        """# metaheuristic every 4th request
-        if len(carrier_.routed_requests) % 5 == 0:
-            # mh.PDPSequentialNeighborhoodDescent().execute(instance, solution)
-            mh.PDPVariableNeighborhoodDescent().execute(instance, solution, [carrier])
-            # mh.PDPSimulatedAnnealing().execute(instance, solution, [carrier])"""
         pass
 
     def best_insertion_for_carrier(

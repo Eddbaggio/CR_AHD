@@ -74,7 +74,7 @@ class Solver(abc.ABC):
 
         # construct_static initial solution
         # solution = cns.MinTimeShiftInsertion().construct_static(instance, solution)
-        cns.MinTravelDistanceInsertion().construct_static(instance, solution)
+        cns.MinTravelDistanceInsertion().construct_static(instance, solution, carrier)
 
         ut.validate_solution(instance, solution)
         return solution
@@ -103,14 +103,9 @@ class CollaborativePlanning(Solver):
     def _auction_phase(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         solution = deepcopy(solution)
         if instance.num_carriers > 1:  # not for centralized instances
-            au.AuctionD(self.construction_method, self.improvement_method).execute(instance, solution)
-
-        # do a final dynamic re-optimization from scratch
-        solution.clear_carrier_routes()
-        for carrier in range(solution.num_carriers()):
-            while solution.carriers[carrier].unrouted_requests:
-                self.construction_method.construct_dynamic(instance, solution, carrier)
-        solution = self._improvement_phase(instance, solution)
+            # au.AuctionStaticInsertion(self.construction_method, self.improvement_method).execute(instance, solution)
+            au.AuctionDynamicReOptAndImprove(self.construction_method,
+                                             self.improvement_method).execute(instance, solution)
         return solution
 
 
@@ -222,11 +217,19 @@ class CentralizedPlanning(Solver):
         return twm.TWManagementSingleOriginalDepot().execute(instance, solution, carrier, request)
 
 
-class IsolatedPlanningNoTW(IsolatedPlanning):
+class IsolatedPlanningNoTW(Solver):
     def _time_window_management(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
         return twm.TWManagementNoTW().execute(instance, solution, carrier, request)
 
 
-class CollaborativePlanningNoTW(CollaborativePlanning):
+class CollaborativePlanningNoTW(Solver):
+    def _auction_phase(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
+        solution = deepcopy(solution)
+        if instance.num_carriers > 1:  # not for centralized instances
+            # au.AuctionStaticInsertion(self.construction_method, self.improvement_method).execute(instance, solution)
+            au.AuctionDynamicReOptAndImprove(self.construction_method,
+                                             self.improvement_method).execute(instance, solution)
+        return solution
+
     def _time_window_management(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
         return twm.TWManagementNoTW().execute(instance, solution, carrier, request)
