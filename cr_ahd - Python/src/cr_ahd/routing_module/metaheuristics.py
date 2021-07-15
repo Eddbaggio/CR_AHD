@@ -12,11 +12,12 @@ logger = logging.getLogger(__name__)
 
 class PDPMetaHeuristic(abc.ABC):
     def __init__(self):
-        self.neighborhoods = [ls.PDPMove,
-                              ls.PDPTwoOpt,
-                              # ls.PDPRelocate,  # inter-tour
-                              # ls.PDPRelocate2,  # inter-tour
-                              ]
+        self.neighborhoods = [
+            ls.PDPMove,
+            ls.PDPTwoOpt,
+            # ls.PDPRelocate,  # inter-tour
+            # ls.PDPRelocate2,  # inter-tour
+        ]
         self.improved = False
         self.stopping_criterion = False
         self.parameters = dict()
@@ -140,6 +141,7 @@ class PDPRandomNeighborhoodDescent(PDPMetaHeuristic):
     """
     randomly select a neighborhood for the next improving move
     """
+
     def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None):
         raise NotImplementedError
         if carriers is None:

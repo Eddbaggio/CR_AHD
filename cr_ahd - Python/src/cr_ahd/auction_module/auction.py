@@ -114,7 +114,49 @@ class AuctionDynamicReOptAndImprove(Auction):
         pass
 
     def _request_selection(self, instance: it.PDPInstance, solution: slt.CAHDSolution, num_request_to_submit: int):
-        return rs.Cluster().execute(instance, solution, ut.NUM_REQUESTS_TO_SUBMIT)
+        return rs.SpatialCluster().execute(instance, solution, ut.NUM_REQUESTS_TO_SUBMIT)
+
+    def _bundle_generation(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool,
+                           original_bundles):
+        return bg.GeneticAlgorithm().execute(instance, solution, auction_pool, original_bundles)
+
+    def _bid_generation(self, instance: it.PDPInstance, solution: slt.CAHDSolution, bundles):
+        # select a dynamic re-optimization policy for bidding
+        return bd.DynamicReOptAndImprove(construction_method=self.construction_method,
+                                         improvement_method=self.improvement_method).execute(instance, solution,
+                                                                                             bundles)
+
+    def _winner_determination(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool: Sequence[int],
+                              bundles: Sequence[Sequence[int]], bids_matrix: Sequence[Sequence[float]]):
+        return wd.MaxBidGurobiCAP1().execute(instance, solution, auction_pool, bundles, bids_matrix)
+
+    def _final_routing(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
+        # do a final dynamic re-optimization from scratch
+        solution.clear_carrier_routes()
+        for carrier in range(solution.num_carriers()):
+            while solution.carriers[carrier].unrouted_requests:
+                self.construction_method.construct_dynamic(instance, solution, carrier)
+        self.improvement_method.execute(instance, solution)
+
+
+class AuctionDynamicReOptAndImproveTemporalRS(Auction):
+    """
+    Request Selection Behavior: Cluster \n
+    Bundle Generation Behavior: Genetic Algorithm by Gansterer & Hartl \n
+    Bidding Behavior: Profit \n
+    Winner Determination Behavior: Gurobi - Set Packing Problem
+    """
+
+    def reopt_and_improve_after_request_selection(self, instance, solution):
+        # clear the solution and do a dynamic re-optimization to get proper value_without_bundle values in bidding
+        solution.clear_carrier_routes()
+        for carrier in range(len(solution.carriers)):
+            self.construction_method.construct_dynamic(instance, solution, carrier)
+        self.improvement_method.execute(instance, solution)
+        pass
+
+    def _request_selection(self, instance: it.PDPInstance, solution: slt.CAHDSolution, num_request_to_submit: int):
+        return rs.TemporalRangeCluster().execute(instance, solution, ut.NUM_REQUESTS_TO_SUBMIT)
 
     def _bundle_generation(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool,
                            original_bundles):
@@ -140,7 +182,7 @@ class AuctionDynamicReOptAndImprove(Auction):
 
 
 class AuctionStaticInsertion(Auction):
-    raise NotImplementedError
+    # raise NotImplementedError
     # the idea was good, however, even if a carrier re-inserts his original requests in a static fashion, he might end
     # up creating a solution that's worse than what he had obtained via dynamic insertion before the Request Selection
 
@@ -149,7 +191,7 @@ class AuctionStaticInsertion(Auction):
         pass
 
     def _request_selection(self, instance: it.PDPInstance, solution: slt.CAHDSolution, num_request_to_submit: int):
-        return rs.Cluster().execute(instance, solution, ut.NUM_REQUESTS_TO_SUBMIT)
+        return rs.SpatialCluster().execute(instance, solution, ut.NUM_REQUESTS_TO_SUBMIT)
 
     def _bundle_generation(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool, original_bundles):
         return bg.GeneticAlgorithm().execute(instance, solution, auction_pool, original_bundles)

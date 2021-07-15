@@ -60,7 +60,7 @@ def execute_all(instance: it.PDPInstance, plot=False):
             solutions.append(solution)
 
         except Exception as e:
-            raise e
+            # raise e
             logger.error(f'{e}\nFailed on instance {instance} with solver {solver.__name__}')
             solution = slt.CAHDSolution(instance)  # create an empty solution for failed instances?!
             solution.solution_algorithm = str(solver.__name__)
@@ -147,14 +147,14 @@ if __name__ == '__main__':
     paths = sorted(
         list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
         key=ut.natural_sort_key)
-    paths = paths[5:6]
+    paths = paths[:]
 
     # solutions = m_solve_single_thread(paths, plot=False)
     solutions = m_solve_multi_thread(paths)
 
     df = write_solution_summary_to_multiindex_df(solutions, 'carrier')
     ev.bar_chart(df,
-                 title='auction based on insertion + final improvement; VND(Move+2opt); 4 requests submitted;',
+                 title='RS based on temporal dist; VND(Move+2opt); 4 requests submitted;',
                  values='sum_profit',
                  category='run',
                  color='solution_algorithm',

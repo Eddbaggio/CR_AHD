@@ -1,3 +1,4 @@
+import datetime as dt
 import itertools
 import logging
 from abc import ABC, abstractmethod
@@ -26,6 +27,7 @@ class RequestSelectionBehaviorIndividual(ABC):
     """
     select (for each carrier) a set of bundles based on their individual evaluation of some quality criterion
     """
+
     def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, num_requests):
         """
         select a set of requests based on the concrete selection behavior. will retract the requests from the carrier
@@ -89,7 +91,8 @@ class HighestInsertionCostDistance(RequestSelectionBehaviorIndividual):
             best_delta_for_r = float('inf')
             for tour in range(carrier_.num_tours()):
                 # cheapest way to fit request into tour
-                delta, _, _ = cns.MinTravelDistanceInsertion()._tour_cheapest_dist_insertion(instance, solution, carrier, tour,
+                delta, _, _ = cns.MinTravelDistanceInsertion()._tour_cheapest_dist_insertion(instance, solution,
+                                                                                             carrier, tour,
                                                                                              request)
                 if delta < best_delta_for_r:
                     best_delta_for_r = delta
@@ -131,11 +134,12 @@ class PackedTW(RequestSelectionBehaviorIndividual):
 # BUNDLE-BASED EVALUATION
 # =====================================================================================================================
 
-class RequestSelectionBehaviorBundle(ABC):
+class RequestSelectionBehaviorCluster(ABC):
     """
     Select (vor each carrier) a set of bundles based on their combined evaluation of a given measure (e.g. spatial
     proximity)
     """
+
     def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, num_requests):
         auction_pool = []
         original_bundles = []
@@ -144,22 +148,23 @@ class RequestSelectionBehaviorBundle(ABC):
             carrier_ = solution.carriers[carrier]
             k = _abs_num_requests(carrier_, num_requests)
 
-            # make the bundles that shall be evaluated
-            bundles = self._create_bundles(instance, solution, carrier, k)
+            # make the clusters that shall be evaluated
+            clusters = self._create_clusters(instance, solution, carrier, k)
 
-            # find the best bundle for the given carrier
-            best_bundle = None
-            best_bundle_valuation = -float('inf')
-            for bundle in bundles:
-                bundle_valuation = self._evaluate_bundle(instance, solution, carrier, bundle)
-                if bundle_valuation >= best_bundle_valuation:
-                    best_bundle = bundle
-                    best_bundle_valuation = bundle_valuation
+            # find the best cluster for the given carrier
+            best_cluster = None
+            best_cluster_valuation = -float('inf')
+            for cluster in clusters:
+                bundle_valuation = self._evaluate_cluster(instance, solution, carrier, cluster)
+                if bundle_valuation > best_cluster_valuation:
+                    best_cluster = cluster
+                    best_cluster_valuation = bundle_valuation
 
-            # carrier's best bundle: retract requests from their tours and add them to auction pool & original bundling
-            for request in best_bundle:
+            # carrier's best cluster: retract requests from their tours and add them to auction pool & original bundling
+            for request in best_cluster:
 
                 # find the request's tour:
+                # TODO: would be faster if the tour was stored somewhere but this is fine for now
                 pickup, delivery = instance.pickup_delivery_pair(request)
                 for t in carrier_.tours:
                     if pickup in t.routing_sequence:
@@ -185,32 +190,54 @@ class RequestSelectionBehaviorBundle(ABC):
         return auction_pool, original_bundles
 
     @abstractmethod
-    def _create_bundles(self, instance, solution, carrier, k):
+    def _create_clusters(self, instance, solution, carrier, k):
         pass
 
     @abstractmethod
-    def _evaluate_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, bundle):
+    def _evaluate_cluster(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, cluster):
         pass
 
 
-class Cluster(RequestSelectionBehaviorBundle):
+class SpatialCluster(RequestSelectionBehaviorCluster):
 
-    def _create_bundles(self, instance, solution, carrier, k):
+    def _create_clusters(self, instance, solution, carrier, k):
         """
         create all possible bundles of size k
         """
         return itertools.combinations(solution.carriers[carrier].accepted_requests, k)
 
-    def _evaluate_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, bundle):
+    def _evaluate_cluster(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, cluster):
         """
         the sum of travel distances of all pairs of requests in this cluster, where the travel distance of a request
         pair is defined as the distance between their origins (pickup locations) plus the distance between
         their destinations (delivery locations).
         """
-        pairs = itertools.combinations(bundle, 2)
+        pairs = itertools.combinations(cluster, 2)
         evaluation = 0
         for r0, r1 in pairs:
             # negative value: low distance between pairs means high valuation
             # pickup0 to pickup1 + delivery0 to delivery1
             evaluation -= instance.distance(instance.pickup_delivery_pair(r0), instance.pickup_delivery_pair(r1))
+        return evaluation
+
+
+class TemporalRangeCluster(RequestSelectionBehaviorCluster):
+    def _create_clusters(self, instance, solution, carrier, k):
+        """
+        create all possible bundles of size k
+        """
+        return itertools.combinations(solution.carriers[carrier].accepted_requests, k)
+
+    def _evaluate_cluster(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, cluster):
+        """
+        the min-max range of the delivery time windows of all requests inside the cluster
+        """
+        delivery_vertices = [instance.pickup_delivery_pair(request)[1] for request in cluster]
+
+        cluster_tw_open = [solution.tw_open[delivery] for delivery in delivery_vertices]
+        cluster_tw_close = [solution.tw_close[delivery] for delivery in delivery_vertices]
+        min_open: dt.datetime = min(cluster_tw_open)
+        max_close: dt.datetime = max(cluster_tw_close)
+        # negative value: low temporal range means high valuation
+        evaluation = - (max_close - min_open).total_seconds()
         return evaluation

@@ -15,7 +15,8 @@ logger = logging.getLogger(__name__)
 class Solver(abc.ABC):
     def __init__(self,
                  construction_method: cns.PDPParallelInsertionConstruction,
-                 improvement_method: mh.PDPMetaHeuristic = mh.NoMetaheuristic):
+                 improvement_method: mh.PDPMetaHeuristic = mh.NoMetaheuristic,
+                 ):
         self.construction_method = construction_method
         self.improvement_method = improvement_method
 
@@ -100,12 +101,22 @@ class CollaborativePlanning(Solver):
     Only a single auction after the acceptance phase
     """
 
+    def __init__(self,
+                 construction_method: cns.PDPParallelInsertionConstruction,
+                 improvement_method: mh.PDPMetaHeuristic = mh.NoMetaheuristic,
+                 # request_selection_method,
+                 # bundle_generation_method,
+                 ):
+        super().__init__(construction_method, improvement_method)
+
     def _auction_phase(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         solution = deepcopy(solution)
         if instance.num_carriers > 1:  # not for centralized instances
             # au.AuctionStaticInsertion(self.construction_method, self.improvement_method).execute(instance, solution)
-            au.AuctionDynamicReOptAndImprove(self.construction_method,
-                                             self.improvement_method).execute(instance, solution)
+            # au.AuctionDynamicReOptAndImprove(self.construction_method,
+            #                                  self.improvement_method).execute(instance, solution)
+            au.AuctionDynamicReOptAndImproveTemporalRS(self.construction_method,
+                                                       self.improvement_method).execute(instance, solution)
         return solution
 
 

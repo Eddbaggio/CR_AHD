@@ -17,13 +17,23 @@ class LocalSearchBehavior(ABC):
         """
         pass
 
+    @final
+    def execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move: tuple):
+        self._execute_move(instance, solution, carrier, move)
+        self.register_move_execution(solution)
+        pass
+
     @abstractmethod
-    def execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move):
+    def _execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move: tuple):
         pass
 
     @abstractmethod
     def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move):
         pass
+
+    @final
+    def register_move_execution(self, solution: slt.CAHDSolution):
+        solution.ls_move_counter[self.__class__.__name__] += 1
 
 
 # =====================================================================================================================
@@ -97,7 +107,7 @@ class PDPMove(LocalSearchBehavior, ABC):
         return tour_.insertion_feasibility_check(instance, solution, [new_pickup_pos, new_delivery_pos],
                                                  [pickup, delivery])
 
-    def execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move):
+    def _execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move):
         delta, tour, old_pickup_pos, old_delivery_pos, pickup, delivery, new_pickup_pos, new_delivery_pos = move
 
         tour_ = solution.carriers[carrier].tours[tour]
@@ -198,7 +208,7 @@ class PDPTwoOpt(LocalSearchBehavior):
 
         )
 
-    def execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move):
+    def _execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move):
         delta, tour, i, j = move
 
         logger.debug(f'PDPTwoOpt: [{delta}] Reverse section between {i} and {j}')
@@ -274,7 +284,7 @@ class PDPRelocate(LocalSearchBehavior):
         return new_tour_.insertion_feasibility_check(instance, solution, [new_pickup_pos, new_delivery_pos],
                                                      [pickup, delivery])
 
-    def execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move):
+    def _execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move):
         delta, old_tour, old_pickup_pos, old_delivery_pos, new_tour, new_pickup_pos, new_delivery_pos = move
         old_tour_ = solution.carriers[carrier].tours[old_tour]
         new_tour_ = solution.carriers[carrier].tours[new_tour]
@@ -385,9 +395,9 @@ class PDPRelocate2(LocalSearchBehavior):
                                 # restore the initial state
                                 new_tour_1_.pop_and_update(instance, solution, [new_pickup_pos_1, new_delivery_pos_1])
 
-    def execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move):
+    def _execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move):
         delta, old_tour, old_pickup_pos_1, old_delivery_pos_1, new_tour_1, new_pickup_pos_1, new_delivery_pos_1, \
-            old_pickup_pos_2, old_delivery_pos_2, new_tour_2, new_pickup_pos_2, new_delivery_pos_2 = move
+        old_pickup_pos_2, old_delivery_pos_2, new_tour_2, new_pickup_pos_2, new_delivery_pos_2 = move
 
         old_tour_ = solution.carriers[carrier].tours[old_tour]
 

@@ -32,6 +32,10 @@ class CAHDSolution:
         # stuff that is filled during the solving
         self.solution_algorithm = None
         self.auction_mechanism = None
+        self.ls_move_counter = dict(PDPMove=0,
+                                    PDPTwoOpt=0,
+                                    PDPRelocate=0,
+                                    PDPRelocate2=0)  # todo find a better way to add available ls neighborhoods
 
     def __str__(self):
         s = f'Solution {self.id_}\nProfit={round(self.sum_profit(), 2)}'
