@@ -6,6 +6,8 @@ from copy import deepcopy
 import src.cr_ahd.utility_module.utils as ut
 from src.cr_ahd.auction_module import auction as au
 from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
+from src.cr_ahd.auction_module import request_selection as rs, bundle_generation as bg, bidding as bd, \
+    winner_determination as wd
 from src.cr_ahd.routing_module import tour_construction as cns, tour_initialization as ini, metaheuristics as mh
 from src.cr_ahd.tw_management_module import tw_management as twm
 
@@ -14,11 +16,13 @@ logger = logging.getLogger(__name__)
 
 class Solver(abc.ABC):
     def __init__(self,
-                 construction_method: cns.PDPParallelInsertionConstruction,
-                 improvement_method: mh.PDPMetaHeuristic = mh.NoMetaheuristic,
+                 tour_construction: cns.PDPParallelInsertionConstruction,
+                 tour_improvement: mh.PDPMetaHeuristic,
+                 time_window_management: twm.TWManagement,
                  ):
-        self.construction_method = construction_method
-        self.improvement_method = improvement_method
+        self.tour_construction = tour_construction
+        self.time_window_management = time_window_management
+        self.tour_improvement = tour_improvement
 
     def execute(self, instance: it.PDPInstance, starting_solution: slt.CAHDSolution = None):
         """
@@ -47,22 +51,18 @@ class Solver(abc.ABC):
             solution.assign_requests_to_carriers([request], [carrier])
 
             # find the tw for the request
-            accepted = self._time_window_management(instance, solution, carrier, request)
+            accepted = self.time_window_management.execute(instance, solution, carrier, request)
 
             # build tours with the assigned request if it was accepted
             if accepted:
-                # solution = cns.MinTimeShiftInsertion().construct_dynamic(instance, solution, carrier)
-                self.construction_method.construct_dynamic(instance, solution, carrier)
+                self.tour_construction.construct_dynamic(instance, solution, carrier)
 
         ut.validate_solution(instance, solution)
         return solution
 
-    def _time_window_management(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
-        return twm.TWManagementSingle().execute(instance, solution, carrier, request)
-
     def _improvement_phase(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         solution = deepcopy(solution)
-        self.improvement_method.execute(instance, solution)
+        self.tour_improvement.execute(instance, solution)
         return solution
 
     def _static_routing(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
@@ -101,22 +101,21 @@ class CollaborativePlanning(Solver):
     Only a single auction after the acceptance phase
     """
 
-    def __init__(self,
-                 construction_method: cns.PDPParallelInsertionConstruction,
-                 improvement_method: mh.PDPMetaHeuristic = mh.NoMetaheuristic,
-                 # request_selection_method,
-                 # bundle_generation_method,
-                 ):
-        super().__init__(construction_method, improvement_method)
-
     def _auction_phase(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         solution = deepcopy(solution)
         if instance.num_carriers > 1:  # not for centralized instances
-            # au.AuctionStaticInsertion(self.construction_method, self.improvement_method).execute(instance, solution)
-            # au.AuctionDynamicReOptAndImprove(self.construction_method,
-            #                                  self.improvement_method).execute(instance, solution)
-            au.AuctionDynamicReOptAndImproveTemporalRS(self.construction_method,
-                                                       self.improvement_method).execute(instance, solution)
+            au.Auction(
+                tour_construction=self.tour_construction,
+                tour_improvement=self.tour_improvement,
+                request_selection=rs.TemporalRangeCluster(),
+                bundle_generation=bg.GeneticAlgorithm(),
+                bidding=bd.DynamicReOptAndImprove(self.tour_construction, self.tour_improvement),
+                winner_determination=wd.MaxBidGurobiCAP1(),
+                reopt_and_improve_after_request_selection=True,
+            ).execute(
+                instance, solution
+            )
+
         return solution
 
 
@@ -238,8 +237,8 @@ class CollaborativePlanningNoTW(Solver):
         solution = deepcopy(solution)
         if instance.num_carriers > 1:  # not for centralized instances
             # au.AuctionStaticInsertion(self.construction_method, self.improvement_method).execute(instance, solution)
-            au.AuctionDynamicReOptAndImprove(self.construction_method,
-                                             self.improvement_method).execute(instance, solution)
+            au.AuctionDynamicReOptAndImprove(self.tour_construction,
+                                             self.tour_improvement).execute(instance, solution)
         return solution
 
     def _time_window_management(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):

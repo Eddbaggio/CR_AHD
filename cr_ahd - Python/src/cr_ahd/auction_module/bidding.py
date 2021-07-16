@@ -14,10 +14,10 @@ logger = logging.getLogger(__name__)
 
 class BiddingBehavior(ABC):
     def __init__(self,
-                 construction_method: cns.PDPParallelInsertionConstruction,
-                 improvement_method: mh.PDPMetaHeuristic):
-        self.construction_method = construction_method
-        self.improvement_method = improvement_method
+                 tour_construction: cns.PDPParallelInsertionConstruction,
+                 tour_improvement: mh.PDPMetaHeuristic):
+        self.tour_construction = tour_construction
+        self.tour_improvement = tour_improvement
 
     def execute(self,
                 instance: it.PDPInstance,
@@ -72,47 +72,6 @@ class BiddingBehavior(ABC):
         pass
 
 
-class StaticInsertion(BiddingBehavior):
-    def _value_with_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, bundle: Sequence[int],
-                           carrier: int):
-        tmp_carrier, tmp_carrier_ = self._create_tmp_carrier_copy_with_bundle(instance, solution, bundle, carrier)
-
-        # insert bundle's requests 'statically'
-        try:
-            while tmp_carrier_.unrouted_requests:
-                self.construction_method.construct_static(instance, solution, tmp_carrier)
-            with_bundle = tmp_carrier_.sum_profit()
-        except ConstraintViolationError:
-            with_bundle = -float('inf')
-        finally:
-            solution.carriers.pop()  # del the temporary carrier copy
-            solution.carrier_depots.pop()  # del the tmp_carrier's depot
-
-        return with_bundle
-
-
-class StaticInsertionAndImprove(BiddingBehavior):
-    def _value_with_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, bundle: Sequence[int],
-                           carrier: int):
-        tmp_carrier, tmp_carrier_ = self._create_tmp_carrier_copy_with_bundle(instance, solution, bundle, carrier)
-
-        # insert bundle's requests 'statically'
-        try:
-            while tmp_carrier_.unrouted_requests:
-                self.construction_method.construct_static(instance, solution, tmp_carrier)
-            self.improvement_method.execute(instance, solution, [tmp_carrier])
-            with_bundle = tmp_carrier_.sum_profit()
-        except ConstraintViolationError:
-            with_bundle = -float('inf')
-        finally:
-            solution.carriers.pop()  # del the temporary carrier copy
-            solution.carrier_depots.pop()  # del the tmp_carrier's depot
-
-        return with_bundle
-
-    pass
-
-
 class DynamicInsertion(BiddingBehavior):
     def _value_with_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, bundle: Sequence[int],
                            carrier: int):
@@ -121,7 +80,7 @@ class DynamicInsertion(BiddingBehavior):
         # insert bundle's requests 'dynamically', i.e. in their order inside the tmp_carrier_.unrouted list
         try:
             while tmp_carrier_.unrouted_requests:
-                self.construction_method.construct_dynamic(instance, solution, tmp_carrier)
+                self.tour_construction.construct_dynamic(instance, solution, tmp_carrier)
             with_bundle = tmp_carrier_.sum_profit()
         except ConstraintViolationError:
             with_bundle = -float('inf')
@@ -145,38 +104,11 @@ class DynamicReOptAndImprove(BiddingBehavior):
         # assign and insert requests of the bundle
         try:
             while tmp_carrier_.unrouted_requests:
-                self.construction_method.construct_dynamic(instance, solution, tmp_carrier)
-            self.improvement_method.execute(instance, solution, [tmp_carrier])
+                self.tour_construction.construct_dynamic(instance, solution, tmp_carrier)
+            self.tour_improvement.execute(instance, solution, [tmp_carrier])
             with_bundle = tmp_carrier_.sum_profit()
         except ConstraintViolationError:
             with_bundle = -float('inf')
-        finally:
-            solution.carriers.pop()  # del the temporary carrier copy
-            solution.carrier_depots.pop()  # del the tmp_carrier's depot
-
-        return with_bundle
-
-
-class StaticReOptAndImprove(BiddingBehavior):
-
-    def _value_with_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, bundle: Sequence[int],
-                           carrier: int):
-        raise NotImplementedError('static routing does not find feasible solutions')
-        # create & append a temporary copy of the carrier which will be used to compute the bid
-        tmp_carrier, tmp_carrier_ = self._create_tmp_carrier_copy_with_bundle(instance, solution, bundle, carrier)
-        # reset the temporary carrier's solution and start from scratch instead
-        tmp_carrier_.clear_routes()
-
-        # build the routes from scratch using static routing
-        try:
-            ini.MaxCliqueTourInitialization()._initialize_carrier(instance, solution, tmp_carrier)
-            self.construction_method.construct_static(instance, solution, tmp_carrier)
-            self.improvement_method.execute(instance, solution, [tmp_carrier])
-            with_bundle = solution.carriers[tmp_carrier].sum_profit()
-
-        except ConstraintViolationError:
-            with_bundle = -float('inf')
-
         finally:
             solution.carriers.pop()  # del the temporary carrier copy
             solution.carrier_depots.pop()  # del the tmp_carrier's depot

@@ -4,15 +4,16 @@ import multiprocessing
 from pathlib import Path
 from typing import List
 
-import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
 import src.cr_ahd.solver as slv
-import src.cr_ahd.utility_module.cr_ahd_logging as log
 from src.cr_ahd.core_module import instance as it, solution as slt
 from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh
-from src.cr_ahd.utility_module import utils as ut, plotting as pl, evaluation as ev
+from src.cr_ahd.tw_management_module import tw_management as twm, tw_selection as tws, tw_offering as two
+from src.cr_ahd.utility_module import utils as ut, plotting as pl, evaluation as ev, cr_ahd_logging as log
+from src.cr_ahd.auction_module import auction as au, request_selection as rs, bundle_generation as bg, bidding as bd, \
+    winner_determination as wd
 
 logging.config.dictConfig(log.LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
@@ -25,42 +26,51 @@ def execute_all(instance: it.PDPInstance, plot=False):
     """
     solutions = []
 
-    construction_method = cns.MinTravelDistanceInsertion()
-    improvement_method = mh.PDPVariableNeighborhoodDescent()
-    # improvement_method = mh.NoMetaheuristic()
+    # define underlying modular behaviors
+    tour_construction = cns.MinTravelDistanceInsertion()
+    tour_improvement = mh.PDPVariableNeighborhoodDescent()
+    time_window_management = twm.TWManagementSingle(
+        two.FeasibleTW(),
+        tws.UnequalPreference())
+    auction = au.Auction(
+        tour_construction,
+        tour_improvement,
+        rs.TemporalRangeCluster(),
+        bg.GeneticAlgorithm(),
+        bd.DynamicReOptAndImprove(tour_construction, tour_improvement),
+        wd.MaxBidGurobiCAP1(),
+        reopt_and_improve_after_request_selection=True
+    )
 
     for solver in [
-        # slv.IsolatedPlanningNoTW,
         slv.IsolatedPlanning,
-        # slv.CollaborativePlanningNoTW,
         slv.CollaborativePlanning,
         # slv.CentralizedPlanning,
     ]:
         logger.info(f'{instance.id_}: Solving via {solver.__name__} ...')
         fails = 0
         try:
-            if solver.__name__ == 'IsolatedPlanningNoTW':
-                solution = solver(construction_method, improvement_method).execute(instance)
-                sol_iso_no_tw = solution
-            elif solver.__name__ == 'CollaborativePlanningNoTW':
-                # Collab: can take the isolated planning as a starting solution and will then only do the auction
-                solution = solver(construction_method, improvement_method).execute(instance, sol_iso_no_tw)
-            elif solver.__name__ == 'IsolatedPlanning':
-                solution = solver(construction_method, improvement_method).execute(instance)
+            if solver.__name__ == 'IsolatedPlanning':
+                solution = solver(tour_construction,
+                                  tour_improvement,
+                                  time_window_management).execute(instance)
                 sol_iso = solution
             elif solver.__name__ == 'CollaborativePlanning':
                 # Collab: can take the isolated planning as a starting solution and will then only do the auction
-                solution = solver(construction_method, improvement_method).execute(instance, sol_iso)
+                solution = solver(tour_construction,
+                                  tour_improvement,
+                                  time_window_management).execute(instance, sol_iso)
 
             logger.info(f'{instance.id_}: Successfully solved via {solver.__name__}')
             if plot:
                 pl.plot_solution_2(instance, solution, show=True,
-                                   title=f'{instance.id_} with Solver "{solver.__name__} - Total profit: {solution.sum_profit()}"')
+                                   title=f'{instance.id_} with Solver "{solver.__name__} - '
+                                         f'Total profit: {solution.sum_profit()}"')
             solution.write_to_json()
             solutions.append(solution)
 
         except Exception as e:
-            # raise e
+            raise e
             logger.error(f'{e}\nFailed on instance {instance} with solver {solver.__name__}')
             solution = slt.CAHDSolution(instance)  # create an empty solution for failed instances?!
             solution.solution_algorithm = str(solver.__name__)
@@ -147,10 +157,10 @@ if __name__ == '__main__':
     paths = sorted(
         list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
         key=ut.natural_sort_key)
-    paths = paths[:]
+    paths = paths[78:79]
 
-    # solutions = m_solve_single_thread(paths, plot=False)
-    solutions = m_solve_multi_thread(paths)
+    solutions = m_solve_single_thread(paths, plot=False)
+    # solutions = m_solve_multi_thread(paths)
 
     df = write_solution_summary_to_multiindex_df(solutions, 'carrier')
     ev.bar_chart(df,

@@ -23,7 +23,17 @@ def _abs_num_requests(carrier_: slt.AHDSolution, num_requests) -> int:
         return round(len(carrier_.assigned_requests) * num_requests)
 
 
-class RequestSelectionBehaviorIndividual(ABC):
+class RequestSelectionBehavior(ABC):
+    @abstractmethod
+    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, num_requests):
+        pass
+
+
+# =====================================================================================================================
+# INDIVIDUAL REQUEST EVALUATION
+# =====================================================================================================================
+
+class RequestSelectionBehaviorIndividual(RequestSelectionBehavior, ABC):
     """
     select (for each carrier) a set of bundles based on their individual evaluation of some quality criterion
     """
@@ -134,7 +144,7 @@ class PackedTW(RequestSelectionBehaviorIndividual):
 # BUNDLE-BASED EVALUATION
 # =====================================================================================================================
 
-class RequestSelectionBehaviorCluster(ABC):
+class RequestSelectionBehaviorCluster(RequestSelectionBehavior, ABC):
     """
     Select (vor each carrier) a set of bundles based on their combined evaluation of a given measure (e.g. spatial
     proximity)

@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 class PDPParallelInsertionConstruction(ABC):
     def construct_static(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
+        """inserts ALL unrouted requests of the specified carrier"""
         carrier_ = solution.carriers[carrier]
         while carrier_.unrouted_requests:
             request, tour, pickup_pos, delivery_pos = self.best_insertion_for_carrier(instance, solution, carrier)
@@ -31,7 +32,6 @@ class PDPParallelInsertionConstruction(ABC):
         """take the single (!) unrouted customer of the given carrier and insert it in the best position
         alters the solution IN PLACE"""
         carrier_ = solution.carriers[carrier]
-        # assert len(carrier_.unrouted_requests) == 1  # TODO I only removed this line because of the final routing. In the acceptance phase this condition must hold but not in the final routing
         request = carrier_.unrouted_requests[0]
         insertion_criteria, tour, pickup_pos, delivery_pos = self.best_insertion_for_request(instance, solution,
                                                                                              carrier, request)
