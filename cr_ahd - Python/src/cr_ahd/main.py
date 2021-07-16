@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 import src.cr_ahd.solver as slv
 from src.cr_ahd.core_module import instance as it, solution as slt
-from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh
+from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh, local_search as ls
 from src.cr_ahd.tw_management_module import tw_management as twm, tw_selection as tws, tw_offering as two
 from src.cr_ahd.utility_module import utils as ut, plotting as pl, evaluation as ev, cr_ahd_logging as log
 from src.cr_ahd.auction_module import auction as au, request_selection as rs, bundle_generation as bg, bidding as bd, \
@@ -26,57 +26,56 @@ def execute_all(instance: it.PDPInstance, plot=False):
     """
     solutions = []
 
-    # define underlying modular behaviors
-    tour_construction = cns.MinTravelDistanceInsertion()
-    tour_improvement = mh.PDPVariableNeighborhoodDescent()
-    time_window_management = twm.TWManagementSingle(
-        two.FeasibleTW(),
-        tws.UnequalPreference())
-    auction = au.Auction(
-        tour_construction,
-        tour_improvement,
-        rs.TemporalRangeCluster(),
-        bg.GeneticAlgorithm(),
-        bd.DynamicReOptAndImprove(tour_construction, tour_improvement),
-        wd.MaxBidGurobiCAP1(),
-        reopt_and_improve_after_request_selection=True
-    )
+    # define underlying modular elements
+    tour_constructions = (cns.MinTravelDistanceInsertion(), cns.MinTimeShiftInsertion())
+    neighborhoods = [ls.PDPMove(), ls.PDPTwoOpt()]
+    tour_improvements = (mh.PDPVariableNeighborhoodDescent(neighborhoods),
+                         mh.NoMetaheuristic(neighborhoods),
 
-    for solver in [
-        slv.IsolatedPlanning,
-        slv.CollaborativePlanning,
-        # slv.CentralizedPlanning,
-    ]:
-        logger.info(f'{instance.id_}: Solving via {solver.__name__} ...')
-        fails = 0
-        try:
-            if solver.__name__ == 'IsolatedPlanning':
-                solution = solver(tour_construction,
-                                  tour_improvement,
-                                  time_window_management).execute(instance)
-                sol_iso = solution
-            elif solver.__name__ == 'CollaborativePlanning':
-                # Collab: can take the isolated planning as a starting solution and will then only do the auction
-                solution = solver(tour_construction,
-                                  tour_improvement,
-                                  time_window_management).execute(instance, sol_iso)
+                         )
+    time_window_managements = (twm.TWManagementSingle(two.FeasibleTW(), tws.UnequalPreference()),
+                               twm.TWManagementNoTW(None, None))
 
-            logger.info(f'{instance.id_}: Successfully solved via {solver.__name__}')
-            if plot:
-                pl.plot_solution_2(instance, solution, show=True,
-                                   title=f'{instance.id_} with Solver "{solver.__name__} - '
-                                         f'Total profit: {solution.sum_profit()}"')
-            solution.write_to_json()
-            solutions.append(solution)
+    for tour_construction in tour_constructions[:1]:
+        for tour_improvement in tour_improvements[:]:
+            for tw_management in time_window_managements[:1]:
 
-        except Exception as e:
-            raise e
-            logger.error(f'{e}\nFailed on instance {instance} with solver {solver.__name__}')
-            solution = slt.CAHDSolution(instance)  # create an empty solution for failed instances?!
-            solution.solution_algorithm = str(solver.__name__)
-            solution.write_to_json()
-            solutions.append(solution)
-            fails += 1
+                auction = au.Auction(
+                    tour_construction,
+                    tour_improvement,
+                    rs.TemporalRangeCluster(),
+                    bg.GeneticAlgorithm(),
+                    bd.DynamicReOptAndImprove(tour_construction, tour_improvement),
+                    wd.MaxBidGurobiCAP1(),
+                    reopt_and_improve_after_request_selection=True
+                )
+
+                for solver in [slv.IsolatedPlanning, slv.CollaborativePlanning]:
+                    try:
+                        if solver.__name__ == 'IsolatedPlanning':
+                            solution = solver(tour_construction,
+                                              tour_improvement,
+                                              tw_management).execute(instance)
+                            sol_iso = solution
+                        elif solver.__name__ == 'CollaborativePlanning':
+                            # Collab: can take the isolated planning as a starting solution and will then only do the auction
+                            solution = solver(tour_construction,
+                                              tour_improvement,
+                                              tw_management).execute(instance, sol_iso)
+
+                        if plot:
+                            pl.plot_solution_2(instance, solution, show=True,
+                                               title=f'{instance.id_} with Solver "{solver.__name__} - '
+                                                     f'Total profit: {solution.sum_profit()}"')
+                        solution.write_to_json()
+                        solutions.append(solution)
+
+                    except Exception as e:
+                        raise e
+                        logger.error(f'{e}\nFailed on instance {instance} with solver {solver.__name__}')
+                        solution = slt.CAHDSolution(instance)  # create an empty solution for failed instances?!
+                        solution.write_to_json()
+                        solutions.append(solution)
 
     return solutions
 
@@ -109,33 +108,62 @@ def write_solution_summary_to_multiindex_df(solutions_per_instance: List[List[sl
     """
     :param solutions_per_instance: A List of Lists of solutions. First Axis: instance, Second Axis: solver
     """
+
     df = []
     for instance_solutions in solutions_per_instance:
         for solution in instance_solutions:
-            for carrier in range(solution.num_carriers()):
 
-                if agg_level == 'carrier':
-                    d = solution.carriers[carrier].summary()
-                    d['carrier_id_'] = carrier
-                    d.pop('tour_summaries')
-                    d.update(solution.meta)
-                    d['solution_algorithm'] = solution.solution_algorithm
-                    df.append(d)
+            if agg_level == 'solution':
+                record = solution.meta.copy()  # rad, n, run, dist
+                record.update(solution.solver_config)  # solution_algorithm, tour_construction, request_selection, ...
+                record.update(solution.summary())
+                df.append(record)
 
-                elif agg_level == 'tour':
+            elif agg_level == 'carrier':
+                for carrier in range(solution.num_carriers()):
+                    record = solution.meta.copy()  # rad, n, run, dist
+                    record.update(solution.solver_config)
+                    record.update(solution.carriers[carrier].summary())
+                    record['carrier_id_'] = carrier
+                    record.pop('tour_summaries')
+                    df.append(record)
+
+            elif agg_level == 'tour':
+                for carrier in range(solution.num_carriers()):
                     for tour in range(solution.carriers[carrier].num_tours()):
-                        d = solution.carriers[carrier].tours[tour].summary()
-                        d.update(solution.meta)
-                        d['solution_algorithm'] = solution.solution_algorithm
-                        d['carrier_id_'] = carrier
-                        d['tour_id_'] = tour
-                        df.append(d)
+                        record = solution.meta.copy()  # rad, n, run, dist
+                        record.update(solution.solver_config)
+                        record.update(solution.carriers[carrier].tours[tour].summary())
+                        record['carrier_id_'] = carrier
+                        record['tour_id_'] = tour
+                        df.append(record)
+
+            else:
+                raise ValueError
 
     df = pd.DataFrame.from_records(df)
-    df = df.drop(columns=['dist'])
+    df = df.drop(columns=['dist'])  # since the distance between depots is always 200 for the GH instances
 
     # set the multiindex
-    index = ['rad', 'n', 'run', 'solution_algorithm', 'carrier_id_']
+    index = ['rad',
+             'n',
+             'run',
+             'solution_algorithm',
+             'tour_construction',
+             'tour_improvement',
+             'time_window_management',
+             'time_window_offering',
+             'time_window_selection',
+             'auction_tour_construction',
+             'auction_tour_improvement',
+             'request_selection',
+             'reopt_and_improve_after_request_selection',
+             'bundle_generation',
+             'bidding',
+             'winner_determination',
+             ]
+    if agg_level == 'carrier':
+        index += ['carrier_id_']
     if agg_level == 'tour':
         index += ['tour_id_']
     df.set_index(keys=index, inplace=True)
@@ -164,9 +192,9 @@ if __name__ == '__main__':
 
     df = write_solution_summary_to_multiindex_df(solutions, 'carrier')
     ev.bar_chart(df,
-                 title='RS based on temporal dist; VND(Move+2opt); 4 requests submitted;',
+                 # title='',
                  values='sum_profit',
-                 category='run',
+                 category='tour_improvement',
                  color='solution_algorithm',
                  facet_col='rad',
                  facet_row='n',

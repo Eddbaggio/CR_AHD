@@ -221,21 +221,41 @@ def print_top_level_stats(df: pd.DataFrame):
 if __name__ == '__main__':
     df = pd.read_csv(
         "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home "
-        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_carrier_#188.csv",
-        index_col=['rad', 'n', 'run', 'solution_algorithm', 'carrier_id_'])
+        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_carrier_#004.csv",
+        index_col=['rad',
+                   'n',
+                   'run',
+                   'carrier_id_',  # only if agg_level of the writer was 'carrier'
+                   'rad',
+                   'n',
+                   'run',
+                   'solution_algorithm',
+                   'tour_construction',
+                   'tour_improvement',
+                   'time_window_management',
+                   'time_window_offering',
+                   'time_window_selection',
+                   'auction_tour_construction',
+                   'auction_tour_improvement',
+                   'request_selection',
+                   'reopt_and_improve_after_request_selection',
+                   'bundle_generation',
+                   'bidding',
+                   'winner_determination',
+                   ])
     print_top_level_stats(df)
-    # bar_chart(df,
-    #           title='',
-    #           values='sum_profit',
-    #           category='rad',
-    #           color='solution_algorithm',
-    #           facet_col=None,
-    #           facet_row='n',
-    #           show=True,
-    #           width=700,
-    #           height=450,
-    #           html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix()
-    #           )
+    bar_chart(df,
+              title='',
+              values='sum_profit',
+              category='time_window_management',
+              color='solution_algorithm',
+              facet_col='rad',
+              facet_row='n',
+              show=True,
+              # width=700,
+              # height=450,
+              html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix()
+              )
     # boxplot(df,
     #         show=True,
     #         category='n',

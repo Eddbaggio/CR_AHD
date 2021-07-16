@@ -685,8 +685,6 @@ def multi_insert_and_update(routing_sequence: List[int],
         sum_revenue = updated_sums['sum_revenue']
         sum_profit = updated_sums['sum_profit']
 
-        # index_shift += 1
-
     return updated_sums
 
 

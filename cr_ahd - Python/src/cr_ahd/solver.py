@@ -28,6 +28,10 @@ class Solver(abc.ABC):
         """
         apply the concrete solution algorithm
         """
+
+        logger.info(
+            f'{instance.id_}: {self.__class__.__name__} & {self.time_window_management.__class__.__name__} Solving ...')
+
         if starting_solution is None:
             solution = slt.CAHDSolution(instance)
         else:
@@ -36,11 +40,27 @@ class Solver(abc.ABC):
         random.seed(0)
 
         solution = self._acceptance_phase(instance, solution)
-        solution = self._improvement_phase(instance, solution)
+        # if self.tour_improvement:
+        solution = self._improvement_phase(instance, solution)  # post-acceptance optimization
+        # if self.auction:
         solution = self._auction_phase(instance, solution)
 
-        solution.solution_algorithm = self.__class__.__name__
+        self.update_solution_solver_config(solution)
+
+        logger.info(
+            f'{instance.id_}: {self.__class__.__name__} & {self.time_window_management.__class__.__name__} Success!')
+
         return solution
+
+    def update_solution_solver_config(self, solution):
+        solution.solver_config['solution_algorithm'] = self.__class__.__name__
+        solution.solver_config['tour_construction'] = self.tour_construction.__class__.__name__
+        solution.solver_config['tour_improvement'] = self.tour_improvement.__class__.__name__
+        solution.solver_config['time_window_management'] = self.time_window_management.__class__.__name__
+        solution.solver_config[
+            'time_window_offering'] = self.time_window_management.time_window_offering.__class__.__name__
+        solution.solver_config[
+            'time_window_selection'] = self.time_window_management.time_window_selection.__class__.__name__
 
     def _acceptance_phase(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         solution = deepcopy(solution)
@@ -164,7 +184,6 @@ class CentralizedPlanning(Solver):
         solution.carrier_depots = [[depot for depot in range(md_instance.num_depots)]]
         solution.request_to_carrier_assignment = [0] * len(solution.request_to_carrier_assignment)
         solution.solution_algorithm = None
-        solution.auction_mechanism = None
         return solution
 
     """
@@ -225,21 +244,3 @@ class CentralizedPlanning(Solver):
         # use only the single, centralized carrier
         carrier = 0
         return twm.TWManagementSingleOriginalDepot().execute(instance, solution, carrier, request)
-
-
-class IsolatedPlanningNoTW(Solver):
-    def _time_window_management(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
-        return twm.TWManagementNoTW().execute(instance, solution, carrier, request)
-
-
-class CollaborativePlanningNoTW(Solver):
-    def _auction_phase(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
-        solution = deepcopy(solution)
-        if instance.num_carriers > 1:  # not for centralized instances
-            # au.AuctionStaticInsertion(self.construction_method, self.improvement_method).execute(instance, solution)
-            au.AuctionDynamicReOptAndImprove(self.tour_construction,
-                                             self.tour_improvement).execute(instance, solution)
-        return solution
-
-    def _time_window_management(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
-        return twm.TWManagementNoTW().execute(instance, solution, carrier, request)

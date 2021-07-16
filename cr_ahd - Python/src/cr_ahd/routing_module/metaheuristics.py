@@ -3,6 +3,7 @@ import logging
 import random
 from copy import deepcopy
 from math import exp, log
+from typing import Sequence
 
 from src.cr_ahd.routing_module import local_search as ls
 from src.cr_ahd.core_module import instance as it, solution as slt
@@ -11,13 +12,8 @@ logger = logging.getLogger(__name__)
 
 
 class PDPMetaHeuristic(abc.ABC):
-    def __init__(self):
-        self.neighborhoods = [
-            ls.PDPMove,
-            ls.PDPTwoOpt,
-            # ls.PDPRelocate,  # inter-tour
-            # ls.PDPRelocate2,  # inter-tour
-        ]
+    def __init__(self, neighborhoods: Sequence[ls.LocalSearchBehavior]):
+        self.neighborhoods = neighborhoods
         self.improved = False
         self.stopping_criterion = False
         self.parameters = dict()
@@ -236,8 +232,8 @@ class PDPVariableNeighborhoodDescentFirst(PDPMetaHeuristic):
 
 
 class PDPSimulatedAnnealing(PDPMetaHeuristic):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, neighborhoods: Sequence[ls.LocalSearchBehavior]):
+        super().__init__(neighborhoods)
         self.parameters['initial_temp'] = None
         self.parameters['temp'] = None
         self.parameters['max_iterations'] = 50  # TODO adjust these two params
@@ -245,18 +241,17 @@ class PDPSimulatedAnnealing(PDPMetaHeuristic):
         self.parameters['alpha'] = 0.8  # for cooling schedule (usually 0.8 <= alpha <=0.9)
 
     def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None):
+        raise NotImplementedError('I think this is not working properly. but it is definitely too slow')
         if carriers is None:
             carriers = range(len(solution.carriers))
-        raise NotImplementedError(
-            'Metaheuristics should modify the solution in place. This has not yet been fixed for SA')
         best_solution = deepcopy(solution)
         tentative_solution = deepcopy(solution)
-
+        print(f'Before SA: {solution.sum_profit()}')
         for carrier in carriers:
             self.compute_start_temperature(tentative_solution, carrier)
             k = random.randint(0, len(self.neighborhoods) - 1)  # random neighborhood
             neighborhood = self.neighborhoods[k]()
-            move_generator = neighborhood.feasible_move_generator(instance, tentative_solution, carrier)
+            moves = list(neighborhood.feasible_move_generator(instance, tentative_solution, carrier))
             i = 0
             while i < self.parameters['max_iterations']:
                 # adjust temperature
@@ -266,21 +261,22 @@ class PDPSimulatedAnnealing(PDPMetaHeuristic):
                     m = 0
                     while m < self.parameters['max_iteration_per_temperature']:
                         # with or without replacement? without since the same move might be accepted next time
-                        move = random.choice(list(move_generator))  # random neighbor
+                        move = random.choice(moves)  # random neighbor
                         accepted = self.acceptance_criterion(instance, tentative_solution, carrier, move)
                         if accepted:
                             neighborhood.execute_move(instance, tentative_solution, carrier, move)
                             self.trajectory.append(move)
-                            move_generator = neighborhood.feasible_move_generator(instance, tentative_solution, carrier)
+                            moves = list(neighborhood.feasible_move_generator(instance, tentative_solution, carrier))
                             if tentative_solution.sum_profit() >= best_solution.sum_profit():
-                                best_solution = deepcopy(tentative_solution)
+                                solution = deepcopy(tentative_solution)
                         m += 1
                 except IndexError:  # if no move exists
                     break
 
                 i += 1
 
-        return best_solution
+        print(f'After SA:  {solution.sum_profit()}')
+        pass
 
     def compute_start_temperature(self, solution, carrier: int, start_temp_control_param=0.5):
         """compute start temperature according to Ropke,S., & Pisinger,D. (2006). An Adaptive Large Neighborhood
@@ -296,11 +292,18 @@ class PDPSimulatedAnnealing(PDPMetaHeuristic):
         self.parameters['temp'] = self.parameters['initial_temp']
 
     def acceptance_criterion(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move: tuple):
-        if move is None:
-            return False
-        elif move[0] <= 0:
-            return True
-        elif random.random() < exp(-move[0] / self.parameters['temp']):
-            return True
-        else:
+        try:
+            if move is None:
+                return False
+            # improving move is always accepted
+            elif move[0] <= 0:
+                return True
+            # degrading move is accepted with certain probability
+            elif random.random() < exp(-move[0] / self.parameters['temp']):  # might raise OverflowError
+                return True
+            else:
+                return False
+        except OverflowError:
+            # overflow caused by double limit if temperature is too low. In that case the random number will not be
+            #  smaller than the required probability
             return False

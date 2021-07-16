@@ -33,7 +33,7 @@ class LocalSearchBehavior(ABC):
 
     @final
     def register_move_execution(self, solution: slt.CAHDSolution):
-        solution.ls_move_counter[self.__class__.__name__] += 1
+        solution.local_search_move_counter[self.__class__.__name__] += 1
 
 
 # =====================================================================================================================

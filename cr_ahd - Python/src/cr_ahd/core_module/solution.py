@@ -30,12 +30,27 @@ class CAHDSolution:
         self.carrier_depots = [[depot] for depot in range(instance.num_depots)]
 
         # stuff that is filled during the solving
-        self.solution_algorithm = None
-        self.auction_mechanism = None
-        self.ls_move_counter = dict(PDPMove=0,
-                                    PDPTwoOpt=0,
-                                    PDPRelocate=0,
-                                    PDPRelocate2=0)  # todo find a better way to add available ls neighborhoods
+        self.solver_config = dict(
+            solution_algorithm=None,
+            tour_construction=None,
+            tour_improvement=None,
+            time_window_management = None,
+            time_window_offering=None,
+            time_window_selection=None,
+            auction_tour_construction=None,
+            auction_tour_improvement=None,
+            request_selection=None,
+            reopt_and_improve_after_request_selection=None,
+            bundle_generation=None,
+            bidding=None,
+            winner_determination=None,
+        )
+
+        # TODO find a better way to add available ls neighborhoods automatically
+        self.local_search_move_counter = dict(PDPMove=0,
+                                              PDPTwoOpt=0,
+                                              PDPRelocate=0,
+                                              PDPRelocate2=0)
 
     def __str__(self):
         s = f'Solution {self.id_}\nProfit={round(self.sum_profit(), 2)}'
@@ -72,7 +87,8 @@ class CAHDSolution:
     def num_routing_stops(self):
         return sum(c.num_routing_stops() for c in self.carriers)
 
-    def acceptance_rate(self):
+    def avg_acceptance_rate(self):
+        # average over all carriers
         return sum([c.acceptance_rate for c in self.carriers]) / self.num_carriers()
 
     def assign_requests_to_carriers(self, requests: Sequence[int], carriers: Sequence[int]):
@@ -92,9 +108,8 @@ class CAHDSolution:
         return {carrier.id_: carrier.as_dict() for carrier in self.carriers}
 
     def summary(self):
-        return {
+        summary = {
             'id_': self.id_,
-            'solution_algorithm': self.solution_algorithm,
             'num_carriers': self.num_carriers(),
             'carrier_depots': self.carrier_depots,
             'sum_travel_distance': self.sum_travel_distance(),
@@ -104,13 +119,15 @@ class CAHDSolution:
             'sum_revenue': self.sum_revenue(),
             'num_tours': self.num_tours(),
             'num_routing_stops': self.num_routing_stops(),
-            'acceptance_rate': self.acceptance_rate(),
+            'acceptance_rate': self.avg_acceptance_rate(),
             'carrier_summaries': {c.id_: c.summary() for c in self.carriers}
         }
+        summary.update(self.solver_config)
+        return summary
 
     def write_to_json(self):
         path = ut.output_dir_GH.joinpath(f'{self.num_carriers()}carriers',
-                                         self.id_ + '_' + self.solution_algorithm)
+                                         self.id_ + '_' + self.solver_config['solution_algorithm'])
         path = ut.unique_path(path.parent, path.stem + '_#{:03d}' + '.json')
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, mode='w') as f:
@@ -132,8 +149,12 @@ class AHDSolution:
 
     def __str__(self):
         s = f'---// Carrier ID: {self.id_} //---' \
-            f'\tProfit={round(self.sum_profit(), 4)}, Acceptance Rate={round(self.acceptance_rate, 2)}, ' \
-            f'Assigned={self.assigned_requests}, Accepted={self.accepted_requests},Unrouted={self.unrouted_requests}'
+            f'\tProfit={round(self.sum_profit(), 4)}, ' \
+            f'Acceptance Rate={round(self.acceptance_rate, 2)}, ' \
+            f'Assigned={self.assigned_requests}, ' \
+            f'Accepted={self.accepted_requests}, ' \
+            f'Unrouted={self.unrouted_requests},' \
+            f' Routed={self.routed_requests}'
         s += '\n'
         for tour_ in self.tours:
             s += str(tour_)

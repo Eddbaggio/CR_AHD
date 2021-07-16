@@ -5,7 +5,6 @@ from typing import Tuple, Union
 
 import src.cr_ahd.utility_module.utils as ut
 from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
-from src.cr_ahd.routing_module import metaheuristics as mh
 
 logger = logging.getLogger(__name__)
 

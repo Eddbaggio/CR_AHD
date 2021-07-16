@@ -84,7 +84,15 @@ class Auction(ABC):
 
         # final routing
         self._reopt_and_improve(instance, solution)
-        solution.auction_mechanism = self.__class__.__name__
+
+        solution.solver_config['auction_tour_construction'] = self.tour_construction.__class__.__name__
+        solution.solver_config['auction_tour_improvement'] = self.tour_improvement.__class__.__name__
+        solution.solver_config['request_selection'] = self.request_selection.__class__.__name__
+        solution.solver_config[
+            'reopt_and_improve_after_request_selection'] = self.reopt_and_improve_after_request_selection
+        solution.solver_config['bundle_generation'] = self.bundle_generation.__class__.__name__
+        solution.solver_config['bidding'] = self.bidding.__class__.__name__
+        solution.solver_config['winner_determination'] = self.winner_determination.__class__.__name__
         pass
 
     @staticmethod
