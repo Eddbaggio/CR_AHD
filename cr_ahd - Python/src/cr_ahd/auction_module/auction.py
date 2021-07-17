@@ -1,5 +1,6 @@
 import logging
 from abc import ABC
+from copy import deepcopy
 
 from src.cr_ahd.auction_module import request_selection as rs, bundle_generation as bg, bidding as bd, \
     winner_determination as wd
@@ -18,7 +19,6 @@ class Auction(ABC):
                  bundle_generation: bg.BundleSetGenerationBehavior,
                  bidding: bd.BiddingBehavior,
                  winner_determination: wd.WinnerDeterminationBehavior,
-                 reopt_and_improve_after_request_selection: bool,
                  ):
         """
         Auction class can be called with various parameters to create different auction variations
@@ -40,7 +40,6 @@ class Auction(ABC):
         self.bundle_generation = bundle_generation
         self.bidding = bidding
         self.winner_determination = winner_determination
-        self.reopt_and_improve_after_request_selection = reopt_and_improve_after_request_selection
 
         assert isinstance(self.bidding.tour_construction, type(self.tour_construction))
         assert isinstance(self.bidding.tour_improvement, type(self.tour_improvement))
@@ -53,12 +52,12 @@ class Auction(ABC):
         if auction_pool_requests:
             logger.debug(f'requests {auction_pool_requests} have been submitted to the auction pool')
 
-            # optional reoptimization, not all auction variants to a reopt, the abstract method may be empty
-            if self.reopt_and_improve_after_request_selection:
-                self._reopt_and_improve(instance, solution)
+            # optional reoptimization, not all auction variants do a reopt, the abstract method may be empty
+            # TODO does this even make any sense if i do complete dynamic reopt in bidding anyways?!
+            # if self.reopt_and_improve_after_request_selection:
+            #     solution = self._reopt_and_improve(instance, solution)
 
             # Bundle Generation
-            # TODO maybe bundles should be a list of bundle indices rather than a list of lists of request indices?
             auction_pool_bundles = self.bundle_generation.execute(instance, solution, auction_pool_requests,
                                                                   original_bundles_indices)
             original_bundles = ut.indices_to_nested_lists(original_bundles_indices, auction_pool_requests)
@@ -83,13 +82,17 @@ class Auction(ABC):
             logger.warning(f'No requests have been submitted!')
 
         # final routing
-        self._reopt_and_improve(instance, solution)
+        # clear the solution and do a dynamic re-optimization + improvement
+        solution.clear_carrier_routes()
+        for carrier in range(len(solution.carriers)):
+            while solution.carriers[carrier].unrouted_requests:
+                request = solution.carriers[carrier].unrouted_requests[0]
+                self.tour_construction.construct_dynamic(instance, solution, carrier)
+        self.tour_improvement.execute(instance, solution)
 
         solution.solver_config['auction_tour_construction'] = self.tour_construction.__class__.__name__
         solution.solver_config['auction_tour_improvement'] = self.tour_improvement.__class__.__name__
         solution.solver_config['request_selection'] = self.request_selection.__class__.__name__
-        solution.solver_config[
-            'reopt_and_improve_after_request_selection'] = self.reopt_and_improve_after_request_selection
         solution.solver_config['bundle_generation'] = self.bundle_generation.__class__.__name__
         solution.solver_config['bidding'] = self.bidding.__class__.__name__
         solution.solver_config['winner_determination'] = self.winner_determination.__class__.__name__
@@ -106,13 +109,3 @@ class Auction(ABC):
             carrier_.assigned_requests.sort()
             carrier_.accepted_requests.sort()
             carrier_.unrouted_requests.sort()
-
-    def _reopt_and_improve(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
-        # clear the solution and do a dynamic re-optimization including improvement
-        solution.clear_carrier_routes()
-        for carrier in range(len(solution.carriers)):
-            while solution.carriers[carrier].unrouted_requests:
-                request = solution.carriers[carrier].unrouted_requests[0]
-                self.tour_construction.construct_dynamic(instance, solution, carrier)
-        self.tour_improvement.execute(instance, solution)
-        pass

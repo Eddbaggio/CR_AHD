@@ -1,29 +1,48 @@
 import warnings
 from pathlib import Path
-from typing import Sequence
+from typing import Sequence, Iterable, List, Tuple
 
 import pandas as pd
+import numpy as np
 import plotly.express as px
 from plotly import graph_objects as go
 from plotly.subplots import make_subplots
 
 import src.cr_ahd.utility_module.utils as ut
 
-labels = {
-    'num_carriers': 'Number of Carriers',
-    'solomon_base': 'Instance',
-    'travel_distance': 'Travel Distance',
-    'travel_duration': 'Travel Duration',
-    'num_act_veh': 'Number of Vehicles',
-    'StaticI1Insertion': 'Static, no collaboration',
-    'StaticI1InsertionWithAuction': 'Static, with collaboration',
-    'StaticSequentialInsertion': 'Static Sequential, no collaboration',
-    'DynamicI1Insertion': 'Dynamic, no collaboration',
-    'DynamicI1InsertionWithAuctionA': 'Dynamic, with collaboration (A)',
-    'DynamicI1InsertionWithAuctionB': 'Dynamic, with collaboration (B)',
-    'DynamicI1InsertionWithAuctionC': 'Dynamic, with collaboration (C)',
-    'DynamicSequentialInsertion': 'Dynamic  Sequential, no collaboration',
-}
+labels = {'num_carriers': 'Number of Carriers',
+          'travel_distance': 'Travel Distance',
+          'travel_duration': 'Travel Duration',
+          'rad': 'Radius of Service Area',
+          'n': 'Number of requests per carrier',
+          }
+
+solver_config = ['solution_algorithm',
+                 'tour_construction',
+                 'tour_improvement',
+                 'time_window_management',
+                 'time_window_offering',
+                 'time_window_selection',
+                 'auction_tour_construction',
+                 'auction_tour_improvement',
+                 'request_selection',
+                 'reopt_and_improve_after_request_selection',
+                 'bundle_generation',
+                 'bidding',
+                 'winner_determination',
+                 ]
+category_orders = {'solution_algorithm': ['IsolatedPlanning',
+                                          'CollaborativePlanning',
+                                          # 'CentralizedPlanning'
+                                          ],
+                   'rad': [150,
+                           200,
+                           300],
+                   'solution_algorithm-request_selection': [('IsolatedPlanning', 'None'),
+                                                            ('CollaborativePlanning', 'SpatialCluster'),
+                                                            ('CollaborativePlanning', 'TemporalRangeCluster')
+                                                            ],
+                   }
 
 config = dict({'scrollZoom': True})
 
@@ -53,16 +72,37 @@ def bar_chart(df: pd.DataFrame,
     :return:
     """
 
-    # group and aggregate
-    # sum over necessary levels and values
-    grouped = df.groupby([x for x in [facet_col, facet_row, color, category] if x])
+    df = drop_single_value_index(df)
+    splitters = dict(category=category, color=color, facet_row=facet_row, facet_col=facet_col, )
+
     agg_dict = {col: sum for col in df.columns}
     agg_dict['acceptance_rate'] = 'mean'
-    df = grouped.agg(agg_dict)
+
+    # aggregate carriers
+    if 'carrier_id_' in df.index.names:
+        # aggregate the 3 carriers
+        solution_df = df.groupby(df.index.names.difference(['carrier_id_']),
+                                 dropna=False).agg({'sum_profit': sum,
+                                                    'sum_travel_distance': sum,
+                                                    'sum_travel_duration': sum,
+                                                    'sum_load': sum,
+                                                    'sum_revenue': sum,
+                                                    'num_tours': sum,
+                                                    'acceptance_rate': 'mean',
+                                                    })
+
+    # if any of facet_col, facet_row, color, category is a sequence, merge the levels into one
+    for k, v in splitters.items():
+        if isinstance(v, (List, Tuple)):
+            solution_df = merge_index_levels(solution_df, v)
+            splitters[k] = '-'.join(v)
+
+    # group by facets, colors and categories
+    px_ready = solution_df.groupby([x for x in splitters.values() if x], dropna=False).agg('mean')
 
     # prepare for use in plotly express
-    df: pd.DataFrame = df.reset_index()
-    df = df.round(2)
+    px_ready: pd.DataFrame = px_ready.reset_index()
+    px_ready = px_ready.round(2)
 
     '''
     # bar plot
@@ -115,30 +155,23 @@ def bar_chart(df: pd.DataFrame,
     '''
 
     # bar plot
-    fig = px.bar(df,
-                 x=category,
+    fig = px.bar(px_ready,
+                 x=splitters['category'],
                  y=values,
                  title=title,
-                 color=color,
+                 color=splitters['color'],
                  color_discrete_sequence=ut.univie_colors_100,
-                 facet_row=facet_row,
-                 facet_col=facet_col,
+                 facet_row=splitters['facet_row'],
+                 facet_col=splitters['facet_col'],
                  text=values,
                  template='plotly_white',
-                 hover_data=df.columns.values,
+                 hover_data=px_ready.columns.values,
                  barmode=barmode,
-                 category_orders={'solution_algorithm': [
-                     'IsolatedPlanningNoTW',
-                     'IsolatedPlanning',
-                     'CollaborativePlanningNoTW',
-                     'CollaborativePlanning',
-                     # 'CentralizedPlanning'
-                 ],
-                     'rad': [150, 200, 300]},
+                 category_orders=category_orders,
                  width=width,
                  height=height,
                  )
-    fig.update_yaxes(range=[0, 12000])
+    fig.update_yaxes(range=[0, 10000])
     fig.update_xaxes(type='category')
     if show:
         fig.show(config=config)
@@ -147,32 +180,53 @@ def bar_chart(df: pd.DataFrame,
         fig.write_html(html_path, )
 
 
-def print_top_level_stats(df: pd.DataFrame):
+def drop_single_value_index(df: pd.DataFrame):
+    """drops all index levels that contain the same unique value for all records OR only one unique value and NaN"""
+    for idx_level in df.index.names:
+        if len(df.index.unique(idx_level).difference([np.NaN, float('nan'), None, 'None'])) <= 1:
+            df = df.droplevel(idx_level, axis=0)
+    return df
+
+
+def merge_index_levels(df: pd.DataFrame, levels: Sequence):
+    """merges two or more levels of a pandas Multiindex Dataframe into a single level"""
+    df['-'.join(levels)] = df.reset_index(df.index.names.difference(levels)).index.to_flat_index()
+    df.set_index('-'.join(levels), append=True, drop=True, inplace=True)
+    for level in levels:
+        df = df.droplevel(level)
+    return df
+
+
+def print_top_level_stats(carrier_df: pd.DataFrame):
+    carrier_df = drop_single_value_index(carrier_df)
+
     with pd.option_context('display.max_rows', None, 'display.max_columns', None, 'display.width', 0):
+
         # aggregate the 3 carriers
-        grouped = df.groupby(['rad', 'n', 'solution_algorithm', 'run']).agg({'sum_profit': sum,
-                                                                             'sum_travel_distance': sum,
-                                                                             'sum_travel_duration': sum,
-                                                                             'sum_load': sum,
-                                                                             'sum_revenue': sum,
-                                                                             'num_tours': sum,
-                                                                             'acceptance_rate': 'mean',
-                                                                             })
+        solution_df = carrier_df.groupby(carrier_df.index.names.difference(['carrier_id_']),
+                                         dropna=False).agg({'sum_profit': sum,
+                                                            'sum_travel_distance': sum,
+                                                            'sum_travel_duration': sum,
+                                                            'sum_load': sum,
+                                                            'sum_revenue': sum,
+                                                            'num_tours': sum,
+                                                            'acceptance_rate': 'mean',
+                                                            })
 
-        print('=============/ stats per instance-algorithm combination /=============')
-        print(grouped, '\n')
-
-        print('=============/ number of solved instances per algorithm /=============')
-        for name, group in grouped.groupby('solution_algorithm'):
-            print(f'{group["num_tours"].astype(bool).sum(axis=0)}/{len(group)} solved by {name}')
-        print('\n')
+        print('=============/ stats per solution /=============')
+        print(solution_df, '\n')
 
         # aggregate the 20 runs
         print('=============/ average over runs  /=============')
-        print(grouped.groupby(['rad', 'n', 'solution_algorithm']).agg('mean'), '\n')
+        print(solution_df.groupby(solution_df.index.names.difference(['run']), dropna=False).agg('mean'), '\n')
+
+        print('=============/ number of solved instances per algorithm /=============')
+        for name, group in solution_df.groupby(solution_df.index.names.difference(['rad', 'n', 'run']), dropna=False):
+            print(f'{group["num_tours"].astype(bool).sum(axis=0)}/{len(group)} solved by {name}')
+        print('\n')
 
         # # csv
-        # bar_chart = grouped.groupby('n')
+        # bar_chart = solution_df.groupby('n')
         # print('=============/ CSV: rad and algorithm /=============')
         # for name, group in bar_chart:
         #     print(f'Group: n={name}')
@@ -188,68 +242,40 @@ def print_top_level_stats(df: pd.DataFrame):
 
         # collaboration gain
         print('=============/ collaboration gains /=============')
-        g = grouped.groupby('solution_algorithm').agg('mean')
-        for pair in [('CollaborativePlanning', 'IsolatedPlanning'),
-                     ('CollaborativePlanningNoTW', 'IsolatedPlanningNoTW')]:
-            print(f'{pair[0]} & {pair[1]}:')
-            for stat in ['sum_profit', 'num_tours']:
-                try:
-                    gain = g.loc[pair[0], stat] / g.loc[pair[1], stat] - 1
-                    print(f'\tCollaboration gain {stat}: {gain}')
-                except:
+        for name1, group1 in solution_df.groupby(['solution_algorithm', 'request_selection'], dropna=False):
+            for name2, group2 in solution_df.groupby(['solution_algorithm', 'request_selection'], dropna=False):
+                if name1 == name2:
                     continue
+                print(f"{name1}/{name2}")
+                for stat in ['sum_profit', 'num_tours']:
+                    print(f"{stat}:\t{group1.agg('mean')[stat] / group2.agg('mean')[stat]}")
+                print('\n')
 
         print('=============/ consistency check: collaborative better than isolated? /=============')
-        for name, group in grouped.groupby(['rad', 'n', 'run'], as_index=False):
-            d = group.reset_index(['rad', 'n', 'run'], True)
-            try:
-                assert d.loc['CollaborativePlanning', 'sum_profit'] >= d.loc[
-                    'IsolatedPlanning', 'sum_profit']
-            except AssertionError:
-                warnings.warn(f'{name}: Collaborative is worse than Isolated!')
-            except KeyError:
-                None
-            try:
-                assert d.loc['CollaborativePlanningNoTW', 'sum_profit'] >= d.loc[
-                    'IsolatedPlanningNoTW', 'sum_profit']
-            except AssertionError:
-                warnings.warn(f'{name}: CollaborativeNoTW is worse than IsolatedNoTW!')
-            except KeyError:
-                None
+        for name, group in solution_df.groupby(
+                solution_df.index.names.difference(['solution_algorithm', 'request_selection']),
+                as_index=False,
+                dropna=False):
+            isolated = group.xs('IsolatedPlanning', level='solution_algorithm').reset_index().iloc[0]
+            for index, row in group.xs('CollaborativePlanning', level='solution_algorithm').iterrows():
+                if isolated['sum_profit'] > row['sum_profit']:
+                    warnings.warn(f'{name}: Collaborative is worse than Isolated!')
 
 
 if __name__ == '__main__':
     df = pd.read_csv(
         "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home "
-        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_carrier_#004.csv",
-        index_col=['rad',
-                   'n',
-                   'run',
-                   'carrier_id_',  # only if agg_level of the writer was 'carrier'
-                   'rad',
-                   'n',
-                   'run',
-                   'solution_algorithm',
-                   'tour_construction',
-                   'tour_improvement',
-                   'time_window_management',
-                   'time_window_offering',
-                   'time_window_selection',
-                   'auction_tour_construction',
-                   'auction_tour_improvement',
-                   'request_selection',
-                   'reopt_and_improve_after_request_selection',
-                   'bundle_generation',
-                   'bidding',
-                   'winner_determination',
-                   ])
+        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_carrier_#013.csv",
+    )
+    df.fillna('None', inplace=True)
+    df.set_index(['rad', 'n', 'run', 'carrier_id_'] + solver_config, inplace=True)
     print_top_level_stats(df)
     bar_chart(df,
               title='',
               values='sum_profit',
-              category='time_window_management',
-              color='solution_algorithm',
-              facet_col='rad',
+              category='rad',
+              color=['solution_algorithm', 'request_selection'],
+              facet_col=None,
               facet_row='n',
               show=True,
               # width=700,

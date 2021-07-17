@@ -1,59 +1,63 @@
-import abc
 import logging.config
 import random
 from copy import deepcopy
+from typing import Union
 
 import src.cr_ahd.utility_module.utils as ut
 from src.cr_ahd.auction_module import auction as au
 from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
-from src.cr_ahd.auction_module import request_selection as rs, bundle_generation as bg, bidding as bd, \
-    winner_determination as wd
 from src.cr_ahd.routing_module import tour_construction as cns, tour_initialization as ini, metaheuristics as mh
 from src.cr_ahd.tw_management_module import tw_management as twm
 
 logger = logging.getLogger(__name__)
 
 
-class Solver(abc.ABC):
+class Solver:
     def __init__(self,
                  tour_construction: cns.PDPParallelInsertionConstruction,
                  tour_improvement: mh.PDPMetaHeuristic,
                  time_window_management: twm.TWManagement,
+                 auction: Union[au.Auction, bool]
                  ):
+        assert isinstance(auction, au.Auction) or auction is False
         self.tour_construction = tour_construction
         self.time_window_management = time_window_management
         self.tour_improvement = tour_improvement
+        self.auction = auction
 
     def execute(self, instance: it.PDPInstance, starting_solution: slt.CAHDSolution = None):
         """
         apply the concrete solution algorithm
         """
 
-        logger.info(
-            f'{instance.id_}: {self.__class__.__name__} & {self.time_window_management.__class__.__name__} Solving ...')
-
         if starting_solution is None:
             solution = slt.CAHDSolution(instance)
         else:
             solution = starting_solution
+
+        self.update_solution_solver_config(solution)
+
+        logger.info(
+            f'{instance.id_}: Solving {solution.solver_config}')
 
         random.seed(0)
 
         solution = self._acceptance_phase(instance, solution)
         # if self.tour_improvement:
         solution = self._improvement_phase(instance, solution)  # post-acceptance optimization
-        # if self.auction:
-        solution = self._auction_phase(instance, solution)
-
-        self.update_solution_solver_config(solution)
+        if self.auction:
+            solution = self._auction_phase(instance, solution)
 
         logger.info(
-            f'{instance.id_}: {self.__class__.__name__} & {self.time_window_management.__class__.__name__} Success!')
+            f'{instance.id_}: Success {solution.solver_config}')
 
         return solution
 
     def update_solution_solver_config(self, solution):
-        solution.solver_config['solution_algorithm'] = self.__class__.__name__
+        if self.auction:
+            solution.solver_config['solution_algorithm'] = 'CollaborativePlanning'
+        else:
+            solution.solver_config['solution_algorithm'] = 'IsolatedPlanning'
         solution.solver_config['tour_construction'] = self.tour_construction.__class__.__name__
         solution.solver_config['tour_improvement'] = self.tour_improvement.__class__.__name__
         solution.solver_config['time_window_management'] = self.time_window_management.__class__.__name__
@@ -86,7 +90,8 @@ class Solver(abc.ABC):
         return solution
 
     def _static_routing(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
-        raise RuntimeError('static routing is omitted atm since it does not yield improvements over the dynamic routes')
+        raise NotImplementedError('static routing is omitted atm since it does not yield improvements over the '
+                                  'dynamic routes or fails with infeasibility')
         solution = deepcopy(solution)
         solution.clear_carrier_routes()
 
@@ -94,8 +99,7 @@ class Solver(abc.ABC):
         ini.MaxCliqueTourInitialization().execute(instance, solution)
 
         # construct_static initial solution
-        # solution = cns.MinTimeShiftInsertion().construct_static(instance, solution)
-        cns.MinTravelDistanceInsertion().construct_static(instance, solution, carrier)
+        self.tour_construction.construct_static(instance, solution, carrier)
 
         ut.validate_solution(instance, solution)
         return solution
@@ -108,34 +112,8 @@ class Solver(abc.ABC):
         :param solution:
         :return:
         """
-        return solution
-
-
-class IsolatedPlanning(Solver):
-    pass
-
-
-class CollaborativePlanning(Solver):
-    """
-    TWM is done one request at a time, i.e. the way it's supposed to be done.
-    Only a single auction after the acceptance phase
-    """
-
-    def _auction_phase(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         solution = deepcopy(solution)
-        if instance.num_carriers > 1:  # not for centralized instances
-            au.Auction(
-                tour_construction=self.tour_construction,
-                tour_improvement=self.tour_improvement,
-                request_selection=rs.TemporalRangeCluster(),
-                bundle_generation=bg.GeneticAlgorithm(),
-                bidding=bd.DynamicReOptAndImprove(self.tour_construction, self.tour_improvement),
-                winner_determination=wd.MaxBidGurobiCAP1(),
-                reopt_and_improve_after_request_selection=True,
-            ).execute(
-                instance, solution
-            )
-
+        self.auction.execute(instance, solution)
         return solution
 
 

@@ -181,7 +181,7 @@ class PDPVariableNeighborhoodDescent(PDPMetaHeuristic):
         for carrier in carriers:
             k = 0
             while k < len(self.neighborhoods):
-                neighborhood = self.neighborhoods[k]()
+                neighborhood = self.neighborhoods[k]
                 all_moves = [move for move in neighborhood.feasible_move_generator(instance, solution, carrier)]
                 if any(all_moves):
                     best_move = min(all_moves, key=lambda x: x[0])

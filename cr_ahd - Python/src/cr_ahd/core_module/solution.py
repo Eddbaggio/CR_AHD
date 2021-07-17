@@ -1,3 +1,4 @@
+import datetime as dt
 import json
 from typing import List, Sequence
 
@@ -5,7 +6,6 @@ import numpy as np
 
 from src.cr_ahd.core_module import instance as it, tour as tr
 from src.cr_ahd.utility_module import utils as ut
-import datetime as dt
 
 
 class CAHDSolution:
@@ -34,7 +34,7 @@ class CAHDSolution:
             solution_algorithm=None,
             tour_construction=None,
             tour_improvement=None,
-            time_window_management = None,
+            time_window_management=None,
             time_window_offering=None,
             time_window_selection=None,
             auction_tour_construction=None,
