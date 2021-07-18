@@ -15,15 +15,18 @@ logger = logging.getLogger(__name__)
 
 
 class BundleSetGenerationBehavior(ABC):
+    def __init__(self, num_auction_bundles: int):
+        self.num_auction_bundles = num_auction_bundles
+
     def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool: Sequence, original_bundles):
         # random.seed(0)
-        bundle_set = self._generate_bundle_set(instance, solution, auction_pool, original_bundles)
+        auction_bundles = self._generate_auction_bundles(instance, solution, auction_pool, original_bundles)
         solution.bundle_generation = self.__class__.__name__
-        return bundle_set
+        return auction_bundles
 
     @abstractmethod
-    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool: Sequence,
-                             original_bundles):
+    def _generate_auction_bundles(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool: Sequence,
+                                  original_bundles):
         pass
 
 
@@ -33,9 +36,9 @@ class AllBundles(BundleSetGenerationBehavior):
     Does not include emtpy set.
     """
 
-    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool: Sequence,
-                             original_bundles):
-        return tuple(ut.power_set(auction_pool, False))  # todo GH decoding of a bundle pool!
+    def _generate_auction_bundles(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool: Sequence,
+                                  original_bundles):
+        return tuple(ut.power_set(range(len(auction_pool)), False))
 
 
 class RandomMaxKPartition(BundleSetGenerationBehavior):
@@ -43,21 +46,28 @@ class RandomMaxKPartition(BundleSetGenerationBehavior):
     creates a random partition of the submitted bundles with AT MOST as many subsets as there are carriers
     """
 
-    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool: Sequence,
-                             original_bundles):
-        bundles = ut.random_max_k_partition(auction_pool, max_k=instance.num_carriers)
-        return bundles  # todo GH decoding of a bundle pool!
+    def _generate_auction_bundles(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool: Sequence,
+                                  original_bundles):
+        bundles = []
+        num_bundles = 0
+        while num_bundles < self.num_auction_bundles - max(original_bundles)+1:
+            bundle = ut.random_max_k_partition(auction_pool, max_k=instance.num_carriers)
+            if bundle not in bundles:
+                bundles.append(bundle)
+                num_bundles += max(bundle)+1
+        bundles.append(original_bundles)
+        return bundles
 
 
-class KMeansBundles(BundleSetGenerationBehavior):
+class SingleKMeansBundle(BundleSetGenerationBehavior):
     """
     creates a k-means partitions of the submitted requests. generates exactly as many clusters as there are carriers.
 
     :return
     """
 
-    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool: Iterable,
-                             original_bundles):
+    def _generate_auction_bundles(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool: Iterable,
+                                  original_bundles):
         request_midpoints = [ut.midpoint(instance, *instance.pickup_delivery_pair(sr)) for sr in auction_pool]
         # k_means = KMeans(n_clusters=instance.num_carriers, random_state=0).fit(request_midpoints)
         k_means = KMeans(n_clusters=instance.num_carriers).fit(request_midpoints)
@@ -65,10 +75,10 @@ class KMeansBundles(BundleSetGenerationBehavior):
 
 
 class GeneticAlgorithm(BundleSetGenerationBehavior):
-    def _generate_bundle_set(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool: Sequence,
-                             original_bundles: List[int]):
+    def _generate_auction_bundles(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool: Sequence,
+                                  original_bundles: List[int]):
         # parameters
-        population_size = 100
+        population_size = 500
         # to ensure a feasible candidate solution to the WDP
         num_generations = 100
         mutation_rate = 0.5
@@ -118,8 +128,7 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
             generation_counter += 1
 
         # select the best bundles
-        auction_pool_size = ut.AUCTION_POOL_SIZE
-        limited_bundle_pool = self.generate_bundle_pool(auction_pool, fitness, population, auction_pool_size)
+        limited_bundle_pool = self.generate_bundle_pool(auction_pool, fitness, population, self.num_auction_bundles)
 
         # add each of the original bundles if it is not contained yet - this cannot be infeasible
         # this might exceed the auction_pool_size even more than self.generate_bundle_pool
@@ -133,8 +142,7 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
         return limited_bundle_pool
 
     @staticmethod
-    def generate_bundle_pool(auction_pool, fitness, population: Sequence[Sequence[int]],
-                             pool_size=ut.AUCTION_POOL_SIZE):
+    def generate_bundle_pool(auction_pool, fitness, population: Sequence[Sequence[int]], pool_size):
         """
         create the set of bundles that is offered in the auction (carrier must solve routing to place bids on these)
         pool_size may be exceeded to guarantee that ALL bundles of a candidate solution are in the pool (either all or
@@ -190,7 +198,7 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
         fitness = []
 
         # initialize at least one k-means bundle that is also likely to be feasible
-        k_means_individual = list(KMeansBundles().execute(instance, solution, auction_pool, None))
+        k_means_individual = list(SingleKMeansBundle(self.num_auction_bundles).execute(instance, solution, auction_pool, None))
         self._normalize_individual(k_means_individual)
         if k_means_individual not in population:
             population.append(k_means_individual)

@@ -25,9 +25,10 @@ solver_config = ['solution_algorithm',
                  'time_window_selection',
                  'auction_tour_construction',
                  'auction_tour_improvement',
+                 # 'num_submitted_requests,'
                  'request_selection',
-                 'reopt_and_improve_after_request_selection',
                  'bundle_generation',
+                 'num_auction_bundles',
                  'bidding',
                  'winner_determination',
                  ]
@@ -72,7 +73,7 @@ def bar_chart(df: pd.DataFrame,
     :return:
     """
 
-    df = drop_single_value_index(df)
+    df = drop_single_value_index(df, ut.flatten([category, color, facet_row, facet_col]))
     splitters = dict(category=category, color=color, facet_row=facet_row, facet_col=facet_col, )
 
     agg_dict = {col: sum for col in df.columns}
@@ -180,9 +181,14 @@ def bar_chart(df: pd.DataFrame,
         fig.write_html(html_path, )
 
 
-def drop_single_value_index(df: pd.DataFrame):
+def drop_single_value_index(df: pd.DataFrame, keep: Sequence):
     """drops all index levels that contain the same unique value for all records OR only one unique value and NaN"""
+    if len(df) == 1:
+        warnings.warn('Dataframe has only a single row, thus all indices will only have a single value and will '
+                      'therefore be dropped')
     for idx_level in df.index.names:
+        if idx_level in keep:
+            continue
         if len(df.index.unique(idx_level).difference([np.NaN, float('nan'), None, 'None'])) <= 1:
             df = df.droplevel(idx_level, axis=0)
     return df
@@ -198,7 +204,8 @@ def merge_index_levels(df: pd.DataFrame, levels: Sequence):
 
 
 def print_top_level_stats(carrier_df: pd.DataFrame):
-    carrier_df = drop_single_value_index(carrier_df)
+    if len(carrier_df) > 1:
+        carrier_df = drop_single_value_index(carrier_df, ['rad', 'n', 'run', 'carrier_id_', 'solution_algorithm'])
 
     with pd.option_context('display.max_rows', None, 'display.max_columns', None, 'display.width', 0):
 
@@ -242,8 +249,8 @@ def print_top_level_stats(carrier_df: pd.DataFrame):
 
         # collaboration gain
         print('=============/ collaboration gains /=============')
-        for name1, group1 in solution_df.groupby(['solution_algorithm', 'request_selection'], dropna=False):
-            for name2, group2 in solution_df.groupby(['solution_algorithm', 'request_selection'], dropna=False):
+        for name1, group1 in solution_df.groupby(['solution_algorithm', 'num_auction_bundles'], dropna=False):
+            for name2, group2 in solution_df.groupby(['solution_algorithm', 'num_auction_bundles'], dropna=False):
                 if name1 == name2:
                     continue
                 print(f"{name1}/{name2}")
@@ -265,22 +272,22 @@ def print_top_level_stats(carrier_df: pd.DataFrame):
 if __name__ == '__main__':
     df = pd.read_csv(
         "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home "
-        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_carrier_#013.csv",
+        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_carrier_#022.csv",
     )
     df.fillna('None', inplace=True)
     df.set_index(['rad', 'n', 'run', 'carrier_id_'] + solver_config, inplace=True)
-    print_top_level_stats(df)
+    # print_top_level_stats(df)
     bar_chart(df,
               title='',
               values='sum_profit',
               category='rad',
-              color=['solution_algorithm', 'request_selection'],
+              color=['solution_algorithm', 'num_auction_bundles'],
               facet_col=None,
               facet_row='n',
               show=True,
               # width=700,
               # height=450,
-              html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix()
+              # html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix()
               )
     # boxplot(df,
     #         show=True,

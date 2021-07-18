@@ -90,12 +90,7 @@ class Auction(ABC):
                 self.tour_construction.construct_dynamic(instance, solution, carrier)
         self.tour_improvement.execute(instance, solution)
 
-        solution.solver_config['auction_tour_construction'] = self.tour_construction.__class__.__name__
-        solution.solver_config['auction_tour_improvement'] = self.tour_improvement.__class__.__name__
-        solution.solver_config['request_selection'] = self.request_selection.__class__.__name__
-        solution.solver_config['bundle_generation'] = self.bundle_generation.__class__.__name__
-        solution.solver_config['bidding'] = self.bidding.__class__.__name__
-        solution.solver_config['winner_determination'] = self.winner_determination.__class__.__name__
+
         pass
 
     @staticmethod

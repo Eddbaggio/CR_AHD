@@ -8,7 +8,7 @@ import time
 import datetime as dt
 from collections import namedtuple
 from pathlib import Path
-from typing import List, Sequence
+from typing import List, Sequence, Tuple
 
 import tqdm
 from tqdm import tqdm, trange
@@ -201,10 +201,10 @@ def power_set(iterable, include_empty_set=True):
     return itertools.chain.from_iterable(itertools.combinations(s, r) for r in rng)
 
 
-def flatten(sequence: Sequence):
+def flatten(sequence: (List, Tuple)):
     if not sequence:
         return sequence
-    if isinstance(sequence[0], Sequence):
+    if isinstance(sequence[0], (List, Tuple)):
         return flatten(sequence[0]) + flatten(sequence[1:])
     return sequence[:1] + flatten(sequence[1:])
 
@@ -260,6 +260,7 @@ def random_max_k_partition(ls, max_k) -> Sequence[Sequence[int]]:
     indices.extend([random.choice(list(range(k))) for _ in range(len(ls) - k)])
     # shuffle the indices into a random order
     random.shuffle(indices)
+    return indices
     # construct and return the random subset: sort the elements by
     # which subset they will be assigned to, and group them into sets
     partitions = []
@@ -412,5 +413,5 @@ TW_LENGTH: dt.timedelta = dt.timedelta(hours=2)
 ALL_TW = [TimeWindow(e, min(e + TW_LENGTH, END_TIME)) for e in datetime_range(START_TIME, END_TIME, freq=TW_LENGTH)]
 TIME_HORIZON = TimeWindow(START_TIME, END_TIME)
 SPEED_KMH = 60  # vehicle speed (set to 60 to treat distance = time)
-NUM_REQUESTS_TO_SUBMIT = 4  # either relative (between 0 and 1) OR an absolute number <= DYNAMIC_CYCLE_TIME
-AUCTION_POOL_SIZE = 100  # 50, 100, 200, 300, 500
+# NUM_REQUESTS_TO_SUBMIT = 4  # either relative (between 0 and 1) OR an absolute number <= DYNAMIC_CYCLE_TIME  # deprecated
+# NUM_AUCTION_BUNDLES = 100  # 50, 100, 200, 300, 500  # deprecated

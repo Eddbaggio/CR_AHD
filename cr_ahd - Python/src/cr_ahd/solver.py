@@ -35,7 +35,7 @@ class Solver:
         else:
             solution = starting_solution
 
-        self.update_solution_solver_config(solution)
+        self.update_solution_solver_config(solution)  # the auction stuff is not included yet
 
         logger.info(
             f'{instance.id_}: Solving {solution.solver_config}')
@@ -56,8 +56,16 @@ class Solver:
     def update_solution_solver_config(self, solution):
         if self.auction:
             solution.solver_config['solution_algorithm'] = 'CollaborativePlanning'
+            solution.solver_config['auction_tour_construction'] = self.tour_construction.__class__.__name__
+            solution.solver_config['auction_tour_improvement'] = self.tour_improvement.__class__.__name__
+            solution.solver_config['request_selection'] = self.auction.request_selection.__class__.__name__
+            solution.solver_config['bundle_generation'] = self.auction.bundle_generation.__class__.__name__
+            solution.solver_config['num_auction_bundles'] = self.auction.bundle_generation.num_auction_bundles
+            solution.solver_config['bidding'] = self.auction.bidding.__class__.__name__
+            solution.solver_config['winner_determination'] = self.auction.winner_determination.__class__.__name__
         else:
             solution.solver_config['solution_algorithm'] = 'IsolatedPlanning'
+
         solution.solver_config['tour_construction'] = self.tour_construction.__class__.__name__
         solution.solver_config['tour_improvement'] = self.tour_improvement.__class__.__name__
         solution.solver_config['time_window_management'] = self.time_window_management.__class__.__name__
@@ -65,6 +73,7 @@ class Solver:
             'time_window_offering'] = self.time_window_management.time_window_offering.__class__.__name__
         solution.solver_config[
             'time_window_selection'] = self.time_window_management.time_window_selection.__class__.__name__
+
 
     def _acceptance_phase(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         solution = deepcopy(solution)

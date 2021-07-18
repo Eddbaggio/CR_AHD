@@ -1,6 +1,7 @@
 import logging
 import logging.config
 import multiprocessing
+from copy import deepcopy
 from pathlib import Path
 from typing import List
 
@@ -38,42 +39,36 @@ def execute_all(instance: it.PDPInstance, plot=False):
         for tour_improvement in tour_improvements[:1]:
             for tw_management in time_window_managements[:1]:
 
-                auctions = [
-                    False,  # for the Isolated Planning, there is no auction
-                    au.Auction(
-                        tour_construction,
-                        tour_improvement,
-                        rs.SpatialCluster(),
-                        bg.GeneticAlgorithm(),
-                        bd.DynamicReOptAndImprove(tour_construction, tour_improvement),
-                        wd.MaxBidGurobiCAP1(),
-                    ),
-                    au.Auction(
-                        tour_construction,
-                        tour_improvement,
-                        rs.TemporalRangeCluster(),
-                        bg.GeneticAlgorithm(),
-                        bd.DynamicReOptAndImprove(tour_construction, tour_improvement),
-                        wd.MaxBidGurobiCAP1(),
-                    )
-                ]
-                for auction in auctions:
-                    isolated_planning_starting_solution = None
-                    try:
-                        solver = slv.Solver(tour_construction, tour_improvement, tw_management, auction)
-                        solution = solver.execute(instance, isolated_planning_starting_solution)
-                        if auction is False:
-                            isolated_planning_starting_solution = solution
+                # Isolated Planning
+                solver = slv.Solver(tour_construction, tour_improvement, tw_management, False)
+                solution = solver.execute(instance)
+                isolated_planning_starting_solution = solution
+                solution.write_to_json()
+                solutions.append(deepcopy(solution))
 
-                        solution.write_to_json()
-                        solutions.append(solution)
+                # Collaborative Planning
+                for num_auction_bundles in [100]:  # [50, 100, 200, 300, 500]
 
-                    except Exception as e:
-                        # raise e
-                        logger.error(f'{e}\nFailed on instance {instance} with solver {solver.__name__}')
-                        solution = slt.CAHDSolution(instance)  # create an empty solution for failed instances?!
-                        solution.write_to_json()
-                        solutions.append(solution)
+                    auction = au.Auction(tour_construction,
+                                         tour_improvement,
+                                         rs.SpatialCluster(),
+                                         bg.GeneticAlgorithm(num_auction_bundles),
+                                         bd.DynamicReOptAndImprove(tour_construction, tour_improvement),
+                                         wd.MaxBidGurobiCAP1(),
+                                         )
+
+                    solver = slv.Solver(tour_construction, tour_improvement, tw_management, auction)
+                    solution = solver.execute(instance, isolated_planning_starting_solution)
+                    solution.write_to_json()
+                    solutions.append(deepcopy(solution))
+
+                    # TODO need to catch exceptions to avoid failures in longer experiments
+                    # except Exception as e:
+                    #     # raise e
+                    #     logger.error(f'{e}\nFailed on instance {instance} with solver {solver.__name__}')
+                    #     solution = slt.CAHDSolution(instance)  # create an empty solution for failed instances?!
+                    #     solution.write_to_json()
+                    #     solutions.append(solution)
 
     return solutions
 
@@ -183,17 +178,17 @@ if __name__ == '__main__':
     paths = sorted(
         list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
         key=ut.natural_sort_key)
-    paths = paths[:]
+    paths = paths[60:66]
 
     # solutions = m_solve_single_thread(paths, plot=False)
     solutions = m_solve_multi_thread(paths)
 
     df = write_solution_summary_to_multiindex_df(solutions, 'carrier')
     ev.bar_chart(df,
-                 # title='',
+                 title='4 requests selected',
                  values='sum_profit',
-                 category='request_selection',
-                 color=None,
+                 category='run',
+                 color=['solution_algorithm', 'num_auction_bundles'],
                  facet_col='rad',
                  facet_row='n',
                  show=True,
