@@ -78,7 +78,7 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
     def _generate_auction_bundles(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool: Sequence,
                                   original_bundles: List[int]):
         # parameters
-        population_size = 500
+        population_size = 250
         # to ensure a feasible candidate solution to the WDP
         num_generations = 100
         mutation_rate = 0.5
@@ -115,7 +115,7 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
                     continue
 
                 # fitness evaluation
-                offspring_fitness = bv.GHProxyValuation(instance, solution, offspring, auction_pool)
+                offspring_fitness = bv.gh_proxy_valuation(instance, solution, offspring, auction_pool)
 
                 # add offspring to the new gen and increase population size counter
                 new_population.append(offspring)
@@ -202,7 +202,7 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
         self._normalize_individual(k_means_individual)
         if k_means_individual not in population:
             population.append(k_means_individual)
-            fitness.append(bv.GHProxyValuation(instance, solution, k_means_individual, auction_pool))
+            fitness.append(bv.gh_proxy_valuation(instance, solution, k_means_individual, auction_pool))
 
         # fill the rest of the population with random individuals
         i = 1
@@ -213,7 +213,7 @@ class GeneticAlgorithm(BundleSetGenerationBehavior):
                 continue
             else:
                 population.append(individual)
-                fitness.append(bv.GHProxyValuation(instance, solution, individual, auction_pool))
+                fitness.append(bv.gh_proxy_valuation(instance, solution, individual, auction_pool))
                 i += 1
 
         return fitness, population

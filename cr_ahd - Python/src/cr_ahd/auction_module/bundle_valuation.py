@@ -116,8 +116,8 @@ def bundle_total_travel_distance_proxy(instance: it.PDPInstance,
                                        bundle: Sequence[int],
                                        ):
     """
-    estimate the total travel distance required to visit all requests in the bundle. Ignores all constraints (time
-    windows, vehicle capacity, max tour length, ...)
+    VERY rough estimate for the total travel distance required to visit all requests in the bundle. Ignores all
+    constraints (time windows, vehicle capacity, max tour length, ...)
     """
     routing_sequence = []
     for request in bundle:
@@ -218,11 +218,11 @@ def bundle_total_travel_distance(instance: it.PDPInstance,
     return sum(tour_dict['travel_distance_sequence'])
 
 
-def GHProxyValuation(instance: it.PDPInstance,
-                     solution: slt.CAHDSolution,
-                     candidate_solution: Sequence[int],
-                     auction_pool: Sequence[int]
-                     ):
+def gh_proxy_valuation(instance: it.PDPInstance,
+                       solution: slt.CAHDSolution,
+                       candidate_solution: Sequence[int],
+                       auction_pool: Sequence[int]
+                       ):
     """
 
     :param auction_pool:

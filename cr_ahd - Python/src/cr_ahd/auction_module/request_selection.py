@@ -2,11 +2,14 @@ import datetime as dt
 import itertools
 import logging
 from abc import ABC, abstractmethod
+from math import comb
+from typing import Sequence, Iterable
 
 import numpy as np
 
 from src.cr_ahd.core_module import instance as it, solution as slt
 from src.cr_ahd.routing_module import tour_construction as cns
+from src.cr_ahd.utility_module import utils as ut
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +27,11 @@ def _abs_num_requests(carrier_: slt.AHDSolution, num_requests) -> int:
 
 
 class RequestSelectionBehavior(ABC):
+    def __init__(self, num_submitted_requests: int):
+        self.num_submitted_requests = num_submitted_requests
+
     @abstractmethod
-    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, num_requests):
+    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         pass
 
 
@@ -38,15 +44,12 @@ class RequestSelectionBehaviorIndividual(RequestSelectionBehavior, ABC):
     select (for each carrier) a set of bundles based on their individual evaluation of some quality criterion
     """
 
-    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, num_requests):
+    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         """
         select a set of requests based on the concrete selection behavior. will retract the requests from the carrier
         and return
 
         :param solution:
-        :param num_requests: the number of requests each carrier shall submit. If fractional, will use the corresponding
-         percentage of requests assigned to that carrier. If integer, will use the absolut amount of requests. If not
-         enough requests are available, will submit as many as are available.
         :param instance:
         :return: the auction pool as a list of request indices and a default bundling, i.e. a list of the carriers that
         originally submitted the request.
@@ -54,7 +57,7 @@ class RequestSelectionBehaviorIndividual(RequestSelectionBehavior, ABC):
         auction_pool = []
         original_bundles = []
         for carrier in range(instance.num_carriers):
-            k = _abs_num_requests(solution.carriers[carrier], num_requests)
+            k = _abs_num_requests(solution.carriers[carrier], self.num_submitted_requests)
             valuations = self._evaluate_requests(instance, solution, carrier)
             # pick the worst k evaluated requests (from ascending order)
             selected = [r for _, r in sorted(zip(valuations, solution.carriers[carrier].unrouted_requests))][:k]
@@ -150,13 +153,13 @@ class RequestSelectionBehaviorCluster(RequestSelectionBehavior, ABC):
     proximity)
     """
 
-    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, num_requests):
+    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         auction_pool = []
         original_bundles = []
 
         for carrier in range(instance.num_carriers):
             carrier_ = solution.carriers[carrier]
-            k = _abs_num_requests(carrier_, num_requests)
+            k = _abs_num_requests(carrier_, self.num_submitted_requests)
 
             # make the clusters that shall be evaluated
             clusters = self._create_clusters(instance, solution, carrier, k)
@@ -242,12 +245,60 @@ class TemporalRangeCluster(RequestSelectionBehaviorCluster):
         """
         the min-max range of the delivery time windows of all requests inside the cluster
         """
-        delivery_vertices = [instance.pickup_delivery_pair(request)[1] for request in cluster]
+        cluster_delivery_vertices = [instance.pickup_delivery_pair(request)[1] for request in cluster]
 
-        cluster_tw_open = [solution.tw_open[delivery] for delivery in delivery_vertices]
-        cluster_tw_close = [solution.tw_close[delivery] for delivery in delivery_vertices]
+        cluster_tw_open = [solution.tw_open[delivery] for delivery in cluster_delivery_vertices]
+        cluster_tw_close = [solution.tw_close[delivery] for delivery in cluster_delivery_vertices]
         min_open: dt.datetime = min(cluster_tw_open)
         max_close: dt.datetime = max(cluster_tw_close)
         # negative value: low temporal range means high valuation
         evaluation = - (max_close - min_open).total_seconds()
         return evaluation
+
+
+class SpatioTemporalCluster(RequestSelectionBehaviorCluster):
+    def _create_clusters(self, instance, solution, carrier, k):
+        """
+        create all possible bundles of size k
+        """
+        return itertools.combinations(solution.carriers[carrier].accepted_requests, k)
+
+    def _evaluate_cluster(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, cluster: Sequence):
+        """a weighted sum of spatial and temporal measures"""
+        # spatial
+        spatial_evaluation = SpatialCluster(self.num_submitted_requests)._evaluate_cluster(instance, solution, carrier,
+                                                                                           cluster)
+        # normalize to range [0, 1]
+        max_pickup_delivery_dist = 0
+        min_pickup_delivery_dist = float('inf')
+        for request1 in solution.carriers[carrier].accepted_requests[:-1]:
+            for request2 in solution.carriers[carrier].accepted_requests[1:]:
+                d = instance.distance(instance.pickup_delivery_pair(request1), instance.pickup_delivery_pair(request2))
+                if d > max_pickup_delivery_dist:
+                    max_pickup_delivery_dist = d
+                if d < min_pickup_delivery_dist:
+                    min_pickup_delivery_dist = d
+
+        min_spatial = comb(len(cluster), 2) * (-min_pickup_delivery_dist)
+        max_spatial = comb(len(cluster), 2) * (-max_pickup_delivery_dist)
+        spatial_evaluation = -(spatial_evaluation - min_spatial) / (max_spatial - min_spatial)
+
+        # temporal range
+        temporal_evaluation = TemporalRangeCluster(self.num_submitted_requests)._evaluate_cluster(instance, solution,
+                                                                                                  carrier, cluster)
+        # normalize to range [0, 1]
+        min_temporal_range = ut.TW_LENGTH.total_seconds()
+        max_temporal_range = (ut.TIME_HORIZON.close - ut.TIME_HORIZON.open).total_seconds()
+
+        temporal_evaluation = -(temporal_evaluation - len(cluster) * (-min_temporal_range)) / (
+                len(cluster) * (-max_temporal_range) - len(cluster) * (-min_temporal_range))
+
+        return 0.5 * spatial_evaluation + 0.5 * temporal_evaluation
+
+# class TimeShiftCluster(RequestSelectionBehaviorCluster):
+#     """Selects the cluster that yields the highest temporal flexibility when removed"""
+#     def _create_clusters(self, instance, solution, carrier, k):
+#         """
+#         create all possible bundles of size k
+#         """
+#         return itertools.combinations(solution.carriers[carrier].accepted_requests, k)

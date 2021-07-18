@@ -47,8 +47,7 @@ class Auction(ABC):
     def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         logger.debug(f'running auction {self.__class__.__name__}')
         # Request Selection
-        auction_pool_requests, original_bundles_indices = self.request_selection.execute(instance, solution,
-                                                                                         ut.NUM_REQUESTS_TO_SUBMIT)
+        auction_pool_requests, original_bundles_indices = self.request_selection.execute(instance, solution)
         if auction_pool_requests:
             logger.debug(f'requests {auction_pool_requests} have been submitted to the auction pool')
 

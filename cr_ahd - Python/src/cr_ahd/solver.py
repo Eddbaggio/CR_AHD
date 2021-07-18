@@ -58,6 +58,7 @@ class Solver:
             solution.solver_config['solution_algorithm'] = 'CollaborativePlanning'
             solution.solver_config['auction_tour_construction'] = self.tour_construction.__class__.__name__
             solution.solver_config['auction_tour_improvement'] = self.tour_improvement.__class__.__name__
+            solution.solver_config['num_submitted_requests'] = self.auction.request_selection.num_submitted_requests
             solution.solver_config['request_selection'] = self.auction.request_selection.__class__.__name__
             solution.solver_config['bundle_generation'] = self.auction.bundle_generation.__class__.__name__
             solution.solver_config['num_auction_bundles'] = self.auction.bundle_generation.num_auction_bundles

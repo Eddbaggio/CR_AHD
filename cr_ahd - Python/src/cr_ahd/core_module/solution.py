@@ -39,7 +39,7 @@ class CAHDSolution:
             time_window_selection=None,
             auction_tour_construction=None,
             auction_tour_improvement=None,
-            # num_submitted_requests=None,
+            num_submitted_requests=None,
             request_selection=None,
             num_auction_bundles=None,
             bundle_generation=None,

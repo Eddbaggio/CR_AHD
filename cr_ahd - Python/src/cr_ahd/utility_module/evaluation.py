@@ -25,7 +25,7 @@ solver_config = ['solution_algorithm',
                  'time_window_selection',
                  'auction_tour_construction',
                  'auction_tour_improvement',
-                 # 'num_submitted_requests,'
+                 'num_submitted_requests',
                  'request_selection',
                  'bundle_generation',
                  'num_auction_bundles',
@@ -272,7 +272,7 @@ def print_top_level_stats(carrier_df: pd.DataFrame):
 if __name__ == '__main__':
     df = pd.read_csv(
         "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home "
-        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_carrier_#022.csv",
+        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_carrier_#029.csv",
     )
     df.fillna('None', inplace=True)
     df.set_index(['rad', 'n', 'run', 'carrier_id_'] + solver_config, inplace=True)
@@ -281,7 +281,7 @@ if __name__ == '__main__':
               title='',
               values='sum_profit',
               category='rad',
-              color=['solution_algorithm', 'num_auction_bundles'],
+              color=['solution_algorithm', 'request_selection'],
               facet_col=None,
               facet_row='n',
               show=True,
