@@ -3,7 +3,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Tuple, Union
 
-import src.cr_ahd.utility_module.utils as ut
+from  src.cr_ahd.utility_module import utils as ut, profiling as pr
 from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
 
 logger = logging.getLogger(__name__)
@@ -169,7 +169,7 @@ class MinTravelDistanceInsertion(PDPParallelInsertionConstruction):
     For each request, identify its cheapest insertion based on distance delta. Compare the collected insertion costs
     and insert the cheapest over all requests.
     """
-
+    @pr.timing
     def best_insertion_for_request_in_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_,
                                            request: int, check_feasibility=True):
         pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
@@ -201,6 +201,7 @@ class MinTimeShiftInsertion(PDPParallelInsertionConstruction):
     construction heuristic for solving the pickup and delivery problem with time windows. European Journal of
     Operational Research, 175(2), 672–687. https://doi.org/10.1016/j.ejor.2005.05.012 """
 
+    @pr.timing
     def best_insertion_for_request_in_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_,
                                            request: int, check_feasibility=True) -> Tuple[float, int, int]:
         """Find the insertions for pickup and delivery for a given tour that have the best C value
@@ -278,6 +279,7 @@ class TimeShiftRegretInsertion(PDPParallelInsertionConstruction):
         else:
             return best_delta, best_tour, best_pickup_pos, best_delivery_pos
 
+    @pr.timing
     def best_insertion_for_request_in_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_,
                                            request: int, check_feasibility=True) -> Tuple[float, int, int]:
         return MinTimeShiftInsertion().best_insertion_for_request_in_tour(instance, solution, tour_, request,
@@ -291,6 +293,7 @@ class TravelDistanceRegretInsertion(PDPParallelInsertionConstruction):
         # steal the regret implementation from time shift
         return TimeShiftRegretInsertion().best_insertion_for_request(instance, solution, carrier, request)
 
+    @pr.timing
     def best_insertion_for_request_in_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_,
                                            request: int, check_feasibility=True) -> Tuple[float, int, int]:
         return MinTravelDistanceInsertion().best_insertion_for_request_in_tour(instance, solution, tour_, request,

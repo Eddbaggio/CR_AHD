@@ -40,8 +40,9 @@ class BundlePoolGenerationBehavior(ABC):
         self.num_auction_bundles = num_auction_bundles
         self.parameters = kwargs
 
-    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_request_pool: Sequence[int],
-                original_bundling_labels: Sequence[int]):
+    def execute_bundle_pool_generation(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
+                                       auction_request_pool: Sequence[int],
+                                       original_bundling_labels: Sequence[int]):
         # random.seed(0)
         auction_bundle_pool = self._generate_auction_bundles(instance, solution, auction_request_pool,
                                                              original_bundling_labels)
@@ -214,11 +215,11 @@ class GeneticAlgorithm(BundlePoolGenerationBehavior):
 
         return bundle_pool
 
-    def generate_offspring(self, instance, solution, auction_pool, parent1, parent2, mutation_rate):
+    def generate_offspring(self, instance, solution, auction_request_pool, parent1, parent2, mutation_rate):
         """
         :param instance:
         :param solution:
-        :param auction_pool:
+        :param auction_request_pool:
         :param parent1:
         :param parent2:
         :param mutation_rate:
@@ -226,7 +227,10 @@ class GeneticAlgorithm(BundlePoolGenerationBehavior):
         """
         # crossover
         crossover_func: Callable = random.choice([self._crossover_uniform, self._crossover_geo])
-        offspring: List[int] = crossover_func(instance, solution, auction_pool, parent1, parent2)
+        offspring: List[int] = crossover_func(instance, solution, auction_request_pool, parent1, parent2)
+        # normalization IN PLACE
+        self._normalize_individual(offspring)
+
         # mutation
         if random.random() <= mutation_rate:
             mutation_func: Callable = random.choice(
@@ -234,11 +238,12 @@ class GeneticAlgorithm(BundlePoolGenerationBehavior):
                     self._mutation_move,
                     self._mutation_create,
                     self._mutation_join,
-                    # self._mutation_shift
+                    self._mutation_shift
                 ])
-            mutation_func(instance, solution, offspring)
+            mutation_func(instance, solution, offspring, auction_request_pool)
         # normalization IN PLACE
         self._normalize_individual(offspring)
+
         return offspring
 
     def initialize_population(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool: Sequence,
@@ -261,7 +266,8 @@ class GeneticAlgorithm(BundlePoolGenerationBehavior):
 
         # initialize at least one k-means bundle that is also likely to be feasible
         k_means_individual = list(
-            SingleKMeansBundle(self.num_auction_bundles).execute(instance, solution, auction_pool, None))
+            SingleKMeansBundle(self.num_auction_bundles).execute_bundle_pool_generation(instance, solution,
+                                                                                        auction_pool, None))
         self._normalize_individual(k_means_individual)
         if k_means_individual not in population:
             population.append(k_means_individual)
@@ -311,7 +317,8 @@ class GeneticAlgorithm(BundlePoolGenerationBehavior):
         return parents
 
     @staticmethod
-    def _crossover_uniform(instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool, parent1, parent2):
+    def _crossover_uniform(instance: it.PDPInstance, solution: slt.CAHDSolution, auction_request_pool, parent1,
+                           parent2):
         """
         For each request, the corresponding bundle is randomly chosen from parent A or B. This corresponds to the
         uniform crossover of Michalewicz (1996), where only one child is produced.
@@ -322,7 +329,7 @@ class GeneticAlgorithm(BundlePoolGenerationBehavior):
         return offspring
 
     @staticmethod
-    def _crossover_geo(instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool, parent1, parent2):
+    def _crossover_geo(instance: it.PDPInstance, solution: slt.CAHDSolution, auction_request_pool, parent1, parent2):
         """
         In this operator, we try to keep potentially good parts of existing bundles by combining the parents using
         geographic information. First, we calculate the center of each request, which is the midpoint between pickup
@@ -338,7 +345,7 @@ class GeneticAlgorithm(BundlePoolGenerationBehavior):
         min_y = min(instance.y_coords)
         max_y = max(instance.y_coords)
 
-        for i, request in enumerate(auction_pool):
+        for i, request in enumerate(auction_request_pool):
             pickup, delivery = instance.pickup_delivery_pair(request)
 
             # center of each request = midpoint between pickup and delivery
@@ -368,7 +375,8 @@ class GeneticAlgorithm(BundlePoolGenerationBehavior):
         return offspring
 
     @staticmethod
-    def _mutation_move(instance: it.PDPInstance, solution: slt.CAHDSolution, offspring: List[int]):
+    def _mutation_move(instance: it.PDPInstance, solution: slt.CAHDSolution, offspring: List[int],
+                       auction_request_pool: Sequence[int]):
         """
         A random number of randomly chosen positions is changed. However, the number of available bundles is not
         increased.
@@ -381,7 +389,8 @@ class GeneticAlgorithm(BundlePoolGenerationBehavior):
         pass
 
     @staticmethod
-    def _mutation_create(instance: it.PDPInstance, solution: slt.CAHDSolution, offspring: List[int]):
+    def _mutation_create(instance: it.PDPInstance, solution: slt.CAHDSolution, offspring: List[int],
+                         auction_request_pool: Sequence[int]):
         """
         A new bundle is created. We randomly chose one request and assign it to the new bundle. If by this the
         maximum number of bundles is exceeded, i.e., if there are more bundles than carriers (see Sect. 4),
@@ -400,7 +409,8 @@ class GeneticAlgorithm(BundlePoolGenerationBehavior):
         pass
 
     @staticmethod
-    def _mutation_join(instance: it.PDPInstance, solution: slt.CAHDSolution, offspring: List[int]):
+    def _mutation_join(instance: it.PDPInstance, solution: slt.CAHDSolution, offspring: List[int],
+                       auction_request_pool: Sequence[int]):
         """
         Two randomly chosen bundles are merged. If the offspring has only a single bundle, nothing happens
         """
@@ -413,11 +423,31 @@ class GeneticAlgorithm(BundlePoolGenerationBehavior):
         pass
 
     @staticmethod
-    def _mutation_shift(instance: it.PDPInstance, solution: slt.CAHDSolution, offspring: List[int]):
+    def _mutation_shift(instance: it.PDPInstance, solution: slt.CAHDSolution, offspring: List[int],
+                        auction_request_pool: Sequence[int]):
         """
         for each of the given bundles in the candidate solution, the centroid is calculated. Then, requests are
         assigned to bundles according to their closeness to the bundle’s centroids.
         """
+        bundles = ut.indices_to_nested_lists(offspring, auction_request_pool)
+        centroids = []
+        for bundle in bundles:
+            direct_travel_dist = bv.bundle_direct_travel_dist(instance, bundle)
+            centroid = bv.bundle_centroid(instance, bundle, direct_travel_dist)
+            centroids.append(centroid)
+
+        for i, request in enumerate(auction_request_pool):
+            midpoint = ut.midpoint(instance, *instance.pickup_delivery_pair(request))
+
+            min_distance = float('inf')
+            closest_centroid = None
+            for c, centroid in enumerate(centroids):
+                distance = ut.euclidean_distance(*midpoint, *centroid)
+                if distance < min_distance:
+                    min_distance = distance
+                    closest_centroid = c
+
+            offspring[i] = closest_centroid
 
         pass
 

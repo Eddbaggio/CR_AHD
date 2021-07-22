@@ -125,7 +125,7 @@ class Solver:
         :return:
         """
         solution = deepcopy(solution)
-        self.auction.execute(instance, solution)
+        self.auction.execute_auction(instance, solution)
         return solution
 
 

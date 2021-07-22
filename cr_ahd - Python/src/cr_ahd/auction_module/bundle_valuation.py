@@ -3,7 +3,7 @@ import random
 from abc import ABC, abstractmethod
 from math import ceil
 from typing import Sequence, Tuple
-
+from typing import Iterable
 import numpy as np
 from scipy.spatial.distance import squareform, pdist
 

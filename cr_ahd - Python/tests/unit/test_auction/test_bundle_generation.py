@@ -10,14 +10,14 @@ from src.cr_ahd.utility_module.utils import  Coordinates
 def test_random_bundle_set_generation(submitted_requests_random_15):
     """cannot actually be tested since it's random"""
     distance_matrix = make_travel_dist_matrix(flatten_dict_of_lists(submitted_requests_random_15))
-    bundle_set = bg.RandomMaxKPartition(distance_matrix).execute(submitted_requests_random_15,,
+    bundle_set = bg.RandomMaxKPartition(distance_matrix).execute_bundle_pool_generation(submitted_requests_random_15,,
     assert len(bundle_set) <= len(submitted_requests_random_15)
 
 
 def test_k_means_bundle_set_generation(submitted_requests_a):
     """"""
     distance_matrix = make_travel_dist_matrix(flatten_dict_of_lists(submitted_requests_a))
-    bundle_set = bg.SingleKMeansBundle(distance_matrix).execute(submitted_requests_a,,
+    bundle_set = bg.SingleKMeansBundle(distance_matrix).execute_bundle_pool_generation(submitted_requests_a,,
                  bundle_0_ids = sorted([v.id_ for v in bundle_set[0]])
     assert bundle_0_ids == ['r0', 'r1', 'r2', 'r3']
     bundle_1_ids = sorted([v.id_ for v in bundle_set[1]])

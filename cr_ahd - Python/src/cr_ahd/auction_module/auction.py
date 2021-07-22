@@ -44,7 +44,7 @@ class Auction(ABC):
         assert isinstance(self.bidding.tour_construction, type(self.tour_construction))
         assert isinstance(self.bidding.tour_improvement, type(self.tour_improvement))
 
-    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
+    def execute_auction(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         logger.debug(f'running auction {self.__class__.__name__}')
         # Request Selection
         auction_request_pool, original_bundling_labels = self.request_selection.execute(instance, solution)
@@ -57,15 +57,15 @@ class Auction(ABC):
             #     solution = self._reopt_and_improve(instance, solution)
 
             # Bundle Generation
-            auction_bundle_pool = self.bundle_generation.execute(instance, solution, auction_request_pool,
-                                                                 original_bundling_labels)
+            auction_bundle_pool = self.bundle_generation.execute_bundle_pool_generation(instance, solution, auction_request_pool,
+                                                                                        original_bundling_labels)
             original_bundles = ut.indices_to_nested_lists(original_bundling_labels, auction_request_pool)
-            original_bundling_labels = [auction_bundle_pool.index(x) for x in original_bundles]
+            original_bundles_indices = [auction_bundle_pool.index(x) for x in original_bundles]
             logger.debug(f'bundles {auction_bundle_pool} have been created')
 
             # Bidding
             logger.debug(f'Generating bids_matrix')
-            bids_matrix = self.bidding.execute(instance, solution, auction_bundle_pool)
+            bids_matrix = self.bidding.execute_bidding(instance, solution, auction_bundle_pool)
             logger.debug(f'Bids {bids_matrix} have been created for bundles {auction_bundle_pool}')
 
             # Winner Determination

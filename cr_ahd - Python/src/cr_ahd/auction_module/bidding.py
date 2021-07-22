@@ -7,7 +7,7 @@ import tqdm
 
 from src.cr_ahd.core_module import instance as it, solution as slt
 from src.cr_ahd.routing_module import tour_construction as cns, tour_initialization as ini, metaheuristics as mh
-from src.cr_ahd.utility_module.utils import ConstraintViolationError
+from src.cr_ahd.utility_module import utils as ut, profiling as pr
 
 logger = logging.getLogger(__name__)
 
@@ -19,10 +19,11 @@ class BiddingBehavior(ABC):
         self.tour_construction = tour_construction
         self.tour_improvement = tour_improvement
 
-    def execute(self,
-                instance: it.PDPInstance,
-                solution: slt.CAHDSolution,
-                bundles: Sequence[Sequence[int]]) -> List[List[float]]:
+    @pr.timing
+    def execute_bidding(self,
+                        instance: it.PDPInstance,
+                        solution: slt.CAHDSolution,
+                        bundles: Sequence[Sequence[int]]) -> List[List[float]]:
         """
         :return a nested list of bids. the first axis is the bundles, the second axis (inner lists) contain the carrier
         bids on that bundle
@@ -82,7 +83,7 @@ class DynamicInsertion(BiddingBehavior):
             while tmp_carrier_.unrouted_requests:
                 self.tour_construction.construct_dynamic(instance, solution, tmp_carrier)
             with_bundle = tmp_carrier_.sum_profit()
-        except ConstraintViolationError:
+        except ut.ConstraintViolationError:
             with_bundle = -float('inf')
         finally:
             solution.carriers.pop()  # del the temporary carrier copy
@@ -107,7 +108,7 @@ class DynamicReOptAndImprove(BiddingBehavior):
                 self.tour_construction.construct_dynamic(instance, solution, tmp_carrier)
             self.tour_improvement.execute(instance, solution, [tmp_carrier])
             with_bundle = tmp_carrier_.sum_profit()
-        except ConstraintViolationError:
+        except ut.ConstraintViolationError:
             with_bundle = -float('inf')
         finally:
             solution.carriers.pop()  # del the temporary carrier copy

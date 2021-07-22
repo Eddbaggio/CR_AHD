@@ -3,7 +3,7 @@ from src.cr_ahd.auction_module.winner_determination import MinBid
 
 # bids: Dict[List[Vertex], Dict[Carrier, float]]
 def test_lowest_bid_winner_determination(bids_a):
-    MinBid().execute(bids_a, ),
+    MinBid().execute_bidding(bids_a, ),
     assignments = []
     for bundle, _ in bids_a.items():
         for request in bundle:
