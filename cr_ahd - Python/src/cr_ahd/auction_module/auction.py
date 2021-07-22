@@ -6,7 +6,7 @@ from src.cr_ahd.auction_module import request_selection as rs, bundle_generation
     winner_determination as wd
 from src.cr_ahd.core_module import instance as it, solution as slt
 from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh
-from src.cr_ahd.utility_module import utils as ut
+from src.cr_ahd.utility_module import utils as ut, profiling as pr
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,7 @@ class Auction(ABC):
                  tour_construction: cns.PDPParallelInsertionConstruction,
                  tour_improvement: mh.PDPMetaHeuristic,
                  request_selection: rs.RequestSelectionBehavior,
-                 bundle_generation: bg.BundleSetGenerationBehavior,
+                 bundle_generation: bg.BundlePoolGenerationBehavior,
                  bidding: bd.BiddingBehavior,
                  winner_determination: wd.WinnerDeterminationBehavior,
                  ):
@@ -47,9 +47,9 @@ class Auction(ABC):
     def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         logger.debug(f'running auction {self.__class__.__name__}')
         # Request Selection
-        auction_pool_requests, original_bundles_indices = self.request_selection.execute(instance, solution)
-        if auction_pool_requests:
-            logger.debug(f'requests {auction_pool_requests} have been submitted to the auction pool')
+        auction_request_pool, original_bundling_labels = self.request_selection.execute(instance, solution)
+        if auction_request_pool:
+            logger.debug(f'requests {auction_request_pool} have been submitted to the auction pool')
 
             # optional reoptimization, not all auction variants do a reopt, the abstract method may be empty
             # TODO does this even make any sense if i do complete dynamic reopt in bidding anyways?!
@@ -57,22 +57,22 @@ class Auction(ABC):
             #     solution = self._reopt_and_improve(instance, solution)
 
             # Bundle Generation
-            auction_pool_bundles = self.bundle_generation.execute(instance, solution, auction_pool_requests,
-                                                                  original_bundles_indices)
-            original_bundles = ut.indices_to_nested_lists(original_bundles_indices, auction_pool_requests)
-            original_bundles_indices = [auction_pool_bundles.index(x) for x in original_bundles]
-            logger.debug(f'bundles {auction_pool_bundles} have been created')
+            auction_bundle_pool = self.bundle_generation.execute(instance, solution, auction_request_pool,
+                                                                 original_bundling_labels)
+            original_bundles = ut.indices_to_nested_lists(original_bundling_labels, auction_request_pool)
+            original_bundling_labels = [auction_bundle_pool.index(x) for x in original_bundles]
+            logger.debug(f'bundles {auction_bundle_pool} have been created')
 
             # Bidding
             logger.debug(f'Generating bids_matrix')
-            bids_matrix = self.bidding.execute(instance, solution, auction_pool_bundles)
-            logger.debug(f'Bids {bids_matrix} have been created for bundles {auction_pool_bundles}')
+            bids_matrix = self.bidding.execute(instance, solution, auction_bundle_pool)
+            logger.debug(f'Bids {bids_matrix} have been created for bundles {auction_bundle_pool}')
 
             # Winner Determination
             winner_bundles, bundle_winners = self.winner_determination.execute(instance, solution,
-                                                                               auction_pool_requests,
-                                                                               auction_pool_bundles, bids_matrix)
-            winner_bundles_indices = [auction_pool_bundles.index(x) for x in winner_bundles]
+                                                                               auction_request_pool,
+                                                                               auction_bundle_pool, bids_matrix)
+            winner_bundles_indices = [auction_bundle_pool.index(x) for x in winner_bundles]
 
             # bundle reallocation
             self.assign_bundles_to_winners(solution, winner_bundles, bundle_winners)

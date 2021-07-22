@@ -3,7 +3,7 @@ import random
 from copy import deepcopy
 from typing import Union
 
-import src.cr_ahd.utility_module.utils as ut
+from src.cr_ahd.utility_module import utils as ut, profiling as pr
 from src.cr_ahd.auction_module import auction as au
 from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
 from src.cr_ahd.routing_module import tour_construction as cns, tour_initialization as ini, metaheuristics as mh
@@ -25,6 +25,7 @@ class Solver:
         self.tour_improvement = tour_improvement
         self.auction = auction
 
+    @pr.timing
     def execute(self, instance: it.PDPInstance, starting_solution: slt.CAHDSolution = None):
         """
         apply the concrete solution algorithm
@@ -35,10 +36,9 @@ class Solver:
         else:
             solution = starting_solution
 
-        self.update_solution_solver_config(solution)  # the auction stuff is not included yet
+        self.update_solution_solver_config(solution)
 
-        logger.info(
-            f'{instance.id_}: Solving {solution.solver_config}')
+        logger.info(f'{instance.id_}: Solving {solution.solver_config}')
 
         random.seed(0)
 
@@ -75,7 +75,7 @@ class Solver:
         solution.solver_config[
             'time_window_selection'] = self.time_window_management.time_window_selection.__class__.__name__
 
-
+    @pr.timing
     def _acceptance_phase(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         solution = deepcopy(solution)
         while solution.unassigned_requests:
@@ -94,6 +94,7 @@ class Solver:
         ut.validate_solution(instance, solution)
         return solution
 
+    @pr.timing
     def _improvement_phase(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         solution = deepcopy(solution)
         self.tour_improvement.execute(instance, solution)
@@ -114,6 +115,7 @@ class Solver:
         ut.validate_solution(instance, solution)
         return solution
 
+    @pr.timing
     def _auction_phase(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         """
         includes request selection, bundle generation, bidding, winner determination and also the final routing

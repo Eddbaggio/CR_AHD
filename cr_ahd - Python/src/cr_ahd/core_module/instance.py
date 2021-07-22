@@ -104,6 +104,7 @@ class PDPInstance:
             return vertex - self.num_depots - self.num_requests
 
     def coords(self, vertex: int):
+        """returns a tuple of (x, y) coordinates for the vertex"""
         return ut.Coordinates(self.x_coords[vertex], self.y_coords[vertex])
 
     def write_to_json(self):

@@ -97,8 +97,9 @@ class PDPParallelInsertionConstruction(ABC):
 
         for tour in range(solution.carriers[carrier].num_tours()):
 
-            delta, pickup_pos, delivery_pos = self.best_insertion_for_request_in_tour(instance, solution, carrier, tour,
-                                                                                      request)
+            delta, pickup_pos, delivery_pos = self.best_insertion_for_request_in_tour(instance, solution,
+                                                                                      solution.carriers[carrier].tours[
+                                                                                          tour], request)
             if delta < best_delta:
                 best_delta = delta
                 best_tour = tour
@@ -108,9 +109,12 @@ class PDPParallelInsertionConstruction(ABC):
         return best_delta, best_tour, best_pickup_pos, best_delivery_pos
 
     @abstractmethod
-    def best_insertion_for_request_in_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
-                                           tour: int, request: int) -> Tuple[float, int, int]:
-        """returns an insertion move as a tuple of (delta, pickup_position, delivery_position)"""
+    def best_insertion_for_request_in_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_,
+                                           request: int, check_feasibility=True) -> Tuple[float, int, int]:
+        """returns the feasible insertion move with the lowest cost as a tuple of (delta, pickup_position,
+        delivery_position)
+        :param check_feasibility:
+        """
         pass
 
     @staticmethod
@@ -166,9 +170,8 @@ class MinTravelDistanceInsertion(PDPParallelInsertionConstruction):
     and insert the cheapest over all requests.
     """
 
-    def best_insertion_for_request_in_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
-                                           tour: int, request: int):
-        tour_: tr.Tour = solution.carriers[carrier].tours[tour]
+    def best_insertion_for_request_in_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_,
+                                           request: int, check_feasibility=True):
         pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
 
         best_delta = float('inf')
@@ -181,8 +184,11 @@ class MinTravelDistanceInsertion(PDPParallelInsertionConstruction):
                                                     [pickup_vertex, delivery_vertex])
                 if delta < best_delta:
 
-                    if tour_.insertion_feasibility_check(instance, solution, [pickup_pos, delivery_pos],
-                                                         [pickup_vertex, delivery_vertex]):
+                    update_best = True
+                    if check_feasibility:
+                        update_best = tour_.insertion_feasibility_check(instance, solution, [pickup_pos, delivery_pos],
+                                                                        [pickup_vertex, delivery_vertex])
+                    if update_best:
                         best_delta = delta
                         best_pickup_position = pickup_pos
                         best_delivery_position = delivery_pos
@@ -195,11 +201,13 @@ class MinTimeShiftInsertion(PDPParallelInsertionConstruction):
     construction heuristic for solving the pickup and delivery problem with time windows. European Journal of
     Operational Research, 175(2), 672–687. https://doi.org/10.1016/j.ejor.2005.05.012 """
 
-    def best_insertion_for_request_in_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
-                                           tour: int, request: int) -> Tuple[float, int, int]:
-        """Find the insertions for pickup and delivery for a given tour that have the best C value"""
+    def best_insertion_for_request_in_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_,
+                                           request: int, check_feasibility=True) -> Tuple[float, int, int]:
+        """Find the insertions for pickup and delivery for a given tour that have the best C value
+        :param check_feasibility:
+        :param tour_:
+        """
 
-        tour_: tr.Tour = solution.carriers[carrier].tours[tour]
         pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
 
         best_delta = dt.timedelta.max
@@ -214,17 +222,14 @@ class MinTimeShiftInsertion(PDPParallelInsertionConstruction):
                                                      [pickup_pos, delivery_pos],
                                                      [pickup_vertex, delivery_vertex])
 
-                if delta < best_delta:
-
-                    # todo is feasibility check faster than insert_max_shift_delta computation? if yes -> check
-                    #  feasibility BEFORE delta!
-                    if tour_.insertion_feasibility_check(instance, solution,
-                                                         [pickup_pos, delivery_pos],
-                                                         [pickup_vertex,
-                                                          delivery_vertex]):
-                        best_delta = delta
-                        best_pickup_pos = pickup_pos
-                        best_delivery_pos = delivery_pos
+                update_best = True
+                if check_feasibility:
+                    update_best = tour_.insertion_feasibility_check(instance, solution, [pickup_pos, delivery_pos],
+                                                                    [pickup_vertex, delivery_vertex])
+                if update_best:
+                    best_delta = delta
+                    best_pickup_pos = pickup_pos
+                    best_delivery_pos = delivery_pos
 
         # convert to number rather than time since caller of this function expects that
         if best_delta == dt.timedelta.max:
@@ -244,7 +249,7 @@ class TimeShiftRegretInsertion(PDPParallelInsertionConstruction):
          for the best insertion. Best, in this case, is defined by the inheriting class (e.g. lowest cost increase or
          least time shift).
 
-         :returns: delta, tour, pickup_position, delivery_position of the best found insertion
+         :returns: (delta, tour, pickup_position, delivery_position) of the best found insertion
          """
         best_delta = float('inf')
         best_tour = None
@@ -255,8 +260,9 @@ class TimeShiftRegretInsertion(PDPParallelInsertionConstruction):
 
         for tour in range(solution.carriers[carrier].num_tours()):
 
-            delta, pickup_pos, delivery_pos = self.best_insertion_for_request_in_tour(instance, solution, carrier, tour,
-                                                                                      request)
+            delta, pickup_pos, delivery_pos = self.best_insertion_for_request_in_tour(instance, solution,
+                                                                                      solution.carriers[carrier].tours[
+                                                                                          tour], request)
             best_insertion_for_request_in_tour.append((delta, pickup_pos, delivery_pos))
 
             if delta < best_delta:
@@ -272,9 +278,10 @@ class TimeShiftRegretInsertion(PDPParallelInsertionConstruction):
         else:
             return best_delta, best_tour, best_pickup_pos, best_delivery_pos
 
-    def best_insertion_for_request_in_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
-                                           tour: int, request: int) -> Tuple[float, int, int]:
-        return MinTimeShiftInsertion().best_insertion_for_request_in_tour(instance, solution, carrier, tour, request)
+    def best_insertion_for_request_in_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_,
+                                           request: int, check_feasibility=True) -> Tuple[float, int, int]:
+        return MinTimeShiftInsertion().best_insertion_for_request_in_tour(instance, solution, tour_, request,
+                                                                          check_feasibility)
 
 
 class TravelDistanceRegretInsertion(PDPParallelInsertionConstruction):
@@ -284,7 +291,7 @@ class TravelDistanceRegretInsertion(PDPParallelInsertionConstruction):
         # steal the regret implementation from time shift
         return TimeShiftRegretInsertion().best_insertion_for_request(instance, solution, carrier, request)
 
-    def best_insertion_for_request_in_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
-                                           tour: int, request: int) -> Tuple[float, int, int]:
-        return MinTravelDistanceInsertion().best_insertion_for_request_in_tour(instance, solution, carrier, tour,
-                                                                               request)
+    def best_insertion_for_request_in_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_,
+                                           request: int, check_feasibility=True) -> Tuple[float, int, int]:
+        return MinTravelDistanceInsertion().best_insertion_for_request_in_tour(instance, solution, tour_, request,
+                                                                               check_feasibility)

@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 import src.cr_ahd.solver as slv
 from src.cr_ahd.auction_module import auction as au, request_selection as rs, bundle_generation as bg, bidding as bd, \
-    winner_determination as wd
+    winner_determination as wd, bundle_valuation as bv
 from src.cr_ahd.core_module import instance as it, solution as slt
 from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh, local_search as ls
 from src.cr_ahd.tw_management_module import tw_management as twm, tw_selection as tws, tw_offering as two
@@ -44,7 +44,7 @@ def execute_all(instance: it.PDPInstance, plot=False):
                 # twm.TWManagementNoTW(None, None)
             ]:
 
-                # Isolated Planning
+                # [1] Isolated Planning
                 solver = slv.Solver(tour_construction, tour_improvement, tw_management, False)
                 try:
                     solution = solver.execute(instance)
@@ -53,23 +53,23 @@ def execute_all(instance: it.PDPInstance, plot=False):
                     solutions.append(deepcopy(solution))
 
                 except Exception as e:
-                    # raise e
+                    raise e
                     logger.error(f'{e}\nFailed on instance {instance} with solver {solver.__class__.__name__}')
                     solution = slt.CAHDSolution(instance)  # create an empty solution for failed instances
                     solver.update_solution_solver_config(solution)
                     solution.write_to_json()
                     solutions.append(solution)
 
-                # Collaborative Planning
                 for num_submitted_requests in [
                     4,
-                    # 6
+                    # 5
                 ]:
                     for request_selection in [
-                        rs.Random(num_submitted_requests),
-                        rs.SpatialCluster(num_submitted_requests),
-                        rs.TemporalRangeCluster(num_submitted_requests),
-                        # rs.SpatioTemporalCluster(num_submitted_requests)  # TODO not yet good enough, somtimes infeasible
+                        # rs.Random(num_submitted_requests),
+                        rs.SpatialBundle(num_submitted_requests),
+                        # rs.TemporalRangeCluster(num_submitted_requests),
+                        # TODO SpatioTemporalCluster is not yet good enough & sometimes even infeasible
+                        # rs.SpatioTemporalCluster(num_submitted_requests)
                     ]:
                         for num_auction_bundles in [
                             # 50,
@@ -82,10 +82,17 @@ def execute_all(instance: it.PDPInstance, plot=False):
                             auction = au.Auction(tour_construction,
                                                  tour_improvement,
                                                  request_selection,
-                                                 bg.GeneticAlgorithm(num_auction_bundles),
+                                                 bg.GeneticAlgorithm(num_auction_bundles=num_auction_bundles,
+                                                                     population_size=300,
+                                                                     num_generations=100,
+                                                                     mutation_rate=0.5,
+                                                                     generation_gap=0.9,
+                                                                     bundle_valuation=bv.GHProxyBundleValuation()),
                                                  bd.DynamicReOptAndImprove(tour_construction, tour_improvement),
                                                  wd.MaxBidGurobiCAP1(),
                                                  )
+
+                            # [2] Collaborative Planning
                             solver = slv.Solver(tour_construction, tour_improvement, tw_management, auction)
                             try:
                                 solution = solver.execute(instance, isolated_planning_starting_solution)
@@ -93,7 +100,7 @@ def execute_all(instance: it.PDPInstance, plot=False):
                                 solutions.append(deepcopy(solution))
 
                             except Exception as e:
-                                # raise e
+                                raise e
                                 logger.error(
                                     f'{e}\nFailed on instance {instance} with solver {solver.__class__.__name__}')
                                 solution = slt.CAHDSolution(instance)  # create an empty solution for failed instances
@@ -195,18 +202,18 @@ if __name__ == '__main__':
     paths = sorted(
         list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
         key=ut.natural_sort_key)
-    paths = paths[:48]
+    paths = paths[83:84]
 
-    # solutions = m_solve_single_thread(paths, plot=False)
-    solutions = m_solve_multi_thread(paths)
+    solutions = m_solve_single_thread(paths, plot=False)
+    # solutions = m_solve_multi_thread(paths)
 
     df = write_solution_summary_to_multiindex_df(solutions, 'carrier')
     ev.bar_chart(df,
-                 title='4 requests selected',
+                 title='Population size 300',
                  values='sum_profit',
-                 category='rad',
-                 color=['solution_algorithm', 'request_selection'],
-                 facet_col=None,
+                 category='run',
+                 color=['solution_algorithm', 'num_submitted_requests'],
+                 facet_col='rad',
                  facet_row='n',
                  show=True,
                  html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix())

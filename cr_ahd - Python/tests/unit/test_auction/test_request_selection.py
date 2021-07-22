@@ -7,5 +7,5 @@ def test_SingleLowestMarginalProfit(carrier_b):
 
 
 def test_Cluster(carrier_b):
-    selected = rs.SpatialCluster()._evaluate_requests(carrier_b, 4)
+    selected = rs.SpatialBundle()._evaluate_requests(carrier_b, 4)
     assert [s.id_ for s in selected] == ['r0', 'r1', 'r2', 'r3']

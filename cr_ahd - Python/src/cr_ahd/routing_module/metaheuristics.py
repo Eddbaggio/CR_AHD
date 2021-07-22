@@ -6,7 +6,7 @@ from math import exp, log
 from typing import Sequence
 
 from src.cr_ahd.routing_module import local_search as ls
-from src.cr_ahd.core_module import instance as it, solution as slt
+from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +105,7 @@ class PDPSequentialNeighborhoodDescent(PDPMetaHeuristic):
 
         for carrier in carriers:
             for k in range(len(self.neighborhoods)):
-                neighborhood = self.neighborhoods[k]()
+                neighborhood = self.neighborhoods[k]
                 move_generator = neighborhood.feasible_move_generator(instance, solution, carrier)
                 self.improved = True
                 while self.improved:
@@ -116,7 +116,7 @@ class PDPSequentialNeighborhoodDescent(PDPMetaHeuristic):
                             move = next(move_generator)
                             if self.acceptance_criterion(instance, solution, carrier, move):
                                 accepted = True
-                                neighborhood.execute_move(instance, solution, carrier, move)
+                                neighborhood.execute_move(instance, solution, move)
                                 self.improved = True
                                 self.trajectory.append(move)
                                 move_generator = neighborhood.feasible_move_generator(instance, solution, carrier)
@@ -186,7 +186,7 @@ class PDPVariableNeighborhoodDescent(PDPMetaHeuristic):
                 if any(all_moves):
                     best_move = min(all_moves, key=lambda x: x[0])
                     if self.acceptance_criterion(instance, solution, carrier, best_move):
-                        neighborhood.execute_move(instance, solution, carrier, best_move)
+                        neighborhood.execute_move(instance, solution, best_move)
                         self.trajectory.append(best_move)
                         k = 0
                     else:
@@ -195,7 +195,32 @@ class PDPVariableNeighborhoodDescent(PDPMetaHeuristic):
                     k += 1
         pass
 
+    def execute_on_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_: tr.Tour):
+        """execute the metaheuristic for a given route using all available intra-tour neighborhoods"""
+        intra_tour_neighborhoods = [nbh for nbh in self.neighborhoods if
+                                    isinstance(nbh, ls.IntraTourLocalSearchBehavior)]
+        k = 0
+        while k < len(intra_tour_neighborhoods):
+            neighborhood = intra_tour_neighborhoods[k]
+            all_moves = [move for move in neighborhood.feasible_move_generator_for_tour(instance, solution, tour_)]
+            if any(all_moves):
+                best_move = min(all_moves, key=lambda x: x[0])
+                if self.acceptance_criterion_tour(best_move):
+                    neighborhood.execute_move(instance, solution, best_move)
+                    self.trajectory.append(best_move)
+                    k = 0
+                else:
+                    k += 1
+            else:
+                k += 1
+
     def acceptance_criterion(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move: tuple):
+        if move[0] < 0:
+            return True
+        else:
+            return False
+
+    def acceptance_criterion_tour(self, move: tuple):
         if move[0] < 0:
             return True
         else:

@@ -272,7 +272,7 @@ def print_top_level_stats(carrier_df: pd.DataFrame):
 if __name__ == '__main__':
     df = pd.read_csv(
         "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home "
-        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_carrier_#029.csv",
+        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_carrier_#035.csv",
     )
     df.fillna('None', inplace=True)
     df.set_index(['rad', 'n', 'run', 'carrier_id_'] + solver_config, inplace=True)
@@ -280,9 +280,9 @@ if __name__ == '__main__':
     bar_chart(df,
               title='',
               values='sum_profit',
-              category='rad',
-              color=['solution_algorithm', 'request_selection'],
-              facet_col=None,
+              category='run',
+              color=['solution_algorithm', 'num_submitted_requests'],
+              facet_col='rad',
               facet_row='n',
               show=True,
               # width=700,

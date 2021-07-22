@@ -47,6 +47,8 @@ class CAHDSolution:
             winner_determination=None,
         )
 
+        self.timings = dict()
+
         # TODO find a better way to add available ls neighborhoods automatically
         self.local_search_move_counter = dict(PDPMove=0,
                                               PDPTwoOpt=0,

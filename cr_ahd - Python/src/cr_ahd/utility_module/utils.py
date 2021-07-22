@@ -1,3 +1,4 @@
+import datetime as dt
 import functools
 import itertools
 import json
@@ -5,17 +6,16 @@ import math
 import random
 import re
 import time
-import datetime as dt
 from collections import namedtuple
 from pathlib import Path
+from time import time
 from typing import List, Sequence, Tuple
 
-import tqdm
-from tqdm import tqdm, trange
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.colors import LinearSegmentedColormap
+from tqdm import trange
 
 Coordinates = namedtuple('Coords', ['x', 'y'])
 
@@ -360,7 +360,7 @@ def natural_sort_key(s, _nsre=re.compile('([0-9]+)')):
 
 def indices_to_nested_lists(indices: Sequence[int], elements: Sequence):
     result = []
-    for i in range(max(indices)+1):
+    for i in range(max(indices) + 1):
         sublist = []
         for j in range(len(elements)):
             if indices[j] == i:
@@ -413,5 +413,13 @@ TW_LENGTH: dt.timedelta = dt.timedelta(hours=2)
 ALL_TW = [TimeWindow(e, min(e + TW_LENGTH, END_TIME)) for e in datetime_range(START_TIME, END_TIME, freq=TW_LENGTH)]
 TIME_HORIZON = TimeWindow(START_TIME, END_TIME)
 SPEED_KMH = 60  # vehicle speed (set to 60 to treat distance = time)
-# NUM_REQUESTS_TO_SUBMIT = 4  # either relative (between 0 and 1) OR an absolute number <= DYNAMIC_CYCLE_TIME  # deprecated
-# NUM_AUCTION_BUNDLES = 100  # 50, 100, 200, 300, 500  # deprecated
+
+if __name__ == '__main__':
+    @timing
+    def f(a):
+        for _ in range(a):
+            i = 0
+        return -1
+
+
+    f(1000000)

@@ -4,6 +4,7 @@ from copy import deepcopy
 from typing import final
 
 from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
+from src.cr_ahd.utility_module import profiling as pr
 
 logger = logging.getLogger(__name__)
 
@@ -18,17 +19,17 @@ class LocalSearchBehavior(ABC):
         pass
 
     @final
-    def execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move: tuple):
-        self._execute_move(instance, solution, carrier, move)
+    def execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move: tuple):
+        self._execute_move(instance, solution, move)
         self.register_move_execution(solution)
         pass
 
     @abstractmethod
-    def _execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move: tuple):
+    def _execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move: tuple):
         pass
 
     @abstractmethod
-    def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move):
+    def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move):
         pass
 
     @final
@@ -39,78 +40,89 @@ class LocalSearchBehavior(ABC):
 # =====================================================================================================================
 # INTRA-TOUR LOCAL SEARCH
 # =====================================================================================================================
+class IntraTourLocalSearchBehavior(LocalSearchBehavior, ABC):
+    @final
+    def feasible_move_generator(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
+        """
+        :return: tuple containing all necessary information to see whether to accept a move and the information to
+        execute a move. The first element must be the delta in travel distance.
+        """
+        for tour in range(solution.carriers[carrier].num_tours()):
+            tour_ = solution.carriers[carrier].tours[tour]
+            yield from self.feasible_move_generator_for_tour(instance, solution, tour_)  # delegated generator
+
+    @abstractmethod
+    def feasible_move_generator_for_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_: tr.Tour):
+        pass
+
+    @abstractmethod
+    def _execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move: tuple):
+        pass
+
+    @abstractmethod
+    def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move):
+        pass
 
 
-class PDPMove(LocalSearchBehavior, ABC):
+class PDPMove(IntraTourLocalSearchBehavior):
     """
     Take a PD pair and see whether inserting it in a different location of the SAME route improves the solution
     """
 
-    def feasible_move_generator(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
-        solution_copy = deepcopy(solution)
-        for tour in range(solution_copy.carriers[carrier].num_tours()):
-            tour_ = solution_copy.carriers[carrier].tours[tour]
+    def feasible_move_generator_for_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_: tr.Tour):
+        # test all requests
+        for old_pickup_pos in range(1, len(tour_) - 2):
+            vertex = tour_.routing_sequence[old_pickup_pos]
 
-            # test all requests
-            for old_pickup_pos in range(1, len(tour_) - 2):
-                vertex = tour_.routing_sequence[old_pickup_pos]
+            # skip if its a delivery vertex
+            if instance.vertex_type(vertex) == "delivery":
+                continue
 
-                # skip if its a delivery vertex
-                if instance.vertex_type(vertex) == "delivery":
-                    continue
+            pickup, delivery = instance.pickup_delivery_pair(instance.request_from_vertex(vertex))
+            old_delivery_pos = tour_.routing_sequence.index(delivery)
 
-                pickup, delivery = instance.pickup_delivery_pair(instance.request_from_vertex(vertex))
-                old_delivery_pos = tour_.routing_sequence.index(delivery)
+            delta = 0
 
-                delta = 0
+            # savings of removing the pickup and delivery
+            delta += tour_.pop_distance_delta(instance, (old_pickup_pos, old_delivery_pos))
 
-                # savings of removing the pickup and delivery
-                delta += tour_.pop_distance_delta(instance, (old_pickup_pos, old_delivery_pos))
+            # pop
+            tour_.pop_and_update(instance, solution, (old_pickup_pos, old_delivery_pos))
 
-                # pop
-                tour_.pop_and_update(instance, solution_copy, (old_pickup_pos, old_delivery_pos))
+            # check all possible new insertions for pickup and delivery vertex of the request
+            for new_pickup_pos in range(1, len(tour_)):
+                for new_delivery_pos in range(new_pickup_pos + 1, len(tour_) + 1):
+                    if new_pickup_pos == old_pickup_pos and new_delivery_pos == old_delivery_pos:
+                        continue
 
-                # check all possible new insertions for pickup and delivery vertex of the request
-                for new_pickup_pos in range(1, len(tour_)):
-                    for new_delivery_pos in range(new_pickup_pos + 1, len(tour_) + 1):
-                        if new_pickup_pos == old_pickup_pos and new_delivery_pos == old_delivery_pos:
-                            continue
+                    # cost for inserting request vertices in the new positions
+                    delta += tour_.insert_distance_delta(instance, [new_pickup_pos, new_delivery_pos],
+                                                         [pickup, delivery])
 
-                        # cost for inserting request vertices in the new positions
-                        delta += tour_.insert_distance_delta(instance, [new_pickup_pos, new_delivery_pos],
-                                                             [pickup, delivery])
+                    move = (delta, tour_, old_pickup_pos, old_delivery_pos, pickup, delivery, new_pickup_pos,
+                            new_delivery_pos)
 
-                        move = (delta, tour, old_pickup_pos, old_delivery_pos, pickup, delivery, new_pickup_pos,
-                                new_delivery_pos)
+                    # yield move if it's feasible
+                    if self.feasibility_check(instance, solution, move):
+                        yield move
 
-                        # yield move if it's feasible
-                        if self.feasibility_check(instance, solution_copy, carrier, move):
-                            yield move
+                    # restore delta
+                    delta -= tour_.insert_distance_delta(instance, [new_pickup_pos, new_delivery_pos],
+                                                         [pickup, delivery])
 
-                        # restore delta
-                        delta -= tour_.insert_distance_delta(instance, [new_pickup_pos, new_delivery_pos],
-                                                             [pickup, delivery])
+            # repair
+            tour_.insert_and_update(instance, solution, (old_pickup_pos, old_delivery_pos), (pickup, delivery))
 
-                # repair
-                tour_.insert_and_update(instance, solution_copy, (old_pickup_pos, old_delivery_pos), (pickup, delivery))
-
-    def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move):
-        """
-        receives a destroyed tour in which a certain request has been removed. Checks insertion at another place
-        """
-
-        delta, tour, old_pickup_pos, old_delivery_pos, pickup, delivery, new_pickup_pos, new_delivery_pos = move
-        tour_ = solution.carriers[carrier].tours[tour]
-
+    @pr.timing
+    def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move: tuple):
+        delta, tour_, old_pickup_pos, old_delivery_pos, pickup, delivery, new_pickup_pos, new_delivery_pos = move
         assert delivery == pickup + instance.num_requests
-
         return tour_.insertion_feasibility_check(instance, solution, [new_pickup_pos, new_delivery_pos],
                                                  [pickup, delivery])
 
-    def _execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move):
-        delta, tour, old_pickup_pos, old_delivery_pos, pickup, delivery, new_pickup_pos, new_delivery_pos = move
-
-        tour_ = solution.carriers[carrier].tours[tour]
+    @pr.timing
+    def _execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move):
+        delta, tour_, old_pickup_pos, old_delivery_pos, pickup, delivery, new_pickup_pos, new_delivery_pos = move
 
         # remove
         pickup_vertex = tour_.routing_sequence[old_pickup_pos]
@@ -123,39 +135,34 @@ class PDPMove(LocalSearchBehavior, ABC):
         # re-insert
         tour_.insert_and_update(instance, solution, [new_pickup_pos, new_delivery_pos],
                                 [pickup_vertex, delivery_vertex])
-
-
-class PDPTwoOpt(LocalSearchBehavior):
-    def feasible_move_generator(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
-        solution = deepcopy(solution)
-
-        for tour in range(solution.carriers[carrier].num_tours()):
-            tour_ = solution.carriers[carrier].tours[tour]
-
-            # iterate over all moves
-            for i in range(0, len(tour_) - 3):
-                for j in range(i + 2, len(tour_) - 1):
-
-                    delta = 0
-
-                    # savings of removing the edges (i, i+1) and (j, j+1)
-                    delta -= instance.distance([tour_.routing_sequence[i], tour_.routing_sequence[j]],
-                                               [tour_.routing_sequence[i + 1], tour_.routing_sequence[j + 1]])
-
-                    # cost of adding the edges (i, j) and (i+1, j+1)
-                    delta += instance.distance([tour_.routing_sequence[i], tour_.routing_sequence[i + 1]],
-                                               [tour_.routing_sequence[j], tour_.routing_sequence[j + 1]])
-
-                    move = (delta, tour, i, j)
-
-                    if self.feasibility_check(instance, solution, carrier, move):
-                        yield move
-
         pass
 
-    def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move):
-        delta, tour, i, j = move
-        tour_ = solution.carriers[carrier].tours[tour]
+
+class PDPTwoOpt(IntraTourLocalSearchBehavior):
+
+    def feasible_move_generator_for_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_: tr.Tour):
+        # iterate over all moves
+        for i in range(0, len(tour_) - 3):
+            for j in range(i + 2, len(tour_) - 1):
+
+                delta = 0
+
+                # savings of removing the edges (i, i+1) and (j, j+1)
+                delta -= instance.distance([tour_.routing_sequence[i], tour_.routing_sequence[j]],
+                                           [tour_.routing_sequence[i + 1], tour_.routing_sequence[j + 1]])
+
+                # cost of adding the edges (i, j) and (i+1, j+1)
+                delta += instance.distance([tour_.routing_sequence[i], tour_.routing_sequence[i + 1]],
+                                           [tour_.routing_sequence[j], tour_.routing_sequence[j + 1]])
+
+                move = (delta, tour_, i, j)
+
+                if self.feasibility_check(instance, solution, move):
+                    yield move
+
+    @pr.timing
+    def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move):
+        delta, tour_, i, j = move
 
         # create a temporary routing sequence to loop over the one that contains the reversed section
         tmp_routing_sequence = list(tour_.routing_sequence)
@@ -208,20 +215,38 @@ class PDPTwoOpt(LocalSearchBehavior):
 
         )
 
-    def _execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move):
-        delta, tour, i, j = move
+    @pr.timing
+    def _execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move):
+        delta, tour_, i, j = move
 
         logger.debug(f'PDPTwoOpt: [{delta}] Reverse section between {i} and {j}')
 
-        solution.carriers[carrier].tours[tour].reverse_section(instance, solution, i, j)
+        tour_.reverse_section(instance, solution, i, j)
+        pass
 
 
 # =====================================================================================================================
 # INTER-TOUR LOCAL SEARCH
 # =====================================================================================================================
+class InterTourLocalSearchBehavior(LocalSearchBehavior, ABC):
+    @abstractmethod
+    def feasible_move_generator(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
+        """
+        :return: tuple containing all necessary information to see whether to accept a move and the information to
+        execute a move. The first element must be the delta in travel distance.
+        """
+        pass
+
+    @abstractmethod
+    def _execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move: tuple):
+        pass
+
+    @abstractmethod
+    def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move):
+        pass
 
 
-class PDPRelocate(LocalSearchBehavior):
+class PDPRelocate(InterTourLocalSearchBehavior):
     """
     Take one PD request at a time and see whether inserting it into another tour is cheaper.
     """
@@ -266,44 +291,43 @@ class PDPRelocate(LocalSearchBehavior):
                                                                      [new_pickup_pos, new_delivery_pos],
                                                                      [pickup, delivery])
 
-                            move = (delta, old_tour, old_pickup_pos, old_delivery_pos, new_tour, new_pickup_pos,
-                                    new_delivery_pos)
+                            move = (
+                                delta, carrier, old_tour_, old_pickup_pos, old_delivery_pos, new_tour_, new_pickup_pos,
+                                new_delivery_pos)
 
                             # is the improving move feasible?
-                            if self.feasibility_check(instance, solution, carrier, move):
+                            if self.feasibility_check(instance, solution, move):
                                 yield move
 
-    def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move):
-        delta, old_tour, old_pickup_pos, old_delivery_pos, new_tour, new_pickup_pos, new_delivery_pos = move
-        old_tour_ = solution.carriers[carrier].tours[old_tour]
+    @pr.timing
+    def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move):
+        delta, carrier, old_tour_, old_pickup_pos, old_delivery_pos, new_tour_, new_pickup_pos, new_delivery_pos = move
         pickup = old_tour_.routing_sequence[old_pickup_pos]
         delivery = old_tour_.routing_sequence[old_delivery_pos]
-
-        new_tour_ = solution.carriers[carrier].tours[new_tour]
 
         return new_tour_.insertion_feasibility_check(instance, solution, [new_pickup_pos, new_delivery_pos],
                                                      [pickup, delivery])
 
-    def _execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move):
-        delta, old_tour, old_pickup_pos, old_delivery_pos, new_tour, new_pickup_pos, new_delivery_pos = move
-        old_tour_ = solution.carriers[carrier].tours[old_tour]
-        new_tour_ = solution.carriers[carrier].tours[new_tour]
+    @pr.timing
+    def _execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move):
+        delta, carrier, old_tour_, old_pickup_pos, old_delivery_pos, new_tour_, new_pickup_pos, new_delivery_pos = move
 
         pickup, delivery = old_tour_.pop_and_update(instance, solution, [old_pickup_pos, old_delivery_pos])
 
         logger.debug(f'PDPRelocate: [{delta}] Relocate vertices {pickup} and {delivery} from '
-                     f'Tour {old_tour} [{old_pickup_pos, old_delivery_pos}] to '
-                     f'Tour {new_tour} [{new_pickup_pos, new_delivery_pos}]')
+                     f'Tour {old_tour_.id_} [{old_pickup_pos, old_delivery_pos}] to '
+                     f'Tour {new_tour_.id_} [{new_pickup_pos, new_delivery_pos}]')
 
         # if it is now empty (i.e. depot -> depot), drop the old tour
         if len(old_tour_) <= 2:
-            solution.carriers[carrier].tours.pop(old_tour)
+            solution.carriers[carrier].tours.remove(old_tour_)
 
         new_tour_.insert_and_update(instance, solution, [new_pickup_pos, new_delivery_pos], [pickup, delivery])
         pass
 
 
-class PDPRelocate2(LocalSearchBehavior):
+'''
+class PDPRelocate2(InterTourLocalSearchBehavior):
     def feasible_move_generator(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
         solution = deepcopy(solution)
         carrier_ = solution.carriers[carrier]
@@ -420,6 +444,8 @@ class PDPRelocate2(LocalSearchBehavior):
     def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move):
         """for this local search, the feasibility check is incorporated in the feasible_move_generator"""
         pass
+
+'''
 
 
 class PDPDeleteTour(LocalSearchBehavior):
