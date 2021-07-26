@@ -44,6 +44,7 @@ class BundlePoolGenerationBehavior(ABC):
                                        auction_request_pool: Sequence[int],
                                        original_bundling_labels: Sequence[int]):
         # random.seed(0)
+        self.preprocessing(instance, solution, auction_request_pool)
         auction_bundle_pool = self._generate_auction_bundles(instance, solution, auction_request_pool,
                                                              original_bundling_labels)
         return auction_bundle_pool
@@ -52,6 +53,11 @@ class BundlePoolGenerationBehavior(ABC):
     def _generate_auction_bundles(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
                                   auction_request_pool: Sequence[int],
                                   original_bundling_labels: Sequence[int]):
+        pass
+
+    def preprocessing(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_request_pool: Sequence[int]):
+        if 'bundle_valuation' in self.parameters:
+            self.parameters['bundle_valuation'].preprocessing(instance, solution, auction_request_pool)
         pass
 
 
@@ -130,7 +136,7 @@ class GeneticAlgorithm(BundlePoolGenerationBehavior):
         # only a fraction of generation_gap is replaced in a new gen. the remaining individuals (generation overlap)
         # are the top (1-generation_gap)*100 % from the previous gen, measured by their fitness
         generation_gap: float = self.parameters['generation_gap']
-        bundle_valuation: bv.BundleValuation = self.parameters['bundle_valuation']
+        bundle_valuation: bv.BundlingValuation = self.parameters['bundle_valuation']
 
         fitness, population = self.initialize_population(instance,
                                                          solution,
@@ -164,8 +170,8 @@ class GeneticAlgorithm(BundlePoolGenerationBehavior):
 
                 else:
                     # fitness evaluation
-                    offspring_fitness = bundle_valuation.evaluate_bundle(instance, solution, offspring,
-                                                                         auction_request_pool)
+                    offspring_fitness = bundle_valuation.evaluate_bundling(instance, solution, offspring,
+                                                                           auction_request_pool)
 
                     # add offspring to the new gen and increase population size counter
                     new_population.append(offspring)
@@ -248,7 +254,7 @@ class GeneticAlgorithm(BundlePoolGenerationBehavior):
 
     def initialize_population(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool: Sequence,
                               original_bundles: Sequence, n: int, population_size: int,
-                              bundle_fitness: bv.BundleValuation):
+                              bundle_fitness: bv.BundlingValuation):
         """
         initializes the a population of size population_size. this first generation includes the original bundles as
         well as a k-means bundling.
@@ -264,14 +270,13 @@ class GeneticAlgorithm(BundlePoolGenerationBehavior):
         population = []
         fitness = []
 
-        # initialize at least one k-means bundle that is also likely to be feasible
-        k_means_individual = list(
-            SingleKMeansBundle(self.num_auction_bundles).execute_bundle_pool_generation(instance, solution,
-                                                                                        auction_pool, None))
+        # initialize at least one k-means bundle that is also likely to be feasible (only location-based)
+        k_means_individual = list(SingleKMeansBundle(self.num_auction_bundles).execute_bundle_pool_generation(instance, solution, auction_pool, None))
+
         self._normalize_individual(k_means_individual)
         if k_means_individual not in population:
             population.append(k_means_individual)
-            fitness.append(bundle_fitness.evaluate_bundle(instance, solution, k_means_individual, auction_pool))
+            fitness.append(bundle_fitness.evaluate_bundling(instance, solution, k_means_individual, auction_pool))
 
         # fill the rest of the population with random individuals
         i = 1
@@ -282,7 +287,7 @@ class GeneticAlgorithm(BundlePoolGenerationBehavior):
                 continue
             else:
                 population.append(individual)
-                fitness.append(bundle_fitness.evaluate_bundle(instance, solution, individual, auction_pool))
+                fitness.append(bundle_fitness.evaluate_bundling(instance, solution, individual, auction_pool))
                 i += 1
 
         return fitness, population
@@ -450,7 +455,6 @@ class GeneticAlgorithm(BundlePoolGenerationBehavior):
             offspring[i] = closest_centroid
 
         pass
-
 
 def stirling_second(n, k):
     """

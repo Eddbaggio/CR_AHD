@@ -212,6 +212,7 @@ class RequestSelectionBehaviorBundle(RequestSelectionBehavior, ABC):
     @abstractmethod
     def _evaluate_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
                          bundle: Sequence[int]):
+        # TODO It could literally be a bundle_valuation strategy that is executed here
         pass
 
 
@@ -278,8 +279,8 @@ class SpatioTemporalBundle(RequestSelectionBehaviorBundle):
         # normalize to range [0, 1]
         max_pickup_delivery_dist = 0
         min_pickup_delivery_dist = float('inf')
-        for request1 in solution.carriers[carrier].accepted_requests[:-1]:
-            for request2 in solution.carriers[carrier].accepted_requests[1:]:
+        for i, request1 in enumerate(solution.carriers[carrier].accepted_requests[:-1]):
+            for request2 in solution.carriers[carrier].accepted_requests[i + 1:]:
                 d = instance.distance(instance.pickup_delivery_pair(request1), instance.pickup_delivery_pair(request2))
                 if d > max_pickup_delivery_dist:
                     max_pickup_delivery_dist = d

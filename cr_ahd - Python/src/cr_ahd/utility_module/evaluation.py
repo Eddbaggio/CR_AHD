@@ -1,12 +1,9 @@
 import warnings
-from pathlib import Path
-from typing import Sequence, Iterable, List, Tuple
+from typing import Sequence, List, Tuple
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import plotly.express as px
-from plotly import graph_objects as go
-from plotly.subplots import make_subplots
 
 import src.cr_ahd.utility_module.utils as ut
 
@@ -17,21 +14,6 @@ labels = {'num_carriers': 'Number of Carriers',
           'n': 'Number of requests per carrier',
           }
 
-solver_config = ['solution_algorithm',
-                 'tour_construction',
-                 'tour_improvement',
-                 'time_window_management',
-                 'time_window_offering',
-                 'time_window_selection',
-                 'auction_tour_construction',
-                 'auction_tour_improvement',
-                 'num_submitted_requests',
-                 'request_selection',
-                 'bundle_generation',
-                 'num_auction_bundles',
-                 'bidding',
-                 'winner_determination',
-                 ]
 category_orders = {'solution_algorithm': ['IsolatedPlanning',
                                           'CollaborativePlanning',
                                           # 'CentralizedPlanning'
@@ -272,16 +254,16 @@ def print_top_level_stats(carrier_df: pd.DataFrame):
 if __name__ == '__main__':
     df = pd.read_csv(
         "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home "
-        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_carrier_#035.csv",
+        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_carrier_#045.csv",
     )
     df.fillna('None', inplace=True)
-    df.set_index(['rad', 'n', 'run', 'carrier_id_'] + solver_config, inplace=True)
+    df.set_index(['rad', 'n', 'run', 'carrier_id_'] + ut.solver_config, inplace=True)
     # print_top_level_stats(df)
     bar_chart(df,
               title='',
               values='sum_profit',
               category='run',
-              color=['solution_algorithm', 'num_submitted_requests'],
+              color=['solution_algorithm', 'bundle_valuation'],
               facet_col='rad',
               facet_row='n',
               show=True,

@@ -21,6 +21,15 @@ logging.config.dictConfig(log.LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
 
 
+def solver_generator():
+    """
+    generate dicts with all parameters that shall be tested.
+    This requires both Isolated and collaborative Planning Solvers to operate on the same level of the nested for loop...
+    May take as input the different parameter lists that shall be tested.
+    """
+    raise NotImplementedError
+
+
 def execute_all(instance: it.PDPInstance, plot=False):
     """
     :param instance: (custom) instance that will we (deep)copied for each algorithm
@@ -78,35 +87,41 @@ def execute_all(instance: it.PDPInstance, plot=False):
                             # 300,
                             # 500
                         ]:
+                            for bundle_valuation in [  # TODO bundle_evaluation is not yet in the solution dictionary thing. cannot be used as a splitter in plotting
+                                bv.GHProxyBundlingValuation(),
+                                bv.MinDistanceBundlingValuation(),
+                                bv.LosSchulteBundlingValuation(),
+                            ]:
 
-                            auction = au.Auction(tour_construction,
-                                                 tour_improvement,
-                                                 request_selection,
-                                                 bg.GeneticAlgorithm(num_auction_bundles=num_auction_bundles,
-                                                                     population_size=300,
-                                                                     num_generations=100,
-                                                                     mutation_rate=0.5,
-                                                                     generation_gap=0.9,
-                                                                     bundle_valuation=bv.GHProxyBundleValuation()),
-                                                 bd.DynamicReOptAndImprove(tour_construction, tour_improvement),
-                                                 wd.MaxBidGurobiCAP1(),
-                                                 )
+                                auction = au.Auction(tour_construction,
+                                                     tour_improvement,
+                                                     request_selection,
+                                                     bg.GeneticAlgorithm(num_auction_bundles=num_auction_bundles,
+                                                                         population_size=300,
+                                                                         num_generations=100,
+                                                                         mutation_rate=0.5,
+                                                                         generation_gap=0.9,
+                                                                         bundle_valuation=bundle_valuation),
+                                                     bd.DynamicReOptAndImprove(tour_construction, tour_improvement),
+                                                     wd.MaxBidGurobiCAP1(),
+                                                     )
 
-                            # [2] Collaborative Planning
-                            solver = slv.Solver(tour_construction, tour_improvement, tw_management, auction)
-                            try:
-                                solution = solver.execute(instance, isolated_planning_starting_solution)
-                                solution.write_to_json()
-                                solutions.append(deepcopy(solution))
+                                # [2] Collaborative Planning
+                                solver = slv.Solver(tour_construction, tour_improvement, tw_management, auction)
+                                try:
+                                    solution = solver.execute(instance, isolated_planning_starting_solution)
+                                    solution.write_to_json()
+                                    solutions.append(deepcopy(solution))
 
-                            except Exception as e:
-                                raise e
-                                logger.error(
-                                    f'{e}\nFailed on instance {instance} with solver {solver.__class__.__name__}')
-                                solution = slt.CAHDSolution(instance)  # create an empty solution for failed instances
-                                solver.update_solution_solver_config(solution)
-                                solution.write_to_json()
-                                solutions.append(solution)
+                                except Exception as e:
+                                    raise e
+                                    logger.error(
+                                        f'{e}\nFailed on instance {instance} with solver {solver.__class__.__name__}')
+                                    solution = slt.CAHDSolution(
+                                        instance)  # create an empty solution for failed instances
+                                    solver.update_solution_solver_config(solution)
+                                    solution.write_to_json()
+                                    solutions.append(solution)
 
     return solutions
 
@@ -178,7 +193,7 @@ def write_solution_summary_to_multiindex_df(solutions_per_instance: List[List[sl
 
     # set the multiindex
 
-    index = ['rad', 'n', 'run'] + ev.solver_config
+    index = ['rad', 'n', 'run'] + ut.solver_config
     if agg_level == 'carrier':
         index += ['carrier_id_']
     if agg_level == 'tour':
@@ -212,7 +227,7 @@ if __name__ == '__main__':
                  title='Population size 300',
                  values='sum_profit',
                  category='run',
-                 color=['solution_algorithm', 'num_submitted_requests'],
+                 color=['solution_algorithm', 'bundle_valuation'],
                  facet_col='rad',
                  facet_row='n',
                  show=True,

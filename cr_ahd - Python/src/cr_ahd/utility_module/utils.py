@@ -32,16 +32,6 @@ class TimeWindow:
         return f'[D{self.open.day} {self.open.strftime("%H:%M:%S")} - D{self.close.day} {self.close.strftime("%H:%M:%S")}]'
 
 
-opts = {
-    'verbose': 0,
-    'plot_level': 1,
-    'max_tour_length': 850,  # pretty arbitrary for now
-    'alpha_1': 0.5,
-    'mu': 1,
-    'lambda': 2,
-    'ccycler': plt.cycler(color=plt.get_cmap('Set1').colors)(),
-}
-
 working_dir = Path()
 data_dir = working_dir.absolute().parent.parent.parent.joinpath('data')
 input_dir = data_dir.joinpath('Input')
@@ -138,22 +128,6 @@ class ConstraintViolationError(Exception):
     def __init__(self, expression='', message=''):
         self.expression = expression
         self.message = message
-
-
-def timer(func):
-    """Print the runtime of the decorated function"""
-
-    @functools.wraps(func)
-    def wrapper_timer(*args, **kwargs):
-        start_time = time.perf_counter()  # 1
-        value = func(*args, **kwargs)
-        end_time = time.perf_counter()  # 2
-        run_time = end_time - start_time  # 3
-        if opts['verbose'] > 0:
-            print(f"Finished {func.__name__!r} in {run_time:.4f} secs")
-        return value, run_time
-
-    return wrapper_timer
 
 
 def unique_path(directory, name_pattern) -> Path:
@@ -359,14 +333,10 @@ def natural_sort_key(s, _nsre=re.compile('([0-9]+)')):
 
 
 def indices_to_nested_lists(indices: Sequence[int], elements: Sequence):
-    result = []
-    for i in range(max(indices) + 1):
-        sublist = []
-        for j in range(len(elements)):
-            if indices[j] == i:
-                sublist.append(elements[j])
-        result.append(sublist)
-    return result
+    nested_list = [[] for _ in range(max(indices) + 1)]
+    for x, y in zip(elements, indices):
+        nested_list[y].append(x)
+    return nested_list
 
 
 def validate_solution(instance, solution):
@@ -413,6 +383,23 @@ TW_LENGTH: dt.timedelta = dt.timedelta(hours=2)
 ALL_TW = [TimeWindow(e, min(e + TW_LENGTH, END_TIME)) for e in datetime_range(START_TIME, END_TIME, freq=TW_LENGTH)]
 TIME_HORIZON = TimeWindow(START_TIME, END_TIME)
 SPEED_KMH = 60  # vehicle speed (set to 60 to treat distance = time)
+
+solver_config = ['solution_algorithm',
+                 'tour_construction',
+                 'tour_improvement',
+                 'time_window_management',
+                 'time_window_offering',
+                 'time_window_selection',
+                 'auction_tour_construction',
+                 'auction_tour_improvement',
+                 'num_submitted_requests',
+                 'request_selection',
+                 'bundle_generation',
+                 'bundle_valuation',
+                 'num_auction_bundles',
+                 'bidding',
+                 'winner_determination',
+                 ]
 
 if __name__ == '__main__':
     @timing

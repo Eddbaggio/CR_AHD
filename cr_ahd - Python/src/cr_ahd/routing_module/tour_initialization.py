@@ -171,7 +171,7 @@ class MaxCliqueTourInitialization(ABC):
         for i, i_request in enumerate(carrier_.unrouted_requests[:-1]):
             i_pickup, i_delivery = instance.pickup_delivery_pair(i_request)
 
-            for j, j_request in enumerate(carrier_.unrouted_requests[1:], start=1):
+            for j, j_request in enumerate(carrier_.unrouted_requests[i+1:], start=1):
                 j_pickup, j_delivery = instance.pickup_delivery_pair(j_request)
 
                 tour_ = tr.Tour('tmp', instance, solution, solution.carrier_depots[carrier][0])

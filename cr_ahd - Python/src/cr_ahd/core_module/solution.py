@@ -30,22 +30,7 @@ class CAHDSolution:
         self.carrier_depots = [[depot] for depot in range(instance.num_depots)]
 
         # stuff that is filled during the solving
-        self.solver_config = dict(
-            solution_algorithm=None,
-            tour_construction=None,
-            tour_improvement=None,
-            time_window_management=None,
-            time_window_offering=None,
-            time_window_selection=None,
-            auction_tour_construction=None,
-            auction_tour_improvement=None,
-            num_submitted_requests=None,
-            request_selection=None,
-            num_auction_bundles=None,
-            bundle_generation=None,
-            bidding=None,
-            winner_determination=None,
-        )
+        self.solver_config = {config: None for config in ut.solver_config}
 
         self.timings = dict()
 
