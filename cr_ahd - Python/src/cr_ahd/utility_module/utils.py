@@ -402,11 +402,4 @@ solver_config = ['solution_algorithm',
                  ]
 
 if __name__ == '__main__':
-    @timing
-    def f(a):
-        for _ in range(a):
-            i = 0
-        return -1
-
-
-    f(1000000)
+    pass

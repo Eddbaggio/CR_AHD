@@ -146,7 +146,7 @@ class GeneticAlgorithm(BundlePoolGenerationBehavior):
                                                          population_size,
                                                          bundle_valuation)
 
-        for generation_counter in tqdm.trange(1, num_generations, desc='Bundle Generation', disable=False):
+        for generation_counter in tqdm.trange(1, num_generations, desc='Bundle Generation', disable=True):
 
             # initialize new generation with the elites from the previous generation
             elites = ut.argsmax(fitness, int(population_size * (1 - generation_gap)))
@@ -271,7 +271,9 @@ class GeneticAlgorithm(BundlePoolGenerationBehavior):
         fitness = []
 
         # initialize at least one k-means bundle that is also likely to be feasible (only location-based)
-        k_means_individual = list(SingleKMeansBundle(self.num_auction_bundles).execute_bundle_pool_generation(instance, solution, auction_pool, None))
+        k_means_individual = list(
+            SingleKMeansBundle(self.num_auction_bundles).execute_bundle_pool_generation(instance, solution,
+                                                                                        auction_pool, None))
 
         self._normalize_individual(k_means_individual)
         if k_means_individual not in population:
@@ -312,13 +314,7 @@ class GeneticAlgorithm(BundlePoolGenerationBehavior):
 
     @staticmethod
     def _roulette_wheel(fitness: Sequence[float], n: int = 2):
-        fitness_adj = []
-        for elem in fitness:
-            if elem == -float('inf'):
-                fitness_adj.append(0)
-            else:
-                fitness_adj.append(elem)
-        parents = random.choices(range(len(fitness)), weights=fitness_adj, k=n)
+        parents = random.choices(range(len(fitness)), weights=fitness, k=n)
         return parents
 
     @staticmethod
@@ -455,6 +451,7 @@ class GeneticAlgorithm(BundlePoolGenerationBehavior):
             offspring[i] = closest_centroid
 
         pass
+
 
 def stirling_second(n, k):
     """

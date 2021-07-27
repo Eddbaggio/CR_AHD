@@ -326,7 +326,7 @@ class GHProxyBundlingValuation(BundlingValuation):
             # if there is no feasible tour for this bundle, return a valuation of negative infinity for the whole
             # bundling
             if approx_travel_dist == float('inf'):
-                return -float('inf')
+                return 0
 
             total_travel_distances.append(approx_travel_dist)
 
@@ -346,6 +346,7 @@ class MinDistanceBundlingValuation(BundlingValuation):
     the value of a bundle is determined by the total travel distance of traversing all its requests. Uses the
     dynamic insertion procedure seen everywhere else
     """
+
     @pr.timing
     def evaluate_bundling(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
                           bundling_labels: Sequence[int], auction_request_pool: Sequence[int]) -> float:
@@ -371,7 +372,8 @@ class LosSchulteBundlingValuation(BundlingValuation):
                 # adjust vertex indices to account for depots
                 p0 -= instance.num_depots
                 d0 -= instance.num_depots
-                bundle_valuations.append(self.vertex_similarity_matrix[p0][d0])  # todo: cluster weights acc. to cluster size?
+                bundle_valuations.append(
+                    self.vertex_similarity_matrix[p0][d0])  # todo: cluster weights acc. to cluster size?
                 continue
 
             # lower relatedness values are better
@@ -400,14 +402,15 @@ class LosSchulteBundlingValuation(BundlingValuation):
 
             # collect mean relatedness of the requests in the bundle; lower values are better
             # TODO try max, min or other measures instead of mean?
-            bundle_valuations.append(sum(request_relatedness_list) / len(bundle)) # todo: cluster weights acc. to cluster size?
+            bundle_valuations.append(
+                sum(request_relatedness_list) / len(bundle))  # todo: cluster weights acc. to cluster size?
 
         # compute mean valuation of the bundles in the bundling; lower values are better
         # TODO try max, min or other measures instead of mean?
         bundling_valuation = sum(bundle_valuations) / len(bundle_valuations)
 
         # return inverse, since low values are better and the caller maximizes
-        return 1/bundling_valuation
+        return 1 / bundling_valuation
 
     def preprocessing(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_request_pool: Sequence[int]):
         """
@@ -441,3 +444,9 @@ class LosSchulteBundlingValuation(BundlingValuation):
 
                 # [6] pickup2 <> delivery2
                 self.vertex_similarity_matrix[j][j + n] = los_schulte_similarity(instance, solution, pickup2, delivery2)
+
+
+class RandomBundlingValuation(BundlingValuation):
+    def evaluate_bundling(self, instance: it.PDPInstance, solution: slt.CAHDSolution, bundling_labels: Sequence[int],
+                          auction_request_pool: Sequence[int]) -> float:
+        return random.random()

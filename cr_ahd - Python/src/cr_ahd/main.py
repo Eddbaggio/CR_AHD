@@ -5,7 +5,9 @@ from copy import deepcopy
 from pathlib import Path
 from typing import List
 from datetime import datetime
-
+import os
+import cProfile
+import pstats
 import pandas as pd
 from tqdm import tqdm
 
@@ -21,81 +23,70 @@ logging.config.dictConfig(log.LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
 
 
-def solver_generator():
+def parameter_generator():
     """
     generate dicts with all parameters that shall be tested.
     This requires both Isolated and collaborative Planning Solvers to operate on the same level of the nested for loop...
     May take as input the different parameter lists that shall be tested.
     """
-    raise NotImplementedError
-
-
-def execute_all(instance: it.PDPInstance, plot=False):
-    """
-    :param instance: (custom) instance that will we (deep)copied for each algorithm
-    :return: evaluation metrics (Instance.evaluation_metrics) of all the solutions obtained
-    """
-    solutions = []
-
-    # define underlying modular elements and loop over all combinations
-    neighborhoods = [ls.PDPMove(), ls.PDPTwoOpt()]
-    for tour_construction in [
+    neighborhoods = [  # these are static at the moment
+        ls.PDPMove(),
+        ls.PDPTwoOpt()
+    ]
+    tour_constructions = [
         cns.MinTravelDistanceInsertion(),
         # cns.MinTimeShiftInsertion()
-    ]:
-        for tour_improvement in [
-            mh.PDPVariableNeighborhoodDescent(neighborhoods),
-            # mh.NoMetaheuristic(neighborhoods)
-        ]:
-            for tw_management in [
-                twm.TWManagementSingle(two.FeasibleTW(),
-                                       tws.UnequalPreference()),
-                # twm.TWManagementNoTW(None, None)
-            ]:
+    ]
+    tour_improvements = [
+        mh.PDPVariableNeighborhoodDescent(neighborhoods),
+        # mh.NoMetaheuristic(neighborhoods)
+    ]
+    time_window_managements = [
+        twm.TWManagementSingle(two.FeasibleTW(),
+                               tws.UnequalPreference()),
+        # twm.TWManagementNoTW(None, None)
+    ]
+    nums_submitted_requests = [
+        4,
+        # 5
+    ]
+    request_selections = [
+        # rs.Random,
+        rs.SpatialBundle,  # the original one from Gansterer & Hartl
+        # rs.TemporalRangeCluster,
+        # TODO SpatioTemporalCluster is not yet good enough & sometimes even infeasible
+        # rs.SpatioTemporalCluster
+    ]
+    nums_auction_bundles = [
+        # 50,
+        100,
+        # 200,
+        # 300,
+        # 500
+    ]
+    bundle_valuations = [
+        bv.GHProxyBundlingValuation(),
+        # bv.MinDistanceBundlingValuation(),
+        # bv.LosSchulteBundlingValuation(),
+        # bv.RandomBundlingValuation(),
+    ]
 
-                # [1] Isolated Planning
-                solver = slv.Solver(tour_construction, tour_improvement, tw_management, False)
-                try:
-                    solution = solver.execute(instance)
-                    isolated_planning_starting_solution = solution
-                    solution.write_to_json()
-                    solutions.append(deepcopy(solution))
-
-                except Exception as e:
-                    raise e
-                    logger.error(f'{e}\nFailed on instance {instance} with solver {solver.__class__.__name__}')
-                    solution = slt.CAHDSolution(instance)  # create an empty solution for failed instances
-                    solver.update_solution_solver_config(solution)
-                    solution.write_to_json()
-                    solutions.append(solution)
-
-                for num_submitted_requests in [
-                    4,
-                    # 5
-                ]:
-                    for request_selection in [
-                        # rs.Random(num_submitted_requests),
-                        rs.SpatialBundle(num_submitted_requests),
-                        # rs.TemporalRangeCluster(num_submitted_requests),
-                        # TODO SpatioTemporalCluster is not yet good enough & sometimes even infeasible
-                        # rs.SpatioTemporalCluster(num_submitted_requests)
-                    ]:
-                        for num_auction_bundles in [
-                            # 50,
-                            100,
-                            # 200,
-                            # 300,
-                            # 500
-                        ]:
-                            for bundle_valuation in [  # TODO bundle_evaluation is not yet in the solution dictionary thing. cannot be used as a splitter in plotting
-                                bv.GHProxyBundlingValuation(),
-                                bv.MinDistanceBundlingValuation(),
-                                bv.LosSchulteBundlingValuation(),
-                            ]:
-
+    for tour_construction in tour_constructions:
+        for tour_improvement in tour_improvements:
+            for time_window_management in time_window_managements:
+                # Isolated Planning Parameters, no auction
+                yield dict(tour_construction=tour_construction,
+                           tour_improvement=tour_improvement,
+                           time_window_management=time_window_management,
+                           auction=False,
+                           )
+                for num_submitted_requests in nums_submitted_requests:
+                    for request_selection in request_selections:
+                        for num_auction_bundles in nums_auction_bundles:
+                            for bundle_valuation in bundle_valuations:
                                 auction = au.Auction(tour_construction,
                                                      tour_improvement,
-                                                     request_selection,
+                                                     request_selection(num_submitted_requests),
                                                      bg.GeneticAlgorithm(num_auction_bundles=num_auction_bundles,
                                                                          population_size=300,
                                                                          num_generations=100,
@@ -105,23 +96,38 @@ def execute_all(instance: it.PDPInstance, plot=False):
                                                      bd.DynamicReOptAndImprove(tour_construction, tour_improvement),
                                                      wd.MaxBidGurobiCAP1(),
                                                      )
+                                yield dict(tour_construction=tour_construction,
+                                           tour_improvement=tour_improvement,
+                                           time_window_management=time_window_management,
+                                           auction=auction,
+                                           )
+    pass
 
-                                # [2] Collaborative Planning
-                                solver = slv.Solver(tour_construction, tour_improvement, tw_management, auction)
-                                try:
-                                    solution = solver.execute(instance, isolated_planning_starting_solution)
-                                    solution.write_to_json()
-                                    solutions.append(deepcopy(solution))
 
-                                except Exception as e:
-                                    raise e
-                                    logger.error(
-                                        f'{e}\nFailed on instance {instance} with solver {solver.__class__.__name__}')
-                                    solution = slt.CAHDSolution(
-                                        instance)  # create an empty solution for failed instances
-                                    solver.update_solution_solver_config(solution)
-                                    solution.write_to_json()
-                                    solutions.append(solution)
+def execute_all(instance: it.PDPInstance, plot=False):
+    """
+    :param instance: (custom) instance that will we (deep)copied for each algorithm
+    :return: evaluation metrics (Instance.evaluation_metrics) of all the solutions obtained
+    """
+    solutions = []
+    isolated_planning_starting_solution = None
+    for solver_params in parameter_generator():
+
+        solver = slv.Solver(**solver_params)
+        try:
+            solution = solver.execute(instance, isolated_planning_starting_solution)
+            if solution.solver_config['solution_algorithm'] == 'IsolatedPlanning':
+                isolated_planning_starting_solution = solution
+            solution.write_to_json()
+            solutions.append(deepcopy(solution))
+
+        except Exception as e:
+            raise e
+            logger.error(f'{e}\nFailed on instance {instance} with solver {solver.__class__.__name__}')
+            solution = slt.CAHDSolution(instance)  # create an empty solution for failed instances
+            solver.update_solution_solver_config(solution)
+            solution.write_to_json()
+            solutions.append(solution)
 
     return solutions
 
@@ -211,28 +217,44 @@ def write_solution_summary_to_multiindex_df(solutions_per_instance: List[List[sl
 
 
 if __name__ == '__main__':
-    logger.info(f'START {datetime.now()}')
+    def cr_ahd():
+        logger.info(f'START {datetime.now()}')
 
-    # paths = [Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/test.dat')]
-    paths = sorted(
-        list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
-        key=ut.natural_sort_key)
-    paths = paths[83:84]
+        # paths = [Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/test.dat')]
+        paths = sorted(
+            list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
+            key=ut.natural_sort_key)
+        paths = paths[50:51]
 
-    solutions = m_solve_single_thread(paths, plot=False)
-    # solutions = m_solve_multi_thread(paths)
+        solutions = m_solve_single_thread(paths, plot=False)
+        # solutions = m_solve_multi_thread(paths)
 
-    df = write_solution_summary_to_multiindex_df(solutions, 'carrier')
-    ev.bar_chart(df,
-                 title='Population size 300',
-                 values='sum_profit',
-                 category='run',
-                 color=['solution_algorithm', 'bundle_valuation'],
-                 facet_col='rad',
-                 facet_row='n',
-                 show=True,
-                 html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix())
+        df = write_solution_summary_to_multiindex_df(solutions, 'carrier')
+        ev.bar_chart(df,
+                     title='Population size 300',
+                     values='sum_profit',
+                     category='rad',
+                     color=['solution_algorithm', 'bundle_valuation'],
+                     facet_col=None,
+                     facet_row='n',
+                     show=True,
+                     html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix())
 
-    ev.print_top_level_stats(df)
+        ev.print_top_level_stats(df)
 
-    logger.info(f'END {datetime.now()}')
+        logger.info(f'END {datetime.now()}')
+        # send windows to sleep
+        # os.system("rundll32.exe powrprof.dll,SetSuspendState 0,1,0")
+
+    # PROFILING
+    cProfile.run('cr_ahd()', ut.output_dir.joinpath('cr_ahd_stats'))
+    # STATS
+    p = pstats.Stats(ut.output_dir.joinpath('cr_ahd_stats').as_posix())
+    # remove the extraneous path from all the module names:
+    p.strip_dirs()
+    # sorts the profile by cumulative time in a function, and then only prints the ten most significant lines:
+    p.sort_stats('cumtime').print_stats(50)
+    # see what functions were looping a lot, and taking a lot of time:
+    p.sort_stats('tottime').print_stats(20)
+    p.sort_stats('ncalls').print_stats(20)
+    p.print_callers(20)
