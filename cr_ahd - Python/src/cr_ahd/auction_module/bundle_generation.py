@@ -1,7 +1,8 @@
+import abc
 import logging
 import random
 from abc import ABC, abstractmethod
-from typing import Iterable, Sequence, List, Callable, Union
+from typing import Iterable, Sequence, List, Callable, Union, Tuple
 
 import numpy as np
 from sklearn.cluster import KMeans
@@ -14,6 +15,8 @@ from src.cr_ahd.utility_module import utils as ut, profiling as pr
 logger = logging.getLogger(__name__)
 
 """
+!!! NAMING CONVENTION !!!
+
 auction_request_pool: Sequence[int][int]
     a sequence of request indices of the requests that were submitted to be auctioned
     
@@ -35,9 +38,54 @@ bundling_labels: Sequence[int]
 """
 
 
-class BundlePoolGenerationBehavior(ABC):
-    def __init__(self, num_auction_bundles: int, **kwargs):
+class SingleKMeansBundling:
+    """
+    creates a k-means partitions of the submitted requests. generates exactly as many clusters as there are carriers.
+    NOTE: ignores the num_auction_bundles
+    :return
+    """
+
+    @staticmethod
+    def generate_bundling(instance: it.PDPInstance, auction_request_pool: Sequence[int]):
+        request_midpoints = [ut.midpoint(instance, *instance.pickup_delivery_pair(sr)) for sr in auction_request_pool]
+        # k_means = KMeans(n_clusters=instance.num_carriers, random_state=0).fit(request_midpoints)
+        k_means = KMeans(n_clusters=instance.num_carriers).fit(request_midpoints)
+        return k_means.labels_
+
+
+class UnlimitedBundlePoolGenerationBehavior(ABC):
+    def execute_bundle_pool_generation(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
+                                       auction_request_pool: Sequence[int],
+                                       original_bundling_labels: Sequence[int]):
+        auction_bundle_pool = self._generate_auction_bundles(instance, solution, auction_request_pool,
+                                                             original_bundling_labels)
+        return auction_bundle_pool
+
+    @abstractmethod
+    def _generate_auction_bundles(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
+                                  auction_request_pool: Sequence[int],
+                                  original_bundling_labels: Sequence[int]):
+        pass
+
+
+class AllBundles(UnlimitedBundlePoolGenerationBehavior):
+    """
+    creates the power set of all the submitted requests, i.e. all subsets of size k for all k = 1, ..., len(pool).
+    Does not include emtpy set.
+    """
+
+    def _generate_auction_bundles(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
+                                  auction_request_pool: Sequence[int],
+                                  original_bundling_labels: Sequence[int]):
+        return tuple(ut.power_set(range(len(auction_request_pool)), False))
+
+
+class LimitedBundlePoolGenerationBehavior(ABC):
+    """generates a pool of bundles that *may* previously have been bundlings"""
+
+    def __init__(self, num_auction_bundles: int, bundling_valuation: bv.BundlingValuation, **kwargs):
         self.num_auction_bundles = num_auction_bundles
+        self.bundling_valuation = bundling_valuation
         self.parameters = kwargs
 
     def execute_bundle_pool_generation(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
@@ -56,24 +104,37 @@ class BundlePoolGenerationBehavior(ABC):
         pass
 
     def preprocessing(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_request_pool: Sequence[int]):
-        if 'bundle_valuation' in self.parameters:
-            self.parameters['bundle_valuation'].preprocessing(instance, solution, auction_request_pool)
+        self.bundling_valuation.preprocessing(instance, solution, auction_request_pool)
         pass
 
 
-class AllBundles(BundlePoolGenerationBehavior):
-    """
-    creates the power set of all the submitted requests, i.e. all subsets of size k for all k = 1, ..., len(pool).
-    Does not include emtpy set. NOTE: Ignores the num_auction_bundles parameter
-    """
+class AllBundlings(LimitedBundlePoolGenerationBehavior):
+    """Creates all possible partitions of the auction request pool and evaluates them to find the best num_auction_bundles ones"""
 
     def _generate_auction_bundles(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
-                                  auction_request_pool: Sequence[int],
-                                  original_bundling_labels: Sequence[int]):
-        return tuple(ut.power_set(range(len(auction_request_pool)), False))
+                                  auction_request_pool: Sequence[int], original_bundling_labels: Sequence[int]):
+
+        all_bundlings = [[auction_request_pool]]
+        for k in range(2, instance.num_carriers + 1):
+            all_bundlings.extend(list(algorithm_u(auction_request_pool, k)))
+
+        bundling_valuations = []
+        for bundling in all_bundlings:
+            bundling_valuations.append(self.bundling_valuation.evaluate_bundling(instance, solution, bundling))
+
+        sorted_bundlings = (bundling for _, bundling in sorted(zip(bundling_valuations, all_bundlings), reverse=True))
+        limited_bundle_pool = [*bv.bundling_labels_to_bundling(original_bundling_labels, auction_request_pool)]
+        # todo loop significantly faster if the limited bundle pool was a set rather than a list! but the return of
+        #  bv.bundling_labels_to_bundling is unhashable List[List[int]]
+        while len(limited_bundle_pool) < self.num_auction_bundles:
+            for bundle in next(sorted_bundlings):
+                if bundle not in limited_bundle_pool:
+                    limited_bundle_pool.append(bundle)
+
+        return limited_bundle_pool
 
 
-class RandomMaxKPartition(BundlePoolGenerationBehavior):
+class RandomMaxKPartition(LimitedBundlePoolGenerationBehavior):
     """
     creates self.num_auction_bundles random partitions of the submitted bundles with AT MOST as many subsets as there
     are carriers
@@ -84,7 +145,7 @@ class RandomMaxKPartition(BundlePoolGenerationBehavior):
                                   original_bundling_labels: Sequence[int]):
         bundles = []
         num_bundles = 0
-        while num_bundles < self.num_auction_bundles - max(original_bundling_labels) + 1:
+        while num_bundles < self.num_auction_bundles - (max(original_bundling_labels) + 1):
             bundle = self._random_max_k_partition_idx(auction_request_pool, max_k=instance.num_carriers)
             if bundle not in bundles:
                 bundles.append(bundle)
@@ -108,23 +169,7 @@ class RandomMaxKPartition(BundlePoolGenerationBehavior):
         return indices
 
 
-class SingleKMeansBundle(BundlePoolGenerationBehavior):
-    """
-    creates a k-means partitions of the submitted requests. generates exactly as many clusters as there are carriers.
-    NOTE: ignores the num_auction_bundles
-    :return
-    """
-
-    def _generate_auction_bundles(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
-                                  auction_request_pool: Sequence[int],
-                                  original_bundling_labels: Sequence[int]):
-        request_midpoints = [ut.midpoint(instance, *instance.pickup_delivery_pair(sr)) for sr in auction_request_pool]
-        # k_means = KMeans(n_clusters=instance.num_carriers, random_state=0).fit(request_midpoints)
-        k_means = KMeans(n_clusters=instance.num_carriers).fit(request_midpoints)
-        return k_means.labels_
-
-
-class GeneticAlgorithm(BundlePoolGenerationBehavior):
+class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
     @pr.timing
     def _generate_auction_bundles(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
                                   auction_request_pool: Sequence[int],
@@ -136,7 +181,6 @@ class GeneticAlgorithm(BundlePoolGenerationBehavior):
         # only a fraction of generation_gap is replaced in a new gen. the remaining individuals (generation overlap)
         # are the top (1-generation_gap)*100 % from the previous gen, measured by their fitness
         generation_gap: float = self.parameters['generation_gap']
-        bundle_valuation: bv.BundlingValuation = self.parameters['bundle_valuation']
 
         fitness, population = self.initialize_population(instance,
                                                          solution,
@@ -144,7 +188,7 @@ class GeneticAlgorithm(BundlePoolGenerationBehavior):
                                                          original_bundling_labels,
                                                          instance.num_carriers,
                                                          population_size,
-                                                         bundle_valuation)
+                                                         self.bundling_valuation)
 
         for generation_counter in tqdm.trange(1, num_generations, desc='Bundle Generation', disable=True):
 
@@ -170,8 +214,8 @@ class GeneticAlgorithm(BundlePoolGenerationBehavior):
 
                 else:
                     # fitness evaluation
-                    offspring_fitness = bundle_valuation.evaluate_bundling(instance, solution, offspring,
-                                                                           auction_request_pool)
+                    offspring_fitness = self.bundling_valuation.evaluate_bundling_labels(instance, solution, offspring,
+                                                                                         auction_request_pool)
 
                     # add offspring to the new gen and increase population size counter
                     new_population.append(offspring)
@@ -252,7 +296,8 @@ class GeneticAlgorithm(BundlePoolGenerationBehavior):
 
         return offspring
 
-    def initialize_population(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_pool: Sequence,
+    def initialize_population(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
+                              auction_request_pool: Sequence,
                               original_bundles: Sequence, n: int, population_size: int,
                               bundle_fitness: bv.BundlingValuation):
         """
@@ -261,7 +306,7 @@ class GeneticAlgorithm(BundlePoolGenerationBehavior):
 
         :param instance:
         :param solution:
-        :param auction_pool:
+        :param auction_request_pool:
         :param original_bundles:
         :param n:
         :param population_size:
@@ -271,25 +316,25 @@ class GeneticAlgorithm(BundlePoolGenerationBehavior):
         fitness = []
 
         # initialize at least one k-means bundle that is also likely to be feasible (only location-based)
-        k_means_individual = list(
-            SingleKMeansBundle(self.num_auction_bundles).execute_bundle_pool_generation(instance, solution,
-                                                                                        auction_pool, None))
+        k_means_individual = list(SingleKMeansBundling().generate_bundling(instance, auction_request_pool))
 
         self._normalize_individual(k_means_individual)
         if k_means_individual not in population:
             population.append(k_means_individual)
-            fitness.append(bundle_fitness.evaluate_bundling(instance, solution, k_means_individual, auction_pool))
+            fitness.append(
+                bundle_fitness.evaluate_bundling_labels(instance, solution, k_means_individual, auction_request_pool))
 
         # fill the rest of the population with random individuals
         i = 1
         while i < population_size:
-            individual = ut.random_max_k_partition_idx(auction_pool, n)
+            individual = ut.random_max_k_partition_idx(auction_request_pool, n)
             self._normalize_individual(individual)
             if individual in population:
                 continue
             else:
                 population.append(individual)
-                fitness.append(bundle_fitness.evaluate_bundling(instance, solution, individual, auction_pool))
+                fitness.append(
+                    bundle_fitness.evaluate_bundling_labels(instance, solution, individual, auction_request_pool))
                 i += 1
 
         return fitness, population
@@ -489,7 +534,7 @@ def algorithm_u(ns, m):
     https://codereview.stackexchange.com/a/1944
 
     Generates all set partitions with a given number of blocks. The total amount of k-partitions is given by the
-     Stirling number of the second kind
+    Stirling number of the second kind
 
     :param ns: sequence of integers to build the subsets from
     :param m: integer, smaller than ns, number of subsets
@@ -575,4 +620,8 @@ def algorithm_u(ns, m):
 
 
 if __name__ == '__main__':
-    pass
+    for p in list(algorithm_u(range(4), 3)) + list(algorithm_u(range(4), 2)) + list(algorithm_u(range(4), 1)):
+        print(p)
+
+    # for p in ut.power_set([0, 1, 2, 3, 4, 5], False):
+    #     print(p)

@@ -16,7 +16,7 @@ class Auction(ABC):
                  tour_construction: cns.PDPParallelInsertionConstruction,
                  tour_improvement: mh.PDPMetaHeuristic,
                  request_selection: rs.RequestSelectionBehavior,
-                 bundle_generation: bg.BundlePoolGenerationBehavior,
+                 bundle_generation: bg.LimitedBundlePoolGenerationBehavior,
                  bidding: bd.BiddingBehavior,
                  winner_determination: wd.WinnerDeterminationBehavior,
                  ):
@@ -57,7 +57,8 @@ class Auction(ABC):
             #     solution = self._reopt_and_improve(instance, solution)
 
             # Bundle Generation
-            auction_bundle_pool = self.bundle_generation.execute_bundle_pool_generation(instance, solution, auction_request_pool,
+            auction_bundle_pool = self.bundle_generation.execute_bundle_pool_generation(instance, solution,
+                                                                                        auction_request_pool,
                                                                                         original_bundling_labels)
             original_bundles = ut.indices_to_nested_lists(original_bundling_labels, auction_request_pool)
             original_bundles_indices = [auction_bundle_pool.index(x) for x in original_bundles]
@@ -73,7 +74,7 @@ class Auction(ABC):
                                                                                auction_request_pool,
                                                                                auction_bundle_pool, bids_matrix)
             winner_bundles_indices = [auction_bundle_pool.index(x) for x in winner_bundles]
-
+            # todo: store whether the auction did achieve a reallocation or not
             # bundle reallocation
             self.assign_bundles_to_winners(solution, winner_bundles, bundle_winners)
 
@@ -89,7 +90,6 @@ class Auction(ABC):
                 self.tour_construction.construct_dynamic(instance, solution, carrier)
         self.tour_improvement.execute(instance, solution)
 
-
         pass
 
     @staticmethod
@@ -103,3 +103,41 @@ class Auction(ABC):
             carrier_.assigned_requests.sort()
             carrier_.accepted_requests.sort()
             carrier_.unrouted_requests.sort()
+
+
+# ======================================================================================================================
+# THESE CLASSES ARE NOT YET IN USE
+# ======================================================================================================================
+
+class Bundle(list):
+    """bundle: Sequence[int]
+    a sequence of request indices that make up one bundle -> cannot have duplicates etc., maybe a set rather than a list
+    would be better?"""
+    pass
+
+
+class Bundling(list):
+    """bundling: Sequence[Sequence[int]]
+    a sequence of {bundles} (see above) that fully partition the {auction_request_pool}"""
+    pass
+
+
+class BundlingLabels(list):
+    """bundling_labels: Sequence[int]
+    a sequence of bundle indices that partitions the {auction_request_pool}
+     NOTE: Contrary to the {bundling}, the {bundling_labels} is not nested and does not contain request indices but
+     bundle indices"""
+    pass
+
+
+class AuctionRequestPool(list):
+    """auction_request_pool: Sequence[int][int]
+    a sequence of request indices of the requests that were submitted to be auctioned"""
+    pass
+
+
+class AuctionBundlePool(list):
+    """auction_bundle_pool: Sequence[Sequence[int]]
+    a nested sequence of request index sequences. Each inner sequence is a {bundle} inside the auction_bundle_pool that
+    carriers will have to bid on"""
+    pass

@@ -2,6 +2,7 @@ import logging.config
 import random
 from copy import deepcopy
 from typing import Union
+import time
 
 from src.cr_ahd.utility_module import utils as ut, profiling as pr
 from src.cr_ahd.auction_module import auction as au
@@ -48,8 +49,7 @@ class Solver:
         if self.auction:
             solution = self._auction_phase(instance, solution)
 
-        logger.info(
-            f'{instance.id_}: Success {solution.solver_config}')
+        logger.info(f'{instance.id_}: Success {solution.solver_config}')
 
         return solution
 

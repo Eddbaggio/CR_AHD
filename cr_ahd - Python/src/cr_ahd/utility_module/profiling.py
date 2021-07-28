@@ -1,16 +1,16 @@
 import time
-import inspect
 from functools import wraps
+from typing import Callable
 
 import src.cr_ahd.core_module.solution as slt
 
 
-def timing(f):
+def timing(f: Callable):
     @wraps(f)
     def wrap(*args, **kw):
-        ts = time.time()
+        ts = time.perf_counter()
         result = f(*args, **kw)
-        te = time.time()
+        te = time.perf_counter()
         # print(f'func:{f.__name__} args:[{args}, {kw}] took: {te - ts} sec')
 
         # store the timing in the solution

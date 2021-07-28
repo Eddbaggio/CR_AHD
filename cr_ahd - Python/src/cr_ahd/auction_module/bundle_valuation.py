@@ -2,13 +2,13 @@ import datetime as dt
 import random
 from abc import ABC, abstractmethod
 from math import ceil
-from typing import Sequence, Tuple
-from typing import Iterable
+from typing import Sequence, Tuple, List, final
+
 import numpy as np
 from scipy.spatial.distance import squareform, pdist
 
 from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
-from src.cr_ahd.routing_module import tour_initialization as ini, tour_construction as cns, metaheuristics as mh, \
+from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh, \
     local_search as ls
 from src.cr_ahd.utility_module import utils as ut, profiling as pr
 
@@ -266,12 +266,51 @@ def los_schulte_similarity(instance: it.PDPInstance, solution: slt.CAHDSolution,
     return gamma * ut.travel_time(instance.distance([vertex1], [vertex2])).total_seconds() + w_ij
 
 
+def bundling_labels_to_bundling(bundling_labels: Sequence[int], auction_request_pool: Sequence[int]):
+    """
+    duplicate of ut.indices_to_nested_list. uses the indices of bundling_labels to sort the items in
+    auction_request_pool into bins.
+
+    Example:
+        bundling_labels = [0, 0, 1, 2, 2, 1]
+        auction_request_pool = [1, 2, 3, 4, 5, 6]
+        bundling = [[1, 2], [3, 6], [4, 5]]
+
+    """
+    bundling = [[] for _ in range(max(bundling_labels) + 1)]
+    for x, y in zip(auction_request_pool, bundling_labels):
+        bundling[y].append(x)
+    return bundling
+
+
 # ======================================================================================================================
+# class BundleValuation(ABC):
+#     @abstractmethod
+#     def evaluate_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, bundle: Sequence[int]):
+#         """evaluates a single bundle"""
+#         pass
+#
+#
+# class LosSchulteBundleValuation(BundleValuation):
+#     def evaluate_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, bundle: Sequence[int]):
+
 
 class BundlingValuation(ABC):
+    """
+    Class to compute the valuation of a bundling based on some valuation measure(s)
+    """
+
+    @final
+    def evaluate_bundling_labels(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
+                                 bundling_labels: Sequence[int], auction_request_pool: Sequence[int]) -> float:
+        """turns bundling labels into bundling and evaluates that bundling"""
+        bundling = bundling_labels_to_bundling(bundling_labels, auction_request_pool)
+        return self.evaluate_bundling(instance, solution, bundling)
+
     @abstractmethod
     def evaluate_bundling(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
-                          bundling_labels: Sequence[int], auction_request_pool: Sequence[int]) -> float:
+                          bundling: List[List[int]]) -> float:
+        """evaluate a bundling"""
         pass
 
     def preprocessing(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_request_pool: Sequence[int]):
@@ -281,20 +320,16 @@ class BundlingValuation(ABC):
 class GHProxyBundlingValuation(BundlingValuation):
     @pr.timing
     def evaluate_bundling(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
-                          bundling_labels: Sequence[int], auction_request_pool: Sequence[int]) -> float:
+                          bundling: List[List[int]]) -> float:
         """
 
-        :param auction_request_pool:
-        :param instance:
-        :param solution:
-        :param bundling_labels: encoded as a sequence of bundle indices
         :return: the bundle's valuation/fitness
         """
         centroids = []
         request_direct_travel_distances = []
-        num_bundles = max(bundling_labels) + 1
+        num_bundles = len(bundling)
 
-        for bundle in ut.indices_to_nested_lists(bundling_labels, auction_request_pool):
+        for bundle in bundling:
             pd_direct_travel_dist = bundle_direct_travel_dist(instance, bundle)
             request_direct_travel_distances.append(pd_direct_travel_dist)
             centroid = bundle_centroid(instance, bundle, pd_direct_travel_dist)
@@ -306,10 +341,7 @@ class GHProxyBundlingValuation(BundlingValuation):
         densities = []
         total_travel_distances = []
 
-        for bundle_idx, bundle in enumerate(ut.indices_to_nested_lists(bundling_labels, auction_request_pool)):
-            # todo make the functions called below work with the GH decoding of bundles directly?
-            # recreate the bundle from the bundling_labels
-
+        for bundle_idx, bundle in enumerate(bundling):
             # compute the radius
             travel_dist_to_centroid = bundle_vertex_to_centroid_travel_dist(instance, bundle_idx, bundle,
                                                                             extended_distance_matrix)
@@ -337,34 +369,35 @@ class GHProxyBundlingValuation(BundlingValuation):
                                          radii[bundle_idx], radii[:bundle_idx] + radii[bundle_idx + 1:])
             isolations.append(isolation)
 
-        evaluation = (min(isolations) * min(densities)) / (max(total_travel_distances) * max(bundling_labels) + 1)
+        evaluation = (min(isolations) * min(densities)) / (max(total_travel_distances) * num_bundles)
         return evaluation
 
 
 class MinDistanceBundlingValuation(BundlingValuation):
     """
-    the value of a bundle is determined by the total travel distance of traversing all its requests. Uses the
-    dynamic insertion procedure seen everywhere else
+    The value of a BUNDLING is determined by the minimum over the travel distances per BUNDLE.
+    The travel distance of a bundle is determined by building a route that traverses all the bundle's requests using
+    the dynamic insertion procedure.
     """
 
     @pr.timing
     def evaluate_bundling(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
-                          bundling_labels: Sequence[int], auction_request_pool: Sequence[int]) -> float:
+                          bundling: List[List[int]]) -> float:
         bundle_valuations = []
-        for bundle in ut.indices_to_nested_lists(bundling_labels, auction_request_pool):
+        for bundle in bundling:
             valuation = bundle_total_travel_distance(instance, solution, bundle)
             bundle_valuations.append(valuation)
-        return -min(bundle_valuations)
+        return 1 / min(bundle_valuations)
 
 
 class LosSchulteBundlingValuation(BundlingValuation):
-    def evaluate_bundling(self, instance: it.PDPInstance, solution: slt.CAHDSolution, bundling_labels: Sequence[int],
-                          auction_request_pool: Sequence[int]) -> float:
+    def evaluate_bundling(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
+                          bundling: List[List[int]]) -> float:
         """
         uses the similarity measure by Los et al. (2020) to compute a clustering evaluation measure (cohesion)
         """
         bundle_valuations = []
-        for bundle in ut.indices_to_nested_lists(bundling_labels, auction_request_pool):
+        for bundle in bundling:
 
             # single-request bundles
             if len(bundle) == 1:
@@ -447,6 +480,6 @@ class LosSchulteBundlingValuation(BundlingValuation):
 
 
 class RandomBundlingValuation(BundlingValuation):
-    def evaluate_bundling(self, instance: it.PDPInstance, solution: slt.CAHDSolution, bundling_labels: Sequence[int],
-                          auction_request_pool: Sequence[int]) -> float:
+    def evaluate_bundling(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
+                          bundling: List[List[int]]) -> float:
         return random.random()

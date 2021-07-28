@@ -63,7 +63,7 @@ class RequestSelectionBehavior(ABC):
 
 
 # =====================================================================================================================
-# INDIVIDUAL REQUEST EVALUATION
+# SELECTION BASED ON INDIVIDUAL REQUEST EVALUATION
 # =====================================================================================================================
 
 class RequestSelectionBehaviorIndividual(RequestSelectionBehavior, ABC):
@@ -166,7 +166,7 @@ class PackedTW(RequestSelectionBehaviorIndividual):
 
 
 # =====================================================================================================================
-# BUNDLE-BASED EVALUATION
+# SELECTION BASED ON BUNDLE EVALUATION
 # =====================================================================================================================
 
 class RequestSelectionBehaviorBundle(RequestSelectionBehavior, ABC):

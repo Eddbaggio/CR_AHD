@@ -185,7 +185,7 @@ def merge_index_levels(df: pd.DataFrame, levels: Sequence):
     return df
 
 
-def print_top_level_stats(carrier_df: pd.DataFrame):
+def print_top_level_stats(carrier_df: pd.DataFrame, secondary_parameters: List[str]):
     if len(carrier_df) > 1:
         carrier_df = drop_single_value_index(carrier_df, ['rad', 'n', 'run', 'carrier_id_', 'solution_algorithm'])
 
@@ -231,8 +231,8 @@ def print_top_level_stats(carrier_df: pd.DataFrame):
 
         # collaboration gain
         print('=============/ collaboration gains /=============')
-        for name1, group1 in solution_df.groupby(['solution_algorithm', 'num_auction_bundles'], dropna=False):
-            for name2, group2 in solution_df.groupby(['solution_algorithm', 'num_auction_bundles'], dropna=False):
+        for name1, group1 in solution_df.groupby(['solution_algorithm', *secondary_parameters], dropna=False):
+            for name2, group2 in solution_df.groupby(['solution_algorithm', *secondary_parameters], dropna=False):
                 if name1 == name2:
                     continue
                 print(f"{name1}/{name2}")
@@ -242,7 +242,7 @@ def print_top_level_stats(carrier_df: pd.DataFrame):
 
         print('=============/ consistency check: collaborative better than isolated? /=============')
         for name, group in solution_df.groupby(
-                solution_df.index.names.difference(['solution_algorithm', 'request_selection']),
+                solution_df.index.names.difference(['solution_algorithm', *secondary_parameters]),
                 as_index=False,
                 dropna=False):
             isolated = group.xs('IsolatedPlanning', level='solution_algorithm').reset_index().iloc[0]

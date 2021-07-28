@@ -3,7 +3,7 @@ import logging.config
 import multiprocessing
 from copy import deepcopy
 from pathlib import Path
-from typing import List
+from typing import List, Union
 from datetime import datetime
 import os
 import cProfile
@@ -25,50 +25,52 @@ logger = logging.getLogger(__name__)
 
 def parameter_generator():
     """
-    generate dicts with all parameters that shall be tested.
-    This requires both Isolated and collaborative Planning Solvers to operate on the same level of the nested for loop...
-    May take as input the different parameter lists that shall be tested.
+    generate dicts with all parameters that shall be tested and are required to initialize a solver.
     """
-    neighborhoods = [  # these are static at the moment
+    neighborhoods: List[ls.LocalSearchBehavior] = [  # these are fixed at the moment
         ls.PDPMove(),
         ls.PDPTwoOpt()
     ]
-    tour_constructions = [
+    tour_constructions: List[cns.PDPParallelInsertionConstruction] = [
         cns.MinTravelDistanceInsertion(),
         # cns.MinTimeShiftInsertion()
     ]
-    tour_improvements = [
+    tour_improvements: List[mh.PDPMetaHeuristic] = [
         mh.PDPVariableNeighborhoodDescent(neighborhoods),
         # mh.NoMetaheuristic(neighborhoods)
     ]
-    time_window_managements = [
+    time_window_managements: List[twm.TWManagement] = [
         twm.TWManagementSingle(two.FeasibleTW(),
                                tws.UnequalPreference()),
         # twm.TWManagementNoTW(None, None)
     ]
-    nums_submitted_requests = [
+    nums_submitted_requests: List[int] = [
         4,
         # 5
     ]
-    request_selections = [
-        # rs.Random,
+    request_selections: List[rs.RequestSelectionBehavior.__class__] = [
+        rs.Random,
         rs.SpatialBundle,  # the original one from Gansterer & Hartl
         # rs.TemporalRangeCluster,
         # TODO SpatioTemporalCluster is not yet good enough & sometimes even infeasible
         # rs.SpatioTemporalCluster
     ]
-    nums_auction_bundles = [
+    nums_auction_bundles: List[int] = [
         # 50,
         100,
         # 200,
         # 300,
         # 500
     ]
-    bundle_valuations = [
-        bv.GHProxyBundlingValuation(),
-        # bv.MinDistanceBundlingValuation(),
-        # bv.LosSchulteBundlingValuation(),
-        # bv.RandomBundlingValuation(),
+    bundle_generations: List[bg.LimitedBundlePoolGenerationBehavior.__class__] = [
+        bg.GeneticAlgorithm,
+        bg.AllBundlings,
+    ]
+    bundle_valuations: List[bv.BundlingValuation.__class__] = [
+        # bv.GHProxyBundlingValuation,
+        # bv.MinDistanceBundlingValuation,
+        bv.LosSchulteBundlingValuation,
+        # bv.RandomBundlingValuation,
     ]
 
     for tour_construction in tour_constructions:
@@ -83,24 +85,26 @@ def parameter_generator():
                 for num_submitted_requests in nums_submitted_requests:
                     for request_selection in request_selections:
                         for num_auction_bundles in nums_auction_bundles:
-                            for bundle_valuation in bundle_valuations:
-                                auction = au.Auction(tour_construction,
-                                                     tour_improvement,
-                                                     request_selection(num_submitted_requests),
-                                                     bg.GeneticAlgorithm(num_auction_bundles=num_auction_bundles,
-                                                                         population_size=300,
-                                                                         num_generations=100,
-                                                                         mutation_rate=0.5,
-                                                                         generation_gap=0.9,
-                                                                         bundle_valuation=bundle_valuation),
-                                                     bd.DynamicReOptAndImprove(tour_construction, tour_improvement),
-                                                     wd.MaxBidGurobiCAP1(),
-                                                     )
-                                yield dict(tour_construction=tour_construction,
-                                           tour_improvement=tour_improvement,
-                                           time_window_management=time_window_management,
-                                           auction=auction,
-                                           )
+                            for bundle_generation in bundle_generations:
+                                for bundle_valuation in bundle_valuations:
+                                    auction = au.Auction(tour_construction,
+                                                         tour_improvement,
+                                                         request_selection(num_submitted_requests),
+                                                         bundle_generation(num_auction_bundles=num_auction_bundles,
+                                                                           bundling_valuation=bundle_valuation(),
+                                                                           population_size=300,
+                                                                           num_generations=100,
+                                                                           mutation_rate=0.5,
+                                                                           generation_gap=0.9,
+                                                                           ),
+                                                         bd.DynamicReOptAndImprove(tour_construction, tour_improvement),
+                                                         wd.MaxBidGurobiCAP1(),
+                                                         )
+                                    yield dict(tour_construction=tour_construction,
+                                               tour_improvement=tour_improvement,
+                                               time_window_management=time_window_management,
+                                               auction=auction,
+                                               )
     pass
 
 
@@ -122,7 +126,7 @@ def execute_all(instance: it.PDPInstance, plot=False):
             solutions.append(deepcopy(solution))
 
         except Exception as e:
-            raise e
+            # raise e
             logger.error(f'{e}\nFailed on instance {instance} with solver {solver.__class__.__name__}')
             solution = slt.CAHDSolution(instance)  # create an empty solution for failed instances
             solver.update_solution_solver_config(solution)
@@ -224,27 +228,30 @@ if __name__ == '__main__':
         paths = sorted(
             list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
             key=ut.natural_sort_key)
-        paths = paths[50:51]
+        paths = paths[:]
 
-        solutions = m_solve_single_thread(paths, plot=False)
-        # solutions = m_solve_multi_thread(paths)
+        if len(paths) <= 6:
+            solutions = m_solve_single_thread(paths, plot=False)
+        else:
+            solutions = m_solve_multi_thread(paths)
 
         df = write_solution_summary_to_multiindex_df(solutions, 'carrier')
         ev.bar_chart(df,
-                     title='Population size 300',
+                     title='BV:LosSchulte // num_auction_bundles: 100',
                      values='sum_profit',
-                     category='rad',
-                     color=['solution_algorithm', 'bundle_valuation'],
-                     facet_col=None,
+                     color=['solution_algorithm', 'request_selection', 'bundle_generation'],
+                     category='rad', facet_col=None,
+                     # category='run', facet_col='rad',
                      facet_row='n',
                      show=True,
                      html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix())
 
-        ev.print_top_level_stats(df)
+        ev.print_top_level_stats(df, ['request_selection', 'bundle_generation'])
 
         logger.info(f'END {datetime.now()}')
         # send windows to sleep
         # os.system("rundll32.exe powrprof.dll,SetSuspendState 0,1,0")
+
 
     # PROFILING
     cProfile.run('cr_ahd()', ut.output_dir.joinpath('cr_ahd_stats'))
@@ -257,4 +264,4 @@ if __name__ == '__main__':
     # see what functions were looping a lot, and taking a lot of time:
     p.sort_stats('tottime').print_stats(20)
     p.sort_stats('ncalls').print_stats(20)
-    p.print_callers(20)
+    # p.print_callers(20)
