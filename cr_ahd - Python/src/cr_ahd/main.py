@@ -50,10 +50,15 @@ def parameter_generator():
     ]
     request_selections: List[rs.RequestSelectionBehavior.__class__] = [
         rs.Random,
-        rs.SpatialBundle,  # the original one from Gansterer & Hartl
+        rs.SpatialBundleDSum,  # the original 'cluster' strategy by Gansterer & Hartl (2016)
+        rs.SpatialBundleDMax,
+        rs.MinDistanceToForeignDepotDMin,
+        rs.MarginalProfitProxy,
+        rs.MarginalProfitProxyNeighbor,
+        rs.Combo,
         # rs.TemporalRangeCluster,
         # TODO SpatioTemporalCluster is not yet good enough & sometimes even infeasible
-        # rs.SpatioTemporalCluster
+        # rs.SpatioTemporalCluster,
     ]
     nums_auction_bundles: List[int] = [
         # 50,
@@ -62,8 +67,8 @@ def parameter_generator():
         # 300,
         # 500
     ]
-    bundle_generations: List[bg.LimitedBundlePoolGenerationBehavior.__class__] = [
-        bg.GeneticAlgorithm,
+    bundle_generations: List[bg.LimitedBundlePoolGenerationBehavior.__class__] = [ #TODO make pairs of (bundle_gen, kwargs)
+        # bg.GeneticAlgorithm,
         bg.AllBundlings,
     ]
     bundle_valuations: List[bv.BundlingValuation.__class__] = [
@@ -228,25 +233,25 @@ if __name__ == '__main__':
         paths = sorted(
             list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
             key=ut.natural_sort_key)
-        paths = paths[:]
+        paths = paths[54:60]
 
-        if len(paths) <= 6:
+        if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=False)
         else:
             solutions = m_solve_multi_thread(paths)
 
         df = write_solution_summary_to_multiindex_df(solutions, 'carrier')
         ev.bar_chart(df,
-                     title='BV:LosSchulte // num_auction_bundles: 100',
+                     title='BG: AllBundlings // BV:LosSchulte // num_auction_bundles:100',
                      values='sum_profit',
-                     color=['solution_algorithm', 'request_selection', 'bundle_generation'],
+                     color=['solution_algorithm', 'request_selection'],
                      category='rad', facet_col=None,
                      # category='run', facet_col='rad',
                      facet_row='n',
                      show=True,
                      html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix())
 
-        ev.print_top_level_stats(df, ['request_selection', 'bundle_generation'])
+        ev.print_top_level_stats(df, ['request_selection'])
 
         logger.info(f'END {datetime.now()}')
         # send windows to sleep
@@ -255,6 +260,7 @@ if __name__ == '__main__':
 
     # PROFILING
     cProfile.run('cr_ahd()', ut.output_dir.joinpath('cr_ahd_stats'))
+    """
     # STATS
     p = pstats.Stats(ut.output_dir.joinpath('cr_ahd_stats').as_posix())
     # remove the extraneous path from all the module names:
@@ -265,3 +271,4 @@ if __name__ == '__main__':
     p.sort_stats('tottime').print_stats(20)
     p.sort_stats('ncalls').print_stats(20)
     # p.print_callers(20)
+    """

@@ -51,11 +51,6 @@ class Auction(ABC):
         if auction_request_pool:
             logger.debug(f'requests {auction_request_pool} have been submitted to the auction pool')
 
-            # optional reoptimization, not all auction variants do a reopt, the abstract method may be empty
-            # TODO does this even make any sense if i do complete dynamic reopt in bidding anyways?!
-            # if self.reopt_and_improve_after_request_selection:
-            #     solution = self._reopt_and_improve(instance, solution)
-
             # Bundle Generation
             auction_bundle_pool = self.bundle_generation.execute_bundle_pool_generation(instance, solution,
                                                                                         auction_request_pool,

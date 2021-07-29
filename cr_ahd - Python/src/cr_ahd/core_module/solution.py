@@ -19,6 +19,10 @@ class CAHDSolution:
 
         # the current REQUEST-to-carrier (not vertex-to-carrier) allocation, initialized with nan for all requests
         self.request_to_carrier_assignment = np.full(instance.num_requests, np.nan)
+        # store a lookup-table to get a request's tour index
+        self.request_to_tour_assignment = [None] * instance.num_requests  # TODO: use where appropriate
+        # store a lookup-table to get requests pickup_position and delivery_position
+        self.vertex_position_in_tour = [None] * (instance.num_depots + instance.num_requests * 2)  # TODO: use where appropriate
 
         # basically no apriori time windows for all VERTICES
         self.tw_open: List = np.full(instance.num_depots + 2 * instance.num_requests, ut.START_TIME).tolist()
@@ -29,11 +33,9 @@ class CAHDSolution:
         # one depot per carrier, can be adjusted externally for multi-depot, single-carrier problems
         self.carrier_depots = [[depot] for depot in range(instance.num_depots)]
 
-        # stuff that is filled during the solving
+        # solver configuration and other meta data
         self.solver_config = {config: None for config in ut.solver_config}
-
         self.timings = dict()
-
         # TODO find a better way to add available ls neighborhoods automatically
         self.local_search_move_counter = dict(PDPMove=0,
                                               PDPTwoOpt=0,

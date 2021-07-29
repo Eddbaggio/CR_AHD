@@ -32,6 +32,7 @@ class BiddingBehavior(ABC):
 
         bundle_bids = []
         for b in tqdm.trange(len(bundles), desc='Bidding', disable=True):
+            # assert [b[i] < b[i+1] for i in range(len(b)-1]  # make sure bundles are sorted?
             carrier_bundle_bids = []
             for carrier in range(instance.num_carriers):
                 logger.debug(f'Carrier {carrier} generating bids for bundle {b}')

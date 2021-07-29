@@ -1,14 +1,15 @@
 import datetime as dt
 import itertools
 import logging
+import random
 from abc import ABC, abstractmethod
 from math import comb
-from typing import Sequence, Iterable
+from typing import Sequence
 
 import numpy as np
 
-from src.cr_ahd.core_module import instance as it, solution as slt
-from src.cr_ahd.routing_module import tour_construction as cns
+from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
+from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh, local_search as ls
 from src.cr_ahd.utility_module import utils as ut
 
 logger = logging.getLogger(__name__)
@@ -63,7 +64,7 @@ class RequestSelectionBehavior(ABC):
 
 
 # =====================================================================================================================
-# SELECTION BASED ON INDIVIDUAL REQUEST EVALUATION
+# REQUEST SELECTION BASED ON INDIVIDUAL REQUEST EVALUATION
 # =====================================================================================================================
 
 class RequestSelectionBehaviorIndividual(RequestSelectionBehavior, ABC):
@@ -83,9 +84,14 @@ class RequestSelectionBehaviorIndividual(RequestSelectionBehavior, ABC):
         original_bundling_labels = []
         for carrier in range(instance.num_carriers):
             k = _abs_num_requests(solution.carriers[carrier], self.num_submitted_requests)
-            valuations = self._evaluate_requests(instance, solution, carrier)
+            valuations = []
+            for request in solution.carriers[carrier].accepted_requests:
+                valuation = self._evaluate_request(instance, solution, carrier, request)
+                valuations.append(valuation)
+
             # pick the WORST k evaluated requests (from ascending order)
             selected = [r for _, r in sorted(zip(valuations, solution.carriers[carrier].accepted_requests))][:k]
+            selected.sort()
 
             for request in selected:
                 self.remove_request_from_carrier(instance, solution, carrier, request)
@@ -95,12 +101,8 @@ class RequestSelectionBehaviorIndividual(RequestSelectionBehavior, ABC):
         return auction_request_pool, original_bundling_labels
 
     @abstractmethod
-    def _evaluate_requests(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
-        """
-        compute the carrier's valuation for all unrouted requests of that carrier.
-        NOTE: a high number corresponds to a high valuation
-
-        """
+    def _evaluate_request(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
+        """compute the valuation of the given request for the carrier"""
         pass
 
 
@@ -109,52 +111,173 @@ class Random(RequestSelectionBehaviorIndividual):
     returns a random selection of unrouted requests
     """
 
-    def _evaluate_requests(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
-        return np.random.random(len(solution.carriers[carrier].accepted_requests))
+    def _evaluate_request(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
+        return random.random()
 
 
-class HighestInsertionCostDistance(RequestSelectionBehaviorIndividual):
-    """given the current set of routes, returns the n unrouted requests that have the HIGHEST Insertion distance cost.
-     NOTE: since routes may not be final, the current highest-marginal-cost request might not have been chosen at an
-     earlier or later stage!"""
+class MarginalProfit(RequestSelectionBehaviorIndividual):
+    """
+        "Requests are selected based on their marginal profits. It is calculated by diminishing the revenue of a
+    request by the fulfillment cost. The revenue consists of a fixed and a distance-dependent transportation rate for
+    traveling from the pickup to the delivery node. The fulfillment costs are composed of fixed stopping costs and
+    the marginal travel cost. The latter can easily be determined by calculating the difference in tour lengths for a
+    tour that includes, and a tour that excludes this request. Note that for each evaluation the tour-building
+    procedure (see Sect. 3.1) has to be called. Thus, this strategy comes with a relatively high computational
+    effort. Requests with the lowest marginal profits are submitted to the pool. This strategy is proposed by Berger
+    and Bierwirth (2010)."
 
-    def _evaluate_requests(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
-        evaluation = []
-        carrier_ = solution.carriers[carrier]
-        for request in carrier_.accepted_requests:
-            best_delta_for_r = float('inf')
-            for tour in range(carrier_.num_tours()):
-                # cheapest way to fit request into tour
-                delta, _, _ = cns.MinTravelDistanceInsertion()._tour_cheapest_dist_insertion(instance, solution,
-                                                                                             carrier, tour,
-                                                                                             request)
-                if delta < best_delta_for_r:
-                    best_delta_for_r = delta
-            # if no feasible insertion for the current request was found, attempt to create a new tour, if that's not
-            # feasible the best_delta_for_r will be infinity
-            if best_delta_for_r == float('inf'):
-                if carrier_.num_tours() < instance.carriers_max_num_tours:
-                    pickup, delivery = instance.pickup_delivery_pair(request)
-                    best_delta_for_r = instance.distance([carrier, pickup, delivery], [pickup, delivery, carrier])
-            # collect the NEGATIVE value, since high insertion cost mean a low valuation for the carrier
-            evaluation.append(-best_delta_for_r)
-        return evaluation
+    NOTE: due to the lack of some functionality (e.g., efficiently identifying all requests that belong to a tour),
+    this is not yet functional.
+    """
 
-
-class LowestProfit(RequestSelectionBehaviorIndividual):
-    def _evaluate_requests(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
+    def _evaluate_request(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
         raise NotImplementedError
-        # this is a wrong implementation of mProfit (Gansterer & Hartl / Berger & Bierwirth). It SHOULD be:
-        # fulfillment costs = (tour costs with the request) - (tour costs without the request)
+        # find the request's tour:
+        # TODO: would be faster if the tour was stored somewhere as a lookup but this is fine for now
+        pickup, delivery = instance.pickup_delivery_pair(request)
+        for t in solution.carriers[carrier].tours:
+            if pickup in t.routing_sequence:
+                tour_ = t
+                break
+        travel_distance_with_request = tour_.sum_travel_distance
 
-        revenue = []
-        for r in solution.carriers[carrier].accepted_requests:
-            request_revenue = sum([instance.revenue[v] for v in instance.pickup_delivery_pair(r)])
-            revenue.append(request_revenue)
-        ins_cost = HighestInsertionCostDistance(self.num_submitted_requests)._evaluate_requests(instance, solution,
-                                                                                                carrier)
-        # return the profit, high profit means high valuation
-        return [rev + cost for rev, cost in zip(revenue, ins_cost)]
+        # create a new tour without the request
+        tmp_tour_ = tr.Tour('tmp', instance, solution, tour_.routing_sequence[0])
+        requests_in_tour_ = None  # TODO need to find all requests in that tour_
+        requests_in_tour_.remove(request)
+
+        insertion = cns.MinTravelDistanceInsertion()
+        for insert_request in requests_in_tour_:
+            delta, pickup_pos, delivery_pos = insertion.best_insertion_for_request_in_tour(instance, solution,
+                                                                                           tmp_tour_, insert_request)
+            insertion.execute_insertion_in_tour(instance, solution, tmp_tour_, request, pickup_pos, delivery_pos)
+        # improvement
+        mh.PDPVariableNeighborhoodDescent([ls.PDPMove(), ls.PDPTwoOpt()]).execute_on_tour(instance, solution, tmp_tour_)
+        travel_distance_without_request = tmp_tour_.sum_travel_distance
+
+        return travel_distance_with_request - travel_distance_without_request
+
+
+class MarginalProfitProxy(RequestSelectionBehaviorIndividual):
+    """
+    "Requests are selected based on their marginal profits. It is calculated by diminishing the revenue of a
+    request by the fulfillment cost. The revenue consists of a fixed and a distance-dependent transportation rate for
+    traveling from the pickup to the delivery node. The fulfillment costs are composed of fixed stopping costs and
+    the marginal travel cost. The latter can easily be determined by calculating the difference in tour lengths for a
+    tour that includes, and a tour that excludes this request. Note that for each evaluation the tour-building
+    procedure (see Sect. 3.1) has to be called. Thus, this strategy comes with a relatively high computational
+    effort. Requests with the lowest marginal profits are submitted to the pool. This strategy is proposed by Berger
+    and Bierwirth (2010)."
+
+    My implementation is not exactly as described, since i do not call the tour_construction twice per request. Instead,
+    the tour that excludes the request is simply calculated by the delta in travel distance when removing the request
+    from its tour
+    """
+
+    def _evaluate_request(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
+
+        # find the request's tour:
+        # TODO: would be faster if the tour was stored somewhere but this is fine for now
+        pickup, delivery = instance.pickup_delivery_pair(request)
+        for t in solution.carriers[carrier].tours:
+            if pickup in t.routing_sequence:
+                tour_ = t
+                break
+
+        pickup_pos = tour_.routing_sequence.index(pickup)
+        delivery_pos = tour_.routing_sequence.index(delivery)
+
+        pickup_predecessor = tour_.routing_sequence[pickup_pos - 1]
+        pickup_successor = tour_.routing_sequence[pickup_pos + 1]
+        delivery_predecessor = tour_.routing_sequence[delivery_pos - 1]
+        delivery_successor = tour_.routing_sequence[delivery_pos + 1]
+
+        # marginal fulfillment cost for the request
+        travel_distance_delta = instance.distance([pickup_predecessor, pickup], [pickup, pickup_successor]) - \
+                                instance.distance([pickup_predecessor], [pickup_successor]) + \
+                                instance.distance([delivery_predecessor, delivery], [delivery, delivery_successor]) - \
+                                instance.distance([delivery_predecessor], [delivery_successor])
+
+        # return marginal profit = revenue - fulfillment cost
+        return instance.revenue[delivery] - travel_distance_delta
+
+
+class MinDistanceToForeignDepotDMin(RequestSelectionBehaviorIndividual):
+    """
+    Select the requests that are closest to another carrier's depot. the distance of a request to a depot is the
+    MINIMUM of the distances (pickup - depot) and (delivery - depot)
+    """
+
+    def _evaluate_request(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
+
+        foreign_depots = solution.carrier_depots[:]
+        foreign_depots.pop(carrier)
+        foreign_depots = ut.flatten(foreign_depots)
+
+        dist_min = float('inf')
+        for depot in foreign_depots:
+            dist = min((instance.distance([depot], [vertex]) for vertex in instance.pickup_delivery_pair(request)))
+            if dist < dist_min:
+                dist_min = dist
+
+        return dist_min
+
+
+class MinDistanceToForeignDepotDSum(RequestSelectionBehaviorIndividual):
+    """
+    Select the requests that are closest to another carrier's depot. the distance of a request to a depot is the
+    SUM of the distances (pickup - depot) and (delivery - depot)
+    """
+
+    def _evaluate_request(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
+
+        foreign_depots = solution.carrier_depots[:]
+        foreign_depots.pop(carrier)
+        foreign_depots = ut.flatten(foreign_depots)
+
+        dist_min = float('inf')
+        for depot in foreign_depots:
+            dist = sum((instance.distance([depot], [vertex]) for vertex in instance.pickup_delivery_pair(request)))
+            if dist < dist_min:
+                dist_min = dist
+
+        return dist_min
+
+
+class Combo(RequestSelectionBehaviorIndividual):
+    """
+    Combo by Gansterer & Hartl (2016)
+
+    This strategy also combines distance-related and profit-related assessments. A carrier a evaluates a request r
+    based on three weighted components: (i) distance to the depot oc of one of the collaborating carriers c (see Fig.
+    4), (ii) marginal profit (mprofit), and (iii) distance to the carrier’s own depot oa. Distances are calculated by
+    summing up the distances between the pickup node pr and the delivery node dr to the depot (oc or oa).
+    """
+
+    def _evaluate_request(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
+        # weighting factors
+        alpha1 = 1
+        alpha2 = 1
+        alpha3 = 1
+
+        # [i] distance to the depot of one of the collaborating carriers
+        min_dist_to_foreign_depot = MinDistanceToForeignDepotDSum(None)._evaluate_request(instance, solution, carrier,
+                                                                                          request)
+
+        # [ii] marginal profit
+        marginal_profit = MarginalProfitProxy(None)._evaluate_request(instance, solution, carrier, request)
+
+        # [iii] distance to the carrier's own depot
+        pickup, delivery = instance.pickup_delivery_pair(request)
+        assert len(solution.carrier_depots[carrier]) == 1
+        own_depot = solution.carrier_depots[carrier][0]
+        dist_to_own_depot = instance.distance([pickup, delivery], [own_depot, own_depot])
+
+        # weighted sum of [i], [ii], [iii]
+        # TODO Gansterer & Hartl (2016) normalize each component
+        valuation = alpha1 * min_dist_to_foreign_depot + alpha2 * marginal_profit - alpha3 * dist_to_own_depot
+
+        return valuation
 
 
 class PackedTW(RequestSelectionBehaviorIndividual):
@@ -162,17 +285,111 @@ class PackedTW(RequestSelectionBehaviorIndividual):
     offer requests from TW slots that are closest to their limit. this way carrier increases flexibility rather than
     profitability
     """
-    pass
+
+    def _evaluate_request(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
+        pass
 
 
 # =====================================================================================================================
-# SELECTION BASED ON BUNDLE EVALUATION
+# NEIGHBOR-BASED REQUEST SELECTION
+# =====================================================================================================================
+
+class RequestSelectionBehaviorNeighbor(RequestSelectionBehavior, ABC):
+    """
+    Select (for each carrier) a bundle by finding an initial request and then adding num_submitted_requests-1 more
+    requests based on some neighborhood criterion
+    """
+
+    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
+        auction_request_pool = []
+        original_bundling_labels = []
+
+        for carrier in range(instance.num_carriers):
+            carrier_ = solution.carriers[carrier]
+            k = _abs_num_requests(carrier_, self.num_submitted_requests)
+
+            # find an initial request
+            initial_request = self._find_initial_request(instance, solution, carrier)
+
+            # find the best k-1 neighboring ones
+            neighbors = self._find_neighbors(instance, solution, carrier, initial_request, k - 1)
+
+            best_bundle = [initial_request] + neighbors
+            best_bundle.sort()
+
+            # carrier's best bundles: retract requests from their tours and add them to auction pool & original bundling
+            for request in best_bundle:
+                self.remove_request_from_carrier(instance, solution, carrier, request)
+
+                # update auction pool and original bundling candidate
+                auction_request_pool.append(request)
+                original_bundling_labels.append(carrier)
+
+        return auction_request_pool, original_bundling_labels
+
+    @abstractmethod
+    def _find_initial_request(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
+        pass
+
+    @staticmethod
+    def _find_neighbors(instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, initial_request: int,
+                        num_neighbors: int):
+        """
+        "Any further request s ∈ Ra is selected based on its closeness to r. Closeness is determined by the sum of
+        distances between four nodes (pickup nodes pr , ps and delivery nodes dr , ds )."
+
+        :param instance:
+        :param solution:
+        :param carrier:
+        :param initial_request: r
+        :param num_neighbors:
+        :return:
+        """
+        init_pickup, init_delivery = instance.pickup_delivery_pair(initial_request)
+
+        neighbor_valuations = []
+        for neighbor in solution.carriers[carrier].accepted_requests:
+            if neighbor == initial_request:
+                neighbor_valuations.append(float('inf'))
+
+            neigh_pickup, neigh_delivery = instance.pickup_delivery_pair(neighbor)
+            valuation = instance.distance([init_pickup, init_pickup, init_delivery, init_delivery],
+                                          [neigh_pickup, neigh_delivery, neigh_pickup, neigh_delivery])
+            neighbor_valuations.append(valuation)
+
+        # sort by valuations
+        best_neigh = [neigh for val, neigh in
+                      sorted(zip(neighbor_valuations, solution.carriers[carrier].accepted_requests))]
+
+        return best_neigh[:num_neighbors]
+
+
+class MarginalProfitProxyNeighbor(RequestSelectionBehaviorNeighbor):
+    """
+    The first request r ∈ Ra is selected using MarginalProfitProxy. Any further request s ∈ Ra is selected based on
+    its closeness to r.
+    """
+
+    def _find_initial_request(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
+        min_marginal_profit = float('inf')
+        initial_request = None
+        for request in solution.carriers[carrier].accepted_requests:
+            marginal_profit = MarginalProfitProxy(1)._evaluate_request(instance, solution, carrier, request)
+            if marginal_profit < min_marginal_profit:
+                min_marginal_profit = marginal_profit
+                initial_request = request
+
+        return initial_request
+
+
+# =====================================================================================================================
+# BUNDLE-BASED REQUEST SELECTION
 # =====================================================================================================================
 
 class RequestSelectionBehaviorBundle(RequestSelectionBehavior, ABC):
     """
-    Select (vor each carrier) a set of bundles based on their combined evaluation of a given measure (e.g. spatial
-    proximity)
+    Select (for each carrier) a set of requests based on their combined evaluation of a given measure (e.g. spatial
+    proximity of the cluster). This idea of bundled evaluation is also from Gansterer & Hartl (2016)
     """
 
     def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
@@ -189,10 +406,10 @@ class RequestSelectionBehaviorBundle(RequestSelectionBehavior, ABC):
             # find the best bundles for the given carrier
             best_bundle = None
             best_bundle_valuation = -float('inf')
-            for bundles in bundles:
-                bundle_valuation = self._evaluate_bundle(instance, solution, carrier, bundles)
+            for bundle in bundles:
+                bundle_valuation = self._evaluate_bundle(instance, solution, carrier, bundle)
                 if bundle_valuation > best_bundle_valuation:
-                    best_bundle = bundles
+                    best_bundle = bundle
                     best_bundle_valuation = bundle_valuation
 
             # carrier's best bundles: retract requests from their tours and add them to auction pool & original bundling
@@ -212,11 +429,14 @@ class RequestSelectionBehaviorBundle(RequestSelectionBehavior, ABC):
     @abstractmethod
     def _evaluate_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
                          bundle: Sequence[int]):
-        # TODO It could literally be a bundle_valuation strategy that is executed here
+        # TODO It could literally be a bundle_valuation strategy that is executed here. Not a bundlING_valuation though
         pass
 
 
-class SpatialBundle(RequestSelectionBehaviorBundle):
+class SpatialBundleDSum(RequestSelectionBehaviorBundle):
+    """
+    Gansterer & Hartl (2016) refer to this one as 'cluster'
+    """
 
     def _create_bundles(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, k: int):
         """
@@ -235,8 +455,37 @@ class SpatialBundle(RequestSelectionBehaviorBundle):
         evaluation = 0
         for r0, r1 in pairs:
             # negative value: low distance between pairs means high valuation
-            # pickup0 to pickup1 + delivery0 to delivery1
+            # pickup0 -> pickup1 + delivery0 -> delivery1
             evaluation -= instance.distance(instance.pickup_delivery_pair(r0), instance.pickup_delivery_pair(r1))
+        return evaluation
+
+
+class SpatialBundleDMax(RequestSelectionBehaviorBundle):
+    """
+    Gansterer & Hartl (2016) refer to this one as 'cluster'
+    """
+
+    def _create_bundles(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, k: int):
+        """
+        create all possible bundles of size k
+        """
+        return itertools.combinations(solution.carriers[carrier].accepted_requests, k)
+
+    def _evaluate_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
+                         bundle: Sequence[int]):
+        """
+        the sum of travel distances of all pairs of requests in this cluster, where the travel distance of a request
+        pair is defined as the distance between their origins (pickup locations) plus the distance between
+        their destinations (delivery locations).
+        """
+        pairs = itertools.combinations(bundle, 2)
+        evaluation = 0
+        for r0, r1 in pairs:
+            # negative value: low distance between pairs means high valuation
+            # pickup0 -> pickup1 + delivery0 -> delivery1
+            p0, d0 = instance.pickup_delivery_pair(r0)
+            p1, d1 = instance.pickup_delivery_pair(r1)
+            evaluation -= max(instance.distance([p0], [p1]), instance.distance([d0], [d1]))
         return evaluation
 
 
@@ -274,8 +523,9 @@ class SpatioTemporalBundle(RequestSelectionBehaviorBundle):
                          bundle: Sequence[int]):
         """a weighted sum of spatial and temporal measures"""
         # spatial
-        spatial_evaluation = SpatialBundle(self.num_submitted_requests)._evaluate_bundle(instance, solution, carrier,
-                                                                                         bundle)
+        spatial_evaluation = SpatialBundleDSum(self.num_submitted_requests)._evaluate_bundle(instance, solution,
+                                                                                             carrier,
+                                                                                             bundle)
         # normalize to range [0, 1]
         max_pickup_delivery_dist = 0
         min_pickup_delivery_dist = float('inf')

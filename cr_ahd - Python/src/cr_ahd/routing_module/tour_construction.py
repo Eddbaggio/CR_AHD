@@ -3,7 +3,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Tuple, Union
 
-from  src.cr_ahd.utility_module import utils as ut, profiling as pr
+from src.cr_ahd.utility_module import utils as ut, profiling as pr
 from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
 
 logger = logging.getLogger(__name__)
@@ -130,6 +130,13 @@ class PDPParallelInsertionConstruction(ABC):
         solution.carriers[carrier].routed_requests.append(request)
 
     @staticmethod
+    def execute_insertion_in_tour(instance: it.PDPInstance, solution: slt.CAHDSolution, tour_: tr.Tour,
+                                  request: int, pickup_pos: int, delivery_pos: int):
+
+        pickup, delivery = instance.pickup_delivery_pair(request)
+        tour_.insert_and_update(instance, solution, [pickup_pos, delivery_pos], [pickup, delivery])
+
+    @staticmethod
     def create_new_tour_with_request(instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
         """
         In case of a multi-depot problem, the pendulum tour with the highest profit for the given request is created
@@ -169,9 +176,10 @@ class MinTravelDistanceInsertion(PDPParallelInsertionConstruction):
     For each request, identify its cheapest insertion based on distance delta. Compare the collected insertion costs
     and insert the cheapest over all requests.
     """
+
     @pr.timing
     def best_insertion_for_request_in_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_,
-                                           request: int, check_feasibility=True):
+                                           request: int, check_feasibility=True) -> Tuple[float, int, int]:
         pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
 
         best_delta = float('inf')

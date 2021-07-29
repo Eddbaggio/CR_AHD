@@ -196,7 +196,7 @@ class PDPVariableNeighborhoodDescent(PDPMetaHeuristic):
         pass
 
     def execute_on_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_: tr.Tour):
-        """execute the metaheuristic for a given route using all available intra-tour neighborhoods"""
+        """execute the metaheuristic for a given route (in place) using all available intra-tour neighborhoods"""
         intra_tour_neighborhoods = [nbh for nbh in self.neighborhoods if
                                     isinstance(nbh, ls.IntraTourLocalSearchBehavior)]
         k = 0
