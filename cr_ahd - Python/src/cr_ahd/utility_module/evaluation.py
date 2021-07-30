@@ -264,15 +264,15 @@ def print_top_level_stats(carrier_df: pd.DataFrame, secondary_parameters: List[s
 if __name__ == '__main__':
     df = pd.read_csv(
         "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home "
-        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_carrier_#070.csv",
+        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_carrier_#073.csv",
     )
     df.fillna('None', inplace=True)
     df.set_index(['rad', 'n', 'run', 'carrier_id_'] + ut.solver_config, inplace=True)
     # print_top_level_stats(df)
     bar_chart(df,
-              title='BG: AllBundlings // BV:LosSchulte // num_auction_bundles:100',
+              title='',
               values='sum_profit',
-              color=['solution_algorithm', 'request_selection'],
+              color=['solution_algorithm', 'bundle_generation'],
               category='run', facet_col='rad',
               # category='run', facet_col='rad',
               facet_row='n',

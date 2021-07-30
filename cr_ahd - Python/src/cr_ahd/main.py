@@ -3,7 +3,7 @@ import logging.config
 import multiprocessing
 from copy import deepcopy
 from pathlib import Path
-from typing import List, Union, Tuple
+from typing import List, Union, Tuple, Dict
 from datetime import datetime
 import os
 import cProfile
@@ -76,16 +76,16 @@ def parameter_generator():
         # 500
     ]
 
-    bundle_generations: List[Tuple[bg.LimitedBundlePoolGenerationBehavior.__class__, dict]] = [
-        (bg.GeneticAlgorithm, dict(population_size=300,
-                                   num_generations=100,
-                                   mutation_rate=0.5,
-                                   generation_gap=0.9,)
-         ),
+    bundle_generations: List[Tuple[bg.LimitedBundlePoolGenerationBehavior.__class__, Dict[str, float]]] = [
+        # (bg.GeneticAlgorithm, dict(population_size=300,
+        #                            num_generations=100,
+        #                            mutation_rate=0.5,
+        #                            generation_gap=0.9,)
+        #  ),
         (bg.BestOfAllBundlings, dict()),
     ]
 
-    bundle_valuations: List[bv.BundlingValuation.__class__] = [
+    bundling_valuations: List[bv.BundlingValuation.__class__] = [
         # bv.GHProxyBundlingValuation,
         # bv.MinDistanceBundlingValuation,
         bv.LosSchulteBundlingValuation,
@@ -105,14 +105,14 @@ def parameter_generator():
                     for request_selection in request_selections:
                         for num_auction_bundles in nums_auction_bundles:
                             for bundle_generation, bundle_generation_kwargs in bundle_generations:
-                                for bundle_valuation in bundle_valuations:
+                                for bundling_valuation in bundling_valuations:
                                     # auction for collaborative planning
                                     auction = au.Auction(tour_construction,
                                                          tour_improvement,
                                                          request_selection(num_submitted_requests),
                                                          bundle_generation(num_auction_bundles=num_auction_bundles,
-                                                                           bundling_valuation=bundle_valuation(),
-                                                                           *bundle_generation_kwargs
+                                                                           bundling_valuation=bundling_valuation(),
+                                                                           **bundle_generation_kwargs
                                                                            ),
                                                          bd.DynamicReOptAndImprove(tour_construction, tour_improvement),
                                                          wd.MaxBidGurobiCAP1(),
@@ -246,7 +246,7 @@ if __name__ == '__main__':
         paths = sorted(
             list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
             key=ut.natural_sort_key)
-        paths = paths[:48]
+        paths = paths[:24]
 
         if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=False)
@@ -255,10 +255,10 @@ if __name__ == '__main__':
 
         df = write_solution_summary_to_multiindex_df(solutions, 'carrier')
         ev.bar_chart(df,
-                     title='BG: AllBundlings // BV:LosSchulte',
+                     title='BG: BestOfAllBundlings // BV:LosSchulte',
                      values='sum_profit',
                      color=['solution_algorithm', 'request_selection'],
-                     category='num_auction_bundles', facet_col='rad',
+                     category='rad', facet_col=None,
                      # category='run', facet_col='rad',
                      facet_row='n',
                      show=True,

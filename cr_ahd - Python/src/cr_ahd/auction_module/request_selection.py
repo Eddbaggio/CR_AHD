@@ -646,7 +646,9 @@ class LosSchulteBundle(RequestSelectionBehaviorBundle):
                          bundle: Sequence[int]):
         # must invert again, since RequestSelectionBehaviorBundle searches for the maximum valuation and request
         # selection for the minimum
-        return 1/bv.LosSchulteBundlingValuation().evaluate_bundling(instance, solution, [bundle])
+        bundle_valuation = bv.LosSchulteBundlingValuation()
+        bundle_valuation.preprocessing(instance, solution, None)
+        return 1 / bundle_valuation.evaluate_bundling(instance, solution, [bundle])
 
 # class TimeShiftCluster(RequestSelectionBehaviorCluster):
 #     """Selects the cluster that yields the highest temporal flexibility when removed"""
