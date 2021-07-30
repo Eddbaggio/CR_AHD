@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class Auction(ABC):
     def __init__(self,
                  tour_construction: cns.PDPParallelInsertionConstruction,
-                 tour_improvement: mh.PDPMetaHeuristic,
+                 tour_improvement: mh.PDPTWMetaHeuristic,
                  request_selection: rs.RequestSelectionBehavior,
                  bundle_generation: bg.LimitedBundlePoolGenerationBehavior,
                  bidding: bd.BiddingBehavior,

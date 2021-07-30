@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class BiddingBehavior(ABC):
     def __init__(self,
                  tour_construction: cns.PDPParallelInsertionConstruction,
-                 tour_improvement: mh.PDPMetaHeuristic):
+                 tour_improvement: mh.PDPTWMetaHeuristic):
         self.tour_construction = tour_construction
         self.tour_improvement = tour_improvement
 

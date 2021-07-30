@@ -49,16 +49,7 @@ univie_colors_100 = [
     '#94C154',  # hellgrün
     '#11897A',  # mintgrün
 ]
-
-
-def map_to_univie_colors(categories: Sequence):
-    colormap = {}
-    for cat, color in zip(categories, itertools.cycle(univie_colors_100)):
-        colormap[cat] = color
-    return colormap
-
-
-# alpha 80%
+# lightness/alpha 60%
 univie_colors_60 = [
     '#6899CA',  # universitätsblau
     '#B5B4B4',  # universtitätsgrau
@@ -68,12 +59,20 @@ univie_colors_60 = [
     '#C3DC9F',  # hellgrün
     '#85B6AE',  # mintgrün
 ]
+
 # paired
 univie_colors_paired = list(itertools.chain(*zip(univie_colors_100, univie_colors_60)))
 
 univie_cmap = LinearSegmentedColormap.from_list('univie', univie_colors_100, N=len(univie_colors_100))
 univie_cmap_paired = LinearSegmentedColormap.from_list('univie_paired', univie_colors_paired,
                                                        N=len(univie_colors_100) + len(univie_colors_60))
+
+
+def map_to_univie_colors(categories: Sequence):
+    colormap = {}
+    for cat, color in zip(categories, itertools.cycle(univie_colors_100 + univie_colors_60)):
+        colormap[cat] = color
+    return colormap
 
 
 def split_iterable(iterable, num_chunks):

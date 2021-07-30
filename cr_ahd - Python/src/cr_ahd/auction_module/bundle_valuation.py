@@ -179,10 +179,7 @@ def bundle_isolation(bundle_centroid: ut.Coordinates,
     return min_separation
 
 
-def bundle_total_travel_distance_proxy(instance: it.PDPInstance,
-                                       solution: slt.CAHDSolution,
-                                       bundle: Sequence[int],
-                                       ):
+def bundle_total_travel_distance_proxy(instance: it.PDPInstance, bundle: Sequence[int]):
     """
     VERY rough estimate for the total travel distance required to visit all requests in the bundle. Ignores all
     constraints (time windows, vehicle capacity, max tour length, ...)
@@ -221,7 +218,7 @@ def bundle_total_travel_distance(instance: it.PDPInstance,
 
     # insert all remaining requests of the bundle
     tour_construction = cns.MinTravelDistanceInsertion()  # TODO this should be a parameter!
-    tour_improvement = mh.PDPVariableNeighborhoodDescent(
+    tour_improvement = mh.PDPTWVariableNeighborhoodDescent(
         [ls.PDPMove(), ls.PDPTwoOpt()])  # TODO this should be a parameter!
     for request in bundle:
         if request == depot_request:
@@ -242,7 +239,7 @@ def bundle_total_travel_distance(instance: it.PDPInstance,
     return tour_.sum_travel_distance
 
 
-def los_schulte_similarity(instance: it.PDPInstance, solution: slt.CAHDSolution, vertex1: int, vertex2: int):
+def los_schulte_request_similarity(instance: it.PDPInstance, solution: slt.CAHDSolution, vertex1: int, vertex2: int):
     """
     Taken from [1] Los, J., Schulte, F., Gansterer, M., Hartl, R. F., Spaan, M. T. J., & Negenborn, R. R. (2020).
     Decentralized combinatorial auctions for dynamic and large-scale collaborative vehicle routing.
@@ -284,16 +281,6 @@ def bundling_labels_to_bundling(bundling_labels: Sequence[int], auction_request_
 
 
 # ======================================================================================================================
-# class BundleValuation(ABC):
-#     @abstractmethod
-#     def evaluate_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, bundle: Sequence[int]):
-#         """evaluates a single bundle"""
-#         pass
-#
-#
-# class LosSchulteBundleValuation(BundleValuation):
-#     def evaluate_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, bundle: Sequence[int]):
-
 
 class BundlingValuation(ABC):
     """
@@ -353,7 +340,7 @@ class GHProxyBundlingValuation(BundlingValuation):
             densities.append(density)
 
             # estimating the tour length of the bundle
-            approx_travel_dist = bundle_total_travel_distance_proxy(instance, solution, bundle)
+            approx_travel_dist = bundle_total_travel_distance_proxy(instance, bundle)
 
             # if there is no feasible tour for this bundle, return a valuation of negative infinity for the whole
             # bundling
@@ -394,21 +381,32 @@ class LosSchulteBundlingValuation(BundlingValuation):
     def evaluate_bundling(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
                           bundling: List[List[int]]) -> float:
         """
-        uses the similarity measure by Los et al. (2020) to compute a clustering evaluation measure (cohesion)
+        uses the request similarity measure by Los et al. (2020) to compute a clustering evaluation measure (cohesion)
         """
         bundle_valuations = []
         for bundle in bundling:
+            bundle_valuation = self.evaluate_bundle(instance, bundle)
+            bundle_valuations.append(bundle_valuation)
 
-            # single-request bundles
-            if len(bundle) == 1:
-                p0, d0 = instance.pickup_delivery_pair(bundle[0])
-                # adjust vertex indices to account for depots
-                p0 -= instance.num_depots
-                d0 -= instance.num_depots
-                # todo: cluster weights acc. to cluster size?
-                bundle_valuations.append(self.vertex_similarity_matrix[p0][d0])
-                continue
+        # compute mean valuation of the bundles in the bundling; lower values are better
+        # TODO try max, min or other measures instead of mean?
+        bundling_valuation = sum(bundle_valuations) / len(bundle_valuations)
 
+        # return inverse, since low values are better and the caller maximizes
+        return 1 / bundling_valuation
+
+    def evaluate_bundle(self, instance: it.PDPInstance, bundle: Sequence[int]):
+        # single-request bundles
+        if len(bundle) == 1:
+            p0, d0 = instance.pickup_delivery_pair(bundle[0])
+            # adjust vertex indices to account for depots
+            p0 -= instance.num_depots
+            d0 -= instance.num_depots
+            # todo: cluster weights acc. to cluster size?
+            bundle_valuation = self.vertex_relatedness_matrix[p0][d0]
+
+        # multi-request bundles
+        else:
             # lower relatedness values are better
             request_relatedness_list = []
 
@@ -426,9 +424,9 @@ class LosSchulteBundlingValuation(BundlingValuation):
 
                     # compute relatedness between requests 0 and 1 acc. to the paper's formula (1)
                     relatedness = min(
-                        self.vertex_similarity_matrix[p0][d1],
-                        self.vertex_similarity_matrix[d0][p1],
-                        0.5 * (self.vertex_similarity_matrix[p0][p1] + self.vertex_similarity_matrix[d0][d1])
+                        self.vertex_relatedness_matrix[p0][d1],
+                        self.vertex_relatedness_matrix[d0][p1],
+                        0.5 * (self.vertex_relatedness_matrix[p0][p1] + self.vertex_relatedness_matrix[d0][d1])
                     )
 
                     request_relatedness_list.append(relatedness)
@@ -436,14 +434,8 @@ class LosSchulteBundlingValuation(BundlingValuation):
             # collect mean relatedness of the requests in the bundle; lower values are better
             # TODO try max, min or other measures instead of mean?
             # TODO: cluster weights acc. to cluster size?
-            bundle_valuations.append(sum(request_relatedness_list) / len(bundle))
-
-        # compute mean valuation of the bundles in the bundling; lower values are better
-        # TODO try max, min or other measures instead of mean?
-        bundling_valuation = sum(bundle_valuations) / len(bundle_valuations)
-
-        # return inverse, since low values are better and the caller maximizes
-        return 1 / bundling_valuation
+            bundle_valuation = sum(request_relatedness_list) / len(bundle)
+        return bundle_valuation
 
     def preprocessing(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_request_pool: Sequence[int]):
         """
@@ -452,7 +444,7 @@ class LosSchulteBundlingValuation(BundlingValuation):
 
         n = instance.num_requests
 
-        self.vertex_similarity_matrix = [[0.0] * n * 2 for _ in range(n * 2)]
+        self.vertex_relatedness_matrix = [[0.0] * n * 2 for _ in range(n * 2)]
 
         for i, request1 in enumerate(instance.requests):
             pickup1, delivery1 = instance.pickup_delivery_pair(request1)
@@ -460,23 +452,28 @@ class LosSchulteBundlingValuation(BundlingValuation):
                 pickup2, delivery2 = instance.pickup_delivery_pair(request2)
 
                 # [1] pickup1 <> delivery1
-                self.vertex_similarity_matrix[i][i + n] = los_schulte_similarity(instance, solution, pickup1, delivery1)
+                self.vertex_relatedness_matrix[i][i + n] = los_schulte_request_similarity(
+                    instance, solution, pickup1, delivery1)
 
                 # [2] pickup1 <> pickup2
-                self.vertex_similarity_matrix[i][j] = los_schulte_similarity(instance, solution, pickup1, pickup2)
+                self.vertex_relatedness_matrix[i][j] = los_schulte_request_similarity(
+                    instance, solution, pickup1, pickup2)
 
                 # [3] pickup1 <> delivery2
-                self.vertex_similarity_matrix[i][j + n] = los_schulte_similarity(instance, solution, pickup1, delivery2)
+                self.vertex_relatedness_matrix[i][j + n] = los_schulte_request_similarity(
+                    instance, solution, pickup1, delivery2)
 
                 # [4] delivery1 <> pickup2
-                self.vertex_similarity_matrix[i + n][j] = los_schulte_similarity(instance, solution, delivery1, pickup2)
+                self.vertex_relatedness_matrix[i + n][j] = los_schulte_request_similarity(
+                    instance, solution, delivery1, pickup2)
 
                 # [5] delivery1 <> delivery2
-                self.vertex_similarity_matrix[i + n][j + n] = los_schulte_similarity(instance, solution, delivery1,
-                                                                                     delivery2)
+                self.vertex_relatedness_matrix[i + n][j + n] = los_schulte_request_similarity(
+                    instance, solution, delivery1, delivery2)
 
                 # [6] pickup2 <> delivery2
-                self.vertex_similarity_matrix[j][j + n] = los_schulte_similarity(instance, solution, pickup2, delivery2)
+                self.vertex_relatedness_matrix[j][j + n] = los_schulte_request_similarity(
+                    instance, solution, pickup2, delivery2)
 
 
 class RandomBundlingValuation(BundlingValuation):

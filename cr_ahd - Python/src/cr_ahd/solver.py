@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class Solver:
     def __init__(self,
                  tour_construction: cns.PDPParallelInsertionConstruction,
-                 tour_improvement: mh.PDPMetaHeuristic,
+                 tour_improvement: mh.PDPTWMetaHeuristic,
                  time_window_management: twm.TWManagement,
                  auction: Union[au.Auction, bool]
                  ):
@@ -63,8 +63,8 @@ class Solver:
             solution.solver_config['bundle_generation'] = self.auction.bundle_generation.__class__.__name__
             try:
                 # for GA-based bundle generation
-                solution.solver_config['bundle_valuation'] = self.auction.bundle_generation.parameters[
-                    'bundle_valuation'].__class__.__name__
+                solution.solver_config['bundling_valuation'] = self.auction.bundle_generation.parameters[
+                    'bundling_valuation'].__class__.__name__
             except KeyError:
                 None
             solution.solver_config['num_auction_bundles'] = self.auction.bundle_generation.num_auction_bundles

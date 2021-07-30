@@ -11,7 +11,7 @@ from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
 logger = logging.getLogger(__name__)
 
 
-class PDPMetaHeuristic(abc.ABC):
+class PDPTWMetaHeuristic(abc.ABC):
     def __init__(self, neighborhoods: Sequence[ls.LocalSearchBehavior]):
         self.neighborhoods = neighborhoods
         self.improved = False
@@ -87,14 +87,14 @@ class PDPMetaHeuristic(abc.ABC):
         pass
 
 
-class NoMetaheuristic(PDPMetaHeuristic):
+class NoMetaheuristic(PDPTWMetaHeuristic):
     """Placeholder for cases in which no improvement is wanted"""
 
     def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None):
         pass
 
 
-class PDPSequentialNeighborhoodDescent(PDPMetaHeuristic):
+class PDPTWSequentialNeighborhoodDescent(PDPTWMetaHeuristic):
     """
     Sequentially exhaust each neighborhood. Only improvements are accepted
     """
@@ -133,7 +133,7 @@ class PDPSequentialNeighborhoodDescent(PDPMetaHeuristic):
             return False
 
 
-class PDPRandomNeighborhoodDescent(PDPMetaHeuristic):
+class PDPTWRandomNeighborhoodDescent(PDPTWMetaHeuristic):
     """
     randomly select a neighborhood for the next improving move
     """
@@ -173,7 +173,7 @@ class PDPRandomNeighborhoodDescent(PDPMetaHeuristic):
             return False
 
 
-class PDPVariableNeighborhoodDescent(PDPMetaHeuristic):
+class PDPTWVariableNeighborhoodDescent(PDPTWMetaHeuristic):
     def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None):
         if carriers is None:
             carriers = range(len(solution.carriers))
@@ -227,7 +227,7 @@ class PDPVariableNeighborhoodDescent(PDPMetaHeuristic):
             return False
 
 
-class PDPVariableNeighborhoodDescentFirst(PDPMetaHeuristic):
+class PDPTWVariableNeighborhoodDescentFirst(PDPTWMetaHeuristic):
     def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None):
         if carriers is None:
             carriers = range(len(solution.carriers))
@@ -256,7 +256,7 @@ class PDPVariableNeighborhoodDescentFirst(PDPMetaHeuristic):
             return False
 
 
-class PDPSimulatedAnnealing(PDPMetaHeuristic):
+class PDPTWSimulatedAnnealing(PDPTWMetaHeuristic):
     def __init__(self, neighborhoods: Sequence[ls.LocalSearchBehavior]):
         super().__init__(neighborhoods)
         self.parameters['initial_temp'] = None
@@ -332,3 +332,7 @@ class PDPSimulatedAnnealing(PDPMetaHeuristic):
             # overflow caused by double limit if temperature is too low. In that case the random number will not be
             #  smaller than the required probability
             return False
+
+
+class IteratedLocalSearch(PDPTWMetaHeuristic):
+    pass

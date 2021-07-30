@@ -282,8 +282,8 @@ class TimeShiftRegretInsertion(PDPParallelInsertionConstruction):
 
         if best_delta < float('inf'):
             regret = sum([(delta - best_delta) for delta in [move[0] for move in best_insertion_for_request_in_tour]])
-            # return the negative of the regret, since the LARGEST regret is to be inserted first
-            return -regret, best_tour, best_pickup_pos, best_delivery_pos
+            # return the inverse of the regret, since the LARGEST regret is to be inserted first
+            return 1/regret, best_tour, best_pickup_pos, best_delivery_pos
         else:
             return best_delta, best_tour, best_pickup_pos, best_delivery_pos
 

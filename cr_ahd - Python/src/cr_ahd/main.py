@@ -37,8 +37,8 @@ def parameter_generator():
         # cns.MinTimeShiftInsertion()
     ]
 
-    tour_improvements: List[mh.PDPMetaHeuristic] = [
-        mh.PDPVariableNeighborhoodDescent(neighborhoods),
+    tour_improvements: List[mh.PDPTWMetaHeuristic] = [
+        mh.PDPTWVariableNeighborhoodDescent(neighborhoods),
         # mh.NoMetaheuristic(neighborhoods)
     ]
 
@@ -55,7 +55,7 @@ def parameter_generator():
 
     request_selections: List[rs.RequestSelectionBehavior.__class__] = [
         rs.Random,
-        rs.SpatialBundleDSum,  # the original 'cluster' strategy by Gansterer & Hartl (2016)
+        # rs.SpatialBundleDSum,  # the original 'cluster' strategy by Gansterer & Hartl (2016)
         # rs.SpatialBundleDMax,
         # rs.MinDistanceToForeignDepotDMin,
         # rs.MarginalProfitProxy,
@@ -144,8 +144,8 @@ def execute_all(instance: it.PDPInstance, plot=False):
             solutions.append(deepcopy(solution))
 
         except Exception as e:
-            # raise e
             logger.error(f'{e}\nFailed on instance {instance} with solver {solver.__class__.__name__}')
+            raise e
             solution = slt.CAHDSolution(instance)  # create an empty solution for failed instances
             solver.update_solution_solver_config(solution)
             solution.write_to_json()
@@ -246,7 +246,7 @@ if __name__ == '__main__':
         paths = sorted(
             list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
             key=ut.natural_sort_key)
-        paths = paths[:24]
+        paths = paths[:12]
 
         if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=False)
@@ -258,8 +258,8 @@ if __name__ == '__main__':
                      title='BG: BestOfAllBundlings // BV:LosSchulte',
                      values='sum_profit',
                      color=['solution_algorithm', 'request_selection'],
-                     category='rad', facet_col=None,
-                     # category='run', facet_col='rad',
+                     # category='rad', facet_col=None,
+                     category='run', facet_col='rad',
                      facet_row='n',
                      show=True,
                      html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix())

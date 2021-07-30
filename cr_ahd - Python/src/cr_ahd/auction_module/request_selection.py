@@ -154,7 +154,7 @@ class MarginalProfit(RequestSelectionBehaviorIndividual):
                                                                                            tmp_tour_, insert_request)
             insertion.execute_insertion_in_tour(instance, solution, tmp_tour_, request, pickup_pos, delivery_pos)
         # improvement
-        mh.PDPVariableNeighborhoodDescent([ls.PDPMove(), ls.PDPTwoOpt()]).execute_on_tour(instance, solution, tmp_tour_)
+        mh.PDPTWVariableNeighborhoodDescent([ls.PDPMove(), ls.PDPTwoOpt()]).execute_on_tour(instance, solution, tmp_tour_)
         travel_distance_without_request = tmp_tour_.sum_travel_distance
 
         return travel_distance_with_request - travel_distance_without_request
@@ -640,7 +640,8 @@ class LosSchulteBundle(RequestSelectionBehaviorBundle):
         """
         create all possible bundles of size k
         """
-        return itertools.combinations(solution.carriers[carrier].accepted_requests, k)
+        bundles = itertools.combinations(solution.carriers[carrier].accepted_requests, k)
+        return bundles
 
     def _evaluate_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
                          bundle: Sequence[int]):
@@ -648,7 +649,7 @@ class LosSchulteBundle(RequestSelectionBehaviorBundle):
         # selection for the minimum
         bundle_valuation = bv.LosSchulteBundlingValuation()
         bundle_valuation.preprocessing(instance, solution, None)
-        return 1 / bundle_valuation.evaluate_bundling(instance, solution, [bundle])
+        return 1 / bundle_valuation.evaluate_bundle(instance, bundle)
 
 # class TimeShiftCluster(RequestSelectionBehaviorCluster):
 #     """Selects the cluster that yields the highest temporal flexibility when removed"""
