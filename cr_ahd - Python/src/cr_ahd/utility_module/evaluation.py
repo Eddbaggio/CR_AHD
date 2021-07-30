@@ -25,6 +25,13 @@ category_orders = {'solution_algorithm': ['IsolatedPlanning',
                                                             ('CollaborativePlanning', 'SpatialCluster'),
                                                             ('CollaborativePlanning', 'TemporalRangeCluster')
                                                             ],
+                   'num_auction_bundles': [
+                       # 50,
+                       100,
+                       # 200,
+                       300,
+                       # 500
+                   ],
                    }
 
 config = dict({'scrollZoom': True})
@@ -75,13 +82,16 @@ def bar_chart(df: pd.DataFrame,
                                                     })
 
     # if any of facet_col, facet_row, color, category is a sequence, merge the levels into one
+    already_joined = []
     for k, v in splitters.items():
         if isinstance(v, (List, Tuple)):
-            solution_df = merge_index_levels(solution_df, v)
             splitters[k] = '-'.join(v)
+            if v not in already_joined:
+                solution_df = merge_index_levels(solution_df, v)
+                already_joined.append(v)
 
     # group by facets, colors and categories
-    px_ready = solution_df.groupby([x for x in splitters.values() if x], dropna=False).agg('mean')
+    px_ready = solution_df.groupby([x for x in set(splitters.values()) if x], dropna=False).agg('mean')
 
     # prepare for use in plotly express
     px_ready: pd.DataFrame = px_ready.reset_index()
@@ -254,17 +264,17 @@ def print_top_level_stats(carrier_df: pd.DataFrame, secondary_parameters: List[s
 if __name__ == '__main__':
     df = pd.read_csv(
         "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home "
-        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_carrier_#045.csv",
+        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_carrier_#070.csv",
     )
     df.fillna('None', inplace=True)
     df.set_index(['rad', 'n', 'run', 'carrier_id_'] + ut.solver_config, inplace=True)
     # print_top_level_stats(df)
     bar_chart(df,
-              title='',
+              title='BG: AllBundlings // BV:LosSchulte // num_auction_bundles:100',
               values='sum_profit',
-              category='run',
-              color=['solution_algorithm', 'bundle_valuation'],
-              facet_col='rad',
+              color=['solution_algorithm', 'request_selection'],
+              category='run', facet_col='rad',
+              # category='run', facet_col='rad',
               facet_row='n',
               show=True,
               # width=700,

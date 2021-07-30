@@ -3,7 +3,7 @@ import logging.config
 import multiprocessing
 from copy import deepcopy
 from pathlib import Path
-from typing import List, Union
+from typing import List, Union, Tuple
 from datetime import datetime
 import os
 import cProfile
@@ -31,35 +31,43 @@ def parameter_generator():
         ls.PDPMove(),
         ls.PDPTwoOpt()
     ]
+
     tour_constructions: List[cns.PDPParallelInsertionConstruction] = [
         cns.MinTravelDistanceInsertion(),
         # cns.MinTimeShiftInsertion()
     ]
+
     tour_improvements: List[mh.PDPMetaHeuristic] = [
         mh.PDPVariableNeighborhoodDescent(neighborhoods),
         # mh.NoMetaheuristic(neighborhoods)
     ]
+
     time_window_managements: List[twm.TWManagement] = [
         twm.TWManagementSingle(two.FeasibleTW(),
                                tws.UnequalPreference()),
         # twm.TWManagementNoTW(None, None)
     ]
+
     nums_submitted_requests: List[int] = [
         4,
         # 5
     ]
+
     request_selections: List[rs.RequestSelectionBehavior.__class__] = [
-        rs.Random,
-        rs.SpatialBundleDSum,  # the original 'cluster' strategy by Gansterer & Hartl (2016)
-        rs.SpatialBundleDMax,
-        rs.MinDistanceToForeignDepotDMin,
-        rs.MarginalProfitProxy,
-        rs.MarginalProfitProxyNeighbor,
-        rs.Combo,
+        # rs.Random,
+        # rs.SpatialBundleDSum,  # the original 'cluster' strategy by Gansterer & Hartl (2016)
+        # rs.SpatialBundleDMax,
+        # rs.MinDistanceToForeignDepotDMin,
+        # rs.MarginalProfitProxy,
+        # rs.MarginalProfitProxyNeighbor,
+        rs.ComboRaw,
+        rs.ComboStandardized,
+        rs.LosSchulteBundle,
         # rs.TemporalRangeCluster,
         # TODO SpatioTemporalCluster is not yet good enough & sometimes even infeasible
         # rs.SpatioTemporalCluster,
     ]
+
     nums_auction_bundles: List[int] = [
         # 50,
         100,
@@ -67,10 +75,16 @@ def parameter_generator():
         # 300,
         # 500
     ]
-    bundle_generations: List[bg.LimitedBundlePoolGenerationBehavior.__class__] = [ #TODO make pairs of (bundle_gen, kwargs)
-        # bg.GeneticAlgorithm,
-        bg.AllBundlings,
+
+    bundle_generations: List[Tuple[bg.LimitedBundlePoolGenerationBehavior.__class__, dict]] = [
+        (bg.GeneticAlgorithm, dict(population_size=300,
+                                   num_generations=100,
+                                   mutation_rate=0.5,
+                                   generation_gap=0.9,)
+         ),
+        (bg.AllBundlings, dict()),
     ]
+
     bundle_valuations: List[bv.BundlingValuation.__class__] = [
         # bv.GHProxyBundlingValuation,
         # bv.MinDistanceBundlingValuation,
@@ -90,17 +104,14 @@ def parameter_generator():
                 for num_submitted_requests in nums_submitted_requests:
                     for request_selection in request_selections:
                         for num_auction_bundles in nums_auction_bundles:
-                            for bundle_generation in bundle_generations:
+                            for bundle_generation, bundle_generation_kwargs in bundle_generations:
                                 for bundle_valuation in bundle_valuations:
                                     auction = au.Auction(tour_construction,
                                                          tour_improvement,
                                                          request_selection(num_submitted_requests),
                                                          bundle_generation(num_auction_bundles=num_auction_bundles,
                                                                            bundling_valuation=bundle_valuation(),
-                                                                           population_size=300,
-                                                                           num_generations=100,
-                                                                           mutation_rate=0.5,
-                                                                           generation_gap=0.9,
+                                                                           *bundle_generation_kwargs
                                                                            ),
                                                          bd.DynamicReOptAndImprove(tour_construction, tour_improvement),
                                                          wd.MaxBidGurobiCAP1(),
@@ -233,7 +244,7 @@ if __name__ == '__main__':
         paths = sorted(
             list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
             key=ut.natural_sort_key)
-        paths = paths[54:60]
+        paths = paths[:48]
 
         if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=False)
@@ -242,10 +253,10 @@ if __name__ == '__main__':
 
         df = write_solution_summary_to_multiindex_df(solutions, 'carrier')
         ev.bar_chart(df,
-                     title='BG: AllBundlings // BV:LosSchulte // num_auction_bundles:100',
+                     title='BG: AllBundlings // BV:LosSchulte',
                      values='sum_profit',
                      color=['solution_algorithm', 'request_selection'],
-                     category='rad', facet_col=None,
+                     category='num_auction_bundles', facet_col='rad',
                      # category='run', facet_col='rad',
                      facet_row='n',
                      show=True,

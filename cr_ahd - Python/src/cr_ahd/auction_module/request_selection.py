@@ -1,16 +1,18 @@
 import datetime as dt
 import itertools
 import logging
+import math
 import random
 from abc import ABC, abstractmethod
-from math import comb
-from typing import Sequence
+from math import comb, sqrt
+from typing import Sequence, Tuple
 
 import numpy as np
 
 from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
 from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh, local_search as ls
 from src.cr_ahd.utility_module import utils as ut
+from src.cr_ahd.auction_module import bundle_valuation as bv
 
 logger = logging.getLogger(__name__)
 
@@ -244,7 +246,7 @@ class MinDistanceToForeignDepotDSum(RequestSelectionBehaviorIndividual):
         return dist_min
 
 
-class Combo(RequestSelectionBehaviorIndividual):
+class ComboRaw(RequestSelectionBehaviorIndividual):
     """
     Combo by Gansterer & Hartl (2016)
 
@@ -273,11 +275,90 @@ class Combo(RequestSelectionBehaviorIndividual):
         own_depot = solution.carrier_depots[carrier][0]
         dist_to_own_depot = instance.distance([pickup, delivery], [own_depot, own_depot])
 
-        # weighted sum of [i], [ii], [iii]
-        # TODO Gansterer & Hartl (2016) normalize each component
+        # weighted sum of non-standardized [i], [ii], [iii]
         valuation = alpha1 * min_dist_to_foreign_depot + alpha2 * marginal_profit - alpha3 * dist_to_own_depot
 
         return valuation
+
+
+class ComboStandardized(RequestSelectionBehaviorIndividual):
+    """
+    Combo by Gansterer & Hartl (2016)
+
+    This strategy also combines distance-related and profit-related assessments. A carrier a evaluates a request r
+    based on three weighted components: (i) distance to the depot oc of one of the collaborating carriers c (see Fig.
+    4), (ii) marginal profit (mprofit), and (iii) distance to the carrier’s own depot oa. Distances are calculated by
+    summing up the distances between the pickup node pr and the delivery node dr to the depot (oc or oa).
+    """
+
+    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
+        """
+        Overrides method in RequestSelectionBehaviorIndividual because different components of the valuation function
+        need to be normalized before summing them up
+
+        select a set of requests based on the concrete selection behavior. will retract the requests from the carrier
+        and return
+
+        :return: the auction_request_pool as a list of request indices and a default
+        bundling, i.e. a list of the carrier indices that maps the auction_request_pool to their original carrier.
+        """
+        auction_request_pool = []
+        original_bundling_labels = []
+
+        # weighting factors for the three components (min_dist_to_foreign_depot, marginal_profit, dist_to_own_depot)
+        # of the valuation function
+        alpha1 = 1
+        alpha2 = 1
+        alpha3 = 1
+
+        for carrier in range(instance.num_carriers):
+            k = _abs_num_requests(solution.carriers[carrier], self.num_submitted_requests)
+            valuations = []
+            for request in solution.carriers[carrier].accepted_requests:
+                valuation = self._evaluate_request(instance, solution, carrier, request)
+                valuations.append(valuation)
+
+            # normalize the valuation components
+            standardized_components = []
+            for component_series in zip(*valuations):
+                mean = sum(component_series) / len(component_series)
+                std = sqrt(sum([(x - mean) ** 2 for x in component_series]) / len(component_series))
+                standardized_components.append(((x - mean) / std for x in component_series))
+
+            # compute the weighted sum of the standardized components
+            valuations = []
+            for comp1, comp2, comp3 in zip(*standardized_components):
+                weighted_valuation = alpha1 * comp1 + alpha2 * comp2 + alpha3 * comp3
+                valuations.append(weighted_valuation)
+
+            # pick the WORST k evaluated requests (from ascending order)
+            selected = [r for _, r in sorted(zip(valuations, solution.carriers[carrier].accepted_requests))][:k]
+            selected.sort()
+
+            for request in selected:
+                self.remove_request_from_carrier(instance, solution, carrier, request)
+                auction_request_pool.append(request)
+                original_bundling_labels.append(carrier)
+
+        return auction_request_pool, original_bundling_labels
+
+    def _evaluate_request(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int) -> \
+            Tuple[float, float, float]:
+
+        # [i] distance to the depot of one of the collaborating carriers
+        min_dist_to_foreign_depot = MinDistanceToForeignDepotDSum(None)._evaluate_request(instance, solution, carrier,
+                                                                                          request)
+
+        # [ii] marginal profit
+        marginal_profit = MarginalProfitProxy(None)._evaluate_request(instance, solution, carrier, request)
+
+        # [iii] distance to the carrier's own depot
+        pickup, delivery = instance.pickup_delivery_pair(request)
+        assert len(solution.carrier_depots[carrier]) == 1
+        own_depot = solution.carrier_depots[carrier][0]
+        dist_to_own_depot = instance.distance([pickup, delivery], [own_depot, own_depot])
+
+        return min_dist_to_foreign_depot, marginal_profit, dist_to_own_depot
 
 
 class PackedTW(RequestSelectionBehaviorIndividual):
@@ -403,7 +484,7 @@ class RequestSelectionBehaviorBundle(RequestSelectionBehavior, ABC):
             # make the bundles that shall be evaluated
             bundles = self._create_bundles(instance, solution, carrier, k)
 
-            # find the best bundles for the given carrier
+            # find the bundle with the MAXIMUM valuation for the given carrier
             best_bundle = None
             best_bundle_valuation = -float('inf')
             for bundle in bundles:
@@ -552,6 +633,20 @@ class SpatioTemporalBundle(RequestSelectionBehaviorBundle):
                 len(bundle) * (-max_temporal_range) - len(bundle) * (-min_temporal_range))
 
         return 0.5 * spatial_evaluation + 0.5 * temporal_evaluation
+
+
+class LosSchulteBundle(RequestSelectionBehaviorBundle):
+    def _create_bundles(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, k: int):
+        """
+        create all possible bundles of size k
+        """
+        return itertools.combinations(solution.carriers[carrier].accepted_requests, k)
+
+    def _evaluate_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
+                         bundle: Sequence[int]):
+        # must invert again, since RequestSelectionBehaviorBundle searches for the maximum valuation and request
+        # selection for the minimum
+        return 1/bv.LosSchulteBundlingValuation().evaluate_bundling(instance, solution, [bundle])
 
 # class TimeShiftCluster(RequestSelectionBehaviorCluster):
 #     """Selects the cluster that yields the highest temporal flexibility when removed"""
