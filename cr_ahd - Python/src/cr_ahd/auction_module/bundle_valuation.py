@@ -405,8 +405,8 @@ class LosSchulteBundlingValuation(BundlingValuation):
                 # adjust vertex indices to account for depots
                 p0 -= instance.num_depots
                 d0 -= instance.num_depots
-                bundle_valuations.append(
-                    self.vertex_similarity_matrix[p0][d0])  # todo: cluster weights acc. to cluster size?
+                # todo: cluster weights acc. to cluster size?
+                bundle_valuations.append(self.vertex_similarity_matrix[p0][d0])
                 continue
 
             # lower relatedness values are better
@@ -435,8 +435,8 @@ class LosSchulteBundlingValuation(BundlingValuation):
 
             # collect mean relatedness of the requests in the bundle; lower values are better
             # TODO try max, min or other measures instead of mean?
-            bundle_valuations.append(
-                sum(request_relatedness_list) / len(bundle))  # todo: cluster weights acc. to cluster size?
+            # TODO: cluster weights acc. to cluster size?
+            bundle_valuations.append(sum(request_relatedness_list) / len(bundle))
 
         # compute mean valuation of the bundles in the bundling; lower values are better
         # TODO try max, min or other measures instead of mean?

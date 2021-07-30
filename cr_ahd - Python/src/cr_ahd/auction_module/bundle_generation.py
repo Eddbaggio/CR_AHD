@@ -38,20 +38,33 @@ bundling_labels: Sequence[int]
 """
 
 
-class SingleKMeansBundling:
+# =====================================================================================================================
+# SINGLE BUNDLE
+# =====================================================================================================================
+
+class SingleBundleGenerationBehavior(ABC):
+    @abstractmethod
+    def generate_bundling(self, instance: it.PDPInstance, auction_request_pool: Sequence[int]):
+        pass
+
+
+class SingleKMeansBundling(SingleBundleGenerationBehavior):
     """
     creates a k-means partitions of the submitted requests. generates exactly as many clusters as there are carriers.
-    NOTE: ignores the num_auction_bundles
-    :return
+
+    :return bundling_labels (not normalized) of the k-means partitioning
     """
 
-    @staticmethod
-    def generate_bundling(instance: it.PDPInstance, auction_request_pool: Sequence[int]):
-        request_midpoints = [ut.midpoint(instance, *instance.pickup_delivery_pair(sr)) for sr in auction_request_pool]
+    def generate_bundling(self, instance: it.PDPInstance, auction_request_pool: Sequence[int]):
+        request_midpoints = [ut.midpoint(instance, *instance.pickup_delivery_pair(r)) for r in auction_request_pool]
         # k_means = KMeans(n_clusters=instance.num_carriers, random_state=0).fit(request_midpoints)
         k_means = KMeans(n_clusters=instance.num_carriers).fit(request_midpoints)
         return k_means.labels_
 
+
+# =====================================================================================================================
+# POTENTIALLY UNLIMITED NUMBER OF BUNDLES
+# =====================================================================================================================
 
 class UnlimitedBundlePoolGenerationBehavior(ABC):
     def execute_bundle_pool_generation(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
@@ -79,6 +92,10 @@ class AllBundles(UnlimitedBundlePoolGenerationBehavior):
                                   original_bundling_labels: Sequence[int]):
         return tuple(ut.power_set(range(len(auction_request_pool)), False))
 
+
+# =====================================================================================================================
+# LIMITED NUMBER OF BUNDLES
+# =====================================================================================================================
 
 class LimitedBundlePoolGenerationBehavior(ABC):
     """generates a pool of bundles that *may* previously have been bundlings"""
@@ -108,8 +125,9 @@ class LimitedBundlePoolGenerationBehavior(ABC):
         pass
 
 
-class AllBundlings(LimitedBundlePoolGenerationBehavior):
-    """Creates all possible partitions of the auction request pool and evaluates them to find the best num_auction_bundles ones"""
+class BestOfAllBundlings(LimitedBundlePoolGenerationBehavior):
+    """Creates all possible partitions of the auction request pool and evaluates them to find the best
+    num_auction_bundles ones """
 
     def _generate_auction_bundles(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
                                   auction_request_pool: Sequence[int], original_bundling_labels: Sequence[int]):
@@ -175,57 +193,19 @@ class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
                                   auction_request_pool: Sequence[int],
                                   original_bundling_labels: Sequence[int]):
         # parameters
-        population_size: int = self.parameters['population_size']
-        num_generations: int = self.parameters['num_generations']
-        mutation_rate: float = self.parameters['mutation_rate']
         # only a fraction of generation_gap is replaced in a new gen. the remaining individuals (generation overlap)
         # are the top (1-generation_gap)*100 % from the previous gen, measured by their fitness
-        generation_gap: float = self.parameters['generation_gap']
-
         fitness, population = self.initialize_population(instance,
                                                          solution,
                                                          auction_request_pool,
-                                                         original_bundling_labels,
-                                                         instance.num_carriers,
-                                                         population_size,
-                                                         self.bundling_valuation)
+                                                         instance.num_carriers)
 
-        for generation_counter in tqdm.trange(1, num_generations, desc='Bundle Generation', disable=True):
-
-            # initialize new generation with the elites from the previous generation
-            elites = ut.argsmax(fitness, int(population_size * (1 - generation_gap)))
-            new_population: List[Sequence[int]] = [population[i] for i in elites]
-            new_fitness: List[float] = [fitness[i] for i in elites]
-
-            offspring_counter = 0
-            while offspring_counter < population_size * generation_gap:
-
-                # parent selection (get the parent's index first, then the actual parent string/chromosome)
-                parent1, parent2 = self._roulette_wheel(fitness, 2)
-                parent1 = population[parent1]
-                parent2 = population[parent2]
-
-                offspring = self.generate_offspring(instance, solution, auction_request_pool, parent1, parent2,
-                                                    mutation_rate)
-
-                # check for duplicates
-                if offspring in new_population:
-                    continue
-
-                else:
-                    # fitness evaluation
-                    offspring_fitness = self.bundling_valuation.evaluate_bundling_labels(instance, solution, offspring,
-                                                                                         auction_request_pool)
-
-                    # add offspring to the new gen and increase population size counter
-                    new_population.append(offspring)
-                    new_fitness.append(offspring_fitness)
-                    offspring_counter += 1
-
-            # replace the old generation with the new one
-            population = new_population
-            fitness = new_fitness
-            generation_counter += 1
+        for generation_counter in tqdm.trange(1,
+                                              self.parameters['num_generations'],
+                                              desc='Bundle Generation',
+                                              disable=True):
+            fitness, population = self.generate_new_population(instance, solution, population, fitness,
+                                                               auction_request_pool)
 
         # select the best bundles
         limited_bundle_pool = self.generate_bundle_pool(auction_request_pool, fitness, population,
@@ -242,6 +222,41 @@ class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
                 limited_bundle_pool.append(ob)
 
         return limited_bundle_pool
+
+    def generate_new_population(self, instance, solution, previous_population, previous_fitness, auction_request_pool):
+        # initialize new generation with the elites from the previous generation
+        elites = ut.argsmax(previous_fitness,
+                            int(self.parameters['population_size'] * (1 - self.parameters['generation_gap'])))
+        new_population: List[Sequence[int]] = [previous_population[i] for i in elites]
+        new_fitness: List[float] = [previous_fitness[i] for i in elites]
+        offspring_counter = 0
+        while offspring_counter < self.parameters['population_size'] * self.parameters['generation_gap']:
+
+            # parent selection (get the parent's index first, then the actual parent string/chromosome)
+            parent1, parent2 = self._roulette_wheel(previous_fitness, 2)
+            parent1 = previous_population[parent1]
+            parent2 = previous_population[parent2]
+
+            offspring = self.generate_offspring(instance, solution, auction_request_pool, parent1, parent2)
+
+            # check for duplicates
+            if offspring in new_population:
+                continue
+
+            else:
+                # fitness evaluation
+                offspring_fitness = self.bundling_valuation.evaluate_bundling_labels(instance, solution, offspring,
+                                                                                     auction_request_pool)
+
+                # add offspring to the new gen and increase population size counter
+                new_population.append(offspring)
+                new_fitness.append(offspring_fitness)
+                offspring_counter += 1
+        # replace the old generation with the new one
+        previous_population = new_population
+        previous_fitness = new_fitness
+
+        return previous_fitness, previous_population
 
     @staticmethod
     def generate_bundle_pool(auction_pool, fitness, population: Sequence[Sequence[int]], pool_size):
@@ -265,7 +280,7 @@ class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
 
         return bundle_pool
 
-    def generate_offspring(self, instance, solution, auction_request_pool, parent1, parent2, mutation_rate):
+    def generate_offspring(self, instance, solution, auction_request_pool, parent1, parent2):
         """
         :param instance:
         :param solution:
@@ -282,7 +297,7 @@ class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
         self._normalize_individual(offspring)
 
         # mutation
-        if random.random() <= mutation_rate:
+        if random.random() <= self.parameters['mutation_rate']:
             mutation_func: Callable = random.choice(
                 [
                     self._mutation_move,
@@ -296,10 +311,11 @@ class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
 
         return offspring
 
-    def initialize_population(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
+    def initialize_population(self, instance: it.PDPInstance,
+                              solution: slt.CAHDSolution,
                               auction_request_pool: Sequence,
-                              original_bundles: Sequence, n: int, population_size: int,
-                              bundle_fitness: bv.BundlingValuation):
+                              n: int,
+                              ):
         """
         initializes the a population of size population_size. this first generation includes the original bundles as
         well as a k-means bundling.
@@ -322,11 +338,12 @@ class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
         if k_means_individual not in population:
             population.append(k_means_individual)
             fitness.append(
-                bundle_fitness.evaluate_bundling_labels(instance, solution, k_means_individual, auction_request_pool))
+                self.bundling_valuation.evaluate_bundling_labels(instance, solution, k_means_individual,
+                                                                 auction_request_pool))
 
         # fill the rest of the population with random individuals
         i = 1
-        while i < population_size:
+        while i < self.parameters['population_size']:
             individual = ut.random_max_k_partition_idx(auction_request_pool, n)
             self._normalize_individual(individual)
             if individual in population:
@@ -334,7 +351,8 @@ class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
             else:
                 population.append(individual)
                 fitness.append(
-                    bundle_fitness.evaluate_bundling_labels(instance, solution, individual, auction_request_pool))
+                    self.bundling_valuation.evaluate_bundling_labels(instance, solution, individual,
+                                                                     auction_request_pool))
                 i += 1
 
         return fitness, population
@@ -497,6 +515,10 @@ class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
 
         pass
 
+
+# =====================================================================================================================
+# AUXILIARY FUNCTIONS
+# =====================================================================================================================
 
 def stirling_second(n, k):
     """

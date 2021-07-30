@@ -54,13 +54,13 @@ def parameter_generator():
     ]
 
     request_selections: List[rs.RequestSelectionBehavior.__class__] = [
-        # rs.Random,
-        # rs.SpatialBundleDSum,  # the original 'cluster' strategy by Gansterer & Hartl (2016)
+        rs.Random,
+        rs.SpatialBundleDSum,  # the original 'cluster' strategy by Gansterer & Hartl (2016)
         # rs.SpatialBundleDMax,
         # rs.MinDistanceToForeignDepotDMin,
         # rs.MarginalProfitProxy,
         # rs.MarginalProfitProxyNeighbor,
-        rs.ComboRaw,
+        # rs.ComboRaw,
         rs.ComboStandardized,
         rs.LosSchulteBundle,
         # rs.TemporalRangeCluster,
@@ -82,7 +82,7 @@ def parameter_generator():
                                    mutation_rate=0.5,
                                    generation_gap=0.9,)
          ),
-        (bg.AllBundlings, dict()),
+        (bg.BestOfAllBundlings, dict()),
     ]
 
     bundle_valuations: List[bv.BundlingValuation.__class__] = [
@@ -106,6 +106,7 @@ def parameter_generator():
                         for num_auction_bundles in nums_auction_bundles:
                             for bundle_generation, bundle_generation_kwargs in bundle_generations:
                                 for bundle_valuation in bundle_valuations:
+                                    # auction for collaborative planning
                                     auction = au.Auction(tour_construction,
                                                          tour_improvement,
                                                          request_selection(num_submitted_requests),
@@ -116,6 +117,7 @@ def parameter_generator():
                                                          bd.DynamicReOptAndImprove(tour_construction, tour_improvement),
                                                          wd.MaxBidGurobiCAP1(),
                                                          )
+                                    # collaborative planning
                                     yield dict(tour_construction=tour_construction,
                                                tour_improvement=tour_improvement,
                                                time_window_management=time_window_management,
