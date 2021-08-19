@@ -396,17 +396,8 @@ class LosSchulteBundlingValuation(BundlingValuation):
         return 1 / bundling_valuation
 
     def evaluate_bundle(self, instance: it.PDPInstance, bundle: Sequence[int]):
-        # single-request bundles
-        if len(bundle) == 1:
-            p0, d0 = instance.pickup_delivery_pair(bundle[0])
-            # adjust vertex indices to account for depots
-            p0 -= instance.num_depots
-            d0 -= instance.num_depots
-            # todo: cluster weights acc. to cluster size?
-            bundle_valuation = self.vertex_relatedness_matrix[p0][d0]
-
         # multi-request bundles
-        else:
+        if len(bundle) > 1:
             # lower relatedness values are better
             request_relatedness_list = []
 
@@ -435,6 +426,16 @@ class LosSchulteBundlingValuation(BundlingValuation):
             # TODO try max, min or other measures instead of mean?
             # TODO: cluster weights acc. to cluster size?
             bundle_valuation = sum(request_relatedness_list) / len(bundle)
+
+        # single-request bundles
+        else:
+            p0, d0 = instance.pickup_delivery_pair(bundle[0])
+            # adjust vertex indices to account for depots
+            p0 -= instance.num_depots
+            d0 -= instance.num_depots
+            # todo: cluster weights acc. to cluster size?
+            bundle_valuation = self.vertex_relatedness_matrix[p0][d0]
+
         return bundle_valuation
 
     def preprocessing(self, instance: it.PDPInstance, solution: slt.CAHDSolution, auction_request_pool: Sequence[int]):

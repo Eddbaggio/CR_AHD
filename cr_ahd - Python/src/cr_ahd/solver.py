@@ -62,9 +62,9 @@ class Solver:
             solution.solver_config['request_selection'] = self.auction.request_selection.__class__.__name__
             solution.solver_config['bundle_generation'] = self.auction.bundle_generation.__class__.__name__
             try:
-                # for GA-based bundle generation
-                solution.solver_config['bundling_valuation'] = self.auction.bundle_generation.parameters[
-                    'bundling_valuation'].__class__.__name__
+                # for bundle generation with LimitedBundlePoolGenerationBehavior
+                solution.solver_config[
+                    'bundling_valuation'] = self.auction.bundle_generation.bundling_valuation.__class__.__name__
             except KeyError:
                 None
             solution.solver_config['num_auction_bundles'] = self.auction.bundle_generation.num_auction_bundles
@@ -240,6 +240,3 @@ class CentralizedPlanning(Solver):
         # use only the single, centralized carrier
         carrier = 0
         return twm.TWManagementSingleOriginalDepot().execute(instance, solution, carrier, request)
-
-
-

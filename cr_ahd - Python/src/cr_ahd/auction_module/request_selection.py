@@ -636,6 +636,9 @@ class SpatioTemporalBundle(RequestSelectionBehaviorBundle):
 
 
 class LosSchulteBundle(RequestSelectionBehaviorBundle):
+    """
+
+    """
     def _create_bundles(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, k: int):
         """
         create all possible bundles of size k

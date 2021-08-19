@@ -334,5 +334,5 @@ class PDPTWSimulatedAnnealing(PDPTWMetaHeuristic):
             return False
 
 
-class IteratedLocalSearch(PDPTWMetaHeuristic):
+class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
     pass
