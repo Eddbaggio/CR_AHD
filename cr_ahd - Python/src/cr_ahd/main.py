@@ -15,7 +15,7 @@ import src.cr_ahd.solver as slv
 from src.cr_ahd.auction_module import auction as au, request_selection as rs, bundle_generation as bg, bidding as bd, \
     winner_determination as wd, bundle_valuation as bv
 from src.cr_ahd.core_module import instance as it, solution as slt
-from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh, local_search as ls
+from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh, neighborhoods as ls
 from src.cr_ahd.tw_management_module import tw_management as twm, tw_selection as tws, tw_offering as two
 from src.cr_ahd.utility_module import utils as ut, evaluation as ev, cr_ahd_logging as log
 
@@ -27,7 +27,7 @@ def parameter_generator():
     """
     generate dicts with all parameters that shall be tested and are required to initialize a solver.
     """
-    neighborhoods: List[ls.LocalSearchBehavior] = [  # these are fixed at the moment, i.e. not looped over
+    neighborhoods: List[ls.Neighborhood] = [  # these are fixed at the moment, i.e. not looped over
         ls.PDPMove(),
         ls.PDPTwoOpt()
     ]
@@ -38,7 +38,7 @@ def parameter_generator():
     ]
 
     tour_improvements: List[mh.PDPTWMetaHeuristic] = [
-        mh.PDPTWVariableNeighborhoodDescent(neighborhoods),
+        mh.PDPTWSequentialVariableNeighborhoodDescent(neighborhoods),
         mh.NoMetaheuristic(neighborhoods)
     ]
 
@@ -246,7 +246,7 @@ if __name__ == '__main__':
         paths = sorted(
             list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
             key=ut.natural_sort_key)
-        paths = paths[:12]
+        paths = paths[:1]
 
         if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=False)

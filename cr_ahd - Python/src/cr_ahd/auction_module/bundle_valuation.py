@@ -6,10 +6,11 @@ from typing import Sequence, Tuple, List, final
 
 import numpy as np
 from scipy.spatial.distance import squareform, pdist
+from sklearn.preprocessing import normalize
 
 from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
 from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh, \
-    local_search as ls
+    neighborhoods as nh
 from src.cr_ahd.utility_module import utils as ut, profiling as pr
 
 
@@ -213,20 +214,20 @@ def bundle_total_travel_distance(instance: it.PDPInstance,
 
     # initialize temporary tour with the earliest request
     depot_pickup, depot_delivery = instance.pickup_delivery_pair(depot_request)
-    tour_ = tr.Tour('tmp', instance, solution, depot_pickup)
-    tour_.insert_and_update(instance, solution, [1], [depot_delivery])
+    tmp_tour_ = tr.Tour('tmp', instance, solution, depot_pickup)
+    tmp_tour_.insert_and_update(instance, solution, [1], [depot_delivery])
 
     # insert all remaining requests of the bundle
     tour_construction = cns.MinTravelDistanceInsertion()  # TODO this should be a parameter!
-    tour_improvement = mh.PDPTWVariableNeighborhoodDescent(
-        [ls.PDPMove(), ls.PDPTwoOpt()])  # TODO this should be a parameter!
+    tour_improvement = mh.PDPTWSequentialVariableNeighborhoodDescent(
+        [nh.PDPMove(), nh.PDPTwoOpt()])  # TODO this should be a parameter!
     for request in bundle:
         if request == depot_request:
             continue
         pickup, delivery = instance.pickup_delivery_pair(request)
 
         # set check_feasibility to False since only the tour length is of interest here
-        insertion = tour_construction.best_insertion_for_request_in_tour(instance, solution, tour_, request, False)
+        insertion = tour_construction.best_insertion_for_request_in_tour(instance, solution, tmp_tour_, request, False)
         delta, pickup_pos, delivery_pos = insertion
 
         # if no feasible insertion exists, return inf for the travel distance
@@ -234,14 +235,14 @@ def bundle_total_travel_distance(instance: it.PDPInstance,
             return float('inf')
 
         # insert, ignores feasibility!
-        tour_.insert_and_update(instance, solution, [pickup_pos, delivery_pos], [pickup, delivery])
-    tour_improvement.execute_on_tour(instance, solution, tour_)
-    return tour_.sum_travel_distance
+        tmp_tour_.insert_and_update(instance, solution, [pickup_pos, delivery_pos], [pickup, delivery])
+    tour_improvement.execute_on_tour(instance, solution, tmp_tour_)
+    return tmp_tour_.sum_travel_distance
 
 
-def los_schulte_request_similarity(instance: it.PDPInstance, solution: slt.CAHDSolution, vertex1: int, vertex2: int):
+def los_schulte_vertex_similarity(instance: it.PDPInstance, solution: slt.CAHDSolution, vertex1: int, vertex2: int):
     """
-    Taken from [1] Los, J., Schulte, F., Gansterer, M., Hartl, R. F., Spaan, M. T. J., & Negenborn, R. R. (2020).
+    Following [1] Los, J., Schulte, F., Gansterer, M., Hartl, R. F., Spaan, M. T. J., & Negenborn, R. R. (2020).
     Decentralized combinatorial auctions for dynamic and large-scale collaborative vehicle routing.
 
     similarity of two vertices (not requests!) based on a weighted sum of travel time and waiting time
@@ -261,6 +262,79 @@ def los_schulte_request_similarity(instance: it.PDPInstance, solution: slt.CAHDS
     w_ij = max(0, min(waiting_time_seconds(vertex1, vertex2), waiting_time_seconds(vertex2, vertex1)))
     gamma = 2
     return gamma * ut.travel_time(instance.distance([vertex1], [vertex2])).total_seconds() + w_ij
+
+
+def los_schulte_request_similarity(delivery0, pickup0, delivery1, pickup1, vertex_similarity_matrix):
+    """
+    Following Los, J., Schulte, F., Gansterer, M., Hartl, R. F., Spaan, M. T. J., & Negenborn, R. R. (2020).
+    Decentralized combinatorial auctions for dynamic and large-scale collaborative vehicle routing.
+
+    :param delivery0:
+    :param pickup0:
+    :param delivery1:
+    :param pickup1:
+    :param vertex_similarity_matrix:
+    :return:
+    """
+    return min(
+        vertex_similarity_matrix[pickup0][delivery1],
+        vertex_similarity_matrix[delivery0][pickup1],
+        0.5 * (vertex_similarity_matrix[pickup0][pickup1] + vertex_similarity_matrix[delivery0][delivery1])
+    )
+
+
+def ropke_pisinger_request_similarity(instance: it.PDPInstance,
+                                      solution: slt.CAHDSolution,
+                                      request_0: int,
+                                      request_1: int,
+                                      distance_weight: float = 1,
+                                      time_weight: float = 1,
+                                      capacity_weight: float = 1,
+                                      num_vehicles_weight: float = 1):
+    """
+    Following Ropke, Stefan, & Pisinger, David. (2006). An Adaptive Large Neighborhood Search Heuristic for the
+    Pickup and Delivery Problem with Time Windows. Transportation Science, 40(4), 455–472.
+    As far as I can see, it is not useful to precompute a request similarity matrix since the similarity is based
+    on the arrival times and these arrival times obviously change with each execute neighborhood move
+
+    :param request_0:
+    :param request_1:
+    :param distance_weight:
+    :param time_weight:
+    :param capacity_weight:
+    :param num_vehicles_weight:
+    :return:
+    """
+    pickup_0, delivery_0 = instance.pickup_delivery_pair(request_0)
+    pickup_1, delivery_1 = instance.pickup_delivery_pair(request_1)
+    distance_max = max(max(x) for x in instance._distance_matrix)
+    distance_min = min(min(x) for x in instance._distance_matrix)
+    normalized_distance_matrix = [ut.linear_interpolation(x, 0, 1, distance_min, distance_max)
+                                  for x in instance._distance_matrix]
+    distance = normalized_distance_matrix[pickup_0][pickup_1] + normalized_distance_matrix[delivery_0][delivery_1]
+
+    tours = [solution.request_to_tour_assignment[request_0], solution.request_to_tour_assignment[request_1]]
+    positions = [solution.vertex_position_in_tour[vertex] for vertex in (pickup_0, delivery_0, pickup_1, delivery_1)]
+
+    tour_0_, tour_1_ = tours
+    pickup_pos_0, delivery_pos_0, pickup_pos_1, delivery_pos_1 = positions
+
+    arrival_time_delta = (abs(tour_0_.arrival_schedule[pickup_pos_0] - tour_1_.arrival_schedule[pickup_pos_1]) +
+                          abs(tour_0_.arrival_schedule[delivery_pos_0] - tour_1_.arrival_schedule[delivery_pos_1])
+                          ).total_seconds()
+    # normalize time [0, 1]
+    start_time_delta = (ut.START_TIME - dt.datetime.min).total_seconds()
+    end_time_delta = (ut.END_TIME - dt.datetime.min).total_seconds()
+    # ((x - old_min) / (old_max - old_min)) * (new_max - new_min) + new_min
+    arrival_time_delta = (arrival_time_delta - start_time_delta) / (end_time_delta - start_time_delta * (1 - 0)) + 0
+
+    normalized_load = ut.linear_interpolation(instance.load, 0, 1)
+    capacity = abs(normalized_load[pickup_0] - normalized_load[pickup_1])
+
+    # num_vehicles not relevant in my application since I assume that all vertices can be served by all vehicles.
+    # num_vehicles = ...
+
+    return distance_weight * distance + time_weight * arrival_time_delta + capacity_weight * capacity  # + num_vehicles_weight * num_vehicles
 
 
 def bundling_labels_to_bundling(bundling_labels: Sequence[int], auction_request_pool: Sequence[int]):
@@ -398,7 +472,7 @@ class LosSchulteBundlingValuation(BundlingValuation):
     def evaluate_bundle(self, instance: it.PDPInstance, bundle: Sequence[int]):
         # multi-request bundles
         if len(bundle) > 1:
-            # lower relatedness values are better
+            # lower request_similarity values are better
             request_relatedness_list = []
 
             for i, request0 in enumerate(bundle[:-1]):
@@ -413,16 +487,12 @@ class LosSchulteBundlingValuation(BundlingValuation):
                     p1 -= instance.num_depots
                     d1 -= instance.num_depots
 
-                    # compute relatedness between requests 0 and 1 acc. to the paper's formula (1)
-                    relatedness = min(
-                        self.vertex_relatedness_matrix[p0][d1],
-                        self.vertex_relatedness_matrix[d0][p1],
-                        0.5 * (self.vertex_relatedness_matrix[p0][p1] + self.vertex_relatedness_matrix[d0][d1])
-                    )
+                    # compute request_similarity between requests 0 and 1 acc. to the paper's formula (1)
+                    request_similarity = los_schulte_request_similarity(d0, p0, d1, p1, self.vertex_relatedness_matrix)
 
-                    request_relatedness_list.append(relatedness)
+                    request_relatedness_list.append(request_similarity)
 
-            # collect mean relatedness of the requests in the bundle; lower values are better
+            # collect mean request_similarity of the requests in the bundle; lower values are better
             # TODO try max, min or other measures instead of mean?
             # TODO: cluster weights acc. to cluster size?
             bundle_valuation = sum(request_relatedness_list) / len(bundle)
@@ -453,27 +523,27 @@ class LosSchulteBundlingValuation(BundlingValuation):
                 pickup2, delivery2 = instance.pickup_delivery_pair(request2)
 
                 # [1] pickup1 <> delivery1
-                self.vertex_relatedness_matrix[i][i + n] = los_schulte_request_similarity(
+                self.vertex_relatedness_matrix[i][i + n] = los_schulte_vertex_similarity(
                     instance, solution, pickup1, delivery1)
 
                 # [2] pickup1 <> pickup2
-                self.vertex_relatedness_matrix[i][j] = los_schulte_request_similarity(
+                self.vertex_relatedness_matrix[i][j] = los_schulte_vertex_similarity(
                     instance, solution, pickup1, pickup2)
 
                 # [3] pickup1 <> delivery2
-                self.vertex_relatedness_matrix[i][j + n] = los_schulte_request_similarity(
+                self.vertex_relatedness_matrix[i][j + n] = los_schulte_vertex_similarity(
                     instance, solution, pickup1, delivery2)
 
                 # [4] delivery1 <> pickup2
-                self.vertex_relatedness_matrix[i + n][j] = los_schulte_request_similarity(
+                self.vertex_relatedness_matrix[i + n][j] = los_schulte_vertex_similarity(
                     instance, solution, delivery1, pickup2)
 
                 # [5] delivery1 <> delivery2
-                self.vertex_relatedness_matrix[i + n][j + n] = los_schulte_request_similarity(
+                self.vertex_relatedness_matrix[i + n][j + n] = los_schulte_vertex_similarity(
                     instance, solution, delivery1, delivery2)
 
                 # [6] pickup2 <> delivery2
-                self.vertex_relatedness_matrix[j][j + n] = los_schulte_request_similarity(
+                self.vertex_relatedness_matrix[j][j + n] = los_schulte_vertex_similarity(
                     instance, solution, pickup2, delivery2)
 
 

@@ -10,7 +10,7 @@ from typing import Sequence, Tuple
 import numpy as np
 
 from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
-from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh, local_search as ls
+from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh, neighborhoods as ls
 from src.cr_ahd.utility_module import utils as ut
 from src.cr_ahd.auction_module import bundle_valuation as bv
 
@@ -45,17 +45,14 @@ class RequestSelectionBehavior(ABC):
         carrier_ = solution.carriers[carrier]
 
         # find the request's tour:
-        # TODO: would be faster if the tour was stored somewhere but this is fine for now
+        tour_ = carrier_.tours[solution.request_to_tour_assignment[request]]
         pickup, delivery = instance.pickup_delivery_pair(request)
-        for t in carrier_.tours:
-            if pickup in t.routing_sequence:
-                tour_ = t
-                break
 
         # destroy & repair, i.e. remove the request from it's tour
         pickup_pos = tour_.routing_sequence.index(pickup)
         delivery_pos = tour_.routing_sequence.index(delivery)
         tour_.pop_and_update(instance, solution, [pickup_pos, delivery_pos])
+        solution.request_to_tour_assignment[request] = None
 
         # retract the request from the carrier
         carrier_.assigned_requests.remove(request)
@@ -154,7 +151,7 @@ class MarginalProfit(RequestSelectionBehaviorIndividual):
                                                                                            tmp_tour_, insert_request)
             insertion.execute_insertion_in_tour(instance, solution, tmp_tour_, request, pickup_pos, delivery_pos)
         # improvement
-        mh.PDPTWVariableNeighborhoodDescent([ls.PDPMove(), ls.PDPTwoOpt()]).execute_on_tour(instance, solution, tmp_tour_)
+        mh.PDPTWSequentialVariableNeighborhoodDescent([ls.PDPMove(), ls.PDPTwoOpt()]).execute_on_tour(instance, solution, tmp_tour_)
         travel_distance_without_request = tmp_tour_.sum_travel_distance
 
         return travel_distance_with_request - travel_distance_without_request
@@ -179,12 +176,8 @@ class MarginalProfitProxy(RequestSelectionBehaviorIndividual):
     def _evaluate_request(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
 
         # find the request's tour:
-        # TODO: would be faster if the tour was stored somewhere but this is fine for now
+        tour_ = solution.carriers[carrier].tours[solution.request_to_tour_assignment[request]]
         pickup, delivery = instance.pickup_delivery_pair(request)
-        for t in solution.carriers[carrier].tours:
-            if pickup in t.routing_sequence:
-                tour_ = t
-                break
 
         pickup_pos = tour_.routing_sequence.index(pickup)
         delivery_pos = tour_.routing_sequence.index(delivery)

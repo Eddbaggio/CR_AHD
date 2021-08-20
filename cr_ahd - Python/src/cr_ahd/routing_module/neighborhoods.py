@@ -9,7 +9,7 @@ from src.cr_ahd.utility_module import profiling as pr
 logger = logging.getLogger(__name__)
 
 
-class LocalSearchBehavior(ABC):
+class Neighborhood(ABC):
     @abstractmethod
     def feasible_move_generator(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
         """
@@ -40,7 +40,7 @@ class LocalSearchBehavior(ABC):
 # =====================================================================================================================
 # INTRA-TOUR LOCAL SEARCH
 # =====================================================================================================================
-class IntraTourLocalSearchBehavior(LocalSearchBehavior, ABC):
+class IntraTourNeighborhood(Neighborhood, ABC):
     @final
     def feasible_move_generator(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
         """
@@ -63,8 +63,18 @@ class IntraTourLocalSearchBehavior(LocalSearchBehavior, ABC):
     def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move):
         pass
 
+    @final
+    def first_feasible_move_for_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_: tr.Tour):
+        raise NotImplementedError
+        pass
 
-class PDPMove(IntraTourLocalSearchBehavior):
+    @final
+    def best_feasible_move_for_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_: tr.Tour):
+        raise NotImplementedError
+        pass
+
+
+class PDPMove(IntraTourNeighborhood):
     """
     Take a PD pair and see whether inserting it in a different location of the SAME route improves the solution
     """
@@ -138,7 +148,7 @@ class PDPMove(IntraTourLocalSearchBehavior):
         pass
 
 
-class PDPTwoOpt(IntraTourLocalSearchBehavior):
+class PDPTwoOpt(IntraTourNeighborhood):
 
     def feasible_move_generator_for_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_: tr.Tour):
         # iterate over all moves
@@ -228,7 +238,7 @@ class PDPTwoOpt(IntraTourLocalSearchBehavior):
 # =====================================================================================================================
 # INTER-TOUR LOCAL SEARCH
 # =====================================================================================================================
-class InterTourLocalSearchBehavior(LocalSearchBehavior, ABC):
+class InterTourNeighborhood(Neighborhood, ABC):
     @abstractmethod
     def feasible_move_generator(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
         """
@@ -246,7 +256,7 @@ class InterTourLocalSearchBehavior(LocalSearchBehavior, ABC):
         pass
 
 
-class PDPRelocate(InterTourLocalSearchBehavior):
+class PDPRelocate(InterTourNeighborhood):
     """
     Take one PD request at a time and see whether inserting it into another tour is cheaper.
     """
@@ -323,6 +333,8 @@ class PDPRelocate(InterTourLocalSearchBehavior):
             solution.carriers[carrier].tours.remove(old_tour_)
 
         new_tour_.insert_and_update(instance, solution, [new_pickup_pos, new_delivery_pos], [pickup, delivery])
+        solution.request_to_tour_assignment[instance.request_from_vertex(pickup)] = new_tour_.id_
+
         pass
 
 
@@ -448,6 +460,6 @@ class PDPRelocate2(InterTourLocalSearchBehavior):
 '''
 
 
-class PDPDeleteTour(LocalSearchBehavior):
+class PDPMergeTours(Neighborhood):
     """take all requests of a tour and see whether inserting them into some other tours improves the solution"""
     pass
