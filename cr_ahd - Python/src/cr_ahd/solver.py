@@ -228,6 +228,7 @@ class CentralizedPlanning(Solver):
         tour_ = tr.Tour(carrier_.num_tours(), instance, solution, depot_index=original_depot)
         if tour_.insertion_feasibility_check(instance, solution, [1, 2], instance.pickup_delivery_pair(request)):
             tour_.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(request))
+            solution.request_to_tour_assignment[request] = tour_.id_
         else:
             raise ut.ConstraintViolationError(f'Cannot create new route with request {request} for carrier {carrier}.')
 

@@ -122,10 +122,9 @@ class PDPParallelInsertionConstruction(ABC):
                           request: int, tour: int, pickup_pos: int, delivery_pos: int):
 
         pickup, delivery = instance.pickup_delivery_pair(request)
-        solution.carriers[carrier].tours[tour].insert_and_update(instance,
-                                                                 solution,
-                                                                 [pickup_pos, delivery_pos],
-                                                                 [pickup, delivery])
+        tour_ = solution.carriers[carrier].tours[tour]
+        tour_.insert_and_update(instance, solution, [pickup_pos, delivery_pos], [pickup, delivery])
+        solution.request_to_tour_assignment[instance.request_from_vertex(pickup)] = tour
         solution.carriers[carrier].unrouted_requests.remove(request)
         solution.carriers[carrier].routed_requests.append(request)
 
@@ -135,6 +134,7 @@ class PDPParallelInsertionConstruction(ABC):
 
         pickup, delivery = instance.pickup_delivery_pair(request)
         tour_.insert_and_update(instance, solution, [pickup_pos, delivery_pos], [pickup, delivery])
+        solution.request_to_tour_assignment[instance.request_from_vertex(pickup)] = tour_.id_
 
     @staticmethod
     def create_new_tour_with_request(instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
@@ -156,6 +156,7 @@ class PDPParallelInsertionConstruction(ABC):
 
             if tour_.insertion_feasibility_check(instance, solution, [1, 2], instance.pickup_delivery_pair(request)):
                 tour_.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(request))
+                solution.request_to_tour_assignment[request] = tour_.id_
 
                 if tour_.sum_profit > max_profit:
                     max_profit = tour_.sum_profit
@@ -283,7 +284,7 @@ class TimeShiftRegretInsertion(PDPParallelInsertionConstruction):
         if best_delta < float('inf'):
             regret = sum([(delta - best_delta) for delta in [move[0] for move in best_insertion_for_request_in_tour]])
             # return the inverse of the regret, since the LARGEST regret is to be inserted first
-            return 1/regret, best_tour, best_pickup_pos, best_delivery_pos
+            return 1 / regret, best_tour, best_pickup_pos, best_delivery_pos
         else:
             return best_delta, best_tour, best_pickup_pos, best_delivery_pos
 
