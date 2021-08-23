@@ -220,6 +220,10 @@ class Tour:
         self._sum_revenue = updated_sums['sum_revenue']
         self._sum_profit = updated_sums['sum_profit']
 
+        # update the solution's record of the tour's vertices where necessary
+        for pos, vertex in enumerate(self.routing_sequence[insertion_indices[0]:], start=insertion_indices[0]):
+            solution.vertex_position_in_tour[vertex] = pos
+
     def pop_and_update(self, instance, solution, pop_indices: Sequence[int]):
         popped, updated_sums = multi_pop_and_update(routing_sequence=self._routing_sequence,
                                                     sum_travel_distance=self.sum_travel_distance,
@@ -245,6 +249,12 @@ class Tour:
         self._sum_load = updated_sums['sum_load']
         self._sum_revenue = updated_sums['sum_revenue']
         self._sum_profit = updated_sums['sum_profit']
+
+        # update the solution's record of the vertices' positions
+        for vertex in popped:
+            solution.vertex_position_in_tour[vertex] = None
+        for pos, vertex in enumerate(self.routing_sequence[pop_indices[0]:], start=pop_indices[0]):
+            solution.vertex_position_in_tour[vertex] = pos
 
         return popped
 
@@ -287,7 +297,8 @@ class Tour:
         # must ensure that no edges are counted twice. Naive implementation with a tmp_routing_sequence
         # TODO pretty sure this could be done without a temporary copy to save time
         else:
-            assert all(pop_indices[i] < pop_indices[i + 1] for i in range(len(pop_indices) - 1)), f'Pop indices {pop_indices} are not in correct order'
+            assert all(pop_indices[i] < pop_indices[i + 1] for i in
+                       range(len(pop_indices) - 1)), f'Pop indices {pop_indices} are not in correct order'
 
             tmp_routing_sequence = list(self.routing_sequence)
 

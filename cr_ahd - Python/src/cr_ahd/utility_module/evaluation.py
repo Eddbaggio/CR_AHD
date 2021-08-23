@@ -262,9 +262,12 @@ def print_top_level_stats(carrier_df: pd.DataFrame, secondary_parameters: List[s
 
 
 if __name__ == '__main__':
+    # df = pd.read_csv(
+    #     "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home "
+    #     "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_carrier_#.csv",
+    # )
     df = pd.read_csv(
-        "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home "
-        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_carrier_#074.csv",
+        "C:/Users/steff/CR_AHD/data/Output/Gansterer_Hartl/evaluation_carrier_#005.csv",
     )
     df.fillna('None', inplace=True)
     df.set_index(['rad', 'n', 'run', 'carrier_id_'] + ut.solver_config, inplace=True)
@@ -272,9 +275,9 @@ if __name__ == '__main__':
     bar_chart(df,
               title='',
               values='sum_profit',
-              color=['solution_algorithm', 'request_selection'],
-              category='run', facet_col='rad',
+              color=['solution_algorithm', 'bundling_valuation'],
               # category='run', facet_col='rad',
+              category='rad', facet_col=None,
               facet_row='n',
               show=True,
               # width=700,

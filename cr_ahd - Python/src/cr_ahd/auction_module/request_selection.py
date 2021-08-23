@@ -10,7 +10,7 @@ from typing import Sequence, Tuple
 import numpy as np
 
 from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
-from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh, local_search as ls
+from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh, neighborhoods as ls
 from src.cr_ahd.utility_module import utils as ut
 from src.cr_ahd.auction_module import bundle_valuation as bv
 
@@ -36,34 +36,6 @@ class RequestSelectionBehavior(ABC):
     @abstractmethod
     def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         pass
-
-    @staticmethod
-    def remove_request_from_carrier(instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
-        """remove the request from the carrier. Finds the tour in which the request is currently served, removes its
-        pickup and delivery nodes and reconnects the tour. updates the solution accordingly"""
-
-        carrier_ = solution.carriers[carrier]
-
-        # find the request's tour:
-        # TODO: would be faster if the tour was stored somewhere but this is fine for now
-        pickup, delivery = instance.pickup_delivery_pair(request)
-        for t in carrier_.tours:
-            if pickup in t.routing_sequence:
-                tour_ = t
-                break
-
-        # destroy & repair, i.e. remove the request from it's tour
-        pickup_pos = tour_.routing_sequence.index(pickup)
-        delivery_pos = tour_.routing_sequence.index(delivery)
-        tour_.pop_and_update(instance, solution, [pickup_pos, delivery_pos])
-
-        # retract the request from the carrier
-        carrier_.assigned_requests.remove(request)
-        carrier_.accepted_requests.remove(request)
-        carrier_.routed_requests.remove(request)
-        solution.request_to_carrier_assignment[request] = np.nan
-        solution.unassigned_requests.append(request)
-
 
 # =====================================================================================================================
 # REQUEST SELECTION BASED ON INDIVIDUAL REQUEST EVALUATION
@@ -96,7 +68,7 @@ class RequestSelectionBehaviorIndividual(RequestSelectionBehavior, ABC):
             selected.sort()
 
             for request in selected:
-                self.remove_request_from_carrier(instance, solution, carrier, request)
+                solution.remove_requests_from_carrier(instance, [request])
                 auction_request_pool.append(request)
                 original_bundling_labels.append(carrier)
 
@@ -154,7 +126,7 @@ class MarginalProfit(RequestSelectionBehaviorIndividual):
                                                                                            tmp_tour_, insert_request)
             insertion.execute_insertion_in_tour(instance, solution, tmp_tour_, request, pickup_pos, delivery_pos)
         # improvement
-        mh.PDPTWVariableNeighborhoodDescent([ls.PDPMove(), ls.PDPTwoOpt()]).execute_on_tour(instance, solution, tmp_tour_)
+        mh.PDPTWSequentialVariableNeighborhoodDescent([ls.PDPMove(), ls.PDPTwoOpt()]).execute_on_tour(instance, solution, tmp_tour_)
         travel_distance_without_request = tmp_tour_.sum_travel_distance
 
         return travel_distance_with_request - travel_distance_without_request
@@ -179,12 +151,8 @@ class MarginalProfitProxy(RequestSelectionBehaviorIndividual):
     def _evaluate_request(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
 
         # find the request's tour:
-        # TODO: would be faster if the tour was stored somewhere but this is fine for now
+        tour_ = solution.carriers[carrier].tours[solution.request_to_tour_assignment[request]]
         pickup, delivery = instance.pickup_delivery_pair(request)
-        for t in solution.carriers[carrier].tours:
-            if pickup in t.routing_sequence:
-                tour_ = t
-                break
 
         pickup_pos = tour_.routing_sequence.index(pickup)
         delivery_pos = tour_.routing_sequence.index(delivery)
@@ -336,7 +304,7 @@ class ComboStandardized(RequestSelectionBehaviorIndividual):
             selected.sort()
 
             for request in selected:
-                self.remove_request_from_carrier(instance, solution, carrier, request)
+                solution.remove_requests_from_carrier(instance, [request])
                 auction_request_pool.append(request)
                 original_bundling_labels.append(carrier)
 
@@ -400,7 +368,7 @@ class RequestSelectionBehaviorNeighbor(RequestSelectionBehavior, ABC):
 
             # carrier's best bundles: retract requests from their tours and add them to auction pool & original bundling
             for request in best_bundle:
-                self.remove_request_from_carrier(instance, solution, carrier, request)
+                solution.remove_requests_from_carrier(instance, [request])
 
                 # update auction pool and original bundling candidate
                 auction_request_pool.append(request)
@@ -495,7 +463,7 @@ class RequestSelectionBehaviorBundle(RequestSelectionBehavior, ABC):
 
             # carrier's best bundles: retract requests from their tours and add them to auction pool & original bundling
             for request in best_bundle:
-                self.remove_request_from_carrier(instance, solution, carrier, request)
+                solution.remove_requests_from_carrier(instance, [request])
 
                 # update auction pool and original bundling candidate
                 auction_request_pool.append(request)
@@ -636,6 +604,9 @@ class SpatioTemporalBundle(RequestSelectionBehaviorBundle):
 
 
 class LosSchulteBundle(RequestSelectionBehaviorBundle):
+    """
+
+    """
     def _create_bundles(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, k: int):
         """
         create all possible bundles of size k

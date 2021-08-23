@@ -15,7 +15,8 @@ import src.cr_ahd.solver as slv
 from src.cr_ahd.auction_module import auction as au, request_selection as rs, bundle_generation as bg, bidding as bd, \
     winner_determination as wd, bundle_valuation as bv
 from src.cr_ahd.core_module import instance as it, solution as slt
-from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh, local_search as ls
+from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh, neighborhoods as ls, \
+    lns_removal as lnsr
 from src.cr_ahd.tw_management_module import tw_management as twm, tw_selection as tws, tw_offering as two
 from src.cr_ahd.utility_module import utils as ut, evaluation as ev, cr_ahd_logging as log
 
@@ -27,7 +28,7 @@ def parameter_generator():
     """
     generate dicts with all parameters that shall be tested and are required to initialize a solver.
     """
-    neighborhoods: List[ls.LocalSearchBehavior] = [  # these are fixed at the moment
+    neighborhoods: List[ls.Neighborhood] = [  # these are fixed at the moment, i.e. not looped over
         ls.PDPMove(),
         ls.PDPTwoOpt()
     ]
@@ -38,8 +39,10 @@ def parameter_generator():
     ]
 
     tour_improvements: List[mh.PDPTWMetaHeuristic] = [
-        mh.PDPTWVariableNeighborhoodDescent(neighborhoods),
-        # mh.NoMetaheuristic(neighborhoods)
+        mh.PDPTWSequentialVariableNeighborhoodDescent(neighborhoods),
+        # mh.NoMetaheuristic(neighborhoods),
+        # mh.PDPTWLargeNeighborhoodSearch([lnsr.ShawRemoval(), lnsr.RandomRemoval()],
+        #                                 [cns.PDPParallelInsertionConstruction(), cns.TravelDistanceRegretInsertion()])
     ]
 
     time_window_managements: List[twm.TWManagement] = [
@@ -54,7 +57,7 @@ def parameter_generator():
     ]
 
     request_selections: List[rs.RequestSelectionBehavior.__class__] = [
-        rs.Random,
+        # rs.Random,
         # rs.SpatialBundleDSum,  # the original 'cluster' strategy by Gansterer & Hartl (2016)
         # rs.SpatialBundleDMax,
         # rs.MinDistanceToForeignDepotDMin,
@@ -62,7 +65,7 @@ def parameter_generator():
         # rs.MarginalProfitProxyNeighbor,
         # rs.ComboRaw,
         rs.ComboStandardized,
-        rs.LosSchulteBundle,
+        # rs.LosSchulteBundle,
         # rs.TemporalRangeCluster,
         # TODO SpatioTemporalCluster is not yet good enough & sometimes even infeasible
         # rs.SpatioTemporalCluster,
@@ -246,7 +249,7 @@ if __name__ == '__main__':
         paths = sorted(
             list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
             key=ut.natural_sort_key)
-        paths = paths[:12]
+        paths = paths[:1]
 
         if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=False)
@@ -257,14 +260,14 @@ if __name__ == '__main__':
         ev.bar_chart(df,
                      title='BG: BestOfAllBundlings // BV:LosSchulte',
                      values='sum_profit',
-                     color=['solution_algorithm', 'request_selection'],
-                     # category='rad', facet_col=None,
-                     category='run', facet_col='rad',
+                     color=['solution_algorithm', 'tour_improvement'],
+                     category='rad', facet_col=None,
+                     # category='run', facet_col='rad',
                      facet_row='n',
                      show=True,
                      html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix())
 
-        ev.print_top_level_stats(df, ['request_selection'])
+        ev.print_top_level_stats(df, ['tour_improvement'])
 
         logger.info(f'END {datetime.now()}')
         # send windows to sleep

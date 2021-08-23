@@ -18,11 +18,11 @@ class CAHDSolution:
         self.unassigned_requests = list(instance.requests)
 
         # the current REQUEST-to-carrier (not vertex-to-carrier) allocation, initialized with nan for all requests
-        self.request_to_carrier_assignment = np.full(instance.num_requests, np.nan)
+        self.request_to_carrier_assignment = np.full(instance.num_requests, np.nan)  # TODO: why numpy array?
         # store a lookup-table to get a request's tour index
-        self.request_to_tour_assignment = [None] * instance.num_requests  # TODO: use where appropriate
-        # store a lookup-table to get requests pickup_position and delivery_position
-        self.vertex_position_in_tour = [None] * (instance.num_depots + instance.num_requests * 2)  # TODO: use where appropriate
+        self.request_to_tour_assignment: List[int] = [None] * instance.num_requests
+        # store a lookup-table to get vertex's position inside its tour
+        self.vertex_position_in_tour: List[int] = [None] * (instance.num_depots + instance.num_requests * 2)
 
         # basically no apriori time windows for all VERTICES
         self.tw_open: List = np.full(instance.num_depots + 2 * instance.num_requests, ut.START_TIME).tolist()
@@ -87,6 +87,34 @@ class CAHDSolution:
             self.unassigned_requests.remove(r)
             self.carriers[c].assigned_requests.append(r)
             self.carriers[c].unrouted_requests.append(r)
+
+    def remove_requests_from_carrier(self, instance: it.PDPInstance, requests: Sequence[int]):
+        """
+        removes the given requests from their route and sets them to be unassigned and not accepted (not_accepted !=
+        rejected)
+
+        :param instance:
+        :param requests:
+        :return:
+        """
+        for request in requests:
+            carrier_: AHDSolution = self.carriers[self.request_to_carrier_assignment[request]]
+            tour_ = carrier_.tours[self.request_to_tour_assignment[request]]
+            for vertex in instance.pickup_delivery_pair(request):
+                pos = self.vertex_position_in_tour[vertex]
+                tour_.pop_and_update(instance, self, [pos])
+                self.vertex_position_in_tour[vertex] = None
+
+            self.request_to_tour_assignment[request] = None
+
+            # retract the request from the carrier
+            carrier_.assigned_requests.remove(request)
+            carrier_.accepted_requests.remove(request)
+            carrier_.routed_requests.remove(request)
+            self.request_to_carrier_assignment[request] = np.nan
+            self.unassigned_requests.append(request)
+
+
 
     def clear_carrier_routes(self):
         """delete all existing routes and move all accepted requests to the list of unrouted requests"""

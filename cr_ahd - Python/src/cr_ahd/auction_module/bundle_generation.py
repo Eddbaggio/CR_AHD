@@ -203,7 +203,7 @@ class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
         for generation_counter in tqdm.trange(1,
                                               self.parameters['num_generations'],
                                               desc='Bundle Generation',
-                                              disable=True):
+                                              disable=False):
             fitness, population = self.generate_new_population(instance, solution, population, fitness,
                                                                auction_request_pool)
 
