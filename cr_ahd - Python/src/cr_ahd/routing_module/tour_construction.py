@@ -111,8 +111,10 @@ class PDPParallelInsertionConstruction(ABC):
     @abstractmethod
     def best_insertion_for_request_in_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_,
                                            request: int, check_feasibility=True) -> Tuple[float, int, int]:
-        """returns the feasible insertion move with the lowest cost as a tuple of (delta, pickup_position,
+        """
+        returns the (feasible) insertion move with the lowest cost as a tuple of (delta, pickup_position,
         delivery_position)
+
         :param check_feasibility:
         """
         pass
@@ -125,7 +127,7 @@ class PDPParallelInsertionConstruction(ABC):
         tour_ = solution.carriers[carrier].tours[tour]
         tour_.insert_and_update(instance, solution, [pickup_pos, delivery_pos], [pickup, delivery])
         solution.request_to_tour_assignment[instance.request_from_vertex(pickup)] = tour
-        solution.carriers[carrier].unrouted_requests.remove(request)
+        solution.carriers[carrier].unrouted_requests.execute(request)
         solution.carriers[carrier].routed_requests.append(request)
 
     @staticmethod
@@ -167,7 +169,7 @@ class PDPParallelInsertionConstruction(ABC):
                                               f' Feasibility checks failed for all depots (most likely a TW problem)!')
 
         carrier_.tours.append(best_tour_)
-        carrier_.unrouted_requests.remove(request)
+        carrier_.unrouted_requests.execute(request)
         carrier_.routed_requests.append(request)
         return
 

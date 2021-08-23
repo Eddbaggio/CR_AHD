@@ -3,9 +3,9 @@ import logging
 import random
 from copy import deepcopy
 from math import exp, log
-from typing import Sequence
+from typing import Sequence, Callable, List
 
-from src.cr_ahd.routing_module import neighborhoods as nh
+from src.cr_ahd.routing_module import neighborhoods as nh, tour_construction as cns, lns_removal as rem
 from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
 
 logger = logging.getLogger(__name__)
@@ -354,27 +354,48 @@ class PDPTWLargeNeighborhoodSearch:  # does not have a superclass because it doe
     https://doi.org/10.1287/trsc.1050.0135
     """
 
-    def __init__(self, removal_heuristics: Sequence, insertion_heuristics: Sequence):
-        self.removal_heuristic: Sequence = removal_heuristics
-        self.insertion_heuristics: Sequence = insertion_heuristics
+    def __init__(self, removal_heuristics: List[rem.LNSRemoval],
+                 insertion_heuristics: List[cns.PDPParallelInsertionConstruction]):
+        self.removal_heuristics: List[rem.LNSRemoval] = removal_heuristics
+        self.insertion_heuristics: List[cns.PDPParallelInsertionConstruction] = insertion_heuristics
         # self.improved=False
         # self.stopping_criterion = False
         # self.parameters = dict()
         # self.history = []  # collection of e.g. visited neighbors, accepted moves, ...
         # self.trajectory = []  # collection of all accepted & executed moves
 
-    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None, q:int=1):
+    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None,
+                num_removal_requests: int = 1):
         """
 
         :param instance:
         :param solution:
         :param carriers:
-        :param q: number of request to be removed and re-inserted
+        :param num_removal_requests: total number of request to be removed and re-inserted
         :return:
         """
         if carriers is None:
             carriers = range(len(solution.carriers))
 
-        for carrier in carriers:
-            continue
+        best_solution = deepcopy(solution)
+        current_solution = deepcopy(solution)
+
+        # destroy/remove
+        removal = random.choice(self.removal_heuristics)
+        removed = removal.execute(instance, current_solution, carriers, num_removal_requests, p=1000)  # no randomness
+
+        # repair/re-insert
+        insertion = random.choice(self.insertion_heuristics)
+        for request in removed:
+            carrier = current_solution.request_to_carrier_assignment[request]
+            insertion.construct_static(instance, current_solution, carrier)
+
+        if current_solution.sum_profit() > best_solution.sum_profit():
+            best_solution = current_solution
+
+        if acceptance_criterion():
+
+
         pass
+
+    def acceptance_criterion

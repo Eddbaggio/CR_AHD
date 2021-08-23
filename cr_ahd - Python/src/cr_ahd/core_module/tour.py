@@ -220,8 +220,8 @@ class Tour:
         self._sum_revenue = updated_sums['sum_revenue']
         self._sum_profit = updated_sums['sum_profit']
 
-        # update the solution's record of the vertices' insertion positions
-        for vertex, pos in zip(insertion_vertices, insertion_indices):
+        # update the solution's record of the tour's vertices where necessary
+        for pos, vertex in enumerate(self.routing_sequence[insertion_indices[0]:], start=insertion_indices[0]):
             solution.vertex_position_in_tour[vertex] = pos
 
     def pop_and_update(self, instance, solution, pop_indices: Sequence[int]):
@@ -253,6 +253,8 @@ class Tour:
         # update the solution's record of the vertices' positions
         for vertex in popped:
             solution.vertex_position_in_tour[vertex] = None
+        for pos, vertex in enumerate(self.routing_sequence[pop_indices[0]:], start=pop_indices[0]):
+            solution.vertex_position_in_tour[vertex] = pos
 
         return popped
 

@@ -1,10 +1,12 @@
 import logging
+import random
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import final
+from typing import final, List, Tuple
 
 from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
 from src.cr_ahd.utility_module import profiling as pr
+from src.cr_ahd.routing_module import lns_removal as rem, tour_construction as cns
 
 logger = logging.getLogger(__name__)
 
@@ -330,7 +332,7 @@ class PDPRelocate(InterTourNeighborhood):
 
         # if it is now empty (i.e. depot -> depot), drop the old tour
         if len(old_tour_) <= 2:
-            solution.carriers[carrier].tours.remove(old_tour_)
+            solution.carriers[carrier].tours.execute(old_tour_)
 
         new_tour_.insert_and_update(instance, solution, [new_pickup_pos, new_delivery_pos], [pickup, delivery])
         solution.request_to_tour_assignment[instance.request_from_vertex(pickup)] = new_tour_.id_
@@ -460,6 +462,79 @@ class PDPRelocate2(InterTourLocalSearchBehavior):
 '''
 
 
-class PDPMergeTours(Neighborhood):
+class PDPMergeTours(InterTourNeighborhood):
     """take all requests of a tour and see whether inserting them into some other tours improves the solution"""
     pass
+
+
+# =====================================================================================================================
+# LARGE NEIGHBORHOODS
+# =====================================================================================================================
+
+class LargeNeighborhood(Neighborhood):  # ???
+    @abstractmethod
+    def _removals(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
+                  num_removal_requests: int = 1, p: int = 1000):
+        pass
+
+    @abstractmethod
+    def _reinsertions(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
+        pass
+
+
+class PDPLargeInterTourNeighborhood(LargeNeighborhood):  # ???
+    def feasible_move_generator(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
+        solution = deepcopy(solution)
+        carrier_ = solution.carriers[carrier]
+
+        # todo: these parameters must be extracted to be parameters of the neighborhood class or even the metaheuristic?
+        num_removal_requests = 3
+        randomness = 3  # without randomness, this generator will continuously generate the same move, doesn't it?
+
+        removal_requests = self._removals(instance, solution, carrier, num_removal_requests, randomness)
+
+        reinsertions = self._reinsertions(instance, solution, carrier)
+
+        delta = 0
+        # savings of removing the pickup and delivery
+        delta +=
+        # cost for inserting request vertices in the new positions
+        delta +=
+
+        move = (delta, carrier, removal_requests, reinsertions)
+
+        # is the improving move feasible?
+        if self.feasibility_check(instance, solution, move):
+            yield move
+
+        pass
+
+    def _removals(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
+                  num_removal_requests: int = 1, p: int = 1000):
+        # select random removal and return the respective requests that shall be removed
+        removal = random.choice([rem.ShawRemoval(), rem.RandomRemoval()])
+        removal_requests = removal.select_removal_requests_from_carrier(instance, solution, solution.carriers[carrier],
+                                                                        num_removal_requests, p)
+        return removal_requests
+
+    def _reinsertions(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int) -> Tuple:
+        solution = deepcopy(solution)
+        # select random insertion strategy and return the respective insertion positions
+        insertion_strategy = random.choice([cns.MinTravelDistanceInsertion(), cns.TravelDistanceRegretInsertion()])
+        reinsertions = []
+        while solution.carriers[carrier].unrouted_requests:
+            insertion = insertion_strategy.best_insertion_for_carrier(instance, solution, carrier)
+            reinsertions.append(insertion)
+            insertion_strategy.execute_insertion(instance, solution, carrier, *insertion)
+        return reinsertions
+
+
+    def _calculate_delta(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
+                         move: tuple) -> float:
+        pass
+
+    def _execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move: tuple):
+        pass
+
+    def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move):
+        pass

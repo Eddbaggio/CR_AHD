@@ -15,7 +15,8 @@ import src.cr_ahd.solver as slv
 from src.cr_ahd.auction_module import auction as au, request_selection as rs, bundle_generation as bg, bidding as bd, \
     winner_determination as wd, bundle_valuation as bv
 from src.cr_ahd.core_module import instance as it, solution as slt
-from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh, neighborhoods as ls
+from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh, neighborhoods as ls, \
+    lns_removal as lnsr
 from src.cr_ahd.tw_management_module import tw_management as twm, tw_selection as tws, tw_offering as two
 from src.cr_ahd.utility_module import utils as ut, evaluation as ev, cr_ahd_logging as log
 
@@ -39,7 +40,9 @@ def parameter_generator():
 
     tour_improvements: List[mh.PDPTWMetaHeuristic] = [
         mh.PDPTWSequentialVariableNeighborhoodDescent(neighborhoods),
-        mh.NoMetaheuristic(neighborhoods)
+        # mh.NoMetaheuristic(neighborhoods),
+        # mh.PDPTWLargeNeighborhoodSearch([lnsr.ShawRemoval(), lnsr.RandomRemoval()],
+        #                                 [cns.PDPParallelInsertionConstruction(), cns.TravelDistanceRegretInsertion()])
     ]
 
     time_window_managements: List[twm.TWManagement] = [

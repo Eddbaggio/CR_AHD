@@ -37,31 +37,6 @@ class RequestSelectionBehavior(ABC):
     def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         pass
 
-    @staticmethod
-    def remove_request_from_carrier(instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
-        """remove the request from the carrier. Finds the tour in which the request is currently served, removes its
-        pickup and delivery nodes and reconnects the tour. updates the solution accordingly"""
-
-        carrier_ = solution.carriers[carrier]
-
-        # find the request's tour:
-        tour_ = carrier_.tours[solution.request_to_tour_assignment[request]]
-        pickup, delivery = instance.pickup_delivery_pair(request)
-
-        # destroy & repair, i.e. remove the request from it's tour
-        pickup_pos = tour_.routing_sequence.index(pickup)
-        delivery_pos = tour_.routing_sequence.index(delivery)
-        tour_.pop_and_update(instance, solution, [pickup_pos, delivery_pos])
-        solution.request_to_tour_assignment[request] = None
-
-        # retract the request from the carrier
-        carrier_.assigned_requests.remove(request)
-        carrier_.accepted_requests.remove(request)
-        carrier_.routed_requests.remove(request)
-        solution.request_to_carrier_assignment[request] = np.nan
-        solution.unassigned_requests.append(request)
-
-
 # =====================================================================================================================
 # REQUEST SELECTION BASED ON INDIVIDUAL REQUEST EVALUATION
 # =====================================================================================================================
@@ -93,7 +68,7 @@ class RequestSelectionBehaviorIndividual(RequestSelectionBehavior, ABC):
             selected.sort()
 
             for request in selected:
-                self.remove_request_from_carrier(instance, solution, carrier, request)
+                solution.remove_requests_from_carrier(instance, [request])
                 auction_request_pool.append(request)
                 original_bundling_labels.append(carrier)
 
@@ -329,7 +304,7 @@ class ComboStandardized(RequestSelectionBehaviorIndividual):
             selected.sort()
 
             for request in selected:
-                self.remove_request_from_carrier(instance, solution, carrier, request)
+                solution.remove_requests_from_carrier(instance, [request])
                 auction_request_pool.append(request)
                 original_bundling_labels.append(carrier)
 
@@ -393,7 +368,7 @@ class RequestSelectionBehaviorNeighbor(RequestSelectionBehavior, ABC):
 
             # carrier's best bundles: retract requests from their tours and add them to auction pool & original bundling
             for request in best_bundle:
-                self.remove_request_from_carrier(instance, solution, carrier, request)
+                solution.remove_requests_from_carrier(instance, [request])
 
                 # update auction pool and original bundling candidate
                 auction_request_pool.append(request)
@@ -488,7 +463,7 @@ class RequestSelectionBehaviorBundle(RequestSelectionBehavior, ABC):
 
             # carrier's best bundles: retract requests from their tours and add them to auction pool & original bundling
             for request in best_bundle:
-                self.remove_request_from_carrier(instance, solution, carrier, request)
+                solution.remove_requests_from_carrier(instance, [request])
 
                 # update auction pool and original bundling candidate
                 auction_request_pool.append(request)
