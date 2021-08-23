@@ -5,7 +5,7 @@ from copy import deepcopy
 from math import exp, log
 from typing import Sequence, Callable, List
 
-from src.cr_ahd.routing_module import neighborhoods as nh, tour_construction as cns
+from src.cr_ahd.routing_module import neighborhoods as nh
 from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
 
 logger = logging.getLogger(__name__)

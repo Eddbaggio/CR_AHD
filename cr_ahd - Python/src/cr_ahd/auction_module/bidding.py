@@ -82,7 +82,8 @@ class DynamicInsertion(BiddingBehavior):
         # insert bundle's requests 'dynamically', i.e. in their order inside the tmp_carrier_.unrouted list
         try:
             while tmp_carrier_.unrouted_requests:
-                self.tour_construction.construct_dynamic(instance, solution, tmp_carrier)
+                request = tmp_carrier_.unrouted_requests[0]
+                self.tour_construction.insert_single(instance, solution, tmp_carrier, request)
             with_bundle = tmp_carrier_.sum_profit()
         except ut.ConstraintViolationError:
             with_bundle = -float('inf')
@@ -106,7 +107,8 @@ class DynamicReOptAndImprove(BiddingBehavior):
         # assign and insert requests of the bundle
         try:
             while tmp_carrier_.unrouted_requests:
-                self.tour_construction.construct_dynamic(instance, solution, tmp_carrier)
+                request = tmp_carrier_.unrouted_requests[0]
+                self.tour_construction.insert_single(instance, solution, tmp_carrier, request)
             self.tour_improvement.execute(instance, solution, [tmp_carrier])
             with_bundle = tmp_carrier_.sum_profit()
         except ut.ConstraintViolationError:

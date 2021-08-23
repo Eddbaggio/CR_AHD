@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class PDPParallelInsertionConstruction(ABC):
-    def construct_static(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
+    def insert_all(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
         """inserts ALL unrouted requests of the specified carrier"""
         carrier_ = solution.carriers[carrier]
         while carrier_.unrouted_requests:
@@ -27,11 +27,12 @@ class PDPParallelInsertionConstruction(ABC):
 
         pass
 
-    def construct_dynamic(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
-        """take the single (!) unrouted customer of the given carrier and insert it in the best position
-        alters the solution IN PLACE"""
+    def insert_single(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
+        """
+        take a single (!) unrouted customer of the given carrier and insert it in the best position
+        alters the solution IN PLACE
+        """
         carrier_ = solution.carriers[carrier]
-        request = carrier_.unrouted_requests[0]
         insertion_criteria, tour, pickup_pos, delivery_pos = self.best_insertion_for_request(instance, solution,
                                                                                              carrier, request)
         if tour is None:

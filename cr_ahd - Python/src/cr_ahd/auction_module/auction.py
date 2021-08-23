@@ -82,7 +82,7 @@ class Auction(ABC):
         for carrier in range(len(solution.carriers)):
             while solution.carriers[carrier].unrouted_requests:
                 request = solution.carriers[carrier].unrouted_requests[0]
-                self.tour_construction.construct_dynamic(instance, solution, carrier)
+                self.tour_construction.insert_single(instance, solution, carrier, request)
         self.tour_improvement.execute(instance, solution)
 
         pass

@@ -95,7 +95,7 @@ class Solver:
 
             # build tours with the assigned request if it was accepted
             if accepted:
-                self.tour_construction.construct_dynamic(instance, solution, carrier)
+                self.tour_construction.insert_single(instance, solution, carrier, request)
 
         ut.validate_solution(instance, solution)
         return solution
@@ -116,7 +116,7 @@ class Solver:
         ini.MaxCliqueTourInitialization().execute(instance, solution)
 
         # construct_static initial solution
-        self.tour_construction.construct_static(instance, solution, carrier)
+        self.tour_construction.insert_all(instance, solution, carrier)
 
         ut.validate_solution(instance, solution)
         return solution
@@ -153,7 +153,7 @@ class CentralizedPlanning(Solver):
         carrier_ = solution.carriers[0]
         while carrier_.unrouted_requests:
             # carrier will always be 0 for centralized
-            cns.MinTravelDistanceInsertion().construct_dynamic(instance, solution, 0)
+            cns.MinTravelDistanceInsertion().insert_single(instance, solution, 0)
 
         solution = self._improvement_phase(md_instance, solution)
 
