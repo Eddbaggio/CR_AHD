@@ -6,7 +6,7 @@ from typing import final, List, Tuple
 
 from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
 from src.cr_ahd.utility_module import profiling as pr
-from src.cr_ahd.routing_module import lns_removal as rem, tour_construction as cns
+from src.cr_ahd.routing_module import tour_construction as cns
 
 logger = logging.getLogger(__name__)
 

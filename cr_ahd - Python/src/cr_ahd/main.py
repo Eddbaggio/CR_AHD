@@ -15,8 +15,7 @@ import src.cr_ahd.solver as slv
 from src.cr_ahd.auction_module import auction as au, request_selection as rs, bundle_generation as bg, bidding as bd, \
     winner_determination as wd, bundle_valuation as bv
 from src.cr_ahd.core_module import instance as it, solution as slt
-from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh, neighborhoods as ls, \
-    lns_removal as lnsr
+from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh, neighborhoods as nh
 from src.cr_ahd.tw_management_module import tw_management as twm, tw_selection as tws, tw_offering as two
 from src.cr_ahd.utility_module import utils as ut, evaluation as ev, cr_ahd_logging as log
 
@@ -28,9 +27,9 @@ def parameter_generator():
     """
     generate dicts with all parameters that shall be tested and are required to initialize a solver.
     """
-    neighborhoods: List[ls.Neighborhood] = [  # these are fixed at the moment, i.e. not looped over
-        ls.PDPMove(),
-        ls.PDPTwoOpt()
+    neighborhoods: List[nh.Neighborhood] = [  # these are fixed at the moment, i.e. not looped over
+        nh.PDPMove(),
+        nh.PDPTwoOpt()
     ]
 
     tour_constructions: List[cns.PDPParallelInsertionConstruction] = [
@@ -39,9 +38,8 @@ def parameter_generator():
     ]
 
     tour_improvements: List = [
-        # mh.PDPTWSequentialVariableNeighborhoodDescent(neighborhoods),
+        mh.PDPTWSequentialVariableNeighborhoodDescent(neighborhoods),
         # mh.NoMetaheuristic(neighborhoods),
-        mh.PDPTWLargeNeighborhoodSearch()
     ]
 
     time_window_managements: List[twm.TWManagement] = [

@@ -5,7 +5,7 @@ from copy import deepcopy
 from math import exp, log
 from typing import Sequence, Callable, List
 
-from src.cr_ahd.routing_module import neighborhoods as nh, tour_construction as cns, lns_removal as rem
+from src.cr_ahd.routing_module import neighborhoods as nh, tour_construction as cns
 from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
 
 logger = logging.getLogger(__name__)
@@ -347,59 +347,3 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
     pass
 
 
-class PDPTWLargeNeighborhoodSearch:  # does not have a superclass because it does not work like the others
-    """
-    Following: Ropke, Stefan, & Pisinger, David. (2006). An Adaptive Large Neighborhood Search Heuristic for the
-    Pickup and Delivery Problem with Time Windows. Transportation Science, 40(4), 455–472.
-    https://doi.org/10.1287/trsc.1050.0135
-    """
-
-    # def __init__(self, removal_heuristics: List[rem.LNSRemoval],
-    #              insertion_heuristics: List[cns.PDPParallelInsertionConstruction]):
-    #     self.removal_heuristics: List[rem.LNSRemoval] = removal_heuristics
-    #     self.insertion_heuristics: List[cns.PDPParallelInsertionConstruction] = insertion_heuristics
-        # self.improved=False
-        # self.stopping_criterion = False
-        # self.parameters = dict()
-        # self.history = []  # collection of e.g. visited neighbors, accepted moves, ...
-        # self.trajectory = []  # collection of all accepted & executed moves
-
-    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None,
-                num_removal_requests: int = 1):
-        """
-
-        :param instance:
-        :param solution:
-        :param carriers:
-        :param num_removal_requests: total number of request to be removed and re-inserted
-        :return:
-        """
-        if carriers is None:
-            carriers = range(len(solution.carriers))
-
-        current_solution = deepcopy(solution)
-        neighborhood = nh.PDPLargeInterTourNeighborhood()
-
-        for carrier in carriers:
-
-            move_gen = neighborhood.feasible_move_generator(instance, current_solution, carrier)
-
-            for _ in range(5):
-                move = next(move_gen)
-                if self.acceptance_criterion(instance, solution, carrier, move):
-                    neighborhood.execute_move(instance, current_solution, move)
-                if move[0] < 0:
-                    solution = current_solution
-        pass
-
-    def acceptance_criterion(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move: tuple):
-        if move is None:
-            return False
-        # improving move is always accepted
-        elif move[0] <= 0:
-            return True
-        # degrading move is accepted with 50% probability
-        elif random.random() < 0.5:
-            return True
-        else:
-            return False
