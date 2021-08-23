@@ -480,3 +480,40 @@ class RandomBundlingValuation(BundlingValuation):
     def evaluate_bundling(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
                           bundling: List[List[int]]) -> float:
         return random.random()
+
+
+class BundlingValuation2(ABC):
+    """
+    attempt at implementing a new & improved BundlingValuation interface/architecture.
+
+    """
+
+    def __init__(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
+        self._vertex_distance_matrix = instance._distance_matrix
+        self._request_distance_matrix = self._compute_request_distance_matrix(instance, solution)
+
+        # todo: a _bundles_distance_matrix would make it so that the instance of this class is tied to a specific
+        #  bundling. Thus, for each bundling, the same request_distance_matrix will have to be recalculated
+        # self._bundles_distance_matrix = self._compute_bundles_distance_matrix()
+
+    @abstractmethod
+    def evaluate_bundling(self, bundling: Sequence[Sequence[int]]):
+        pass
+
+    @abstractmethod
+    def evaluate_bundle(self, bundle: Sequence[int]):
+        pass
+
+    def _compute_request_distance_matrix(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
+        request_distance_matrix = []
+        for i, request0 in enumerate(instance.requests[:-1]):
+            request_distance_array = []
+            for j, request1 in instance.requests[i:]:
+                distance = self.request_distance(instance, solution, request0, request1)
+                request_distance_array.append(distance)
+            request_distance_matrix.append(request_distance_array)
+        return request_distance_matrix
+
+    @abstractmethod
+    def request_distance(self, instance: it.PDPInstance, solution: slt.CAHDSolution, request0: int, request1: int):
+        pass
