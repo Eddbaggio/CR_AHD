@@ -18,11 +18,13 @@ class CAHDSolution:
         self.unassigned_requests = list(instance.requests)
 
         # the current REQUEST-to-carrier (not vertex-to-carrier) allocation, initialized with nan for all requests
-        self.request_to_carrier_assignment = np.full(instance.num_requests, np.nan)  # TODO: why numpy array?
+        self.request_to_carrier_assignment = np.full(instance.num_requests, np.nan)  # TODO: why numpy array? test: override with None list instead
+        self.request_to_carrier_assignment: List[int] = [None for _ in range(instance.num_requests)]
+
         # store a lookup-table to get a request's tour index
-        self.request_to_tour_assignment: List[int] = [None] * instance.num_requests
+        self.request_to_tour_assignment: List[int] = [None for _ in range(instance.num_requests)]
         # store a lookup-table to get vertex's position inside its tour
-        self.vertex_position_in_tour: List[int] = [None] * (instance.num_depots + instance.num_requests * 2)
+        self.vertex_position_in_tour: List[int] = [None for _ in range(instance.num_depots + instance.num_requests * 2)]
 
         # basically no apriori time windows for all VERTICES
         self.tw_open: List = np.full(instance.num_depots + 2 * instance.num_requests, ut.START_TIME).tolist()
@@ -40,7 +42,8 @@ class CAHDSolution:
         self.local_search_move_counter = dict(PDPMove=0,
                                               PDPTwoOpt=0,
                                               PDPRelocate=0,
-                                              PDPRelocate2=0)
+                                              PDPRelocate2=0,
+                                              PDPLargeInterTourNeighborhood=0)
 
     def __str__(self):
         s = f'Solution {self.id_}\nProfit={round(self.sum_profit(), 2)}'
@@ -113,8 +116,6 @@ class CAHDSolution:
             carrier_.routed_requests.remove(request)
             self.request_to_carrier_assignment[request] = np.nan
             self.unassigned_requests.append(request)
-
-
 
     def clear_carrier_routes(self):
         """delete all existing routes and move all accepted requests to the list of unrouted requests"""

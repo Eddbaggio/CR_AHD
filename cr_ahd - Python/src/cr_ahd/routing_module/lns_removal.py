@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class LNSRemoval(ABC):
     @final
     def _execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers: List[int] = None,
-                num_removal_requests: int = 1, p: int = 1000):
+                 num_removal_requests: int = 1, p: float = float('inf')):
         """
         DO NOT CALL!
         removes num_removal_requests requests from each carrier. some randomness that is introduced by the parameter p.
@@ -48,7 +48,7 @@ class LNSRemoval(ABC):
     @abstractmethod
     def select_removal_requests_from_carrier(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
                                              carrier_: slt.AHDSolution,
-                                             num_removal_requests: int, p: int):
+                                             num_removal_requests: int, p: float = float('inf')):
         pass
 
 
@@ -59,7 +59,7 @@ class ShawRemoval(LNSRemoval):
 
     def select_removal_requests_from_carrier(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
                                              carrier_: slt.AHDSolution,
-                                             num_removal_requests: int, p: int):
+                                             num_removal_requests: int, p: float = float('inf')):
         assert p >= 1
         assert num_removal_requests <= instance.num_requests
 
@@ -86,8 +86,7 @@ class RandomRemoval(LNSRemoval):
 
     def select_removal_requests_from_carrier(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
                                              carrier_: slt.AHDSolution,
-                                             num_removal_requests: int, p: int):
-
+                                             num_removal_requests: int, p: float = float('inf')):
         assert p >= 1
         assert num_removal_requests <= instance.num_requests
 

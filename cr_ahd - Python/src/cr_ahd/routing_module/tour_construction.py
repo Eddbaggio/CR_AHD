@@ -126,8 +126,8 @@ class PDPParallelInsertionConstruction(ABC):
         pickup, delivery = instance.pickup_delivery_pair(request)
         tour_ = solution.carriers[carrier].tours[tour]
         tour_.insert_and_update(instance, solution, [pickup_pos, delivery_pos], [pickup, delivery])
-        solution.request_to_tour_assignment[instance.request_from_vertex(pickup)] = tour
-        solution.carriers[carrier].unrouted_requests.execute(request)
+        solution.request_to_tour_assignment[request] = tour
+        solution.carriers[carrier].unrouted_requests.remove(request)
         solution.carriers[carrier].routed_requests.append(request)
 
     @staticmethod
@@ -169,7 +169,7 @@ class PDPParallelInsertionConstruction(ABC):
                                               f' Feasibility checks failed for all depots (most likely a TW problem)!')
 
         carrier_.tours.append(best_tour_)
-        carrier_.unrouted_requests.execute(request)
+        carrier_.unrouted_requests.remove(request)
         carrier_.routed_requests.append(request)
         return
 

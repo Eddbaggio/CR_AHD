@@ -313,10 +313,12 @@ def ropke_pisinger_request_similarity(instance: it.PDPInstance,
                                   for x in instance._distance_matrix]
     distance = normalized_distance_matrix[pickup_0][pickup_1] + normalized_distance_matrix[delivery_0][delivery_1]
 
-    tours = [solution.request_to_tour_assignment[request_0], solution.request_to_tour_assignment[request_1]]
+    carriers = [solution.request_to_carrier_assignment[r] for r in (request_0, request_1)]
+    tours = [solution.request_to_tour_assignment[r] for r in (request_0, request_1)]
+    tour_0_, tour_1_ = [solution.carriers[c].tours[t] for c, t in zip(carriers, tours)]
+
     positions = [solution.vertex_position_in_tour[vertex] for vertex in (pickup_0, delivery_0, pickup_1, delivery_1)]
 
-    tour_0_, tour_1_ = tours
     pickup_pos_0, delivery_pos_0, pickup_pos_1, delivery_pos_1 = positions
 
     arrival_time_delta = (abs(tour_0_.arrival_schedule[pickup_pos_0] - tour_1_.arrival_schedule[pickup_pos_1]) +

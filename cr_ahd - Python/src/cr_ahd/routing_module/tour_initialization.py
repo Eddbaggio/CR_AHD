@@ -58,7 +58,7 @@ class TourInitializationBehavior(ABC):
             tour.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(best_request))
             solution.request_to_tour_assignment[best_request] = carrier_.num_tours()
             carrier_.tours.append(tour)
-            carrier_.unrouted_requests.execute(best_request)
+            carrier_.unrouted_requests.remove(best_request)
             carrier_.routed_requests.append(best_request)
         pass
 

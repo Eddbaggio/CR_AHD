@@ -474,7 +474,7 @@ class PDPMergeTours(InterTourNeighborhood):
 class LargeNeighborhood(Neighborhood):  # ???
     @abstractmethod
     def _removals(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
-                  num_removal_requests: int = 1, p: int = 1000):
+                  num_removal_requests: int = 1, p: float = float('inf')):
         pass
 
     @abstractmethod
@@ -483,58 +483,125 @@ class LargeNeighborhood(Neighborhood):  # ???
 
 
 class PDPLargeInterTourNeighborhood(LargeNeighborhood):  # ???
+    def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move):
+        raise NotImplementedError(f'LNS does not require feasibility check the same way other neighborhoods do')
+
     def feasible_move_generator(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
         solution = deepcopy(solution)
-        carrier_ = solution.carriers[carrier]
 
         # todo: these parameters must be extracted to be parameters of the neighborhood class or even the metaheuristic?
         num_removal_requests = 3
-        randomness = 3  # without randomness, this generator will continuously generate the same move, doesn't it?
+        randomness = 3  # low value (>=1) -> high randomness
 
-        removal_requests = self._removals(instance, solution, carrier, num_removal_requests, randomness)
-
-        reinsertions = self._reinsertions(instance, solution, carrier)
-
-        delta = 0
-        # savings of removing the pickup and delivery
-        delta +=
-        # cost for inserting request vertices in the new positions
-        delta +=
-
+        removal_requests, removal_distance_delta = self._removals(instance, solution, carrier, num_removal_requests,
+                                                                  randomness)
+        reinsertions, reinsertion_distance_delta = self._reinsertions(instance, solution, carrier)
+        delta = removal_distance_delta + reinsertion_distance_delta
         move = (delta, carrier, removal_requests, reinsertions)
 
-        # is the improving move feasible?
-        if self.feasibility_check(instance, solution, move):
-            yield move
+        # feasibility check is not necessary as the reinsertion method guarantees to only return feasible
+        # moves
+        yield move
+
+        removal_requests_history = []
+
+        # if there is randomness in the selection of removal requests, the next iteration can produce a different move
+        if randomness < float('inf'):
+
+            iter_max = 100  # TODO: should be a parameter of some sort
+            iter = 1
+            while iter < iter_max:
+                solution = deepcopy(solution)
+
+                removal_requests, removal_distance_delta = self._removals(instance, solution, carrier,
+                                                                          num_removal_requests,
+                                                                          randomness)
+                if removal_requests not in removal_requests_history:
+                    removal_requests_history.append(removal_requests)
+                    reinsertions, reinsertion_distance_delta = self._reinsertions(instance, solution, carrier)
+                    delta = removal_distance_delta + reinsertion_distance_delta
+                    move = (delta, carrier, removal_requests, reinsertions)
+
+                    # feasibility check is not necessary as the reinsertion method guarantees to only return feasible
+                    # moves
+                    yield move
+
+                iter += 1
 
         pass
 
     def _removals(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
-                  num_removal_requests: int = 1, p: int = 1000):
+                  num_removal_requests: int = 1, p: float = float('inf')):
+        """
+        NOTE: Will actually perform the removal of the selected requests in place!
+
+        :param instance:
+        :param solution:
+        :param carrier:
+        :param num_removal_requests:
+        :param p:
+        :return: a tuple describing the removal operation: (removal_requests, delta)
+        """
         # select random removal and return the respective requests that shall be removed
         removal = random.choice([rem.ShawRemoval(), rem.RandomRemoval()])
-        removal_requests = removal.select_removal_requests_from_carrier(instance, solution, solution.carriers[carrier],
+        carrier_ = solution.carriers[carrier]
+        removal_requests = removal.select_removal_requests_from_carrier(instance, solution, carrier_,
                                                                         num_removal_requests, p)
-        return removal_requests
+        # compute the distance delta of removal
+        # must consider that multiple vertices are removed at once (!= sum of all individual removals)
 
-    def _reinsertions(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int) -> Tuple:
-        solution = deepcopy(solution)
-        # select random insertion strategy and return the respective insertion positions
+        delta = 0
+        # find for each tour the corresponding requests that shall be removed from that tour
+        for tour, tour_ in enumerate(carrier_.tours):
+            pop_indices = []
+            for request in removal_requests:
+                if solution.request_to_tour_assignment[request] == tour:
+                    pickup, delivery = instance.pickup_delivery_pair(request)
+                    pop_indices.append(solution.vertex_position_in_tour[pickup])
+                    pop_indices.append(solution.vertex_position_in_tour[delivery])
+                    carrier_.routed_requests.remove(request)
+                    carrier_.unrouted_requests.append(request)
+            if pop_indices:
+                delta += tour_.pop_distance_delta(instance, sorted(pop_indices))
+                tour_.pop_and_update(instance, solution, sorted(pop_indices))
+
+        return removal_requests, delta
+
+    def _reinsertions(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
+        """
+        select random insertion strategy and return the respective insertion positions as well as the distance delta.
+        NOTE: performs the actual insertion on a temporary copy of the solution to compute the total delta.
+
+        """
+        tmp_solution = deepcopy(solution)
         insertion_strategy = random.choice([cns.MinTravelDistanceInsertion(), cns.TravelDistanceRegretInsertion()])
         reinsertions = []
-        while solution.carriers[carrier].unrouted_requests:
-            insertion = insertion_strategy.best_insertion_for_carrier(instance, solution, carrier)
+        delta = 0
+        while tmp_solution.carriers[carrier].unrouted_requests:
+            insertion = insertion_strategy.best_insertion_for_carrier(instance, tmp_solution, carrier)
             reinsertions.append(insertion)
-            insertion_strategy.execute_insertion(instance, solution, carrier, *insertion)
-        return reinsertions
-
-
-    def _calculate_delta(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
-                         move: tuple) -> float:
-        pass
+            request, tour, pickup_pos, delivery_pos = insertion
+            tour_ = tmp_solution.carriers[carrier].tours[tour]
+            delta += tour_.insert_distance_delta(instance, [pickup_pos, delivery_pos],
+                                                 instance.pickup_delivery_pair(request))
+            insertion_strategy.execute_insertion(instance, tmp_solution, carrier, *insertion)
+        return reinsertions, delta
 
     def _execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move: tuple):
-        pass
+        delta, carrier, removal_requests, reinsertions = move
+        carrier_ = solution.carriers[carrier]
 
-    def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move):
+        # remove
+        for request in removal_requests:
+            tour_ = carrier_.tours[solution.request_to_tour_assignment[request]]
+            pickup, delivery = instance.pickup_delivery_pair(request)
+            pickup_pos = solution.vertex_position_in_tour[pickup]
+            delivery_pos = solution.vertex_position_in_tour[delivery]
+            tour_.pop_and_update(instance, solution, [pickup_pos, delivery_pos])
+
+        # insert
+        for reinsertion in reinsertions:
+            request, tour, pickup_pos, delivery_pos = reinsertion
+            carrier_.tours[tour].insert_and_update(instance, solution, [pickup_pos, delivery_pos],
+                                                   instance.pickup_delivery_pair(request))
         pass

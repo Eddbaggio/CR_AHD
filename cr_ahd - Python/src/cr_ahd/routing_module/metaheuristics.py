@@ -354,10 +354,10 @@ class PDPTWLargeNeighborhoodSearch:  # does not have a superclass because it doe
     https://doi.org/10.1287/trsc.1050.0135
     """
 
-    def __init__(self, removal_heuristics: List[rem.LNSRemoval],
-                 insertion_heuristics: List[cns.PDPParallelInsertionConstruction]):
-        self.removal_heuristics: List[rem.LNSRemoval] = removal_heuristics
-        self.insertion_heuristics: List[cns.PDPParallelInsertionConstruction] = insertion_heuristics
+    # def __init__(self, removal_heuristics: List[rem.LNSRemoval],
+    #              insertion_heuristics: List[cns.PDPParallelInsertionConstruction]):
+    #     self.removal_heuristics: List[rem.LNSRemoval] = removal_heuristics
+    #     self.insertion_heuristics: List[cns.PDPParallelInsertionConstruction] = insertion_heuristics
         # self.improved=False
         # self.stopping_criterion = False
         # self.parameters = dict()
@@ -377,25 +377,29 @@ class PDPTWLargeNeighborhoodSearch:  # does not have a superclass because it doe
         if carriers is None:
             carriers = range(len(solution.carriers))
 
-        best_solution = deepcopy(solution)
         current_solution = deepcopy(solution)
+        neighborhood = nh.PDPLargeInterTourNeighborhood()
 
-        # destroy/remove
-        removal = random.choice(self.removal_heuristics)
-        removed = removal.execute(instance, current_solution, carriers, num_removal_requests, p=1000)  # no randomness
+        for carrier in carriers:
 
-        # repair/re-insert
-        insertion = random.choice(self.insertion_heuristics)
-        for request in removed:
-            carrier = current_solution.request_to_carrier_assignment[request]
-            insertion.construct_static(instance, current_solution, carrier)
+            move_gen = neighborhood.feasible_move_generator(instance, current_solution, carrier)
 
-        if current_solution.sum_profit() > best_solution.sum_profit():
-            best_solution = current_solution
-
-        if acceptance_criterion():
-
-
+            for _ in range(5):
+                move = next(move_gen)
+                if self.acceptance_criterion(instance, solution, carrier, move):
+                    neighborhood.execute_move(instance, current_solution, move)
+                if move[0] < 0:
+                    solution = current_solution
         pass
 
-    def acceptance_criterion
+    def acceptance_criterion(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move: tuple):
+        if move is None:
+            return False
+        # improving move is always accepted
+        elif move[0] <= 0:
+            return True
+        # degrading move is accepted with 50% probability
+        elif random.random() < 0.5:
+            return True
+        else:
+            return False

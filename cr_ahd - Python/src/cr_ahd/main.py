@@ -38,11 +38,10 @@ def parameter_generator():
         # cns.MinTimeShiftInsertion()
     ]
 
-    tour_improvements: List[mh.PDPTWMetaHeuristic] = [
-        mh.PDPTWSequentialVariableNeighborhoodDescent(neighborhoods),
+    tour_improvements: List = [
+        # mh.PDPTWSequentialVariableNeighborhoodDescent(neighborhoods),
         # mh.NoMetaheuristic(neighborhoods),
-        # mh.PDPTWLargeNeighborhoodSearch([lnsr.ShawRemoval(), lnsr.RandomRemoval()],
-        #                                 [cns.PDPParallelInsertionConstruction(), cns.TravelDistanceRegretInsertion()])
+        mh.PDPTWLargeNeighborhoodSearch()
     ]
 
     time_window_managements: List[twm.TWManagement] = [
