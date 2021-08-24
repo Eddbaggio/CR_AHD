@@ -1,4 +1,5 @@
 import logging
+import time
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import List, Sequence
@@ -109,7 +110,9 @@ class DynamicReOptAndImprove(BiddingBehavior):
             while tmp_carrier_.unrouted_requests:
                 request = tmp_carrier_.unrouted_requests[0]
                 self.tour_construction.insert_single(instance, solution, tmp_carrier, request)
+            # start_time = time.time()
             self.tour_improvement.execute(instance, solution, [tmp_carrier])
+            # print(time.time() - start_time)
             with_bundle = tmp_carrier_.sum_profit()
         except ut.ConstraintViolationError:
             with_bundle = -float('inf')

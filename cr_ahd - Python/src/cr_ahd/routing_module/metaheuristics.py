@@ -4,10 +4,12 @@ import random
 from copy import deepcopy
 from math import exp, log
 from typing import Sequence, Callable, List
+import time
 
 from src.cr_ahd.routing_module import neighborhoods as nh, shakes as sh, tour_construction as cns
 from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
 from src.cr_ahd.auction_module import request_selection as rs
+from src.cr_ahd.utility_module.utils import ConstraintViolationError
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +52,9 @@ class PDPTWMetaHeuristic(ABC):
 
 class NoMetaheuristic(PDPTWMetaHeuristic):
     """Placeholder for cases in which no improvement is wanted"""
+
+    def acceptance_criterion(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move: tuple):
+        pass
 
     def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None):
         pass
@@ -359,22 +364,33 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
             carriers = range(len(solution.carriers))
 
         solution = self.local_search(instance, solution, carriers)
-        num_requests = 3
+        best_solution = solution
+        num_requests = 2
 
         for carrier in carriers:
-            iter_max = 100
+
+            iter_max = 20
             i = 0
-            while i < iter_max:
+
+            time_max = 0.5  # roughly the time required by the VND procedure to terminate
+            start_time = time.time()
+
+            while time.time() - start_time < time_max:
                 solution_1 = self.perturbation(instance, solution, carrier, num_requests)
-                solution_1 = self.local_search(instance, solution_1, carriers)
+                solution_1 = self.local_search(instance, solution_1, [carrier])
                 # hacky way to define a move as (old_solution, new_solution) since describing a "move" with all
                 # information of the perturbation is cumbersome
+                if solution_1.sum_profit() > best_solution.sum_profit():
+                    best_solution = solution_1
+
                 if self.acceptance_criterion(instance, solution, carrier, (solution, solution_1)):
                     solution = solution_1
 
+                i += 1
+
     def acceptance_criterion(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move: tuple):
         """
-        accept slight degradations sometimes: Threshold acceptance, 20% degradations are accepted
+        accept slight degradations: Threshold acceptance
 
         :param instance:
         :param solution:
@@ -384,18 +400,23 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
         """
         solution_1: slt.CAHDSolution
         solution, solution_1 = move
-        if solution_1.sum_profit() >= solution.sum_profit() * 0.8:
+        if solution.sum_profit() > solution_1.sum_profit() > solution.sum_profit() * 0.9:
             return True
         else:
             return False
 
     def perturbation(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, num_requests: int):
         solution_copy = deepcopy(solution)
-        # destroy
-        sh.RandomRemovalShake().execute(instance, solution_copy, carrier, num_requests)
-        # repair
-        cns.MinTravelDistanceInsertion().insert_all(instance, solution_copy, carrier)
-        return solution_copy
+        try:
+            # destroy
+            sh.RandomRemovalShake().execute(instance, solution_copy, carrier, num_requests)  # todo test different shakes
+            # repair
+            cns.MinTravelDistanceInsertion().insert_all(instance, solution_copy, carrier)  # todo test different repairs
+            return solution_copy
+        except ConstraintViolationError:
+            # sometimes the shaking cannot be repaired with the given method and will raise a ConstraintViolationError
+            # in that case, simply returning the original solution
+            return solution
 
     def local_search(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers: Sequence[int]):
         solution_copy = deepcopy(solution)

@@ -38,10 +38,10 @@ def parameter_generator():
     ]
 
     tour_improvements: List = [
-        mh.LocalSearchFirst([neighborhoods[0]]),
+        # mh.LocalSearchFirst([neighborhoods[0]]),
         # mh.LocalSearchBest([neighborhoods[0]]),
         mh.PDPTWIteratedLocalSearch(neighborhoods),
-        # mh.PDPTWVariableNeighborhoodDescent(neighborhoods),
+        mh.PDPTWVariableNeighborhoodDescent(neighborhoods),
         # mh.NoMetaheuristic(neighborhoods),
     ]
 
@@ -117,8 +117,9 @@ def parameter_generator():
                                                                            bundling_valuation=bundling_valuation(),
                                                                            **bundle_generation_kwargs
                                                                            ),
-                                                         bd.DynamicReOptAndImprove(tour_construction, tour_improvement),
-                                                         wd.MaxBidGurobiCAP1(),
+                                                         bidding=bd.DynamicReOptAndImprove(tour_construction,
+                                                                                           tour_improvement),
+                                                         winner_determination=wd.MaxBidGurobiCAP1(),
                                                          )
                                     # collaborative planning
                                     yield dict(tour_construction=tour_construction,
@@ -249,7 +250,7 @@ if __name__ == '__main__':
         paths = sorted(
             list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
             key=ut.natural_sort_key)
-        paths = paths[:1]
+        paths = paths[:6]
 
         if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=False)
@@ -258,7 +259,7 @@ if __name__ == '__main__':
 
         df = write_solution_summary_to_multiindex_df(solutions, 'carrier')
         ev.bar_chart(df,
-                     title='BG: BestOfAllBundlings // BV:LosSchulte',
+                     title='ILS time limit: 0.5',
                      values='sum_profit',
                      color=['solution_algorithm', 'tour_improvement'],
                      category='rad', facet_col=None,
