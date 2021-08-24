@@ -44,7 +44,7 @@ class Auction(ABC):
         assert isinstance(self.bidding.tour_construction, type(self.tour_construction))
         assert isinstance(self.bidding.tour_improvement, type(self.tour_improvement))
 
-    def execute_auction(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
+    def execute_auction(self, instance: it.PDPInstance, solution: slt.CAHDSolution) -> slt.CAHDSolution:
         logger.debug(f'running auction {self.__class__.__name__}')
         # Request Selection
         auction_request_pool, original_bundling_labels = self.request_selection.execute(instance, solution)
@@ -83,9 +83,9 @@ class Auction(ABC):
             while solution.carriers[carrier].unrouted_requests:
                 request = solution.carriers[carrier].unrouted_requests[0]
                 self.tour_construction.insert_single(instance, solution, carrier, request)
-        self.tour_improvement.execute(instance, solution)
+        solution = self.tour_improvement.execute(instance, solution)
 
-        pass
+        return solution
 
     @staticmethod
     def assign_bundles_to_winners(solution, winner_bundles, bundle_winners):

@@ -40,8 +40,9 @@ def parameter_generator():
     tour_improvements: List = [
         # mh.LocalSearchFirst([neighborhoods[0]]),
         # mh.LocalSearchBest([neighborhoods[0]]),
-        mh.PDPTWIteratedLocalSearch(neighborhoods),
-        mh.PDPTWVariableNeighborhoodDescent(neighborhoods),
+        # mh.PDPTWIteratedLocalSearch(neighborhoods),
+        # mh.PDPTWVariableNeighborhoodDescent(neighborhoods),
+        mh.PDPTWSimulatedAnnealing(neighborhoods),
         # mh.NoMetaheuristic(neighborhoods),
     ]
 
@@ -250,7 +251,7 @@ if __name__ == '__main__':
         paths = sorted(
             list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
             key=ut.natural_sort_key)
-        paths = paths[:6]
+        paths = paths[55:56]
 
         if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=False)
@@ -259,7 +260,7 @@ if __name__ == '__main__':
 
         df = write_solution_summary_to_multiindex_df(solutions, 'carrier')
         ev.bar_chart(df,
-                     title='ILS time limit: 0.5',
+                     title='',
                      values='sum_profit',
                      color=['solution_algorithm', 'tour_improvement'],
                      category='rad', facet_col=None,

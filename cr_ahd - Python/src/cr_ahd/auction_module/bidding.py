@@ -96,6 +96,12 @@ class DynamicInsertion(BiddingBehavior):
 
 
 class DynamicReOptAndImprove(BiddingBehavior):
+    """
+    The profit for the carrier WITH the bundle added is calculated by inserting all requests (the ones that already
+    belong to the carrier AND the bundle's requests) sequentially in their order of vertex index, i.e. in the order
+    of request arrival to mimic the dynamic request arrival process within the acceptance phase. Afterwards, an
+    improvement is executed using the defined metaheuristic.
+    """
     def _value_with_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, bundle: Sequence[int],
                            carrier: int):
 
@@ -111,9 +117,9 @@ class DynamicReOptAndImprove(BiddingBehavior):
                 request = tmp_carrier_.unrouted_requests[0]
                 self.tour_construction.insert_single(instance, solution, tmp_carrier, request)
             # start_time = time.time()
-            self.tour_improvement.execute(instance, solution, [tmp_carrier])
+            tmp_solution = self.tour_improvement.execute(instance, solution, [tmp_carrier])
             # print(time.time() - start_time)
-            with_bundle = tmp_carrier_.sum_profit()
+            with_bundle = tmp_solution.carriers[tmp_carrier].sum_profit()  # todo: CHECK WHETHER THE TMP_CARRIER IS CORRECT! TOUR IMPROVEMENT DOES NOT OPERATE IN PLACE ANY LONGER
         except ut.ConstraintViolationError:
             with_bundle = -float('inf')
         finally:

@@ -102,8 +102,7 @@ class Solver:
 
     @pr.timing
     def _improvement_phase(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
-        solution = deepcopy(solution)
-        self.tour_improvement.execute(instance, solution)
+        solution = self.tour_improvement.execute(instance, solution)
         ut.validate_solution(instance, solution)
         return solution
 
@@ -131,8 +130,7 @@ class Solver:
         :param solution:
         :return:
         """
-        solution = deepcopy(solution)
-        self.auction.execute_auction(instance, solution)
+        solution = self.auction.execute_auction(instance, solution)
         return solution
 
 

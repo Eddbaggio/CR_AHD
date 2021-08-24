@@ -24,7 +24,7 @@ class PDPTWMetaHeuristic(ABC):
         self.trajectory = []  # collection of all accepted & executed moves
 
     @abstractmethod
-    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None):
+    def execute(self, instance: it.PDPInstance, original_solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
         pass
 
     @abstractmethod
@@ -56,7 +56,7 @@ class NoMetaheuristic(PDPTWMetaHeuristic):
     def acceptance_criterion(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move: tuple):
         pass
 
-    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None):
+    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
         pass
 
 
@@ -68,7 +68,7 @@ class NoMetaheuristic(PDPTWMetaHeuristic):
 #         super().__init__(neighborhoods)
 #
 #     @abstractmethod
-#     def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None):
+#     def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
 #         pass
 #
 #     @abstractmethod
@@ -80,26 +80,28 @@ class LocalSearchFirst(PDPTWMetaHeuristic):
     local search heuristic using the first improvement strategy
     """
 
-    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None):
+    def execute(self, instance: it.PDPInstance, original_solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
+        best_solution = deepcopy(original_solution)
         assert len(self.neighborhoods) == 1, 'Local Search can use a single neighborhood only!'
         if carriers is None:
-            carriers = range(len(solution.carriers))
+            carriers = range(len(best_solution.carriers))
 
         for carrier in carriers:
             neighborhood = self.neighborhoods[0]
             self.improved = True
             while self.improved:
                 self.improved = False
-                move_gen = neighborhood.feasible_move_generator(instance, solution, carrier)
+                move_gen = neighborhood.feasible_move_generator(instance, best_solution, carrier)
                 try:
                     move = next(move_gen)  # may be feasible but not improving
-                    while not self.acceptance_criterion(instance, solution, carrier, move):
+                    while not self.acceptance_criterion(instance, best_solution, carrier, move):
                         move = next(move_gen)
-                    neighborhood.execute_move(instance, solution, move)
+                    neighborhood.execute_move(instance, best_solution, move)
                     self.trajectory.append(move)
                     self.improved = True
                 except StopIteration:
                     break  # exit the while loop (while-condition is false anyway)
+        return best_solution
 
     def acceptance_criterion(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move: tuple):
         if move[0] < 0:
@@ -111,21 +113,23 @@ class LocalSearchFirst(PDPTWMetaHeuristic):
 class LocalSearchBest(PDPTWMetaHeuristic):
     """implements a the local search heuristic using the best improvement strategy, i.e. steepest descent"""
 
-    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None):
+    def execute(self, instance: it.PDPInstance, original_solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
+        best_solution = deepcopy(original_solution)
         assert len(self.neighborhoods) == 1, 'Local Search can uses a single neighborhood only!'
         if carriers is None:
-            carriers = range(len(solution.carriers))
+            carriers = range(len(best_solution.carriers))
 
         for carrier in carriers:
             neighborhood = self.neighborhoods[0]
             self.improved = True
             while self.improved:
                 self.improved = False
-                best_move = min(neighborhood.feasible_move_generator(instance, solution, carrier))
-                if self.acceptance_criterion(instance, solution, carrier, best_move):
-                    neighborhood.execute_move(instance, solution, best_move)
+                best_move = min(neighborhood.feasible_move_generator(instance, best_solution, carrier))
+                if self.acceptance_criterion(instance, best_solution, carrier, best_move):
+                    neighborhood.execute_move(instance, best_solution, best_move)
                     self.trajectory.append(best_move)
                     self.improved = True
+        return best_solution
 
     def acceptance_criterion(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move: tuple):
         if move[0] < 0:
@@ -139,14 +143,15 @@ class PDPTWSequentialLocalSearch(PDPTWMetaHeuristic):
     Sequentially exhaust each neighborhood. Only improvements are accepted.
     """
 
-    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None):
+    def execute(self, instance: it.PDPInstance, original_solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
+        best_solution = deepcopy(original_solution)
         if carriers is None:
-            carriers = range(len(solution.carriers))
+            carriers = range(len(best_solution.carriers))
 
         for carrier in carriers:
             for k in range(len(self.neighborhoods)):
                 neighborhood = self.neighborhoods[k]
-                move_generator = neighborhood.feasible_move_generator(instance, solution, carrier)
+                move_generator = neighborhood.feasible_move_generator(instance, best_solution, carrier)
                 self.improved = True
                 while self.improved:
                     self.improved = False
@@ -154,15 +159,15 @@ class PDPTWSequentialLocalSearch(PDPTWMetaHeuristic):
                     while accepted is False:
                         try:
                             move = next(move_generator)
-                            if self.acceptance_criterion(instance, solution, carrier, move):
+                            if self.acceptance_criterion(instance, best_solution, carrier, move):
                                 accepted = True
-                                neighborhood.execute_move(instance, solution, move)
+                                neighborhood.execute_move(instance, best_solution, move)
                                 self.improved = True
                                 self.trajectory.append(move)
-                                move_generator = neighborhood.feasible_move_generator(instance, solution, carrier)
+                                move_generator = neighborhood.feasible_move_generator(instance, best_solution, carrier)
                         except StopIteration:
                             break
-        pass
+        return best_solution
 
     def acceptance_criterion(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move: tuple):
         if move is None:
@@ -178,8 +183,9 @@ class PDPTWRandomVariableNeighborhoodDescent(PDPTWMetaHeuristic):
     randomly select a neighborhood for the next improving move
     """
 
-    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None):
+    def execute(self, instance: it.PDPInstance, original_solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
         raise NotImplementedError
+        solution = deepcopy(original_solution)
         if carriers is None:
             carriers = range(len(solution.carriers))
 
@@ -204,7 +210,7 @@ class PDPTWRandomVariableNeighborhoodDescent(PDPTWMetaHeuristic):
                         k = random.choice(eligible_neighborhoods)
                 else:
                     k += 1
-        pass
+        return solution
 
     def acceptance_criterion(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move: tuple):
         if move[0] < 0:
@@ -220,26 +226,27 @@ class PDPTWVariableNeighborhoodDescent(PDPTWMetaHeuristic):
     neighborhood
     """
 
-    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None):
+    def execute(self, instance: it.PDPInstance, original_solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
+        best_solution = deepcopy(original_solution)
         if carriers is None:
-            carriers = range(len(solution.carriers))
+            carriers = range(len(best_solution.carriers))
 
         for carrier in carriers:
             k = 0
             while k < len(self.neighborhoods):
                 neighborhood = self.neighborhoods[k]
-                all_moves = [move for move in neighborhood.feasible_move_generator(instance, solution, carrier)]
+                all_moves = [move for move in neighborhood.feasible_move_generator(instance, best_solution, carrier)]
                 if any(all_moves):
                     best_move = min(all_moves, key=lambda x: x[0])
-                    if self.acceptance_criterion(instance, solution, carrier, best_move):
-                        neighborhood.execute_move(instance, solution, best_move)
+                    if self.acceptance_criterion(instance, best_solution, carrier, best_move):
+                        neighborhood.execute_move(instance, best_solution, best_move)
                         self.trajectory.append(best_move)
                         k = 0
                     else:
                         k += 1
                 else:
                     k += 1
-        pass
+        return best_solution
 
     def execute_on_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_: tr.Tour):
         """
@@ -279,62 +286,41 @@ class PDPTWVariableNeighborhoodDescent(PDPTWMetaHeuristic):
 class PDPTWSimulatedAnnealing(PDPTWMetaHeuristic):
     def __init__(self, neighborhoods: Sequence[nh.Neighborhood]):
         super().__init__(neighborhoods)
-        self.parameters['initial_temp'] = None
-        self.parameters['temp'] = None
-        self.parameters['max_iterations'] = 50  # TODO adjust these two params
-        self.parameters['max_iteration_per_temperature'] = 15
-        self.parameters['alpha'] = 0.8  # for cooling schedule (usually 0.8 <= alpha <=0.9)
+        self.parameters['initial_temperature'] = 0
+        self.parameters['temperature'] = 0
 
-    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None):
-        raise NotImplementedError('I think this is not working properly. but it is definitely too slow')
+    def execute(self, instance: it.PDPInstance, original_solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
+        solution = deepcopy(original_solution)
         if carriers is None:
             carriers = range(len(solution.carriers))
-        best_solution = deepcopy(solution)
-        tentative_solution = deepcopy(solution)
-        print(f'Before SA: {solution.sum_profit()}')
+
+        best_solution = solution
+
         for carrier in carriers:
-            self.compute_start_temperature(tentative_solution, carrier)
-            k = random.randint(0, len(self.neighborhoods) - 1)  # random neighborhood
-            neighborhood = self.neighborhoods[k]()
-            moves = list(neighborhood.feasible_move_generator(instance, tentative_solution, carrier))
+            self.parameters['initial_temperature'] = self.compute_start_temperature(solution, carrier)
+            self.parameters['temperature'] = self.parameters['initial_temperature']
+
+            time_max = 0.05  # roughly the time required by the VND procedure to terminate
+            start_time = time.time()
+
             i = 0
-            while i < self.parameters['max_iterations']:
-                # adjust temperature
-                self.parameters['temp'] = self.parameters['initial_temp'] * self.parameters['alpha'] ** i
-                # try different neighbors
-                try:
-                    m = 0
-                    while m < self.parameters['max_iteration_per_temperature']:
-                        # with or without replacement? without since the same move might be accepted next time
-                        move = random.choice(moves)  # random neighbor
-                        accepted = self.acceptance_criterion(instance, tentative_solution, carrier, move)
-                        if accepted:
-                            neighborhood.execute_move(instance, tentative_solution, carrier, move)
-                            self.trajectory.append(move)
-                            moves = list(neighborhood.feasible_move_generator(instance, tentative_solution, carrier))
-                            if tentative_solution.sum_profit() >= best_solution.sum_profit():
-                                solution = deepcopy(tentative_solution)
-                        m += 1
-                except IndexError:  # if no move exists
-                    break
+            while time.time() - start_time < time_max:
+                # update the current temperature
+                self.parameters['temperature'] = self.parameters['initial_temperature'] * 0.85 ** i
 
+                # random neighbor
+                neighborhood = random.choice(self.neighborhoods)
+                move_gen = neighborhood.feasible_move_generator(instance, solution, carrier)
+                move = random.choice(list(move_gen))
+
+                # always accept improving moves, accept deteriorating moves with a certain probability
+                if self.acceptance_criterion(instance, solution, carrier, move):
+                    neighborhood.execute_move(instance, solution, move)
+                    # update the best solution
+                    if solution.sum_profit() > best_solution.sum_profit():
+                        best_solution = solution
                 i += 1
-
-        print(f'After SA:  {solution.sum_profit()}')
-        pass
-
-    def compute_start_temperature(self, solution, carrier: int, start_temp_control_param=0.5):
-        """compute start temperature according to Ropke,S., & Pisinger,D. (2006). An Adaptive Large Neighborhood
-        Search Heuristic for the Pickup and Delivery Problem with Time Windows. Transportation Science, 40(4),
-        455–472. https://doi.org/10.1287/trsc.1050.0135
-
-        a solution that is (start_temp_control_param * 100) % worse will be accepted with a probability 0.5
-        """
-        carrier_ = solution.carriers[carrier]
-        obj = carrier_.sum_profit()
-        acceptance_probability = 0.5
-        self.parameters['initial_temp'] = -(obj * start_temp_control_param) / log(acceptance_probability)
-        self.parameters['temp'] = self.parameters['initial_temp']
+        return best_solution
 
     def acceptance_criterion(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move: tuple):
         try:
@@ -344,14 +330,28 @@ class PDPTWSimulatedAnnealing(PDPTWMetaHeuristic):
             elif move[0] <= 0:
                 return True
             # degrading move is accepted with certain probability
-            elif random.random() < exp(-move[0] / self.parameters['temp']):  # might raise OverflowError
+            elif random.random() < exp(-move[0] / self.parameters['temperature']):  # might raise OverflowError
                 return True
             else:
                 return False
         except OverflowError:
-            # overflow caused by double limit if temperature is too low. In that case the random number will not be
-            #  smaller than the required probability
+            # overflow caused by double limit if temperature is too low. In that case the random number will most
+            # likely not be smaller than the required probability
             return False
+
+    @staticmethod
+    def compute_start_temperature(solution, carrier: int, start_temp_control_param=0.5):
+        """compute start temperature according to Ropke,S., & Pisinger,D. (2006). An Adaptive Large Neighborhood
+        Search Heuristic for the Pickup and Delivery Problem with Time Windows. Transportation Science, 40(4),
+        455–472. https://doi.org/10.1287/trsc.1050.0135
+
+        a solution that is (start_temp_control_param * 100) % worse will be accepted with a probability 0.5
+        """
+        carrier_ = solution.carriers[carrier]
+        obj = carrier_.sum_profit()
+        acceptance_probability = 0.5
+        temperature = -(obj * start_temp_control_param) / log(acceptance_probability)
+        return temperature
 
 
 class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
@@ -359,7 +359,9 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
 
     """
 
-    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None):
+    def execute(self, instance: it.PDPInstance, original_solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
+        solution = deepcopy(original_solution)
+
         if carriers is None:
             carriers = range(len(solution.carriers))
 
@@ -372,7 +374,7 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
             iter_max = 20
             i = 0
 
-            time_max = 0.5  # roughly the time required by the VND procedure to terminate
+            time_max = 0.05  # roughly the time required by the VND procedure to terminate
             start_time = time.time()
 
             while time.time() - start_time < time_max:
@@ -387,6 +389,7 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
                     solution = solution_1
 
                 i += 1
+        return best_solution
 
     def acceptance_criterion(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move: tuple):
         """
@@ -409,7 +412,8 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
         solution_copy = deepcopy(solution)
         try:
             # destroy
-            sh.RandomRemovalShake().execute(instance, solution_copy, carrier, num_requests)  # todo test different shakes
+            sh.RandomRemovalShake().execute(instance, solution_copy, carrier,
+                                            num_requests)  # todo test different shakes
             # repair
             cns.MinTravelDistanceInsertion().insert_all(instance, solution_copy, carrier)  # todo test different repairs
             return solution_copy
@@ -420,6 +424,6 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
 
     def local_search(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers: Sequence[int]):
         solution_copy = deepcopy(solution)
-        random_neighborhood = random.choice(self.neighborhoods)   # TODO should be a parameter
+        random_neighborhood = random.choice(self.neighborhoods)  # TODO should be a parameter
         LocalSearchFirst([random_neighborhood]).execute(instance, solution_copy, carriers)
         return solution_copy
