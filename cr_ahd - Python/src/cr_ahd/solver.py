@@ -104,6 +104,7 @@ class Solver:
     def _improvement_phase(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         solution = deepcopy(solution)
         self.tour_improvement.execute(instance, solution)
+        ut.validate_solution(instance, solution)
         return solution
 
     def _static_routing(self, instance: it.PDPInstance, solution: slt.CAHDSolution):

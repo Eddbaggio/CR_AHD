@@ -361,7 +361,7 @@ def validate_solution(instance, solution):
                 # waiting times
                 assert tour_.service_schedule[i] == tour_.arrival_schedule[i] + tour_._wait_sequence[i], instance.id_
                 # tw constraint
-                assert solution.tw_open[vertex] <= tour_.service_schedule[i] <= solution.tw_close[vertex], instance.id_
+                assert solution.tw_open[vertex] <= tour_.service_schedule[i] <= solution.tw_close[vertex], f'{instance.id_}, {tour_}, vertex{vertex} at index {i}'
                 # precedence constraint
                 if instance.vertex_type(vertex) == 'pickup':
                     assert vertex + instance.num_requests in tour_.routing_sequence[i:], instance.id_

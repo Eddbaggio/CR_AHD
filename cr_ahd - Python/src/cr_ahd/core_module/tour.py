@@ -221,7 +221,7 @@ class Tour:
         self._sum_profit = updated_sums['sum_profit']
 
         # update the solution's record of the tour's vertices where necessary
-        for pos, vertex in enumerate(self.routing_sequence[insertion_indices[0]:], start=insertion_indices[0]):
+        for pos, vertex in enumerate(self.routing_sequence[insertion_indices[0]:-1], start=insertion_indices[0]):
             solution.vertex_position_in_tour[vertex] = pos
 
     def pop_and_update(self, instance, solution, pop_indices: Sequence[int]):
@@ -253,7 +253,7 @@ class Tour:
         # update the solution's record of the vertices' positions
         for vertex in popped:
             solution.vertex_position_in_tour[vertex] = None
-        for pos, vertex in enumerate(self.routing_sequence[pop_indices[0]:], start=pop_indices[0]):
+        for pos, vertex in enumerate(self.routing_sequence[pop_indices[0]:-1], start=pop_indices[0]):
             solution.vertex_position_in_tour[vertex] = pos
 
         return popped
@@ -434,11 +434,11 @@ def single_insertion_feasibility_check(routing_sequence: Sequence[int],
     travel_time_j_k = ut.travel_time(distance_matrix[j][k])
     travel_time_i_k = ut.travel_time(distance_matrix[i][k])
 
-    # condition 1: service of j must fit the time window of j
+    # tw condition 1: service of j must fit the time window of j
     arrival_time_j = service_schedule[insertion_index - 1] + service_duration[i] + travel_time_i_j
     tw_cond1 = arrival_time_j <= tw_close[j]
 
-    # condition 2: time_shift_j must be limited to the sum of wait_k + max_shift_k
+    # tw condition 2: time_shift_j must be limited to the sum of wait_k + max_shift_k
     wait_j = max(dt.timedelta(0), tw_open[j] - arrival_time_j)
     time_shift_j = travel_time_i_j + wait_j + service_duration[j] + travel_time_j_k - travel_time_i_k
     wait_k = wait_sequence[insertion_index]
@@ -513,7 +513,7 @@ def multi_insertion_feasibility_check(routing_sequence: List[int],
         if single_insertion_feasibility_check(**input_dict):
 
             # if there are more insertions to check, insert the current vertex at the current pos inside the copied
-            # route sequence & update the input dict
+            # route sequence & update the input dict before checking the next insertion
             if idx < len(insertion_indices) - 1:
                 updated = single_insert_and_update(**input_dict)
                 input_dict.update(updated)

@@ -5,8 +5,9 @@ from copy import deepcopy
 from math import exp, log
 from typing import Sequence, Callable, List
 
-from src.cr_ahd.routing_module import neighborhoods as nh
+from src.cr_ahd.routing_module import neighborhoods as nh, shakes as sh, tour_construction as cns
 from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
+from src.cr_ahd.auction_module import request_selection as rs
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ class PDPTWMetaHeuristic(ABC):
     def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None):
         pass
 
-    # @abstractmethod
+    @abstractmethod
     def acceptance_criterion(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move: tuple):
         return True
 
@@ -70,19 +71,21 @@ class NoMetaheuristic(PDPTWMetaHeuristic):
 #         pass
 
 class LocalSearchFirst(PDPTWMetaHeuristic):
-    """implements a the local search heuristic using the first improvement strategy"""
+    """
+    local search heuristic using the first improvement strategy
+    """
 
     def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None):
-        assert len(self.neighborhoods) == 1, 'Local Search can uses a single neighborhood only!'
+        assert len(self.neighborhoods) == 1, 'Local Search can use a single neighborhood only!'
         if carriers is None:
             carriers = range(len(solution.carriers))
 
         for carrier in carriers:
             neighborhood = self.neighborhoods[0]
-            move_gen = neighborhood.feasible_move_generator(instance, solution, carrier)
             self.improved = True
             while self.improved:
                 self.improved = False
+                move_gen = neighborhood.feasible_move_generator(instance, solution, carrier)
                 try:
                     move = next(move_gen)  # may be feasible but not improving
                     while not self.acceptance_criterion(instance, solution, carrier, move):
@@ -205,9 +208,12 @@ class PDPTWRandomVariableNeighborhoodDescent(PDPTWMetaHeuristic):
             return False
 
 
-class PDPTWSequentialVariableNeighborhoodDescent(PDPTWMetaHeuristic):
-    """deterministic variant of VNS. multiple neighborhoods are ordered and searched sequentially. In each neighborhood
-    that is searched, the *best* found neighbor is used."""
+class PDPTWVariableNeighborhoodDescent(PDPTWMetaHeuristic):
+    """
+    deterministic variant of VNS. multiple neighborhoods are ordered and searched sequentially. In each neighborhood
+    that is searched, the *best* found neighbor is used. When stuck in a local optimum, switches to the next
+    neighborhood
+    """
 
     def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None):
         if carriers is None:
@@ -234,7 +240,7 @@ class PDPTWSequentialVariableNeighborhoodDescent(PDPTWMetaHeuristic):
         """
         execute the metaheuristic for a given route (in place) using all available intra-tour neighborhoods. useful if
         a tour shall be improved that does not belong to a carrier. E.g. when estimating the tour length of a bundle
-         """
+        """
 
         intra_tour_neighborhoods = [nbh for nbh in self.neighborhoods if isinstance(nbh, nh.IntraTourNeighborhood)]
         k = 0
@@ -344,6 +350,55 @@ class PDPTWSimulatedAnnealing(PDPTWMetaHeuristic):
 
 
 class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
-    pass
+    """
 
+    """
 
+    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None):
+        if carriers is None:
+            carriers = range(len(solution.carriers))
+
+        solution = self.local_search(instance, solution, carriers)
+        num_requests = 3
+
+        for carrier in carriers:
+            iter_max = 100
+            i = 0
+            while i < iter_max:
+                solution_1 = self.perturbation(instance, solution, carrier, num_requests)
+                solution_1 = self.local_search(instance, solution_1, carriers)
+                # hacky way to define a move as (old_solution, new_solution) since describing a "move" with all
+                # information of the perturbation is cumbersome
+                if self.acceptance_criterion(instance, solution, carrier, (solution, solution_1)):
+                    solution = solution_1
+
+    def acceptance_criterion(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move: tuple):
+        """
+        accept slight degradations sometimes: Threshold acceptance, 20% degradations are accepted
+
+        :param instance:
+        :param solution:
+        :param carrier:
+        :param move:
+        :return:
+        """
+        solution_1: slt.CAHDSolution
+        solution, solution_1 = move
+        if solution_1.sum_profit() >= solution.sum_profit() * 0.8:
+            return True
+        else:
+            return False
+
+    def perturbation(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, num_requests: int):
+        solution_copy = deepcopy(solution)
+        # destroy
+        sh.RandomRemovalShake().execute(instance, solution_copy, carrier, num_requests)
+        # repair
+        cns.MinTravelDistanceInsertion().insert_all(instance, solution_copy, carrier)
+        return solution_copy
+
+    def local_search(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers: Sequence[int]):
+        solution_copy = deepcopy(solution)
+        random_neighborhood = random.choice(self.neighborhoods)   # TODO should be a parameter
+        LocalSearchFirst([random_neighborhood]).execute(instance, solution_copy, carriers)
+        return solution_copy

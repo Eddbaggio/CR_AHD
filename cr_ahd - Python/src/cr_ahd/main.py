@@ -38,7 +38,10 @@ def parameter_generator():
     ]
 
     tour_improvements: List = [
-        mh.PDPTWSequentialVariableNeighborhoodDescent(neighborhoods),
+        mh.LocalSearchFirst([neighborhoods[0]]),
+        # mh.LocalSearchBest([neighborhoods[0]]),
+        mh.PDPTWIteratedLocalSearch(neighborhoods),
+        # mh.PDPTWVariableNeighborhoodDescent(neighborhoods),
         # mh.NoMetaheuristic(neighborhoods),
     ]
 
