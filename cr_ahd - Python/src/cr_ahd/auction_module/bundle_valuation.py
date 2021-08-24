@@ -219,7 +219,7 @@ def bundle_total_travel_distance(instance: it.PDPInstance,
 
     # insert all remaining requests of the bundle
     tour_construction = cns.MinTravelDistanceInsertion()  # TODO this should be a parameter!
-    tour_improvement = mh.PDPTWSequentialVariableNeighborhoodDescent(
+    tour_improvement = mh.PDPTWVariableNeighborhoodDescent(
         [nh.PDPMove(), nh.PDPTwoOpt()])  # TODO this should be a parameter!
     for request in bundle:
         if request == depot_request:
