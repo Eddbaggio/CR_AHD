@@ -8,25 +8,25 @@ import src.cr_ahd.core_module.solution as slt
 def timing(f: Callable):
     @wraps(f)
     def wrap(*args, **kw):
-        ts = time.perf_counter()
+        start_time = time.perf_counter()
         result = f(*args, **kw)
-        te = time.perf_counter()
-        # print(f'func:{f.__name__} args:[{args}, {kw}] took: {te - ts} sec')
+        end_time = time.perf_counter()
+        # print(f'func:{f.__name__} args:[{args}, {kw}] took: {end_time - start_time} sec')
 
         # store the timing in the solution
         # only works if the function had a slt.CAHDSolution as an input ...
         if isinstance(result, slt.CAHDSolution):
             try:
-                result.timings[f.__name__] += [te - ts]
+                result.timings[f.__name__] += [end_time - start_time]
             except KeyError:
-                result.timings[f.__name__] = [te - ts]
+                result.timings[f.__name__] = [end_time - start_time]
         else:
             for arg in [*args, *kw.values()]:
                 if isinstance(arg, slt.CAHDSolution):
                     try:
-                        arg.timings[f.__name__] += [te - ts]
+                        arg.timings[f.__name__] += [end_time - start_time]
                     except KeyError:
-                        arg.timings[f.__name__] = [te - ts]
+                        arg.timings[f.__name__] = [end_time - start_time]
         return result
 
     return wrap

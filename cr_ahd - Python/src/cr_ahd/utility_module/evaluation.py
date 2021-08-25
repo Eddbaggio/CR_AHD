@@ -64,6 +64,10 @@ def bar_chart(df: pd.DataFrame,
 
     df = drop_single_value_index(df, ut.flatten([category, color, facet_row, facet_col]))
     splitters = dict(category=category, color=color, facet_row=facet_row, facet_col=facet_col, )
+    # for k, v in splitters.items():
+    #     cond1 = isinstance(v, (List, Tuple)) and len(v) > 1
+    #     cond2 = isinstance(v, str)
+    #     assert cond1 or cond2, f'splitters cannot be List/Tuple of singular string'
 
     agg_dict = {col: sum for col in df.columns}
     agg_dict['acceptance_rate'] = 'mean'
@@ -197,7 +201,8 @@ def merge_index_levels(df: pd.DataFrame, levels: Sequence):
 
 def print_top_level_stats(carrier_df: pd.DataFrame, secondary_parameters: List[str]):
     if len(carrier_df) > 1:
-        carrier_df = drop_single_value_index(carrier_df, ['rad', 'n', 'run', 'carrier_id_', 'solution_algorithm', *secondary_parameters])
+        carrier_df = drop_single_value_index(carrier_df, ['rad', 'n', 'run', 'carrier_id_', 'solution_algorithm',
+                                                          *secondary_parameters])
 
     with pd.option_context('display.max_rows', None, 'display.max_columns', None, 'display.width', 0):
 
@@ -250,25 +255,27 @@ def print_top_level_stats(carrier_df: pd.DataFrame, secondary_parameters: List[s
                     print(f"{stat}:\t{group1.agg('mean')[stat] / group2.agg('mean')[stat]}")
                 print('\n')
 
-        print('=============/ consistency check: collaborative better than isolated? /=============')
-        consistency_df = solution_df.droplevel(level=[x for x in solution_df.index.names if x.startswith('auction_')])
-        for name, group in consistency_df.groupby(
-                consistency_df.index.names.difference(['solution_algorithm', *secondary_parameters]),
-                as_index=False,
-                dropna=False):
-            for sec_param in secondary_parameters:
-                group = group.droplevel(level=group.index.names.difference(['solution_algorithm', sec_param]))
+        if 'CollaborativePlanning' in solution_df.index.get_level_values('solution_algorithm'):
+            print('=============/ consistency check: collaborative better than isolated? /=============')
+            consistency_df = solution_df.droplevel(
+                level=[x for x in solution_df.index.names if x.startswith('auction_')])
+            for name, group in consistency_df.groupby(
+                    consistency_df.index.names.difference(['solution_algorithm', *secondary_parameters]),
+                    as_index=False,
+                    dropna=False):
+                for sec_param in secondary_parameters:
+                    group = group.droplevel(level=group.index.names.difference(['solution_algorithm', sec_param]))
 
-                collaborative = group.loc['CollaborativePlanning', 'sum_profit']
-                isolated = group.loc['IsolatedPlanning', 'sum_profit']
-                if not all(collaborative > isolated):
-                    warnings.warn(f'{name}: Collaborative is worse than Isolated!')
+                    collaborative = group.loc['CollaborativePlanning', 'sum_profit']
+                    isolated = group.loc['IsolatedPlanning', 'sum_profit']
+                    if not all(collaborative > isolated):
+                        warnings.warn(f'{name}: Collaborative is worse than Isolated!')
 
 
 if __name__ == '__main__':
     df = pd.read_csv(
         "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home "
-        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_carrier_#094.csv",
+        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_carrier_#097.csv",
     )
     df.fillna('None', inplace=True)
     df.set_index(['rad', 'n', 'run', 'carrier_id_'] + ut.solver_config, inplace=True)
@@ -276,9 +283,10 @@ if __name__ == '__main__':
     bar_chart(df,
               title='',
               values='sum_profit',
-              color=['solution_algorithm', 'tour_improvement'],
-              category='run', facet_col='rad',
-              # category='rad', facet_col=None,
+              # color=['solution_algorithm','tour_improvement',],
+              color='tour_improvement',
+              # category='run', facet_col='rad',
+              category='rad', facet_col=None,
               facet_row='n',
               show=True,
               # width=700,

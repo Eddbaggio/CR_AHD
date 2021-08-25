@@ -147,6 +147,7 @@ class CAHDSolution:
             'num_tours': self.num_tours(),
             'num_routing_stops': self.num_routing_stops(),
             'acceptance_rate': self.avg_acceptance_rate(),
+            'timings': self.timings,
             'carrier_summaries': {c.id_: c.summary() for c in self.carriers}
         }
         summary.update(self.solver_config)

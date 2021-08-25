@@ -38,12 +38,15 @@ def parameter_generator():
     ]
 
     tour_improvements: List = [
-        # mh.LocalSearchFirst([neighborhoods[0]]),
-        # mh.LocalSearchBest([neighborhoods[0]]),
+        mh.LocalSearchFirst([neighborhoods[0]]),
+        mh.LocalSearchFirst([neighborhoods[1]]),
+        mh.LocalSearchBest([neighborhoods[0]]),
+        mh.LocalSearchBest([neighborhoods[1]]),
+        mh.PDPTWSequentialLocalSearch(neighborhoods),
         mh.PDPTWIteratedLocalSearch(neighborhoods),
-        # mh.PDPTWVariableNeighborhoodDescent(neighborhoods),
-        # mh.PDPTWSimulatedAnnealing(neighborhoods),
-        # mh.NoMetaheuristic(neighborhoods),
+        mh.PDPTWVariableNeighborhoodDescent(neighborhoods),
+        mh.PDPTWSimulatedAnnealing(neighborhoods),
+        mh.NoMetaheuristic([]),
     ]
 
     time_window_managements: List[twm.TWManagement] = [
@@ -53,7 +56,7 @@ def parameter_generator():
     ]
 
     nums_submitted_requests: List[int] = [
-        4,
+        # 4,
         # 5
     ]
 
@@ -188,6 +191,7 @@ def m_solve_single_thread(instance_paths, plot=False):
 def write_solution_summary_to_multiindex_df(solutions_per_instance: List[List[slt.CAHDSolution]], agg_level='tour'):
     """
     :param solutions_per_instance: A List of Lists of solutions. First Axis: instance, Second Axis: solver
+    :param agg_level:
     """
 
     df = []
@@ -253,7 +257,7 @@ if __name__ == '__main__':
         paths = sorted(
             list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
             key=ut.natural_sort_key)
-        paths = paths[36:48]
+        paths = paths[:]
 
         if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=False)
@@ -264,10 +268,11 @@ if __name__ == '__main__':
         ev.bar_chart(df,
                      title='',
                      values='sum_profit',
-                     color=['solution_algorithm', 'tour_improvement'],
-                     # category='rad', facet_col=None,
-                     category='run', facet_col='rad',
-                     facet_row='n',
+                     # color=['solution_algorithm','tour_improvement',],
+                     color='tour_improvement',
+                     # category='rad', facet_col=None, facet_row='n',
+                     # category='run', facet_col='rad', facet_row='n',
+                     category='solution_algorithm', facet_col=None, facet_row=None,
                      show=True,
                      html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix())
 

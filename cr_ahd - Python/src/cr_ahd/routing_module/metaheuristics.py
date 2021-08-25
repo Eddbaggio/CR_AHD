@@ -9,9 +9,11 @@ import time
 from src.cr_ahd.routing_module import neighborhoods as nh, shakes as sh, tour_construction as cns
 from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
 from src.cr_ahd.auction_module import request_selection as rs
-from src.cr_ahd.utility_module.utils import ConstraintViolationError
+from src.cr_ahd.utility_module import utils as ut, profiling as pr
 
 logger = logging.getLogger(__name__)
+
+TIME_MAX = 3  # 0.05 is roughly the time required by the VND procedure to exhaust all neighborhoods
 
 
 class PDPTWMetaHeuristic(ABC):
@@ -22,6 +24,8 @@ class PDPTWMetaHeuristic(ABC):
         self.parameters = dict()
         self.history = []  # collection of e.g. visited neighbors, accepted moves, ...
         self.trajectory = []  # collection of all accepted & executed moves
+
+        self.name = f'{self.__class__.__name__}{[n.__class__.__name__ for n in self.neighborhoods]}'
 
     @abstractmethod
     def execute(self, instance: it.PDPInstance, original_solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
@@ -80,6 +84,7 @@ class LocalSearchFirst(PDPTWMetaHeuristic):
     local search heuristic using the first improvement strategy
     """
 
+    @pr.timing
     def execute(self, instance: it.PDPInstance, original_solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
         best_solution = deepcopy(original_solution)
         assert len(self.neighborhoods) == 1, 'Local Search can use a single neighborhood only!'
@@ -113,6 +118,7 @@ class LocalSearchFirst(PDPTWMetaHeuristic):
 class LocalSearchBest(PDPTWMetaHeuristic):
     """implements a the local search heuristic using the best improvement strategy, i.e. steepest descent"""
 
+    @pr.timing
     def execute(self, instance: it.PDPInstance, original_solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
         best_solution = deepcopy(original_solution)
         assert len(self.neighborhoods) == 1, 'Local Search can uses a single neighborhood only!'
@@ -124,11 +130,13 @@ class LocalSearchBest(PDPTWMetaHeuristic):
             self.improved = True
             while self.improved:
                 self.improved = False
-                best_move = min(neighborhood.feasible_move_generator(instance, best_solution, carrier))
-                if self.acceptance_criterion(instance, best_solution, carrier, best_move):
-                    neighborhood.execute_move(instance, best_solution, best_move)
-                    self.trajectory.append(best_move)
-                    self.improved = True
+                all_moves = [move for move in neighborhood.feasible_move_generator(instance, best_solution, carrier)]
+                if any(all_moves):
+                    best_move = min(all_moves, key=lambda x: x[0])
+                    if self.acceptance_criterion(instance, best_solution, carrier, best_move):
+                        neighborhood.execute_move(instance, best_solution, best_move)
+                        self.trajectory.append(best_move)
+                        self.improved = True
         return best_solution
 
     def acceptance_criterion(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move: tuple):
@@ -143,6 +151,7 @@ class PDPTWSequentialLocalSearch(PDPTWMetaHeuristic):
     Sequentially exhaust each neighborhood. Only improvements are accepted.
     """
 
+    @pr.timing
     def execute(self, instance: it.PDPInstance, original_solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
         best_solution = deepcopy(original_solution)
         if carriers is None:
@@ -183,6 +192,7 @@ class PDPTWRandomVariableNeighborhoodDescent(PDPTWMetaHeuristic):
     randomly select a neighborhood for the next improving move
     """
 
+    @pr.timing
     def execute(self, instance: it.PDPInstance, original_solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
         raise NotImplementedError
         solution = deepcopy(original_solution)
@@ -226,6 +236,7 @@ class PDPTWVariableNeighborhoodDescent(PDPTWMetaHeuristic):
     neighborhood
     """
 
+    @pr.timing
     def execute(self, instance: it.PDPInstance, original_solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
         best_solution = deepcopy(original_solution)
         if carriers is None:
@@ -233,7 +244,8 @@ class PDPTWVariableNeighborhoodDescent(PDPTWMetaHeuristic):
 
         for carrier in carriers:
             k = 0
-            while k < len(self.neighborhoods):
+            start_time = time.time()
+            while k < len(self.neighborhoods) and time.time() - start_time < TIME_MAX:
                 neighborhood = self.neighborhoods[k]
                 all_moves = [move for move in neighborhood.feasible_move_generator(instance, best_solution, carrier)]
                 if any(all_moves):
@@ -289,6 +301,7 @@ class PDPTWSimulatedAnnealing(PDPTWMetaHeuristic):
         self.parameters['initial_temperature'] = 0
         self.parameters['temperature'] = 0
 
+    @pr.timing
     def execute(self, instance: it.PDPInstance, original_solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
         solution = deepcopy(original_solution)
         if carriers is None:
@@ -300,11 +313,10 @@ class PDPTWSimulatedAnnealing(PDPTWMetaHeuristic):
             self.parameters['initial_temperature'] = self.compute_start_temperature(solution, carrier)
             self.parameters['temperature'] = self.parameters['initial_temperature']
 
-            time_max = 0.05  # roughly the time required by the VND procedure to terminate
             start_time = time.time()
 
             i = 0
-            while time.time() - start_time < time_max:
+            while time.time() - start_time < TIME_MAX:
                 # update the current temperature
                 self.parameters['temperature'] = self.parameters['initial_temperature'] * 0.85 ** i
 
@@ -362,6 +374,7 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
 
     """
 
+    @pr.timing
     def execute(self, instance: it.PDPInstance, original_solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
         solution = deepcopy(original_solution)
 
@@ -377,10 +390,9 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
             iter_max = 20
             i = 0
 
-            time_max = 0.05  # roughly the time required by the VND procedure to terminate
             start_time = time.time()
 
-            while time.time() - start_time < time_max:
+            while time.time() - start_time < TIME_MAX:
                 solution_1 = self.perturbation(instance, solution, carrier, num_requests)
                 solution_1 = self.local_search(instance, solution_1, [carrier])
                 # hacky way to define a move as (old_solution, new_solution) since describing a "move" with all
@@ -420,7 +432,7 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
             # repair
             cns.MinTravelDistanceInsertion().insert_all(instance, solution_copy, carrier)  # todo test different repairs
             return solution_copy
-        except ConstraintViolationError:
+        except ut.ConstraintViolationError:
             # sometimes the shaking cannot be repaired with the given method and will raise a ConstraintViolationError
             # in that case, simply returning the original solution
             return solution

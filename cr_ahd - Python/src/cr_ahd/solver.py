@@ -60,7 +60,7 @@ class Solver:
 
     def update_solution_solver_config(self, solution):
         solution.solver_config['tour_construction'] = self.tour_construction.__class__.__name__
-        solution.solver_config['tour_improvement'] = self.tour_improvement.__class__.__name__
+        solution.solver_config['tour_improvement'] = self.tour_improvement.name
         solution.solver_config['time_window_management'] = self.time_window_management.__class__.__name__
         solution.solver_config[
             'time_window_offering'] = self.time_window_management.time_window_offering.__class__.__name__
@@ -70,7 +70,7 @@ class Solver:
         if self.auction:
             solution.solver_config['solution_algorithm'] = 'CollaborativePlanning'
             solution.solver_config['auction_tour_construction'] = self.tour_construction.__class__.__name__
-            solution.solver_config['auction_tour_improvement'] = self.tour_improvement.__class__.__name__
+            solution.solver_config['auction_tour_improvement'] = self.tour_improvement.name
             solution.solver_config['num_submitted_requests'] = self.auction.request_selection.num_submitted_requests
             solution.solver_config['request_selection'] = self.auction.request_selection.__class__.__name__
             solution.solver_config['bundle_generation'] = self.auction.bundle_generation.__class__.__name__
