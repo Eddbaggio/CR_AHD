@@ -95,7 +95,7 @@ class DynamicInsertion(BiddingBehavior):
         return with_bundle
 
 
-class DynamicReOptAndImprove(BiddingBehavior):
+class DynamicInsertionAndImprove(BiddingBehavior):
     """
     The profit for the carrier WITH the bundle added is calculated by inserting all requests (the ones that already
     belong to the carrier AND the bundle's requests) sequentially in their order of vertex index, i.e. in the order

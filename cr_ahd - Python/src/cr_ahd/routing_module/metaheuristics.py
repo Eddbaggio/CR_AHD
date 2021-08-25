@@ -57,7 +57,7 @@ class NoMetaheuristic(PDPTWMetaHeuristic):
         pass
 
     def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
-        pass
+        return solution
 
 
 # class PDPTWIntraTourMetaheuristic(PDPTWMetaHeuristic, ABC):
@@ -310,15 +310,18 @@ class PDPTWSimulatedAnnealing(PDPTWMetaHeuristic):
 
                 # random neighbor
                 neighborhood = random.choice(self.neighborhoods)
-                move_gen = neighborhood.feasible_move_generator(instance, solution, carrier)
-                move = random.choice(list(move_gen))
+                moves = list(neighborhood.feasible_move_generator(instance, solution, carrier))
+                if any(moves):
+                    move = random.choice(moves)
 
-                # always accept improving moves, accept deteriorating moves with a certain probability
-                if self.acceptance_criterion(instance, solution, carrier, move):
-                    neighborhood.execute_move(instance, solution, move)
-                    # update the best solution
-                    if solution.sum_profit() > best_solution.sum_profit():
-                        best_solution = solution
+                    # always accept improving moves, accept deteriorating moves with a certain probability
+                    if self.acceptance_criterion(instance, solution, carrier, move):
+                        neighborhood.execute_move(instance, solution, move)
+                        # update the best solution
+                        if solution.sum_profit() > best_solution.sum_profit():
+                            best_solution = solution
+                else:
+                    continue
                 i += 1
         return best_solution
 

@@ -197,7 +197,7 @@ def merge_index_levels(df: pd.DataFrame, levels: Sequence):
 
 def print_top_level_stats(carrier_df: pd.DataFrame, secondary_parameters: List[str]):
     if len(carrier_df) > 1:
-        carrier_df = drop_single_value_index(carrier_df, ['rad', 'n', 'run', 'carrier_id_', 'solution_algorithm'])
+        carrier_df = drop_single_value_index(carrier_df, ['rad', 'n', 'run', 'carrier_id_', 'solution_algorithm', *secondary_parameters])
 
     with pd.option_context('display.max_rows', None, 'display.max_columns', None, 'display.width', 0):
 
@@ -251,33 +251,34 @@ def print_top_level_stats(carrier_df: pd.DataFrame, secondary_parameters: List[s
                 print('\n')
 
         print('=============/ consistency check: collaborative better than isolated? /=============')
-        for name, group in solution_df.groupby(
-                solution_df.index.names.difference(['solution_algorithm', *secondary_parameters]),
+        consistency_df = solution_df.droplevel(level=[x for x in solution_df.index.names if x.startswith('auction_')])
+        for name, group in consistency_df.groupby(
+                consistency_df.index.names.difference(['solution_algorithm', *secondary_parameters]),
                 as_index=False,
                 dropna=False):
-            isolated = group.xs('IsolatedPlanning', level='solution_algorithm').reset_index().iloc[0]
-            for index, row in group.xs('CollaborativePlanning', level='solution_algorithm').iterrows():
-                if isolated['sum_profit'] > row['sum_profit']:
+            for sec_param in secondary_parameters:
+                group = group.droplevel(level=group.index.names.difference(['solution_algorithm', sec_param]))
+
+                collaborative = group.loc['CollaborativePlanning', 'sum_profit']
+                isolated = group.loc['IsolatedPlanning', 'sum_profit']
+                if not all(collaborative > isolated):
                     warnings.warn(f'{name}: Collaborative is worse than Isolated!')
 
 
 if __name__ == '__main__':
-    # df = pd.read_csv(
-    #     "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home "
-    #     "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_carrier_#.csv",
-    # )
     df = pd.read_csv(
-        "C:/Users/steff/CR_AHD/data/Output/Gansterer_Hartl/evaluation_carrier_#005.csv",
+        "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home "
+        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_carrier_#094.csv",
     )
     df.fillna('None', inplace=True)
     df.set_index(['rad', 'n', 'run', 'carrier_id_'] + ut.solver_config, inplace=True)
-    # print_top_level_stats(df)
+    print_top_level_stats(df, ['tour_improvement'])
     bar_chart(df,
               title='',
               values='sum_profit',
-              color=['solution_algorithm', 'bundling_valuation'],
-              # category='run', facet_col='rad',
-              category='rad', facet_col=None,
+              color=['solution_algorithm', 'tour_improvement'],
+              category='run', facet_col='rad',
+              # category='rad', facet_col=None,
               facet_row='n',
               show=True,
               # width=700,
