@@ -135,14 +135,12 @@ class PDPMove(IntraTourNeighborhood):
             # repair
             tour_copy_.insert_and_update(instance, solution, (old_pickup_pos, old_delivery_pos), (pickup, delivery))
 
-    @pr.timing
     def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move: tuple):
         delta, tour_, old_pickup_pos, old_delivery_pos, pickup, delivery, new_pickup_pos, new_delivery_pos = move
         assert delivery == pickup + instance.num_requests
         return tour_.insertion_feasibility_check(instance, solution, [new_pickup_pos, new_delivery_pos],
                                                  [pickup, delivery])
 
-    @pr.timing
     def _execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move):
         delta, tour_, old_pickup_pos, old_delivery_pos, pickup, delivery, new_pickup_pos, new_delivery_pos = move
 
@@ -182,7 +180,6 @@ class PDPTwoOpt(IntraTourNeighborhood):
                 if self.feasibility_check(instance, solution, move):
                     yield move
 
-    @pr.timing
     def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move):
         delta, tour_, i, j = move
 
@@ -237,7 +234,6 @@ class PDPTwoOpt(IntraTourNeighborhood):
 
         )
 
-    @pr.timing
     def _execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move):
         delta, tour_, i, j = move
 
@@ -321,7 +317,6 @@ class PDPRelocate(InterTourNeighborhood):
                             if self.feasibility_check(instance, solution, move):
                                 yield move
 
-    @pr.timing
     def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move):
         delta, carrier, old_tour_, old_pickup_pos, old_delivery_pos, new_tour_, new_pickup_pos, new_delivery_pos = move
         pickup = old_tour_.routing_sequence[old_pickup_pos]
@@ -330,7 +325,6 @@ class PDPRelocate(InterTourNeighborhood):
         return new_tour_.insertion_feasibility_check(instance, solution, [new_pickup_pos, new_delivery_pos],
                                                      [pickup, delivery])
 
-    @pr.timing
     def _execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move):
         delta, carrier, old_tour_, old_pickup_pos, old_delivery_pos, new_tour_, new_pickup_pos, new_delivery_pos = move
 

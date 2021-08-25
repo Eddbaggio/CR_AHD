@@ -46,44 +46,56 @@ class Auction(ABC):
 
     def execute_auction(self, instance: it.PDPInstance, solution: slt.CAHDSolution) -> slt.CAHDSolution:
         logger.debug(f'running auction {self.__class__.__name__}')
-        # Request Selection
+
+        # ===== Request Selection =====
+        timer = pr.Timer()
         auction_request_pool, original_bundling_labels = self.request_selection.execute(instance, solution)
+        timer.write_duration_to_solution(solution, 'runtime_request_selection')
+
         if auction_request_pool:
             logger.debug(f'requests {auction_request_pool} have been submitted to the auction pool')
 
-            # Bundle Generation
+            # ===== Bundle Generation =====
+            timer = pr.Timer()
             auction_bundle_pool = self.bundle_generation.execute_bundle_pool_generation(instance, solution,
                                                                                         auction_request_pool,
                                                                                         original_bundling_labels)
-            original_bundles = ut.indices_to_nested_lists(original_bundling_labels, auction_request_pool)
-            original_bundles_indices = [auction_bundle_pool.index(x) for x in original_bundles]
+            timer.write_duration_to_solution(solution, 'runtime_auction_bundle_pool_generation')
             logger.debug(f'bundles {auction_bundle_pool} have been created')
 
-            # Bidding
+            # ===== Bidding =====
             logger.debug(f'Generating bids_matrix')
+            timer = pr.Timer()
             bids_matrix = self.bidding.execute_bidding(instance, solution, auction_bundle_pool)
+            timer.write_duration_to_solution(solution, 'runtime_bidding')
             logger.debug(f'Bids {bids_matrix} have been created for bundles {auction_bundle_pool}')
 
-            # Winner Determination
+            # ===== Winner Determination =====
+            timer = pr.Timer()
             winner_bundles, bundle_winners = self.winner_determination.execute(instance, solution,
                                                                                auction_request_pool,
                                                                                auction_bundle_pool, bids_matrix)
-            winner_bundles_indices = [auction_bundle_pool.index(x) for x in winner_bundles]
+            timer.write_duration_to_solution(solution, 'runtime_winner_determination')
             # todo: store whether the auction did achieve a reallocation or not
-            # bundle reallocation
+
+            # ===== Bundle Reallocation =====
             self.assign_bundles_to_winners(solution, winner_bundles, bundle_winners)
 
         else:
             logger.warning(f'No requests have been submitted!')
 
-        # final routing
+        # ===== Final Routing =====
         # clear the solution and do a dynamic re-optimization + improvement
         solution.clear_carrier_routes()
+        timer = pr.Timer()
         for carrier in range(len(solution.carriers)):
             while solution.carriers[carrier].unrouted_requests:
                 request = solution.carriers[carrier].unrouted_requests[0]
                 self.tour_construction.insert_single(instance, solution, carrier, request)
+        timer.write_duration_to_solution(solution, 'runtime_final_construction')
+        timer = pr.Timer()
         solution = self.tour_improvement.execute(instance, solution)
+        timer.write_duration_to_solution(solution, 'runtime_final_improvement')
 
         return solution
 

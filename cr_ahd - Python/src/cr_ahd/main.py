@@ -17,7 +17,7 @@ from src.cr_ahd.auction_module import auction as au, request_selection as rs, bu
 from src.cr_ahd.core_module import instance as it, solution as slt
 from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh, neighborhoods as nh
 from src.cr_ahd.tw_management_module import tw_management as twm, tw_selection as tws, tw_offering as two
-from src.cr_ahd.utility_module import utils as ut, evaluation as ev, cr_ahd_logging as log
+from src.cr_ahd.utility_module import utils as ut, evaluation as ev, cr_ahd_logging as log, profiling as pr
 
 logging.config.dictConfig(log.LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
@@ -38,14 +38,14 @@ def parameter_generator():
     ]
 
     tour_improvements: List = [
-        mh.LocalSearchFirst([neighborhoods[0]]),
-        mh.LocalSearchFirst([neighborhoods[1]]),
-        mh.LocalSearchBest([neighborhoods[0]]),
-        mh.LocalSearchBest([neighborhoods[1]]),
-        mh.PDPTWSequentialLocalSearch(neighborhoods),
-        mh.PDPTWIteratedLocalSearch(neighborhoods),
+        # mh.LocalSearchFirst([neighborhoods[0]]),
+        # mh.LocalSearchFirst([neighborhoods[1]]),
+        # mh.LocalSearchBest([neighborhoods[0]]),
+        # mh.LocalSearchBest([neighborhoods[1]]),
+        # mh.PDPTWSequentialLocalSearch(neighborhoods),
+        # mh.PDPTWIteratedLocalSearch(neighborhoods),
         mh.PDPTWVariableNeighborhoodDescent(neighborhoods),
-        mh.PDPTWSimulatedAnnealing(neighborhoods),
+        # mh.PDPTWSimulatedAnnealing(neighborhoods),
         mh.NoMetaheuristic([]),
     ]
 
@@ -56,7 +56,7 @@ def parameter_generator():
     ]
 
     nums_submitted_requests: List[int] = [
-        # 4,
+        4,
         # 5
     ]
 
@@ -145,9 +145,11 @@ def execute_all(instance: it.PDPInstance, plot=False):
 
         solver = slv.Solver(**solver_params)
         try:
+            timer = pr.Timer()
             solution = solver.execute(instance,
                                       # isolated_planning_starting_solution
                                       )
+            timer.write_duration_to_solution(solution, 'runtime_total')
             # if solution.solver_config['solution_algorithm'] == 'IsolatedPlanning':
             #     isolated_planning_starting_solution = solution
             solution.write_to_json()
@@ -191,7 +193,8 @@ def m_solve_single_thread(instance_paths, plot=False):
 def write_solution_summary_to_multiindex_df(solutions_per_instance: List[List[slt.CAHDSolution]], agg_level='tour'):
     """
     :param solutions_per_instance: A List of Lists of solutions. First Axis: instance, Second Axis: solver
-    :param agg_level:
+    :param agg_level: defines up to which level the solution will be summarized. E.g. if agg_level='carrier' the
+    returned pd.DataFrame contains infos per carrier but not per tour since tours are summarized for each carrier.
     """
 
     df = []
@@ -201,7 +204,7 @@ def write_solution_summary_to_multiindex_df(solutions_per_instance: List[List[sl
             if agg_level == 'solution':
                 record = solution.meta.copy()  # rad, n, run, dist
                 record.update(solution.solver_config)  # solution_algorithm, tour_construction, request_selection, ...
-                record.update(solution.summary())
+                record.update({k: v for k, v in solution.summary().items() if k != 'carrier_summaries'})
                 df.append(record)
 
             elif agg_level == 'carrier':
@@ -244,8 +247,8 @@ def write_solution_summary_to_multiindex_df(solutions_per_instance: List[List[sl
         df[column] = df[column].dt.total_seconds()
 
     # write to disk
-    df.to_csv(ut.unique_path(ut.output_dir_GH, 'evaluation_' + agg_level + '_#{:03d}' + '.csv'))
-    df.to_excel(ut.unique_path(ut.output_dir_GH, 'evaluation_' + agg_level + '_#{:03d}' + '.xlsx'), merge_cells=False)
+    df.to_csv(ut.unique_path(ut.output_dir_GH, 'evaluation_agg_' + agg_level + '_#{:03d}' + '.csv'))
+    df.to_excel(ut.unique_path(ut.output_dir_GH, 'evaluation_agg_' + agg_level + '_#{:03d}' + '.xlsx'), merge_cells=False)
     return df.reset_index().fillna('None').set_index(keys=index)
 
 
@@ -257,22 +260,22 @@ if __name__ == '__main__':
         paths = sorted(
             list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
             key=ut.natural_sort_key)
-        paths = paths[:]
+        paths = paths[:2]
 
         if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=False)
         else:
             solutions = m_solve_multi_thread(paths)
 
-        df = write_solution_summary_to_multiindex_df(solutions, 'carrier')
+        df = write_solution_summary_to_multiindex_df(solutions, 'solution')
         ev.bar_chart(df,
                      title='',
-                     values='sum_profit',
-                     # color=['solution_algorithm','tour_improvement',],
-                     color='tour_improvement',
+                     values='runtime_total',
+                     color=['solution_algorithm', 'tour_improvement', ],
+                     # color='tour_improvement',
                      # category='rad', facet_col=None, facet_row='n',
-                     # category='run', facet_col='rad', facet_row='n',
-                     category='solution_algorithm', facet_col=None, facet_row=None,
+                     category='run', facet_col='rad', facet_row='n',
+                     # category='solution_algorithm', facet_col=None, facet_row=None,
                      show=True,
                      html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix())
 

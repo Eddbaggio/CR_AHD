@@ -188,7 +188,6 @@ class RandomMaxKPartition(LimitedBundlePoolGenerationBehavior):
 
 
 class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
-    @pr.timing
     def _generate_auction_bundles(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
                                   auction_request_pool: Sequence[int],
                                   original_bundling_labels: Sequence[int]):

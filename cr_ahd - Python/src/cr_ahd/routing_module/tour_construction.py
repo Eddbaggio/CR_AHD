@@ -181,7 +181,7 @@ class MinTravelDistanceInsertion(PDPParallelInsertionConstruction):
     and insert the cheapest over all requests.
     """
 
-    @pr.timing
+    # @pr.timing
     def best_insertion_for_request_in_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_,
                                            request: int, check_feasibility=True) -> Tuple[float, int, int]:
         pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
@@ -213,7 +213,7 @@ class MinTimeShiftInsertion(PDPParallelInsertionConstruction):
     construction heuristic for solving the pickup and delivery problem with time windows. European Journal of
     Operational Research, 175(2), 672–687. https://doi.org/10.1016/j.ejor.2005.05.012 """
 
-    @pr.timing
+    # @pr.timing
     def best_insertion_for_request_in_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_,
                                            request: int, check_feasibility=True) -> Tuple[float, int, int]:
         """Find the insertions for pickup and delivery for a given tour that have the best C value
@@ -291,7 +291,7 @@ class TimeShiftRegretInsertion(PDPParallelInsertionConstruction):
         else:
             return best_delta, best_tour, best_pickup_pos, best_delivery_pos
 
-    @pr.timing
+    # @pr.timing
     def best_insertion_for_request_in_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_,
                                            request: int, check_feasibility=True) -> Tuple[float, int, int]:
         return MinTimeShiftInsertion().best_insertion_for_request_in_tour(instance, solution, tour_, request,
@@ -305,7 +305,7 @@ class TravelDistanceRegretInsertion(PDPParallelInsertionConstruction):
         # steal the regret implementation from time shift
         return TimeShiftRegretInsertion().best_insertion_for_request(instance, solution, carrier, request)
 
-    @pr.timing
+    # @pr.timing
     def best_insertion_for_request_in_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_,
                                            request: int, check_feasibility=True) -> Tuple[float, int, int]:
         return MinTravelDistanceInsertion().best_insertion_for_request_in_tour(instance, solution, tour_, request,

@@ -1,19 +1,18 @@
-from abc import abstractmethod, ABC
 import logging
 import random
+import time
+from abc import abstractmethod, ABC
 from copy import deepcopy
 from math import exp, log
-from typing import Sequence, Callable, List
-import time
+from typing import Sequence
 
-from src.cr_ahd.routing_module import neighborhoods as nh, shakes as sh, tour_construction as cns
 from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
-from src.cr_ahd.auction_module import request_selection as rs
+from src.cr_ahd.routing_module import neighborhoods as nh, shakes as sh, tour_construction as cns
 from src.cr_ahd.utility_module import utils as ut, profiling as pr
 
 logger = logging.getLogger(__name__)
 
-TIME_MAX = 3  # 0.05 is roughly the time required by the VND procedure to exhaust all neighborhoods
+TIME_MAX = 0.05  # 0.05 is roughly the time required by the VND procedure to exhaust all neighborhoods
 
 
 class PDPTWMetaHeuristic(ABC):
@@ -84,7 +83,6 @@ class LocalSearchFirst(PDPTWMetaHeuristic):
     local search heuristic using the first improvement strategy
     """
 
-    @pr.timing
     def execute(self, instance: it.PDPInstance, original_solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
         best_solution = deepcopy(original_solution)
         assert len(self.neighborhoods) == 1, 'Local Search can use a single neighborhood only!'
@@ -118,7 +116,6 @@ class LocalSearchFirst(PDPTWMetaHeuristic):
 class LocalSearchBest(PDPTWMetaHeuristic):
     """implements a the local search heuristic using the best improvement strategy, i.e. steepest descent"""
 
-    @pr.timing
     def execute(self, instance: it.PDPInstance, original_solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
         best_solution = deepcopy(original_solution)
         assert len(self.neighborhoods) == 1, 'Local Search can uses a single neighborhood only!'
@@ -151,7 +148,6 @@ class PDPTWSequentialLocalSearch(PDPTWMetaHeuristic):
     Sequentially exhaust each neighborhood. Only improvements are accepted.
     """
 
-    @pr.timing
     def execute(self, instance: it.PDPInstance, original_solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
         best_solution = deepcopy(original_solution)
         if carriers is None:
@@ -192,7 +188,6 @@ class PDPTWRandomVariableNeighborhoodDescent(PDPTWMetaHeuristic):
     randomly select a neighborhood for the next improving move
     """
 
-    @pr.timing
     def execute(self, instance: it.PDPInstance, original_solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
         raise NotImplementedError
         solution = deepcopy(original_solution)
@@ -236,7 +231,6 @@ class PDPTWVariableNeighborhoodDescent(PDPTWMetaHeuristic):
     neighborhood
     """
 
-    @pr.timing
     def execute(self, instance: it.PDPInstance, original_solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
         best_solution = deepcopy(original_solution)
         if carriers is None:
@@ -301,7 +295,6 @@ class PDPTWSimulatedAnnealing(PDPTWMetaHeuristic):
         self.parameters['initial_temperature'] = 0
         self.parameters['temperature'] = 0
 
-    @pr.timing
     def execute(self, instance: it.PDPInstance, original_solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
         solution = deepcopy(original_solution)
         if carriers is None:
@@ -374,7 +367,6 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
 
     """
 
-    @pr.timing
     def execute(self, instance: it.PDPInstance, original_solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
         solution = deepcopy(original_solution)
 

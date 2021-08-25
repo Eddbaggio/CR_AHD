@@ -4,7 +4,7 @@ from typing import Callable
 
 import src.cr_ahd.core_module.solution as slt
 
-
+'''
 def timing(f: Callable):
     @wraps(f)
     def wrap(*args, **kw):
@@ -30,37 +30,65 @@ def timing(f: Callable):
         return result
 
     return wrap
+'''
 
 
 class Timer(object):
-    def __init__(self):
-        self._start_set = False
-        self._stop_set = False
+    def __init__(self, start=True):
+        self._started = False
+        self._start_time = None
+        self._stopped = False
+        self._stop_time = None
         self._paused = False
+        self._pause_start_time = None
+        self._pause_end_time = None
         self._pause_duration = 0
 
+        if start is True:
+            self.start()
+
     def start(self):
-        assert not self._start_set
-        self._start_set = True
-        self._start = time.perf_counter()
+        assert not self._started
+        self._started = True
+        self._start_time = time.perf_counter()
 
     def stop(self):
-        assert not self._stop_set
-        self._stop_set = True
-        self._end = time.perf_counter()
+        assert not self._stopped
+        self._stopped = True
+        self._stop_time = time.perf_counter()
 
     def pause(self):
         assert not self._paused
-        self._pause_start = time.perf_counter()
+        self._pause_start_time = time.perf_counter()
         self._paused = True
 
     def resume(self):
         assert self._paused
-        self._pause_end = time.perf_counter()
-        self._pause_duration += self._pause_end - self._pause_start
+        self._pause_end_time = time.perf_counter()
+        self._pause_duration += self._pause_end_time - self._pause_start_time
         self._paused = False
 
     @property
     def duration(self):
-        assert self._stop_set
-        return self._end - self._start - self._pause_duration
+        assert self._stopped
+        return self._stop_time - self._start_time - self._pause_duration
+
+    def write_duration_to_solution(self, solution: slt.CAHDSolution, name: str, add_to_existing: bool = False):
+        """
+        Stops the timer if it has not been stopped yet. Then, writes the timer's measured duration to the solution
+        with the given name. If there already exists a measurement under the given name, add_to_existing determines
+        whether the operation will fail or the time will be added to the existing one
+
+        :param solution:
+        :param name:
+        :return:
+        """
+        if self._stopped is False:
+            self.stop()
+        if name in solution.timings:
+            if add_to_existing:
+                solution.timings[name] += self.duration
+            else:
+                raise KeyError
+        else:
+            solution.timings[name] = self.duration

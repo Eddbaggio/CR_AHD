@@ -26,7 +26,6 @@ class Solver:
         self.tour_improvement = tour_improvement
         self.auction = auction
 
-    @pr.timing
     def execute(self, instance: it.PDPInstance,
                 # starting_solution: slt.CAHDSolution = None
                 ):
@@ -47,10 +46,14 @@ class Solver:
         logger.info(f'{instance.id_}: Solving {solution.solver_config}')
 
         random.seed(0)
-
+        timer = pr.Timer()
         solution = self._acceptance_phase(instance, solution)
-        # if self.tour_improvement:
+        timer.write_duration_to_solution(solution, 'runtime_acceptance_phase')
+
+        timer = pr.Timer()
         solution = self._improvement_phase(instance, solution)  # post-acceptance optimization
+        timer.write_duration_to_solution(solution, 'runtime_post_acceptance_improvement')
+
         if self.auction:
             solution = self._auction_phase(instance, solution)
 
@@ -86,7 +89,6 @@ class Solver:
         else:
             solution.solver_config['solution_algorithm'] = 'IsolatedPlanning'
 
-    @pr.timing
     def _acceptance_phase(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         solution = deepcopy(solution)
         while solution.unassigned_requests:
@@ -105,7 +107,6 @@ class Solver:
         ut.validate_solution(instance, solution)
         return solution
 
-    @pr.timing
     def _improvement_phase(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         solution = self.tour_improvement.execute(instance, solution)
         ut.validate_solution(instance, solution)
@@ -126,7 +127,6 @@ class Solver:
         ut.validate_solution(instance, solution)
         return solution
 
-    @pr.timing
     def _auction_phase(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
         """
         includes request selection, bundle generation, bidding, winner determination and also the final routing

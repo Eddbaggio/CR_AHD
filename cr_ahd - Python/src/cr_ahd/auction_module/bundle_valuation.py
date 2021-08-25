@@ -381,7 +381,6 @@ class BundlingValuation(ABC):
 
 
 class GHProxyBundlingValuation(BundlingValuation):
-    @pr.timing
     def evaluate_bundling(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
                           bundling: List[List[int]]) -> float:
         """
@@ -443,7 +442,6 @@ class MinDistanceBundlingValuation(BundlingValuation):
     the dynamic insertion procedure.
     """
 
-    @pr.timing
     def evaluate_bundling(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
                           bundling: List[List[int]]) -> float:
         bundle_valuations = []
