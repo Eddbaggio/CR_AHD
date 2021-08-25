@@ -40,9 +40,9 @@ def parameter_generator():
     tour_improvements: List = [
         # mh.LocalSearchFirst([neighborhoods[0]]),
         # mh.LocalSearchBest([neighborhoods[0]]),
-        # mh.PDPTWIteratedLocalSearch(neighborhoods),
-        # mh.PDPTWVariableNeighborhoodDescent(neighborhoods),
-        mh.PDPTWSimulatedAnnealing(neighborhoods),
+        mh.PDPTWVariableNeighborhoodDescent(neighborhoods),
+        mh.PDPTWIteratedLocalSearch(neighborhoods),
+        # mh.PDPTWSimulatedAnnealing(neighborhoods),
         # mh.NoMetaheuristic(neighborhoods),
     ]
 
@@ -118,8 +118,8 @@ def parameter_generator():
                                                                            bundling_valuation=bundling_valuation(),
                                                                            **bundle_generation_kwargs
                                                                            ),
-                                                         bidding=bd.DynamicReOptAndImprove(tour_construction,
-                                                                                           tour_improvement),
+                                                         bidding=bd.DynamicInsertionAndImprove(tour_construction,
+                                                                                               tour_improvement),
                                                          winner_determination=wd.MaxBidGurobiCAP1(),
                                                          )
                                     # collaborative planning
@@ -142,9 +142,11 @@ def execute_all(instance: it.PDPInstance, plot=False):
 
         solver = slv.Solver(**solver_params)
         try:
-            solution = solver.execute(instance, isolated_planning_starting_solution)
-            if solution.solver_config['solution_algorithm'] == 'IsolatedPlanning':
-                isolated_planning_starting_solution = solution
+            solution = solver.execute(instance,
+                                      # isolated_planning_starting_solution
+                                      )
+            # if solution.solver_config['solution_algorithm'] == 'IsolatedPlanning':
+            #     isolated_planning_starting_solution = solution
             solution.write_to_json()
             solutions.append(deepcopy(solution))
 
@@ -251,7 +253,7 @@ if __name__ == '__main__':
         paths = sorted(
             list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
             key=ut.natural_sort_key)
-        paths = paths[55:56]
+        paths = paths[38:39]
 
         if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=False)
@@ -263,8 +265,8 @@ if __name__ == '__main__':
                      title='',
                      values='sum_profit',
                      color=['solution_algorithm', 'tour_improvement'],
-                     category='rad', facet_col=None,
-                     # category='run', facet_col='rad',
+                     # category='rad', facet_col=None,
+                     category='run', facet_col='rad',
                      facet_row='n',
                      show=True,
                      html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix())

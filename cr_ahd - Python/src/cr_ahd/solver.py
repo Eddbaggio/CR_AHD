@@ -27,15 +27,20 @@ class Solver:
         self.auction = auction
 
     @pr.timing
-    def execute(self, instance: it.PDPInstance, starting_solution: slt.CAHDSolution = None):
+    def execute(self, instance: it.PDPInstance,
+                # starting_solution: slt.CAHDSolution = None
+                ):
         """
         apply the concrete solution algorithm
         """
 
+        '''
         if starting_solution is None:
             solution = slt.CAHDSolution(instance)
         else:
             solution = starting_solution
+        '''
+        solution = slt.CAHDSolution(instance)
 
         self.update_solution_solver_config(solution)
 
@@ -54,6 +59,14 @@ class Solver:
         return solution
 
     def update_solution_solver_config(self, solution):
+        solution.solver_config['tour_construction'] = self.tour_construction.__class__.__name__
+        solution.solver_config['tour_improvement'] = self.tour_improvement.__class__.__name__
+        solution.solver_config['time_window_management'] = self.time_window_management.__class__.__name__
+        solution.solver_config[
+            'time_window_offering'] = self.time_window_management.time_window_offering.__class__.__name__
+        solution.solver_config[
+            'time_window_selection'] = self.time_window_management.time_window_selection.__class__.__name__
+
         if self.auction:
             solution.solver_config['solution_algorithm'] = 'CollaborativePlanning'
             solution.solver_config['auction_tour_construction'] = self.tour_construction.__class__.__name__
@@ -72,14 +85,6 @@ class Solver:
             solution.solver_config['winner_determination'] = self.auction.winner_determination.__class__.__name__
         else:
             solution.solver_config['solution_algorithm'] = 'IsolatedPlanning'
-
-        solution.solver_config['tour_construction'] = self.tour_construction.__class__.__name__
-        solution.solver_config['tour_improvement'] = self.tour_improvement.__class__.__name__
-        solution.solver_config['time_window_management'] = self.time_window_management.__class__.__name__
-        solution.solver_config[
-            'time_window_offering'] = self.time_window_management.time_window_offering.__class__.__name__
-        solution.solver_config[
-            'time_window_selection'] = self.time_window_management.time_window_selection.__class__.__name__
 
     @pr.timing
     def _acceptance_phase(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
