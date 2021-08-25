@@ -40,8 +40,8 @@ def parameter_generator():
     tour_improvements: List = [
         # mh.LocalSearchFirst([neighborhoods[0]]),
         # mh.LocalSearchBest([neighborhoods[0]]),
-        mh.PDPTWVariableNeighborhoodDescent(neighborhoods),
         mh.PDPTWIteratedLocalSearch(neighborhoods),
+        # mh.PDPTWVariableNeighborhoodDescent(neighborhoods),
         # mh.PDPTWSimulatedAnnealing(neighborhoods),
         # mh.NoMetaheuristic(neighborhoods),
     ]
@@ -253,7 +253,7 @@ if __name__ == '__main__':
         paths = sorted(
             list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
             key=ut.natural_sort_key)
-        paths = paths[38:39]
+        paths = paths[36:48]
 
         if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=False)
