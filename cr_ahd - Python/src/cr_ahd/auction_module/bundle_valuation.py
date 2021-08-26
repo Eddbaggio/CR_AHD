@@ -13,6 +13,10 @@ from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics a
     neighborhoods as nh
 from src.cr_ahd.utility_module import utils as ut, profiling as pr
 
+# ======================================================================================================================
+# STAND-ALONE BUNDLE EVALUATION MEASURES
+# ======================================================================================================================
+
 
 def bundle_direct_travel_dist(instance: it.PDPInstance, bundle: Sequence):
     """
@@ -199,7 +203,7 @@ def bundle_total_travel_distance(instance: it.PDPInstance,
     total travel distance needed to visit all requests in a bundle. Since finding the optimal solutions for
     all bundles is too time consuming, the tour length is approximated using the cheapest insertion heuristic
     ["...using an algorithm proposed by Renaud et al. (2000).]\n
-    uses bundle member vertex as depot
+    uses bundle member vertex as depot. Does not check feasibility of the tour
 
     """
 
@@ -356,6 +360,9 @@ def bundling_labels_to_bundling(bundling_labels: Sequence[int], auction_request_
     return bundling
 
 
+# ======================================================================================================================
+# BUNDLING EVALUATION CLASSES
+# combine the above functions in a certain way
 # ======================================================================================================================
 
 class BundlingValuation(ABC):
@@ -587,4 +594,13 @@ class BundlingValuation2(ABC):
 
     @abstractmethod
     def request_distance(self, instance: it.PDPInstance, solution: slt.CAHDSolution, request0: int, request1: int):
+        """
+        Computes a pairwise distance matrix of requests based on the given distance function.
+
+        :param instance:
+        :param solution:
+        :param request0:
+        :param request1:
+        :return:
+        """
         pass

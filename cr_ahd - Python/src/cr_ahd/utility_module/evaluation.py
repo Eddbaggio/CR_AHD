@@ -1,6 +1,6 @@
 import warnings
 from typing import Sequence, List, Tuple
-
+from itertools import zip_longest
 import numpy as np
 import pandas as pd
 import plotly.express as px
@@ -47,8 +47,7 @@ def bar_chart(df: pd.DataFrame,
               facet_row,
               facet_col,
               barmode='group',
-              title: str = f"<b>n</b>: Number of requests per carrier<br>"
-                           f"<b>rad</b>: Radius of the carriers' operational area around the depot<br>",
+              title: str = '',
               width=None,
               height=None,
               show: bool = True,
@@ -61,18 +60,20 @@ def bar_chart(df: pd.DataFrame,
     :param df: multi-index dataframe
     :return:
     """
-
-    df = drop_single_value_index(df, ut.flatten([category, color, facet_row, facet_col]))
     splitters = dict(category=category, color=color, facet_row=facet_row, facet_col=facet_col, )
-    # for k, v in splitters.items():
-    #     cond1 = isinstance(v, (List, Tuple)) and len(v) > 1
-    #     cond2 = isinstance(v, str)
-    #     assert cond1 or cond2, f'splitters cannot be List/Tuple of singular string'
 
-    agg_dict = {col: sum for col in df.columns}
-    agg_dict['acceptance_rate'] = 'mean'
+    # create title
+    if not title:
+        title, _ = single_and_zero_value_indices(df.index, list(splitters.values()))
+        title = [f'{i}={df.index.unique(i).dropna()[0]}' for i in title]
+        title = '<br>'.join(title)
+        # title = '<br>'.join(('; '.join(x) for x in zip_longest(title[::2], title[1::2], fillvalue='')))
 
-    # aggregate carriers
+    # drop indices with single values or only None values
+    svi, zvi = single_and_zero_value_indices(df.index, ut.flatten([category, color, facet_row, facet_col]))
+    df.droplevel([*svi, *zvi], axis=0)
+
+    # aggregate carriers if necessary to obtain a df containing data per solution rather than per carrier
     if 'carrier_id_' in df.index.names:
         # aggregate the 3 carriers
         solution_df = df.groupby(df.index.names.difference(['carrier_id_']),
@@ -179,17 +180,32 @@ def bar_chart(df: pd.DataFrame,
         fig.write_html(html_path, )
 
 
-def drop_single_value_index(df: pd.DataFrame, keep: Sequence):
-    """drops all index levels that contain the same unique value for all records OR only one unique value and NaN"""
-    if len(df) == 1:
-        warnings.warn('Dataframe has only a single row, thus all indices will only have a single value and will '
-                      'therefore be dropped')
-    for idx_level in df.index.names:
-        if idx_level in keep:
+def single_and_zero_value_indices(multiindex: pd.MultiIndex, ignore=None):
+    """
+    identify the indices that contain a single value (not counting None, NaN, etc.)
+    or no value (not counting None, NaN, etc.). Zero-value-indices can only happen if all values of that index are
+    None, NaN, etc.
+
+    :param ignore: indices to ignore even if they only have a single value or no value
+    :return: two lists of levels from the DataFrame's MultiIndex that contain (1) only a single value and (2) no values
+    """
+    if ignore is None:
+        ignore = []
+
+    if len(multiindex) == 1:
+        warnings.warn('Dataframe has only a single row, thus all indices will only have a single value!')
+
+    single_value_indices = []
+    zero_value_indices = []
+    for index in multiindex.names:
+        if index in ignore:
             continue
-        if len(df.index.unique(idx_level).difference([np.NaN, float('nan'), None, 'None'])) <= 1:
-            df = df.droplevel(idx_level, axis=0)
-    return df
+        index_length = len(multiindex.unique(index).difference([np.NaN, float('nan'), None, 'None']))
+        if index_length == 1:
+            single_value_indices.append(index)
+        elif index_length == 0:
+            zero_value_indices.append(index)
+    return single_value_indices, zero_value_indices
 
 
 def merge_index_levels(df: pd.DataFrame, levels: Sequence):
@@ -203,8 +219,9 @@ def merge_index_levels(df: pd.DataFrame, levels: Sequence):
 
 def print_top_level_stats(carrier_df: pd.DataFrame, secondary_parameters: List[str]):
     if len(carrier_df) > 1:
-        carrier_df = drop_single_value_index(carrier_df, ['rad', 'n', 'run', 'carrier_id_', 'solution_algorithm',
-                                                          *secondary_parameters])
+        drop_indices = single_and_zero_value_indices(
+            carrier_df.index, ['rad', 'n', 'run', 'carrier_id_', 'solution_algorithm', *secondary_parameters])
+        carrier_df.droplevel([*drop_indices[0], *drop_indices[1]], axis=0)
 
     with pd.option_context('display.max_rows', None, 'display.max_columns', None, 'display.width', 0):
 
@@ -284,7 +301,7 @@ if __name__ == '__main__':
     print_top_level_stats(df, ['tour_improvement'])
     bar_chart(df,
               title='',
-              values='time_total',
+              values='sum_profit',
               # color=['solution_algorithm','tour_improvement',],
               color=['solution_algorithm', 'tour_improvement', ],
               # category='rad', facet_col=None, facet_row='n',
@@ -294,9 +311,3 @@ if __name__ == '__main__':
               # height=450,
               # html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix()
               )
-    # boxplot(df,
-    #         show=True,
-    #         category='n',
-    #         facet_col=None,
-    #         facet_row='rad'
-    #         )

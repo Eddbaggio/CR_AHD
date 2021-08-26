@@ -15,13 +15,24 @@ class Neighborhood(ABC):
     @abstractmethod
     def feasible_move_generator(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
         """
-        :return: tuple containing all necessary information to see whether to accept a move and the information to
-        execute a move. The first element must be the delta in travel distance.
+        :return: generator that returns the next found move upon calling the next() method on it. Each move is a
+        tuple containing all necessary information to see whether to accept that move and the information to execute
+        a move. The first element of that tuple is always the delta in travel distance.
         """
         pass
 
     @final
     def execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move: tuple):
+        """
+        Apply the neighborhood move and register it in the solution's dictionary which keeps track of how often each
+        neighborhood operator found a move that was accepted.
+
+        :param instance:
+        :param solution:
+        :param move: tuple containing all necessary information to execute a move. The first element of that tuple is
+         always the delta in travel distance. the remaining ones are e.g. current positions and new insertion positions.
+        :return:
+        """
         self._execute_move(instance, solution, move)
         self.register_move_execution(solution)
         pass
@@ -31,11 +42,27 @@ class Neighborhood(ABC):
         pass
 
     @abstractmethod
-    def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move):
+    def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move: tuple):
+        """
+        A (hopefully efficient) feasibility check of the neighborhood move. Optimally, this is a constant time
+        algorithm. However, the Precedence and Time Window constraints of the PDPTW make efficient move evaluation
+        a challenge
+
+        :param instance:
+        :param solution:
+        :param move:
+        :return:
+        """
         pass
 
     @final
     def register_move_execution(self, solution: slt.CAHDSolution):
+        """
+        update the count of each executed move to see which neighborhoods are more 'successful'.
+
+        :param solution:
+        :return:
+        """
         solution.local_search_move_counter[self.__class__.__name__] += 1
 
 
@@ -45,10 +72,6 @@ class Neighborhood(ABC):
 class IntraTourNeighborhood(Neighborhood, ABC):
     @final
     def feasible_move_generator(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
-        """
-        :return: tuple containing all necessary information to see whether to accept a move and the information to
-        execute a move. The first element must be the delta in travel distance.
-        """
         for tour in range(solution.carriers[carrier].num_tours()):
             tour_ = solution.carriers[carrier].tours[tour]
             yield from self.feasible_move_generator_for_tour(instance, solution, tour_)  # delegated generator
@@ -159,7 +182,9 @@ class PDPMove(IntraTourNeighborhood):
 
 
 class PDPTwoOpt(IntraTourNeighborhood):
-
+    """
+    The classic 2-opt neighborhood by Croes (1958)
+    """
     def feasible_move_generator_for_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_: tr.Tour):
         # iterate over all moves
         for i in range(0, len(tour_) - 3):

@@ -46,7 +46,7 @@ def parameter_generator():
         # mh.PDPTWIteratedLocalSearch(neighborhoods),
         mh.PDPTWVariableNeighborhoodDescent(neighborhoods),
         # mh.PDPTWSimulatedAnnealing(neighborhoods),
-        mh.NoMetaheuristic([]),
+        # mh.NoMetaheuristic([]),
     ]
 
     time_window_managements: List[twm.TWManagement] = [
@@ -56,6 +56,7 @@ def parameter_generator():
     ]
 
     nums_submitted_requests: List[int] = [
+        # 3,
         4,
         # 5
     ]
@@ -93,8 +94,8 @@ def parameter_generator():
     ]
 
     bundling_valuations: List[bv.BundlingValuation.__class__] = [
-        # bv.GHProxyBundlingValuation,
-        # bv.MinDistanceBundlingValuation,
+        bv.GHProxyBundlingValuation,
+        bv.MinDistanceBundlingValuation,
         bv.LosSchulteBundlingValuation,
         # bv.RandomBundlingValuation,
     ]
@@ -260,7 +261,7 @@ if __name__ == '__main__':
         paths = sorted(
             list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
             key=ut.natural_sort_key)
-        paths = paths[:2]
+        paths = paths[:12]
 
         if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=False)
@@ -268,18 +269,19 @@ if __name__ == '__main__':
             solutions = m_solve_multi_thread(paths)
 
         df = write_solution_summary_to_multiindex_df(solutions, 'solution')
+        secondary_parameter = 'bundling_valuation'
         ev.bar_chart(df,
                      title='',
                      values='runtime_total',
-                     color=['solution_algorithm', 'tour_improvement', ],
-                     # color='tour_improvement',
+                     color=['solution_algorithm', secondary_parameter, ],
+                     # color=secondary_parameter,
                      # category='rad', facet_col=None, facet_row='n',
                      category='run', facet_col='rad', facet_row='n',
                      # category='solution_algorithm', facet_col=None, facet_row=None,
                      show=True,
                      html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix())
 
-        ev.print_top_level_stats(df, ['tour_improvement'])
+        ev.print_top_level_stats(df, [secondary_parameter])
 
         logger.info(f'END {datetime.now()}')
         # send windows to sleep
