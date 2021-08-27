@@ -62,12 +62,12 @@ def bar_chart(df: pd.DataFrame,
     """
     splitters = dict(category=category, color=color, facet_row=facet_row, facet_col=facet_col, )
 
-    # create title
-    if not title:
-        title, _ = single_and_zero_value_indices(df.index, list(splitters.values()))
-        title = [f'{i}={df.index.unique(i).dropna()[0]}' for i in title]
-        title = '<br>'.join(title)
-        # title = '<br>'.join(('; '.join(x) for x in zip_longest(title[::2], title[1::2], fillvalue='')))
+    # create annotation
+    annotation, _ = single_and_zero_value_indices(df.index, list(splitters.values()))
+    annotation = [f"{i}={df.index.unique(i).dropna().difference([np.NaN, float('nan'), None, 'None'])[0]}"
+                  for i in annotation]
+    annotation = '<br>'.join(annotation)
+    # annotation = '<br>'.join(('; '.join(x) for x in zip_longest(annotation[::2], annotation[1::2], fillvalue='')))
 
     # drop indices with single values or only None values
     svi, zvi = single_and_zero_value_indices(df.index, ut.flatten([category, color, facet_row, facet_col]))
@@ -160,7 +160,7 @@ def bar_chart(df: pd.DataFrame,
                  y=values,
                  title=title,
                  color=splitters['color'],
-                 color_discrete_sequence=ut.univie_colors_100,
+                 color_discrete_sequence=ut.univie_colors_100+ut.univie_colors_60,
                  facet_row=splitters['facet_row'],
                  facet_col=splitters['facet_col'],
                  text=values,
@@ -171,8 +171,23 @@ def bar_chart(df: pd.DataFrame,
                  width=width,
                  height=height,
                  )
+    # add annotation
+    fig.add_annotation(
+        x=1,
+        y=0,
+        xanchor='left',
+        yanchor='bottom',
+        xref='paper',
+        yref='paper',
+        showarrow=False,
+        align='left',
+        text=annotation)
+
     # fig.update_yaxes(range=[0, 10000])
     fig.update_xaxes(type='category')
+    fig.update_layout(
+        title_font_size=12,
+    )
     if show:
         fig.show(config=config)
 
@@ -217,24 +232,26 @@ def merge_index_levels(df: pd.DataFrame, levels: Sequence):
     return df
 
 
-def print_top_level_stats(carrier_df: pd.DataFrame, secondary_parameters: List[str]):
-    if len(carrier_df) > 1:
+def print_top_level_stats(df: pd.DataFrame, secondary_parameters: List[str]):
+    if len(df) > 1:
         drop_indices = single_and_zero_value_indices(
-            carrier_df.index, ['rad', 'n', 'run', 'carrier_id_', 'solution_algorithm', *secondary_parameters])
-        carrier_df.droplevel([*drop_indices[0], *drop_indices[1]], axis=0)
+            df.index, ['rad', 'n', 'run', 'carrier_id_', 'solution_algorithm', *secondary_parameters])
+        df.droplevel([*drop_indices[0], *drop_indices[1]], axis=0)
 
     with pd.option_context('display.max_rows', None, 'display.max_columns', None, 'display.width', 0):
-
-        # aggregate the 3 carriers
-        solution_df = carrier_df.groupby(carrier_df.index.names.difference(['carrier_id_']),
-                                         dropna=False).agg({'sum_profit': sum,
-                                                            'sum_travel_distance': sum,
-                                                            'sum_travel_duration': sum,
-                                                            'sum_load': sum,
-                                                            'sum_revenue': sum,
-                                                            'num_tours': sum,
-                                                            'acceptance_rate': 'mean',
-                                                            })
+        if 'carrier_id_' in df.index.names:
+            # aggregate the 3 carriers
+            solution_df = df.groupby(df.index.names.difference(['carrier_id_']),
+                                     dropna=False).agg({'sum_profit': sum,
+                                                        'sum_travel_distance': sum,
+                                                        'sum_travel_duration': sum,
+                                                        'sum_load': sum,
+                                                        'sum_revenue': sum,
+                                                        'num_tours': sum,
+                                                        'acceptance_rate': 'mean',
+                                                        })
+        else:
+            solution_df = df
 
         print('=============/ stats per solution /=============')
         print(solution_df, '\n')
@@ -276,6 +293,7 @@ def print_top_level_stats(carrier_df: pd.DataFrame, secondary_parameters: List[s
 
         if 'CollaborativePlanning' in solution_df.index.get_level_values('solution_algorithm'):
             print('=============/ consistency check: collaborative better than isolated? /=============')
+            '''
             consistency_df = solution_df.droplevel(
                 level=[x for x in solution_df.index.names if x.startswith('auction_')])
             for name, group in consistency_df.groupby(
@@ -289,21 +307,29 @@ def print_top_level_stats(carrier_df: pd.DataFrame, secondary_parameters: List[s
                     isolated = group.loc['IsolatedPlanning', 'sum_profit']
                     if not all(collaborative > isolated):
                         warnings.warn(f'{name}: Collaborative is worse than Isolated!')
+            '''
+            for name, group in solution_df.groupby(['rad', 'n', 'run']):
+                grouped = group.groupby('solution_algorithm')
+                isolated = grouped.get_group('IsolatedPlanning')
+                for _, collaborative in grouped.get_group('CollaborativePlanning').groupby(secondary_parameter):
+                    if not isolated.squeeze()['sum_profit'] <= collaborative.squeeze()['sum_profit']:
+                        warnings.warn(f'{name}: Collaborative is worse than Isolated!')
 
 
 if __name__ == '__main__':
     df = pd.read_csv(
         "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home "
-        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_carrier_#006.csv",
+        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_agg_solution_#006.csv",
     )
     df.fillna('None', inplace=True)
-    df.set_index(['rad', 'n', 'run', 'carrier_id_'] + ut.solver_config, inplace=True)
-    print_top_level_stats(df, ['tour_improvement'])
+    df.set_index(['rad', 'n', 'run', ] + ut.solver_config, inplace=True)  # add 'carrier_id_' if agg_level==carrier
+    secondary_parameter = 'bundle_generation'
+    print_top_level_stats(df, [secondary_parameter])
     bar_chart(df,
               title='',
               values='sum_profit',
               # color=['solution_algorithm','tour_improvement',],
-              color=['solution_algorithm', 'tour_improvement', ],
+              color=['solution_algorithm', secondary_parameter, ],
               # category='rad', facet_col=None, facet_row='n',
               category='run', facet_col='rad', facet_row='n',
               show=True,

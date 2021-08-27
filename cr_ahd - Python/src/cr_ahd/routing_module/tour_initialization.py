@@ -54,7 +54,7 @@ class TourInitializationBehavior(ABC):
                     best_evaluation = evaluation
 
             # create the pendulum tour
-            tour = tr.Tour(carrier_.num_tours(), instance, solution, best_depot)
+            tour = tr.Tour(carrier_.num_tours(), instance, best_depot)
             tour.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(best_request))
             solution.request_to_tour_assignment[best_request] = carrier_.num_tours()
             carrier_.tours.append(tour)
@@ -153,7 +153,7 @@ class MaxCliqueTourInitialization(ABC):
             # create the pendulum tours, popping the seeds off the list of unrouted requires reverse traversal
             for i in sorted(seed_idx, reverse=True):
                 seed = carrier_.unrouted_requests[i]
-                tour = tr.Tour(carrier_.num_tours(), instance, solution, solution.carrier_depots[carrier][0])
+                tour = tr.Tour(carrier_.num_tours(), instance, solution.carrier_depots[carrier][0])
                 tour.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(seed))
                 solution.request_to_tour_assignment[seed] = carrier_.num_tours()
                 carrier_.tours.append(tour)
@@ -176,7 +176,7 @@ class MaxCliqueTourInitialization(ABC):
             for j, j_request in enumerate(carrier_.unrouted_requests[i+1:], start=1):
                 j_pickup, j_delivery = instance.pickup_delivery_pair(j_request)
 
-                tour_ = tr.Tour('tmp', instance, solution, solution.carrier_depots[carrier][0])
+                tour_ = tr.Tour('tmp', instance, solution.carrier_depots[carrier][0])
 
                 # make sure that the first request is feasible alone
                 if not tour_.insertion_feasibility_check(instance, solution, [1, 2], [i_pickup, i_delivery]):

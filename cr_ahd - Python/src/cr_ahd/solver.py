@@ -229,7 +229,7 @@ class CentralizedPlanning(Solver):
                                               f' ({instance.id_})')
 
         original_depot = request // instance.num_requests_per_carrier
-        tour_ = tr.Tour(carrier_.num_tours(), instance, solution, depot_index=original_depot)
+        tour_ = tr.Tour(carrier_.num_tours(), instance, depot_index=original_depot)
         if tour_.insertion_feasibility_check(instance, solution, [1, 2], instance.pickup_delivery_pair(request)):
             tour_.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(request))
             solution.request_to_tour_assignment[request] = tour_.id_

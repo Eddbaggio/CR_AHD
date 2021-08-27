@@ -57,9 +57,8 @@ class Auction(ABC):
 
             # ===== Bundle Generation =====
             timer = pr.Timer()
-            auction_bundle_pool = self.bundle_generation.execute_bundle_pool_generation(instance, solution,
-                                                                                        auction_request_pool,
-                                                                                        original_bundling_labels)
+            auction_bundle_pool = self.bundle_generation.execute(instance, solution, auction_request_pool,
+                                                                 original_bundling_labels)
             timer.write_duration_to_solution(solution, 'runtime_auction_bundle_pool_generation')
             logger.debug(f'bundles {auction_bundle_pool} have been created')
 

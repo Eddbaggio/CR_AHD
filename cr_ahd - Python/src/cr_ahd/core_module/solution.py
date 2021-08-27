@@ -139,6 +139,7 @@ class CAHDSolution:
             'id_': self.id_,
             'num_carriers': self.num_carriers(),
             'carrier_depots': self.carrier_depots,
+            'sum_profit': self.sum_profit(),
             'sum_travel_distance': self.sum_travel_distance(),
             'sum_travel_duration': self.sum_travel_duration(),
             # 'sum_wait_duration': self.sum_wait_duration(),

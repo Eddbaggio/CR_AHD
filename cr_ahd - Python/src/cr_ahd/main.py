@@ -85,18 +85,19 @@ def parameter_generator():
     ]
 
     bundle_generations: List[Tuple[bg.LimitedBundlePoolGenerationBehavior.__class__, Dict[str, float]]] = [
-        # (bg.GeneticAlgorithm, dict(population_size=300,
-        #                            num_generations=100,
-        #                            mutation_rate=0.5,
-        #                            generation_gap=0.9,)
-        #  ),
-        (bg.BestOfAllBundlings, dict()),
+        (bg.GeneticAlgorithm, dict(population_size=300,
+                                   num_generations=100,
+                                   mutation_rate=0.5,
+                                   generation_gap=0.9,)
+         ),
+        # (bg.BestOfAllBundlings, dict()),
+        (bg.RandomMaxKPartition, dict())
     ]
 
     bundling_valuations: List[bv.BundlingValuation.__class__] = [
         bv.GHProxyBundlingValuation,
-        bv.MinDistanceBundlingValuation,
-        bv.LosSchulteBundlingValuation,
+        # bv.MinDistanceBundlingValuation,
+        # bv.LosSchulteBundlingValuation,
         # bv.RandomBundlingValuation,
     ]
 
@@ -261,7 +262,7 @@ if __name__ == '__main__':
         paths = sorted(
             list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
             key=ut.natural_sort_key)
-        paths = paths[:12]
+        paths = paths[:2]
 
         if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=False)
@@ -269,9 +270,9 @@ if __name__ == '__main__':
             solutions = m_solve_multi_thread(paths)
 
         df = write_solution_summary_to_multiindex_df(solutions, 'solution')
-        secondary_parameter = 'bundling_valuation'
+        secondary_parameter = 'bundle_generation'
         ev.bar_chart(df,
-                     title='',
+                     title='Comparing Bundle Generation',
                      values='runtime_total',
                      color=['solution_algorithm', secondary_parameter, ],
                      # color=secondary_parameter,

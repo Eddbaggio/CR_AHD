@@ -8,12 +8,11 @@ logger = logging.getLogger(__name__)
 
 
 class Tour:
-    def __init__(self, id_, instance, solution, depot_index):
+    def __init__(self, id_, instance, depot_index):
         """
 
         :param id_:
         :param instance:
-        :param solution:
         :param depot_index: may be different to the id! id's can exist twice temporarily if a carrier is copied!
         """
         logger.debug(f'Initializing tour {id_}')

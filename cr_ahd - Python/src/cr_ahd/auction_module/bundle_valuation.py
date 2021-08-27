@@ -13,6 +13,7 @@ from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics a
     neighborhoods as nh
 from src.cr_ahd.utility_module import utils as ut, profiling as pr
 
+
 # ======================================================================================================================
 # STAND-ALONE BUNDLE EVALUATION MEASURES
 # ======================================================================================================================
@@ -218,7 +219,7 @@ def bundle_total_travel_distance(instance: it.PDPInstance,
 
     # initialize temporary tour with the earliest request
     depot_pickup, depot_delivery = instance.pickup_delivery_pair(depot_request)
-    tmp_tour_ = tr.Tour('tmp', instance, solution, depot_pickup)
+    tmp_tour_ = tr.Tour('tmp', instance, depot_pickup)
     tmp_tour_.insert_and_update(instance, solution, [1], [depot_delivery])
 
     # insert all remaining requests of the bundle
@@ -388,6 +389,13 @@ class BundlingValuation(ABC):
 
 
 class GHProxyBundlingValuation(BundlingValuation):
+    """
+    The quality of a bundling is defined as: \n
+    (min(isolations) * min(densities)) / (max(total_travel_distances) * num_bundles) \n
+    Each of isolations, densities and total_travel_distances is a list of values per bundle in the bundling. The
+    total_travel_distance for a bundle is estimated by a very rough proxy function (bundle_total_travel_distance_proxy)
+
+    """
     def evaluate_bundling(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
                           bundling: List[List[int]]) -> float:
         """
@@ -459,11 +467,13 @@ class MinDistanceBundlingValuation(BundlingValuation):
 
 
 class LosSchulteBundlingValuation(BundlingValuation):
+    """
+    uses the request similarity measure by Los et al. (2020) to compute a clustering evaluation measure (cohesion)
+    """
+
     def evaluate_bundling(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
                           bundling: List[List[int]]) -> float:
-        """
-        uses the request similarity measure by Los et al. (2020) to compute a clustering evaluation measure (cohesion)
-        """
+
         bundle_valuations = []
         for bundle in bundling:
             bundle_valuation = self.evaluate_bundle(instance, bundle)
