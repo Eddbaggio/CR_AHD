@@ -72,6 +72,16 @@ class Neighborhood(ABC):
 class IntraTourNeighborhood(Neighborhood, ABC):
     @final
     def feasible_move_generator(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
+        """
+        using a generator (i.e. "yield" instead of "return") avoids unnecessary move evaluations. E.g., in a first
+        improvement scenario, it is not necessary to evaluate (or even define) the complete neighborhood, finding a
+        single, feasible and improving move is sufficient here.
+
+        :param instance:
+        :param solution:
+        :param carrier:
+        :return:
+        """
         for tour in range(solution.carriers[carrier].num_tours()):
             tour_ = solution.carriers[carrier].tours[tour]
             yield from self.feasible_move_generator_for_tour(instance, solution, tour_)  # delegated generator
@@ -108,21 +118,24 @@ class IntraTourNeighborhood(Neighborhood, ABC):
 
 class PDPMove(IntraTourNeighborhood):
     """
-    Take a PD pair and see whether inserting it in a different location of the SAME route improves the solution
+    Take a PD pair and see whether inserting it in a different location of the SAME route improves the solution.
+    move = (delta, tour_copy_, old_pickup_pos, old_delivery_pos, pickup, delivery, new_pickup_pos, new_delivery_pos)
     """
 
     def feasible_move_generator_for_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_: tr.Tour):
+        solution_copy = deepcopy(solution)
         tour_copy_ = deepcopy(tour_)
         # test all requests
         for old_pickup_pos in range(1, len(tour_copy_) - 2):
-            vertex = tour_copy_.routing_sequence[old_pickup_pos]
+            vertex = tour_copy_.routing_sequence[
+                old_pickup_pos]  # TODO gives the wrong index! for some reason the wrong one is stored
 
             # skip if its a delivery vertex
             if instance.vertex_type(vertex) == "delivery":
                 continue
 
             pickup, delivery = instance.pickup_delivery_pair(instance.request_from_vertex(vertex))
-            old_delivery_pos = solution.vertex_position_in_tour[delivery]
+            old_delivery_pos = solution_copy.vertex_position_in_tour[delivery]
 
             delta = 0
 
@@ -130,7 +143,16 @@ class PDPMove(IntraTourNeighborhood):
             delta += tour_copy_.pop_distance_delta(instance, (old_pickup_pos, old_delivery_pos))
 
             # pop
-            tour_copy_.pop_and_update(instance, solution, (old_pickup_pos, old_delivery_pos))
+            """
+            Following is a great example for the problem of solution-to-tour coupling: doing
+                'tour_copy_.pop_and_update(instance, solution, (old_pickup_pos, old_delivery_pos))'
+            would update the solution's record of the vertex_position_in_tour. Consequently, the next call to
+                'old_delivery_pos = solution.vertex_position_in_tour[delivery]'
+            would return None as the old_delivery_pos.
+            It would be much nicer if it was possible to pop_and_update without updating the solution's record of the 
+            routing index.       
+            """
+            tour_copy_.pop_and_update(instance, solution_copy, (old_pickup_pos, old_delivery_pos))
 
             # check all possible new insertions for pickup and delivery vertex of the request
             for new_pickup_pos in range(1, len(tour_copy_)):
@@ -139,24 +161,26 @@ class PDPMove(IntraTourNeighborhood):
                         continue
 
                     # cost for inserting request vertices in the new positions
-                    delta += tour_copy_.insert_distance_delta(instance, [new_pickup_pos, new_delivery_pos],
-                                                              [pickup, delivery])
+                    insertion_distance_delta = tour_copy_.insert_distance_delta(instance,
+                                                                                [new_pickup_pos, new_delivery_pos],
+                                                                                [pickup, delivery])
+                    delta += insertion_distance_delta
 
                     move = (delta, tour_copy_, old_pickup_pos, old_delivery_pos, pickup, delivery, new_pickup_pos,
                             new_delivery_pos)
 
                     # yield move (with the original tour_, not the copy) if it's feasible
-                    if self.feasibility_check(instance, solution, move):
+                    if self.feasibility_check(instance, solution_copy, move):
                         move = (delta, tour_, old_pickup_pos, old_delivery_pos, pickup, delivery, new_pickup_pos,
                                 new_delivery_pos)
                         yield move
 
-                    # restore delta
-                    delta -= tour_copy_.insert_distance_delta(instance, [new_pickup_pos, new_delivery_pos],
-                                                              [pickup, delivery])
+                    # restore delta before checking the next insertion positions
+                    delta -= insertion_distance_delta
 
             # repair
-            tour_copy_.insert_and_update(instance, solution, (old_pickup_pos, old_delivery_pos), (pickup, delivery))
+            tour_copy_.insert_and_update(instance, solution_copy, (old_pickup_pos, old_delivery_pos),
+                                         (pickup, delivery))
 
     def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move: tuple):
         delta, tour_, old_pickup_pos, old_delivery_pos, pickup, delivery, new_pickup_pos, new_delivery_pos = move
@@ -185,6 +209,7 @@ class PDPTwoOpt(IntraTourNeighborhood):
     """
     The classic 2-opt neighborhood by Croes (1958)
     """
+
     def feasible_move_generator_for_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_: tr.Tour):
         # iterate over all moves
         for i in range(0, len(tour_) - 3):
@@ -318,7 +343,7 @@ class PDPRelocate(InterTourNeighborhood):
                 for new_tour in range(carrier_.num_tours()):
                     new_tour_: tr.Tour = carrier_.tours[new_tour]
 
-                    # skip the current tour, there is the PDPMove local search for that option
+                    # skip the current tour, there is PDPMove for that option
                     if new_tour == old_tour:
                         continue
 
@@ -335,7 +360,7 @@ class PDPRelocate(InterTourNeighborhood):
                                                                      [pickup, delivery])
 
                             move = (
-                                delta, carrier, old_tour_, old_pickup_pos, old_delivery_pos, new_tour_, new_pickup_pos,
+                                delta, carrier, old_tour, old_pickup_pos, old_delivery_pos, new_tour, new_pickup_pos,
                                 new_delivery_pos)
 
                             # is the improving move feasible?
@@ -343,7 +368,9 @@ class PDPRelocate(InterTourNeighborhood):
                                 yield move
 
     def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move):
-        delta, carrier, old_tour_, old_pickup_pos, old_delivery_pos, new_tour_, new_pickup_pos, new_delivery_pos = move
+        delta, carrier, old_tour, old_pickup_pos, old_delivery_pos, new_tour, new_pickup_pos, new_delivery_pos = move
+        old_tour_ = solution.carriers[carrier].tours[old_tour]
+        new_tour_ = solution.carriers[carrier].tours[new_tour]
         pickup = old_tour_.routing_sequence[old_pickup_pos]
         delivery = old_tour_.routing_sequence[old_delivery_pos]
 
@@ -351,17 +378,21 @@ class PDPRelocate(InterTourNeighborhood):
                                                      [pickup, delivery])
 
     def _execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move):
-        delta, carrier, old_tour_, old_pickup_pos, old_delivery_pos, new_tour_, new_pickup_pos, new_delivery_pos = move
+        old_tour: int
+        new_tour: int
+        delta, carrier, old_tour, old_pickup_pos, old_delivery_pos, new_tour, new_pickup_pos, new_delivery_pos = move
+        old_tour_ = solution.carriers[carrier].tours[old_tour]
+        new_tour_ = solution.carriers[carrier].tours[new_tour]
 
         pickup, delivery = old_tour_.pop_and_update(instance, solution, [old_pickup_pos, old_delivery_pos])
 
         logger.debug(f'PDPRelocate: [{delta}] Relocate vertices {pickup} and {delivery} from '
-                     f'Tour {old_tour_.id_} [{old_pickup_pos, old_delivery_pos}] to '
-                     f'Tour {new_tour_.id_} [{new_pickup_pos, new_delivery_pos}]')
+                     f'Tour {old_tour_.id_} {old_pickup_pos, old_delivery_pos} to '
+                     f'Tour {new_tour_.id_} {new_pickup_pos, new_delivery_pos}')
 
         # if it is now empty (i.e. depot -> depot), drop the old tour
         if len(old_tour_) <= 2:
-            solution.carriers[carrier].tours.execute(old_tour_)
+            solution.carriers[carrier].tours.remove(old_tour_)
 
         new_tour_.insert_and_update(instance, solution, [new_pickup_pos, new_delivery_pos], [pickup, delivery])
         solution.request_to_tour_assignment[instance.request_from_vertex(pickup)] = new_tour_.id_

@@ -350,8 +350,9 @@ def validate_solution(instance, solution):
 
             assert tour_._sum_load == 0, instance.id_
             assert tour_._sum_travel_distance <= instance.vehicles_max_travel_distance, instance.id_
-            assert round(tour_._sum_profit, 4) == round(tour_._sum_revenue - tour_._sum_travel_distance,
-                                                        4), f'{instance.id_}: {round(tour_._sum_profit, 4)}!={round(tour_._sum_revenue - tour_._sum_travel_distance, 4)}'
+            assert round(tour_._sum_profit, 4) == round(tour_._sum_revenue - tour_._sum_travel_distance, 4), \
+                f'{instance.id_}: {round(tour_._sum_profit, 4)}!={round(tour_._sum_revenue - tour_._sum_travel_distance, 4)}'
+            # iterate over the tour
             for i in trange(1, len(tour_.routing_sequence), desc=f'Tour {tour_.id_}', disable=True):
                 predecessor = tour_.routing_sequence[i - 1]
                 vertex = tour_.routing_sequence[i]
@@ -361,7 +362,8 @@ def validate_solution(instance, solution):
                 # waiting times
                 assert tour_.service_schedule[i] == tour_.arrival_schedule[i] + tour_._wait_sequence[i], instance.id_
                 # tw constraint
-                assert solution.tw_open[vertex] <= tour_.service_schedule[i] <= solution.tw_close[vertex], f'{instance.id_}, {tour_}, vertex{vertex} at index {i}'
+                assert solution.tw_open[vertex] <= tour_.service_schedule[i] <= solution.tw_close[
+                    vertex], f'{instance.id_}, {tour_}, vertex{vertex} at index {i}'
                 # precedence constraint
                 if instance.vertex_type(vertex) == 'pickup':
                     assert vertex + instance.num_requests in tour_.routing_sequence[i:], instance.id_
@@ -369,6 +371,14 @@ def validate_solution(instance, solution):
                     assert vertex - instance.num_requests in tour_.routing_sequence[:i], instance.id_
                 else:
                     assert vertex in solution.carrier_depots[carrier], instance.id_
+                # routing index record
+                if instance.vertex_type(vertex) != 'depot':
+                    assert solution.vertex_position_in_tour[vertex] == i, \
+                        f'routing index record for vertex {vertex} is incorrect: ' \
+                        f'Expected: {i}, got {solution.vertex_position_in_tour[vertex]}'
+                    # tour assignment record
+                    request = instance.request_from_vertex(vertex)
+                    assert solution.request_to_tour_assignment[request] == tour_.id_
 
 
 random.seed(0)
