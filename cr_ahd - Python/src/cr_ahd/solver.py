@@ -108,8 +108,10 @@ class Solver:
         return solution
 
     def _improvement_phase(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
+        before = solution.sum_profit()
         solution = self.tour_improvement.execute(instance, solution)
         ut.validate_solution(instance, solution)
+        assert solution.sum_profit() >= before
         return solution
 
     def _static_routing(self, instance: it.PDPInstance, solution: slt.CAHDSolution):

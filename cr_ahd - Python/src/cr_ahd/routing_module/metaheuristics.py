@@ -12,7 +12,7 @@ from src.cr_ahd.utility_module import utils as ut, profiling as pr
 
 logger = logging.getLogger(__name__)
 
-TIME_MAX = 0.05  # 0.05 is roughly the time required by the VND procedure to exhaust all neighborhoods
+TIME_MAX = float(10)  # 0.05 is roughly the time required by the VND procedure to exhaust all neighborhoods
 
 
 class PDPTWMetaHeuristic(ABC):
@@ -55,6 +55,9 @@ class PDPTWMetaHeuristic(ABC):
 
 class NoMetaheuristic(PDPTWMetaHeuristic):
     """Placeholder for cases in which no improvement is wanted"""
+
+    def stopping_criterion(self):
+        pass
 
     def acceptance_criterion(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move: tuple):
         pass
@@ -228,6 +231,7 @@ class PDPTWVariableNeighborhoodDescent(PDPTWMetaHeuristic):
                     best_move = min(all_moves, key=lambda x: x[0])
                     if self.acceptance_criterion(instance, best_solution, carrier, best_move):
                         neighborhood.execute_move(instance, best_solution, best_move)
+                        # ut.validate_solution(instance, best_solution)
                         self.trajectory.append(best_move)
                         self.parameters['k'] = 0
                     else:
@@ -375,7 +379,7 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
 
             self.start_time = time.time()
 
-            while self.stopping_criterion():
+            while not self.stopping_criterion():
                 solution_1 = self.perturbation(instance, solution, carrier, num_requests)
                 solution_1 = self.local_search(instance, solution_1, [carrier])
                 # hacky way to define a move as (old_solution, new_solution) since describing a "move" with all
@@ -386,7 +390,6 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
                 if self.acceptance_criterion(instance, solution, carrier, (solution, solution_1)):
                     solution = solution_1
 
-                i += 1
         return best_solution
 
     def acceptance_criterion(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, move: tuple):

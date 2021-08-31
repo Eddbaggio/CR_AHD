@@ -29,7 +29,8 @@ def parameter_generator():
     """
     neighborhoods: List[nh.Neighborhood] = [  # these are fixed at the moment, i.e. not looped over
         nh.PDPMove(),
-        nh.PDPTwoOpt()
+        nh.PDPTwoOpt(),
+        # nh.PDPRelocate()
     ]
 
     tour_constructions: List[cns.PDPParallelInsertionConstruction] = [
@@ -43,10 +44,10 @@ def parameter_generator():
         # mh.LocalSearchBest([neighborhoods[0]]),
         # mh.LocalSearchBest([neighborhoods[1]]),
         # mh.PDPTWSequentialLocalSearch(neighborhoods),
-        # mh.PDPTWIteratedLocalSearch(neighborhoods),
+        mh.PDPTWIteratedLocalSearch(neighborhoods),
         mh.PDPTWVariableNeighborhoodDescent(neighborhoods),
-        # mh.PDPTWSimulatedAnnealing(neighborhoods),
-        # mh.NoMetaheuristic([]),
+        mh.PDPTWSimulatedAnnealing(neighborhoods),
+        mh.NoMetaheuristic([]),
     ]
 
     time_window_managements: List[twm.TWManagement] = [
@@ -57,7 +58,7 @@ def parameter_generator():
 
     nums_submitted_requests: List[int] = [
         # 3,
-        4,
+        # 4,
         # 5
     ]
 
@@ -262,18 +263,18 @@ if __name__ == '__main__':
         paths = sorted(
             list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
             key=ut.natural_sort_key)
-        paths = paths[:2]
+        paths = paths[:12]
 
         if len(paths) < 6:
-            solutions = m_solve_single_thread(paths, plot=False)
+            solutions = m_solve_single_thread(paths, plot=True)
         else:
             solutions = m_solve_multi_thread(paths)
 
         df = write_solution_summary_to_multiindex_df(solutions, 'solution')
-        secondary_parameter = 'bundle_generation'
+        secondary_parameter = 'tour_improvement'
         ev.bar_chart(df,
-                     title='Comparing Bundle Generation',
-                     values='runtime_total',
+                     title='',
+                     values='sum_profit',
                      color=['solution_algorithm', secondary_parameter, ],
                      # color=secondary_parameter,
                      # category='rad', facet_col=None, facet_row='n',
