@@ -263,7 +263,7 @@ if __name__ == '__main__':
         paths = sorted(
             list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
             key=ut.natural_sort_key)
-        paths = paths[:12]
+        paths = paths[:1]
 
         if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=True)
