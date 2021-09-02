@@ -17,7 +17,7 @@ class Shake(ABC):
     """
 
     @abstractmethod
-    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
+    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int,
                 num_requests: int):
         """
         Perform the Shake step on each tour of the given carrier. Currently, no intra-tour shakes do exist!
@@ -31,7 +31,7 @@ class Shake(ABC):
         pass
 
     @abstractmethod
-    def execute_on_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_: tr.Tour, num_requests: int):
+    def execute_on_tour(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, tour_: tr.Tour, num_requests: int):
         """
         Perform the shaking operation on the given tour
 
@@ -49,7 +49,7 @@ class RandomRemovalShake(Shake):
     removes num_requests random requests from each given tour
     """
 
-    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, num_requests: int):
+    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, num_requests: int):
         carrier_ = solution.carriers[carrier]
         for tour in range(carrier_.num_tours()):
             tour_ = carrier_.tours[tour]
@@ -58,7 +58,7 @@ class RandomRemovalShake(Shake):
                 carrier_.unrouted_requests.append(request)
                 carrier_.routed_requests.remove(request)
 
-    def execute_on_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_: tr.Tour, num_requests: int):
+    def execute_on_tour(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, tour_: tr.Tour, num_requests: int):
         num_requests = min(num_requests, round(len(tour_)/2)-1)
         if num_requests > 0:
             routed = []

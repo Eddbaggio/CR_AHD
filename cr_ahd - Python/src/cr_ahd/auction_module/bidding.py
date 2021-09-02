@@ -21,7 +21,7 @@ class BiddingBehavior(ABC):
         self.tour_improvement = tour_improvement
 
     def execute_bidding(self,
-                        instance: it.PDPInstance,
+                        instance: it.MDPDPTWInstance,
                         solution: slt.CAHDSolution,
                         bundles: Sequence[Sequence[int]]) -> List[List[float]]:
         """
@@ -37,7 +37,7 @@ class BiddingBehavior(ABC):
             for carrier in range(instance.num_carriers):
                 logger.debug(f'Carrier {carrier} generating bids for bundle {b}')
 
-                value_without_bundle = solution.carriers[carrier].sum_profit()
+                value_without_bundle = solution.carriers[carrier].objective()
                 value_with_bundle = self._value_with_bundle(instance, solution, bundles[b], carrier)
                 bid = value_with_bundle - value_without_bundle
 
@@ -47,7 +47,7 @@ class BiddingBehavior(ABC):
         solution.bidding_behavior = self.__class__.__name__
         return bundle_bids
 
-    def _create_tmp_carrier_copy_with_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution,
+    def _create_tmp_carrier_copy_with_bundle(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
                                              bundle: Sequence[int], carrier: int):
         # create a temporary copy to compute the correct bids
         tmp_carrier = instance.num_carriers  # ID
@@ -69,13 +69,13 @@ class BiddingBehavior(ABC):
         return tmp_carrier, tmp_carrier_
 
     @abstractmethod
-    def _value_with_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, bundle: Sequence[int],
+    def _value_with_bundle(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, bundle: Sequence[int],
                            carrier: int):
         pass
 
 
 class DynamicInsertion(BiddingBehavior):
-    def _value_with_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, bundle: Sequence[int],
+    def _value_with_bundle(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, bundle: Sequence[int],
                            carrier: int):
         tmp_carrier, tmp_carrier_ = self._create_tmp_carrier_copy_with_bundle(instance, solution, bundle, carrier)
 
@@ -84,7 +84,7 @@ class DynamicInsertion(BiddingBehavior):
             while tmp_carrier_.unrouted_requests:
                 request = tmp_carrier_.unrouted_requests[0]
                 self.tour_construction.insert_single(instance, solution, tmp_carrier, request)
-            with_bundle = tmp_carrier_.sum_profit()
+            with_bundle = tmp_carrier_.objective()
         except ut.ConstraintViolationError:
             with_bundle = -float('inf')
         finally:
@@ -101,7 +101,7 @@ class DynamicInsertionAndImprove(BiddingBehavior):
     of request arrival to mimic the dynamic request arrival process within the acceptance phase. Afterwards, an
     improvement is executed using the defined metaheuristic.
     """
-    def _value_with_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, bundle: Sequence[int],
+    def _value_with_bundle(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, bundle: Sequence[int],
                            carrier: int):
 
         # create temporary copy of the carrier
@@ -118,7 +118,8 @@ class DynamicInsertionAndImprove(BiddingBehavior):
             # start_time = time.time()
             tmp_solution = self.tour_improvement.execute(instance, solution, [tmp_carrier])
             # print(time.time() - start_time)
-            with_bundle = tmp_solution.carriers[tmp_carrier].sum_profit()  # todo: CHECK WHETHER THE TMP_CARRIER IS CORRECT! TOUR IMPROVEMENT DOES NOT OPERATE IN PLACE ANY LONGER
+            with_bundle = tmp_solution.carriers[
+                tmp_carrier].objective()  # todo: CHECK WHETHER THE TMP_CARRIER IS CORRECT! TOUR IMPROVEMENT DOES NOT OPERATE IN PLACE ANY LONGER
         except ut.ConstraintViolationError:
             with_bundle = -float('inf')
         finally:

@@ -91,21 +91,6 @@ def euclidean_distance(x1, y1, x2, y2):
     return math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
 
 
-def make_travel_duration_matrix(vertices: List):
-    """
-    :param vertices: List of vertices each of class Vertex
-    :return: pd.DataFrame travel time matrix
-    """
-    index = [i.id_ for i in vertices]
-    travel_duration_matrix: pd.DataFrame = pd.DataFrame(index=index, columns=index, dtype='timedelta64[ns]')
-
-    for i in vertices:
-        for j in vertices:
-            travel_duration_matrix.loc[i.id_, j.id_] = travel_time(_euclidean_distance(i.coords, j.coords))
-    assert travel_duration_matrix.index.is_unique, f"Duration matrix must have unique row id's"
-    return travel_duration_matrix
-
-
 def travel_time(dist):
     return dt.timedelta(hours=dist / SPEED_KMH)  # compute timedelta
 
@@ -344,41 +329,63 @@ def validate_solution(instance, solution):
     for carrier in trange(len(solution.carriers), desc=f'Solution validation', disable=True):
         carrier_ = solution.carriers[carrier]
 
-        for tour_ in carrier_.tours:
-            assert tour_.routing_sequence[0] in solution.carrier_depots[carrier]
-            assert tour_.routing_sequence[-1] in solution.carrier_depots[carrier]
+        for tour_ in carrier_.tours(solution):
+            assert tour_.routing_sequence[0] == carrier_.id_
+            assert tour_.routing_sequence[-1] == carrier_.id_
 
             assert tour_._sum_load == 0, instance.id_
             assert tour_._sum_travel_distance <= instance.vehicles_max_travel_distance, instance.id_
             assert round(tour_._sum_profit, 4) == round(tour_._sum_revenue - tour_._sum_travel_distance, 4), \
                 f'{instance.id_}: {round(tour_._sum_profit, 4)}!={round(tour_._sum_revenue - tour_._sum_travel_distance, 4)}'
+
             # iterate over the tour
             for i in trange(1, len(tour_.routing_sequence), desc=f'Tour {tour_.id_}', disable=True):
                 predecessor = tour_.routing_sequence[i - 1]
                 vertex = tour_.routing_sequence[i]
+                msg = f'{instance.id_}, tour {tour_.id_}, vertex {vertex} at index {i}'
+
                 # routing and service time constraint
-                assert tour_.arrival_schedule[i] == tour_.service_schedule[i - 1] + instance.service_duration[
-                    predecessor] + travel_time(instance.distance([predecessor], [vertex])), instance.id_
+                assert tour_.arrival_time_sequence[i] == tour_.service_time_sequence[i - 1] + \
+                       instance.vertex_service_duration[predecessor] + \
+                       instance.travel_duration([predecessor], [vertex]), msg
+
                 # waiting times
-                assert tour_.service_schedule[i] == tour_.arrival_schedule[i] + tour_._wait_sequence[i], instance.id_
+                assert tour_.service_time_sequence[i] == tour_.arrival_time_sequence[i] + \
+                       tour_._wait_duration_sequence[i], msg
+                assert tour_._wait_duration_sequence[i] == max(
+                    dt.timedelta(0), instance.tw_open[vertex] - tour_.arrival_time_sequence[i]), msg
+
+                # max_shift times
+                if instance.vertex_type(vertex) != 'depot':
+                    assert tour_._max_shift_sequence[i] == min(
+                        instance.tw_close[vertex] - tour_._service_time_sequence[i],
+                        tour_._wait_duration_sequence[i + 1] + tour_._max_shift_sequence[i + 1]
+                    ), msg
+                else:
+                    assert tour_._max_shift_sequence[i] == instance.tw_close[vertex] - tour_._service_time_sequence[i]
+
                 # tw constraint
-                assert solution.tw_open[vertex] <= tour_.service_schedule[i] <= solution.tw_close[
-                    vertex], f'{instance.id_}, {tour_}, vertex{vertex} at index {i}'
+                assert instance.tw_open[vertex] <= tour_.service_time_sequence[i] <= instance.tw_close[vertex], \
+                    msg
+
                 # precedence constraint
                 if instance.vertex_type(vertex) == 'pickup':
-                    assert vertex + instance.num_requests in tour_.routing_sequence[i:], instance.id_
+                    assert vertex + instance.num_requests in tour_.routing_sequence[i:], msg
                 elif instance.vertex_type(vertex) == 'delivery':
-                    assert vertex - instance.num_requests in tour_.routing_sequence[:i], instance.id_
+                    assert vertex - instance.num_requests in tour_.routing_sequence[:i], msg
                 else:
-                    assert vertex in solution.carrier_depots[carrier], instance.id_
-                # routing index record
+                    assert vertex in range(instance.num_carriers), msg
+
+                # meta data
                 if instance.vertex_type(vertex) != 'depot':
-                    assert solution.vertex_position_in_tour[vertex] == i, \
-                        f'routing index record for vertex {vertex} is incorrect: ' \
-                        f'Expected: {i}, got {solution.vertex_position_in_tour[vertex]}'
+                    assert tour_._vertex_pos[vertex] == i, msg
+                    assert tour_.arrival_time_sequence[i] == tour_._arrival_time_dict[vertex], msg
+                    assert tour_.service_time_sequence[i] == tour_._service_time_dict[vertex], msg
+                    assert tour_._max_shift_sequence[i] == tour_._max_shift_dict[vertex], msg
+
                     # tour assignment record
                     request = instance.request_from_vertex(vertex)
-                    assert solution.request_to_tour_assignment[request] == tour_.id_
+                    assert solution.request_to_tour_assignment[request] == tour_.id_, msg
 
 
 random.seed(0)
@@ -386,10 +393,11 @@ DISTANCE_SCALING = 1
 REVENUE_SCALING = DISTANCE_SCALING
 LOAD_CAPACITY_SCALING = 10
 START_TIME: dt.datetime = dt.datetime.min
-END_TIME: dt.datetime = dt.datetime.min + dt.timedelta(minutes=3390)
+END_TIME: dt.datetime = dt.datetime.min + dt.timedelta(minutes=3360)
 # END_TIME = dt.datetime.min + dt.timedelta(days=1)
 TW_LENGTH: dt.timedelta = dt.timedelta(hours=2)
-ALL_TW = [TimeWindow(e, min(e + TW_LENGTH, END_TIME)) for e in datetime_range(START_TIME, END_TIME, freq=TW_LENGTH)]
+ALL_TW = [TimeWindow(e, min(e + TW_LENGTH, END_TIME)) for e in
+          datetime_range(START_TIME, END_TIME, freq=TW_LENGTH, include_end=False)]
 TIME_HORIZON = TimeWindow(START_TIME, END_TIME)
 SPEED_KMH = 60  # vehicle speed (set to 60 to treat distance = time)
 

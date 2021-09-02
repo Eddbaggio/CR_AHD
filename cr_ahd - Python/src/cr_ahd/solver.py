@@ -26,7 +26,7 @@ class Solver:
         self.tour_improvement = tour_improvement
         self.auction = auction
 
-    def execute(self, instance: it.PDPInstance,
+    def execute(self, instance: it.MDPDPTWInstance,
                 # starting_solution: slt.CAHDSolution = None
                 ):
         """
@@ -34,6 +34,7 @@ class Solver:
         """
 
         '''
+        # using a starting solution messed up the solver config that is stored with the solution
         if starting_solution is None:
             solution = slt.CAHDSolution(instance)
         else:
@@ -47,7 +48,7 @@ class Solver:
 
         random.seed(0)
         timer = pr.Timer()
-        solution = self._acceptance_phase(instance, solution)
+        instance, solution = self._acceptance_phase(instance, solution)
         timer.write_duration_to_solution(solution, 'runtime_acceptance_phase')
 
         timer = pr.Timer()
@@ -89,7 +90,8 @@ class Solver:
         else:
             solution.solver_config['solution_algorithm'] = 'IsolatedPlanning'
 
-    def _acceptance_phase(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
+    def _acceptance_phase(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution):
+        instance = deepcopy(instance)
         solution = deepcopy(solution)
         while solution.unassigned_requests:
             # assign the next request
@@ -104,17 +106,17 @@ class Solver:
             if accepted:
                 self.tour_construction.insert_single(instance, solution, carrier, request)
 
-        ut.validate_solution(instance, solution)
-        return solution
+        ut.validate_solution(instance, solution)  # check to make sure everything's functional
+        return instance, solution
 
-    def _improvement_phase(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
-        before = solution.sum_profit()
+    def _improvement_phase(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution):
+        before = solution.objective()
         solution = self.tour_improvement.execute(instance, solution)
         ut.validate_solution(instance, solution)
-        assert solution.sum_profit() >= before
+        assert solution.objective() >= before
         return solution
 
-    def _static_routing(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
+    def _static_routing(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution):
         raise NotImplementedError('static routing is omitted atm since it does not yield improvements over the '
                                   'dynamic routes or fails with infeasibility')
         solution = deepcopy(solution)
@@ -129,7 +131,7 @@ class Solver:
         ut.validate_solution(instance, solution)
         return solution
 
-    def _auction_phase(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
+    def _auction_phase(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution):
         """
         includes request selection, bundle generation, bidding, winner determination and also the final routing
         after the auction
@@ -139,111 +141,3 @@ class Solver:
         """
         solution = self.auction.execute_auction(instance, solution)
         return solution
-
-
-class CentralizedPlanning(Solver):
-
-    def execute(self, instance: it.PDPInstance, starting_solution: slt.CAHDSolution = None):
-        # copy and alter the underlying instance to make it a multi-depot, single-carrier instance
-        md_instance = deepcopy(instance)
-        md_instance.num_carriers = 1
-        md_instance.carrier_depots = [[d for d in range(instance.num_depots)]]
-        md_instance.request_to_carrier_assignment = [0] * len(md_instance.request_to_carrier_assignment)
-
-        # copy, clear and adjust the solution, in particular the TW will be maintained from the starting solution
-        solution = self._make_centralized_solution(md_instance, starting_solution)
-
-        random.seed(0)
-
-        # do dynamic insertion
-        carrier_ = solution.carriers[0]
-        while carrier_.unrouted_requests:
-            # carrier will always be 0 for centralized
-            cns.MinTravelDistanceInsertion().insert_single(instance, solution, 0)
-
-        solution = self._improvement_phase(md_instance, solution)
-
-        solution.solution_algorithm = self.__class__.__name__
-        return solution
-
-    def _make_centralized_solution(self, md_instance, starting_solution):
-        solution = deepcopy(starting_solution)
-        solution.clear_carrier_routes()
-        central_carrier_ = slt.AHDSolution(0)
-        central_carrier_.assigned_requests = [request for carrier_ in solution.carriers for request in
-                                              carrier_.assigned_requests]
-        central_carrier_.accepted_requests = [request for carrier_ in solution.carriers for request in
-                                              carrier_.accepted_requests]
-        central_carrier_.rejected_requests = [request for carrier_ in solution.carriers for request in
-                                              carrier_.rejected_requests]
-        central_carrier_.routed_requests = []
-        central_carrier_.unrouted_requests = [request for carrier_ in solution.carriers for request in
-                                              carrier_.unrouted_requests]
-        central_carrier_.acceptance_rate = len(central_carrier_.accepted_requests) / len(
-            central_carrier_.assigned_requests)
-        solution.carriers.clear()
-        solution.carriers.append(central_carrier_)
-        solution.carrier_depots = [[depot for depot in range(md_instance.num_depots)]]
-        solution.request_to_carrier_assignment = [0] * len(solution.request_to_carrier_assignment)
-        solution.solution_algorithm = None
-        return solution
-
-    """
-    def _acceptance_phase(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
-        solution = deepcopy(solution)
-        while solution.unassigned_requests:
-            # assign the next request
-            request = solution.unassigned_requests[0]
-            carrier = instance.request_to_carrier_assignment[request]
-            solution.assign_requests_to_carriers([request], [carrier])
-
-            # find the tw for the request
-            accepted = self._time_window_management(instance, solution, carrier, request)
-            construction = cns.MinTravelDistanceInsertion()
-            # insert assigned request if it was accepted
-            if accepted:
-                insertion_criteria, tour, pickup_pos, delivery_pos = construction.best_insertion_for_request(instance,
-                                                                                                             solution,
-                                                                                                             carrier,
-                                                                                                             request)
-
-                if tour is None:
-                    # print(f'{request}: new tour')
-                    self._create_new_tour_with_request(instance, solution, carrier, request)
-                else:
-                    # print(f'{request}: t{solution.carriers[carrier].tours[best_tour].routing_sequence[0]} '
-                    #       f'{best_pickup_pos, best_delivery_pos}')
-                    construction.execute_insertion(instance, solution, carrier, request, tour, pickup_pos, delivery_pos)
-
-        ut.validate_solution(instance, solution)
-        return solution
-        """
-
-    def _create_new_tour_with_request(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
-                                      request: int):
-        """only for multi-depot instances. ensures that non-routable requests will be assigned to their original
-        depot """
-        carrier_ = solution.carriers[carrier]
-        if carrier_.num_tours() >= instance.carriers_max_num_tours * len(solution.carrier_depots[carrier]):
-            # logger.error(f'Max Vehicle Constraint violated!')
-            raise ut.ConstraintViolationError(f'Cannot create new route with request {request} for carrier {carrier}.'
-                                              f' Max. number of vehicles is {instance.carriers_max_num_tours}!'
-                                              f' ({instance.id_})')
-
-        original_depot = request // instance.num_requests_per_carrier
-        tour_ = tr.Tour(carrier_.num_tours(), instance, depot_index=original_depot)
-        if tour_.insertion_feasibility_check(instance, solution, [1, 2], instance.pickup_delivery_pair(request)):
-            tour_.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(request))
-            solution.request_to_tour_assignment[request] = tour_.id_
-        else:
-            raise ut.ConstraintViolationError(f'Cannot create new route with request {request} for carrier {carrier}.')
-
-        carrier_.tours.append(tour_)
-        carrier_.unrouted_requests.remove(request)
-        carrier_.routed_requests.append(request)
-        return
-
-    def _time_window_management(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
-        # use only the single, centralized carrier
-        carrier = 0
-        return twm.TWManagementSingleOriginalDepot().execute(instance, solution, carrier, request)

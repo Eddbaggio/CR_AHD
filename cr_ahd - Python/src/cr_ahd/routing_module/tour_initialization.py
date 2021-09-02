@@ -16,12 +16,12 @@ class TourInitializationBehavior(ABC):
     or a single specific carrier.
     """
 
-    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
+    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution):
         for carrier in range(len(solution.carriers)):
             self._initialize_carrier(instance, solution, carrier)
         pass
 
-    def _initialize_carrier(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
+    def _initialize_carrier(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int):
         carrier_ = solution.carriers[carrier]
         assert carrier_.unrouted_requests
 
@@ -54,8 +54,9 @@ class TourInitializationBehavior(ABC):
                     best_evaluation = evaluation
 
             # create the pendulum tour
-            tour = tr.Tour(carrier_.num_tours(), instance, best_depot)
-            tour.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(best_request))
+            tour_id = solution.num_tours()
+            tour = tr.Tour(tour_id, instance, best_depot)
+            tour.insert_and_update(instance, [1, 2], instance.pickup_delivery_pair(best_request))
             solution.request_to_tour_assignment[best_request] = carrier_.num_tours()
             carrier_.tours.append(tour)
             carrier_.unrouted_requests.remove(best_request)
@@ -129,12 +130,12 @@ class MaxCliqueTourInitialization(ABC):
     https://doi.org/10.1016/j.ejor.2005.05.012
     """
 
-    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
+    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution):
         for carrier in range(len(solution.carriers)):
             self._initialize_carrier(instance, solution, carrier)
         pass
 
-    def _initialize_carrier(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
+    def _initialize_carrier(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int):
         carrier_ = solution.carriers[carrier]
         assert len(solution.carrier_depots[carrier]) == 1, f'graph based initialization only available for single-depot'
         assert carrier_.unrouted_requests
@@ -153,8 +154,9 @@ class MaxCliqueTourInitialization(ABC):
             # create the pendulum tours, popping the seeds off the list of unrouted requires reverse traversal
             for i in sorted(seed_idx, reverse=True):
                 seed = carrier_.unrouted_requests[i]
-                tour = tr.Tour(carrier_.num_tours(), instance, solution.carrier_depots[carrier][0])
-                tour.insert_and_update(instance, solution, [1, 2], instance.pickup_delivery_pair(seed))
+                tour_id = solution.num_tours()
+                tour = tr.Tour(tour_id, instance, solution.carrier_depots[carrier][0])
+                tour.insert_and_update(instance, [1, 2], instance.pickup_delivery_pair(seed))
                 solution.request_to_tour_assignment[seed] = carrier_.num_tours()
                 carrier_.tours.append(tour)
                 carrier_.unrouted_requests.pop(i)
@@ -179,10 +181,10 @@ class MaxCliqueTourInitialization(ABC):
                 tour_ = tr.Tour('tmp', instance, solution.carrier_depots[carrier][0])
 
                 # make sure that the first request is feasible alone
-                if not tour_.insertion_feasibility_check(instance, solution, [1, 2], [i_pickup, i_delivery]):
+                if not tour_.insertion_feasibility_check(instance, [1, 2], [i_pickup, i_delivery]):
                     raise ut.ConstraintViolationError(
                         message=f'[{instance.id_}] Request {i_request} cannot feasibly be served by carrier {carrier}!')
-                tour_.insert_and_update(instance, solution, [1, 2], [i_pickup, i_delivery])
+                tour_.insert_and_update(instance, [1, 2], [i_pickup, i_delivery])
                 solution.request_to_tour_assignment[i_request] = tour_.id_
 
                 # try all insertion positions to see whether all are infeasible
@@ -191,9 +193,7 @@ class MaxCliqueTourInitialization(ABC):
                     for j_delivery_pos in range(j_pickup_pos + 1, 5):
 
                         # connect the nodes if insertion is infeasible
-                        if tour_.insertion_feasibility_check(instance,
-                                                             solution,
-                                                             [j_pickup_pos, j_delivery_pos],
+                        if tour_.insertion_feasibility_check(instance, [j_pickup_pos, j_delivery_pos],
                                                              [j_pickup, j_delivery]):
                             feasible = True
                             break

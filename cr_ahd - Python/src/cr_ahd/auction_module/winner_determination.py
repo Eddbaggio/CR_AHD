@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 class WinnerDeterminationBehavior(ABC):
     def execute(self,
-                instance: it.PDPInstance,
+                instance: it.MDPDPTWInstance,
                 solution: slt.CAHDSolution,
                 auction_pool,
                 bundles: Sequence,
@@ -31,7 +31,7 @@ class WinnerDeterminationBehavior(ABC):
 
     @abstractmethod
     def _determine_winners(self,
-                           instance: it.PDPInstance,
+                           instance: it.MDPDPTWInstance,
                            solution: slt.CAHDSolution,
                            auction_pool: Sequence[int],
                            bundles: Sequence[Sequence[int]],
@@ -59,7 +59,7 @@ class MaxBidGurobiCAP1(WinnerDeterminationBehavior):
     """
 
     def _determine_winners(self,
-                           instance: it.PDPInstance,
+                           instance: it.MDPDPTWInstance,
                            solution: slt.CAHDSolution,
                            auction_pool: Sequence[int],
                            bundles: Sequence[Sequence[int]],
@@ -123,7 +123,7 @@ class MaxBidGurobiCAP2(WinnerDeterminationBehavior):
     """
 
     def _determine_winners(self,
-                           instance: it.PDPInstance,
+                           instance: it.MDPDPTWInstance,
                            solution: slt.CAHDSolution,
                            auction_pool: Sequence[int],
                            bundles: Sequence[Sequence[int]],

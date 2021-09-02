@@ -44,7 +44,7 @@ class Auction(ABC):
         assert isinstance(self.bidding.tour_construction, type(self.tour_construction))
         assert isinstance(self.bidding.tour_improvement, type(self.tour_improvement))
 
-    def execute_auction(self, instance: it.PDPInstance, solution: slt.CAHDSolution) -> slt.CAHDSolution:
+    def execute_auction(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution) -> slt.CAHDSolution:
         logger.debug(f'running auction {self.__class__.__name__}')
 
         # ===== Request Selection =====

@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 class Neighborhood(ABC):
     @abstractmethod
-    def feasible_move_generator(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
+    def feasible_move_generator(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int):
         """
         :return: generator that returns the next found move upon calling the next() method on it. Each move is a
         tuple containing all necessary information to see whether to accept that move and the information to execute
@@ -22,7 +22,7 @@ class Neighborhood(ABC):
         pass
 
     @final
-    def execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move: tuple):
+    def execute_move(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, move: tuple):
         """
         Apply the neighborhood move and register it in the solution's dictionary which keeps track of how often each
         neighborhood operator found a move that was accepted.
@@ -38,11 +38,11 @@ class Neighborhood(ABC):
         pass
 
     @abstractmethod
-    def _execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move: tuple):
+    def _execute_move(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, move: tuple):
         pass
 
     @abstractmethod
-    def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move: tuple):
+    def feasibility_check(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, move: tuple):
         """
         A (hopefully efficient) feasibility check of the neighborhood move. Optimally, this is a constant time
         algorithm. However, the Precedence and Time Window constraints of the PDPTW make efficient move evaluation
@@ -71,7 +71,7 @@ class Neighborhood(ABC):
 # =====================================================================================================================
 class IntraTourNeighborhood(Neighborhood, ABC):
     @final
-    def feasible_move_generator(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
+    def feasible_move_generator(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int):
         """
         using a generator (i.e. "yield" instead of "return") avoids unnecessary move evaluations. E.g., in a first
         improvement scenario, it is not necessary to evaluate (or even define) the complete neighborhood, finding a
@@ -87,7 +87,7 @@ class IntraTourNeighborhood(Neighborhood, ABC):
             yield from self.feasible_move_generator_for_tour(instance, solution, tour_)  # delegated generator
 
     @abstractmethod
-    def feasible_move_generator_for_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_: tr.Tour):
+    def feasible_move_generator_for_tour(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, tour_: tr.Tour):
         """
 
         :param instance:
@@ -98,22 +98,31 @@ class IntraTourNeighborhood(Neighborhood, ABC):
         pass
 
     @abstractmethod
-    def _execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move: tuple):
+    def _execute_move(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, move: tuple):
         pass
 
     @abstractmethod
-    def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move):
+    def feasibility_check(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, move):
         pass
 
     @final
-    def first_feasible_move_for_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_: tr.Tour):
+    def first_feasible_move_for_tour(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, tour_: tr.Tour):
         raise NotImplementedError
         pass
 
     @final
-    def best_feasible_move_for_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_: tr.Tour):
+    def best_feasible_move_for_tour(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, tour_: tr.Tour):
         raise NotImplementedError
         pass
+
+'''class PDPMove(IntraTourNeighborhood):
+    def feasible_move_generator_for_tour(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, tour_: tr.Tour, only_improving=False):
+        for request in tour_.requests:
+            pickup, delivery = instance.pickup_delivery_pair(request)
+            pickup_pos = solution.vertex_position_in_tour[pickup]
+            delivery_pos = solution.vertex_position_in_tour[delivery]
+
+            ================================================================='''
 
 
 class PDPMove(IntraTourNeighborhood):
@@ -122,7 +131,7 @@ class PDPMove(IntraTourNeighborhood):
     move = (delta, tour_copy_, old_pickup_pos, old_delivery_pos, pickup, delivery, new_pickup_pos, new_delivery_pos)
     """
 
-    def feasible_move_generator_for_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_: tr.Tour):
+    def feasible_move_generator_for_tour(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, tour_: tr.Tour):
         solution_copy = deepcopy(solution)
         tour_copy_ = deepcopy(tour_)
         # test all requests
@@ -179,16 +188,14 @@ class PDPMove(IntraTourNeighborhood):
                     delta -= insertion_distance_delta
 
             # repair
-            tour_copy_.insert_and_update(instance, solution_copy, (old_pickup_pos, old_delivery_pos),
-                                         (pickup, delivery))
+            tour_copy_.insert_and_update(instance, (old_pickup_pos, old_delivery_pos), (pickup, delivery))
 
-    def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move: tuple):
+    def feasibility_check(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, move: tuple):
         delta, tour_, old_pickup_pos, old_delivery_pos, pickup, delivery, new_pickup_pos, new_delivery_pos = move
         assert delivery == pickup + instance.num_requests
-        return tour_.insertion_feasibility_check(instance, solution, [new_pickup_pos, new_delivery_pos],
-                                                 [pickup, delivery])
+        return tour_.insertion_feasibility_check(instance, [new_pickup_pos, new_delivery_pos], [pickup, delivery])
 
-    def _execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move):
+    def _execute_move(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, move):
         delta, tour_, old_pickup_pos, old_delivery_pos, pickup, delivery, new_pickup_pos, new_delivery_pos = move
 
         # remove
@@ -200,8 +207,7 @@ class PDPMove(IntraTourNeighborhood):
                      f'indices [{old_pickup_pos, old_delivery_pos}] to indices [{new_pickup_pos, new_delivery_pos}]')
 
         # re-insert
-        tour_.insert_and_update(instance, solution, [new_pickup_pos, new_delivery_pos],
-                                [pickup_vertex, delivery_vertex])
+        tour_.insert_and_update(instance, [new_pickup_pos, new_delivery_pos], [pickup_vertex, delivery_vertex])
         pass
 
 
@@ -210,7 +216,7 @@ class PDPTwoOpt(IntraTourNeighborhood):
     The classic 2-opt neighborhood by Croes (1958)
     """
 
-    def feasible_move_generator_for_tour(self, instance: it.PDPInstance, solution: slt.CAHDSolution, tour_: tr.Tour):
+    def feasible_move_generator_for_tour(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, tour_: tr.Tour):
         # iterate over all moves
         for i in range(0, len(tour_) - 3):
             for j in range(i + 2, len(tour_) - 1):
@@ -230,14 +236,14 @@ class PDPTwoOpt(IntraTourNeighborhood):
                 if self.feasibility_check(instance, solution, move):
                     yield move
 
-    def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move):
+    def feasibility_check(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, move):
         delta, tour_, i, j = move
 
         # create a temporary routing sequence to loop over the one that contains the reversed section
         tmp_routing_sequence = list(tour_.routing_sequence)
-        tmp_arrival_schedule = list(tour_.arrival_schedule)
-        tmp_service_schedule = list(tour_.service_schedule)
-        tmp_wait_sequence = list(tour_._wait_sequence)
+        tmp_arrival_schedule = list(tour_.arrival_time_sequence)
+        tmp_service_schedule = list(tour_.service_time_sequence)
+        tmp_wait_sequence = list(tour_._wait_duration_sequence)
         tmp_max_shift_sequence = list(tour_._max_shift_sequence)
         pop_indices = list(range(i + 1, j + 1))
         popped, updated_sums = tr.multi_pop_and_update(routing_sequence=tmp_routing_sequence,
@@ -247,15 +253,15 @@ class PDPTwoOpt(IntraTourNeighborhood):
                                                        service_schedule=tmp_service_schedule,
                                                        sum_load=tour_.sum_load,
                                                        sum_revenue=tour_.sum_revenue,
-                                                       sum_profit=tour_.sum_profit,
+                                                       sum_profit=tour_.tmp_sum_profit,
                                                        wait_sequence=tmp_wait_sequence,
                                                        max_shift_sequence=tmp_max_shift_sequence,
                                                        distance_matrix=instance._distance_matrix,
-                                                       vertex_load=instance.load,
-                                                       revenue=instance.revenue,
-                                                       service_duration=instance.service_duration,
-                                                       tw_open=solution.tw_open,
-                                                       tw_close=solution.tw_close,
+                                                       vertex_load=instance.vertex_load,
+                                                       revenue=instance.vertex_revenue,
+                                                       service_duration=instance.vertex_service_duration,
+                                                       tw_open=instance.tw_open,
+                                                       tw_close=instance.tw_close,
                                                        pop_indices=pop_indices)
 
         return tr.multi_insertion_feasibility_check(
@@ -272,19 +278,19 @@ class PDPTwoOpt(IntraTourNeighborhood):
             num_depots=instance.num_depots,
             num_requests=instance.num_requests,
             distance_matrix=instance._distance_matrix,
-            vertex_load=instance.load,
-            revenue=instance.revenue,
-            service_duration=instance.service_duration,
+            vertex_load=instance.vertex_load,
+            revenue=instance.vertex_revenue,
+            service_duration=instance.vertex_service_duration,
             vehicles_max_travel_distance=instance.vehicles_max_travel_distance,
             vehicles_max_load=instance.vehicles_max_load,
-            tw_open=solution.tw_open,
-            tw_close=solution.tw_close,
+            tw_open=instance.tw_open,
+            tw_close=instance.tw_close,
             insertion_indices=range(i + 1, j + 1),
             insertion_vertices=list(reversed(popped)),
 
         )
 
-    def _execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move):
+    def _execute_move(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, move):
         delta, tour_, i, j = move
 
         logger.debug(f'PDPTwoOpt: [{delta}] Reverse section between {i} and {j}')
@@ -298,7 +304,7 @@ class PDPTwoOpt(IntraTourNeighborhood):
 # =====================================================================================================================
 class InterTourNeighborhood(Neighborhood, ABC):
     @abstractmethod
-    def feasible_move_generator(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
+    def feasible_move_generator(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int):
         """
         :return: tuple containing all necessary information to see whether to accept a move and the information to
         execute a move. The first element must be the delta in travel distance.
@@ -306,11 +312,11 @@ class InterTourNeighborhood(Neighborhood, ABC):
         pass
 
     @abstractmethod
-    def _execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move: tuple):
+    def _execute_move(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, move: tuple):
         pass
 
     @abstractmethod
-    def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move):
+    def feasibility_check(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, move):
         pass
 
 
@@ -319,7 +325,7 @@ class PDPRelocate(InterTourNeighborhood):
     Take one PD request at a time and see whether inserting it into another tour is cheaper.
     """
 
-    def feasible_move_generator(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
+    def feasible_move_generator(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int):
         solution = deepcopy(solution)
         carrier_ = solution.carriers[carrier]
 
@@ -367,17 +373,16 @@ class PDPRelocate(InterTourNeighborhood):
                             if self.feasibility_check(instance, solution, move):
                                 yield move
 
-    def feasibility_check(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move):
+    def feasibility_check(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, move):
         delta, carrier, old_tour, old_pickup_pos, old_delivery_pos, new_tour, new_pickup_pos, new_delivery_pos = move
         old_tour_ = solution.carriers[carrier].tours[old_tour]
         new_tour_ = solution.carriers[carrier].tours[new_tour]
         pickup = old_tour_.routing_sequence[old_pickup_pos]
         delivery = old_tour_.routing_sequence[old_delivery_pos]
 
-        return new_tour_.insertion_feasibility_check(instance, solution, [new_pickup_pos, new_delivery_pos],
-                                                     [pickup, delivery])
+        return new_tour_.insertion_feasibility_check(instance, [new_pickup_pos, new_delivery_pos], [pickup, delivery])
 
-    def _execute_move(self, instance: it.PDPInstance, solution: slt.CAHDSolution, move):
+    def _execute_move(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, move):
         old_tour: int
         new_tour: int
         delta, carrier, old_tour, old_pickup_pos, old_delivery_pos, new_tour, new_pickup_pos, new_delivery_pos = move
@@ -394,7 +399,7 @@ class PDPRelocate(InterTourNeighborhood):
         if len(old_tour_) <= 2:
             solution.carriers[carrier].tours.remove(old_tour_)
 
-        new_tour_.insert_and_update(instance, solution, [new_pickup_pos, new_delivery_pos], [pickup, delivery])
+        new_tour_.insert_and_update(instance, [new_pickup_pos, new_delivery_pos], [pickup, delivery])
         solution.request_to_tour_assignment[instance.request_from_vertex(pickup)] = new_tour_.id_
 
         pass

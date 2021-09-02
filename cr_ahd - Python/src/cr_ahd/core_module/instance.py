@@ -13,7 +13,7 @@ import src.cr_ahd.utility_module.utils as ut
 logger = logging.getLogger(__name__)
 
 
-class PDPInstance:
+class MDPDPTWInstance:
     def __init__(self,
                  id_: str,
                  max_num_tours_per_carrier: int,
@@ -30,8 +30,14 @@ class PDPInstance:
                  requests_delivery_service_time: Sequence,
                  requests_pickup_load: Sequence,
                  requests_delivery_load: Sequence,
+                 request_pickup_time_window_open: Sequence,
+                 request_pickup_time_window_close: Sequence,
+                 request_delivery_time_window_open: Sequence,
+                 request_delivery_time_window_close: Sequence,
                  carrier_depots_x: Sequence,
                  carrier_depots_y: Sequence,
+                 carrier_depots_tw_open: Sequence,
+                 carrier_depots_tw_close: Sequence,
                  ):
         """
         Create an instance for the collaborative transportation network for attended home delivery
@@ -54,17 +60,20 @@ class PDPInstance:
         self.x_coords = [*carrier_depots_x, *requests_pickup_x, *requests_delivery_x]
         self.y_coords = [*carrier_depots_y, *requests_pickup_y, *requests_delivery_y]
         self.request_to_carrier_assignment = requests_initial_carrier_assignment
-        self.revenue = [*[0] * (self.num_depots + len(requests)), *requests_revenue]
-        self.load = [*[0] * self.num_depots, *requests_pickup_load, *requests_delivery_load]
-        self.service_duration = (*[dt.timedelta(0)] * self.num_depots,
-                                 *requests_pickup_service_time,
-                                 *requests_delivery_service_time)
+        self.vertex_revenue = [*[0] * (self.num_depots + len(requests)), *requests_revenue]
+        self.vertex_load = [*[0] * self.num_depots, *requests_pickup_load, *requests_delivery_load]
+        self.vertex_service_duration = (*[dt.timedelta(0)] * self.num_depots,
+                                        *requests_pickup_service_time,
+                                        *requests_delivery_service_time)
+        self.tw_open = [*carrier_depots_tw_open, *request_pickup_time_window_open, *request_delivery_time_window_open]
+        self.tw_close = [*carrier_depots_tw_close, *request_pickup_time_window_close, *request_delivery_time_window_close]
 
-        # compute the distance matrix
-        # need to round the distances due to floating point precision!
+        # compute the distance and travel time matrix
+        # need to ceil the distances due to floating point precision!
         self._distance_matrix = np.ceil(
             squareform(pdist(np.array(list(zip(self.x_coords, self.y_coords))), 'euclidean'))).astype('int')
-        # self._distance_matrix = squareform(pdist(np.array(list(zip(self.x_coords, self.y_coords))), 'euclidean'))
+        self._travel_time_matrix = [[ut.travel_time(d) for d in x] for x in self._distance_matrix]
+
         logger.debug(f'{id_}: created')
 
     def __str__(self):
@@ -84,6 +93,20 @@ class PDPInstance:
         for ii, jj in zip(i, j):
             d += self._distance_matrix[ii, jj]
         return d
+
+    def travel_duration(self, i: Sequence[int], j: Sequence[int]):
+        """
+        returns the travel time between pairs of elements in i and j.
+        Think sum(travel_time(i[0], j[0]), travel_time(i[1], j[1]), ...)
+
+        :param i:
+        :param j:
+        :return:
+        """
+        t = dt.timedelta(0)
+        for ii, jj in zip(i, j):
+            t += self._travel_time_matrix[ii][jj]
+        return t
 
     def pickup_delivery_pair(self, request: int) -> Tuple[int, int]:
         """returns a tuple of pickup & delivery vertex indices for the given request"""
@@ -135,7 +158,7 @@ class PDPInstance:
             raise IndexError(f'Vertex index {vertex} out of range')
 
 
-def read_gansterer_hartl_mv(path: Path, num_carriers=3) -> PDPInstance:
+def read_gansterer_hartl_mv(path: Path, num_carriers=3) -> MDPDPTWInstance:
     """read an instance file as used in (Gansterer,M., & Hartl,R.F. (2016). Request evaluation strategies
     for carriers in auction-based collaborations. https://doi.org/10.1007/s00291-015-0411-1).
     CAUTION:multiplies the max vehicle load by 10!
@@ -148,28 +171,33 @@ def read_gansterer_hartl_mv(path: Path, num_carriers=3) -> PDPInstance:
                            float_precision='round_trip')
     requests['pickup_service_time'] = dt.timedelta(0)
     requests['delivery_service_time'] = dt.timedelta(0)
-    return PDPInstance(path.stem,
-                       vrp_params['V'].tolist(),
-                       (vrp_params['L'] * ut.LOAD_CAPACITY_SCALING).tolist(),
-                       # todo can i solve the problems without *10 vehicle capacity?
-                       vrp_params['T'].tolist(),
-                       requests.index.tolist(),
-                       requests['carrier_index'].tolist(),
-                       (requests['pickup_x'] * ut.DISTANCE_SCALING).tolist(),
-                       (requests['pickup_y'] * ut.DISTANCE_SCALING).tolist(),
-                       (requests['delivery_x'] * ut.DISTANCE_SCALING).tolist(),
-                       (requests['delivery_y'] * ut.DISTANCE_SCALING).tolist(),
-                       (requests['revenue'] * ut.REVENUE_SCALING).tolist(),
-                       [x.to_pytimedelta() for x in requests['pickup_service_time']],
-                       [x.to_pytimedelta() for x in requests['delivery_service_time']],
-                       requests['load'].tolist(),
-                       (-requests['load']).tolist(),
-                       (depots['x'] * ut.DISTANCE_SCALING).tolist(),
-                       (depots['y'] * ut.DISTANCE_SCALING).tolist(),
-                       )
+    return MDPDPTWInstance(id_=path.stem,
+                           max_num_tours_per_carrier=vrp_params['V'].tolist(),
+                           max_vehicle_load=(vrp_params['L'] * ut.LOAD_CAPACITY_SCALING).tolist(),
+                           max_tour_length=vrp_params['T'].tolist(),
+                           requests=requests.index.tolist(),
+                           requests_initial_carrier_assignment=requests['carrier_index'].tolist(),
+                           requests_pickup_x=(requests['pickup_x'] * ut.DISTANCE_SCALING).tolist(),
+                           requests_pickup_y=(requests['pickup_y'] * ut.DISTANCE_SCALING).tolist(),
+                           requests_delivery_x=(requests['delivery_x'] * ut.DISTANCE_SCALING).tolist(),
+                           requests_delivery_y=(requests['delivery_y'] * ut.DISTANCE_SCALING).tolist(),
+                           requests_revenue=(requests['revenue'] * ut.REVENUE_SCALING).tolist(),
+                           requests_pickup_service_time=[x.to_pytimedelta() for x in requests['pickup_service_time']],
+                           requests_delivery_service_time=[x.to_pytimedelta() for x in requests['delivery_service_time']],
+                           requests_pickup_load=requests['load'].tolist(),
+                           requests_delivery_load=(-requests['load']).tolist(),
+                           request_pickup_time_window_open=[ut.START_TIME for _ in range(len(requests) * 2)],
+                           request_pickup_time_window_close=[ut.END_TIME for _ in range(len(requests) * 2)],
+                           request_delivery_time_window_open=[ut.START_TIME for _ in range(len(requests) * 2)],
+                           request_delivery_time_window_close=[ut.END_TIME for _ in range(len(requests) * 2)],
+                           carrier_depots_x=(depots['x'] * ut.DISTANCE_SCALING).tolist(),
+                           carrier_depots_y=(depots['y'] * ut.DISTANCE_SCALING).tolist(),
+                           carrier_depots_tw_open=[ut.START_TIME for _ in range(len(depots))],
+                           carrier_depots_tw_close=[ut.END_TIME for _ in range(len(depots))]
+                           )
 
 
-def read_gansterer_hartl_sv(path: Path) -> PDPInstance:
+def read_gansterer_hartl_sv(path: Path) -> MDPDPTWInstance:
     """read an instance file as used in (Gansterer,M., & Hartl,R.F. (2016). Request evaluation strategies
     for carriers in auction-based collaborations. https://doi.org/10.1007/s00291-015-0411-1).
     """
@@ -180,7 +208,7 @@ def read_gansterer_hartl_sv(path: Path) -> PDPInstance:
     requests = pd.read_csv(path, skiprows=8, delim_whitespace=True, names=cols, index_col=False,
                            float_precision='round_trip')
     requests['service_time'] = dt.timedelta(0)
-    return PDPInstance(path.stem, requests, depots, 1, float('inf'), float('inf'))
+    return MDPDPTWInstance(path.stem, requests, depots, 1, float('inf'), float('inf'))
 
 
 if __name__ == '__main__':

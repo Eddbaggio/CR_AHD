@@ -137,7 +137,7 @@ def parameter_generator():
     pass
 
 
-def execute_all(instance: it.PDPInstance, plot=False):
+def execute_all(instance: it.MDPDPTWInstance, plot=False):
     """
     :param instance: (custom) instance that will we (deep)copied for each algorithm
     :return: evaluation metrics (Instance.evaluation_metrics) of all the solutions obtained

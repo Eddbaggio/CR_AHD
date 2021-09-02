@@ -34,7 +34,7 @@ class RequestSelectionBehavior(ABC):
         self.num_submitted_requests = num_submitted_requests
 
     @abstractmethod
-    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
+    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution):
         pass
 
 
@@ -47,7 +47,7 @@ class RequestSelectionBehaviorIndividual(RequestSelectionBehavior, ABC):
     select (for each carrier) a set of bundles based on their individual evaluation of some quality criterion
     """
 
-    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
+    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution):
         """
         select a set of requests based on the concrete selection behavior. will retract the requests from the carrier
         and return
@@ -76,7 +76,7 @@ class RequestSelectionBehaviorIndividual(RequestSelectionBehavior, ABC):
         return auction_request_pool, original_bundling_labels
 
     @abstractmethod
-    def _evaluate_request(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
+    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, request: int):
         """compute the valuation of the given request for the carrier"""
         pass
 
@@ -86,7 +86,7 @@ class Random(RequestSelectionBehaviorIndividual):
     returns a random selection of unrouted requests
     """
 
-    def _evaluate_request(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
+    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, request: int):
         return random.random()
 
 
@@ -105,7 +105,7 @@ class MarginalProfit(RequestSelectionBehaviorIndividual):
     this is not yet functional.
     """
 
-    def _evaluate_request(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
+    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, request: int):
         raise NotImplementedError
         # find the request's tour:
         # TODO: would be faster if the tour was stored somewhere as a lookup but this is fine for now
@@ -151,7 +151,7 @@ class MarginalProfitProxy(RequestSelectionBehaviorIndividual):
     from its tour
     """
 
-    def _evaluate_request(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
+    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, request: int):
         # find the request's tour:
         tour_ = solution.carriers[carrier].tours[solution.request_to_tour_assignment[request]]
         pickup, delivery = instance.pickup_delivery_pair(request)
@@ -171,7 +171,7 @@ class MarginalProfitProxy(RequestSelectionBehaviorIndividual):
                                 instance.distance([delivery_predecessor], [delivery_successor])
 
         # return marginal profit = revenue - fulfillment cost
-        return instance.revenue[delivery] - travel_distance_delta
+        return instance.vertex_revenue[delivery] - travel_distance_delta
 
 
 class MinDistanceToForeignDepotDMin(RequestSelectionBehaviorIndividual):
@@ -180,7 +180,7 @@ class MinDistanceToForeignDepotDMin(RequestSelectionBehaviorIndividual):
     MINIMUM of the distances (pickup - depot) and (delivery - depot)
     """
 
-    def _evaluate_request(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
+    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, request: int):
 
         foreign_depots = solution.carrier_depots[:]
         foreign_depots.pop(carrier)
@@ -201,7 +201,7 @@ class MinDistanceToForeignDepotDSum(RequestSelectionBehaviorIndividual):
     SUM of the distances (pickup - depot) and (delivery - depot)
     """
 
-    def _evaluate_request(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
+    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, request: int):
 
         foreign_depots = solution.carrier_depots[:]
         foreign_depots.pop(carrier)
@@ -226,7 +226,7 @@ class ComboRaw(RequestSelectionBehaviorIndividual):
     summing up the distances between the pickup node pr and the delivery node dr to the depot (oc or oa).
     """
 
-    def _evaluate_request(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
+    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, request: int):
         # weighting factors
         alpha1 = 1
         alpha2 = 1
@@ -261,7 +261,7 @@ class ComboStandardized(RequestSelectionBehaviorIndividual):
     summing up the distances between the pickup node pr and the delivery node dr to the depot (oc or oa).
     """
 
-    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
+    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution):
         """
         Overrides method in RequestSelectionBehaviorIndividual because different components of the valuation function
         need to be normalized before summing them up
@@ -312,7 +312,7 @@ class ComboStandardized(RequestSelectionBehaviorIndividual):
 
         return auction_request_pool, original_bundling_labels
 
-    def _evaluate_request(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int) -> \
+    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, request: int) -> \
             Tuple[float, float, float]:
 
         # [i] distance to the depot of one of the collaborating carriers
@@ -337,7 +337,7 @@ class PackedTW(RequestSelectionBehaviorIndividual):
     profitability
     """
 
-    def _evaluate_request(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, request: int):
+    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, request: int):
         pass
 
 
@@ -351,7 +351,7 @@ class RequestSelectionBehaviorNeighbor(RequestSelectionBehavior, ABC):
     requests based on some neighborhood criterion
     """
 
-    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
+    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution):
         auction_request_pool = []
         original_bundling_labels = []
 
@@ -379,11 +379,11 @@ class RequestSelectionBehaviorNeighbor(RequestSelectionBehavior, ABC):
         return auction_request_pool, original_bundling_labels
 
     @abstractmethod
-    def _find_initial_request(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
+    def _find_initial_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int):
         pass
 
     @staticmethod
-    def _find_neighbors(instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, initial_request: int,
+    def _find_neighbors(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, initial_request: int,
                         num_neighbors: int):
         """
         "Any further request s ∈ Ra is selected based on its closeness to r. Closeness is determined by the sum of
@@ -421,7 +421,7 @@ class MarginalProfitProxyNeighbor(RequestSelectionBehaviorNeighbor):
     its closeness to r.
     """
 
-    def _find_initial_request(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int):
+    def _find_initial_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int):
         min_marginal_profit = float('inf')
         initial_request = None
         for request in solution.carriers[carrier].accepted_requests:
@@ -443,7 +443,7 @@ class RequestSelectionBehaviorBundle(RequestSelectionBehavior, ABC):
     proximity of the cluster). This idea of bundled evaluation is also from Gansterer & Hartl (2016)
     """
 
-    def execute(self, instance: it.PDPInstance, solution: slt.CAHDSolution):
+    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution):
         auction_request_pool = []
         original_bundling_labels = []
 
@@ -474,11 +474,11 @@ class RequestSelectionBehaviorBundle(RequestSelectionBehavior, ABC):
         return auction_request_pool, original_bundling_labels
 
     @abstractmethod
-    def _create_bundles(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, k: int):
+    def _create_bundles(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, k: int):
         pass
 
     @abstractmethod
-    def _evaluate_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
+    def _evaluate_bundle(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int,
                          bundle: Sequence[int]):
         # TODO It could literally be a bundle_valuation strategy that is executed here. Not a bundlING_valuation though
         pass
@@ -489,13 +489,13 @@ class SpatialBundleDSum(RequestSelectionBehaviorBundle):
     Gansterer & Hartl (2016) refer to this one as 'cluster'
     """
 
-    def _create_bundles(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, k: int):
+    def _create_bundles(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, k: int):
         """
         create all possible bundles of size k
         """
         return itertools.combinations(solution.carriers[carrier].accepted_requests, k)
 
-    def _evaluate_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
+    def _evaluate_bundle(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int,
                          bundle: Sequence[int]):
         """
         the sum of travel distances of all pairs of requests in this cluster, where the travel distance of a request
@@ -516,13 +516,13 @@ class SpatialBundleDMax(RequestSelectionBehaviorBundle):
     Gansterer & Hartl (2016) refer to this one as 'cluster'
     """
 
-    def _create_bundles(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, k: int):
+    def _create_bundles(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, k: int):
         """
         create all possible bundles of size k
         """
         return itertools.combinations(solution.carriers[carrier].accepted_requests, k)
 
-    def _evaluate_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
+    def _evaluate_bundle(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int,
                          bundle: Sequence[int]):
         """
         the sum of travel distances of all pairs of requests in this cluster, where the travel distance of a request
@@ -541,21 +541,21 @@ class SpatialBundleDMax(RequestSelectionBehaviorBundle):
 
 
 class TemporalRangeBundle(RequestSelectionBehaviorBundle):
-    def _create_bundles(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, k: int):
+    def _create_bundles(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, k: int):
         """
         create all possible bundles of size k
         """
         return itertools.combinations(solution.carriers[carrier].accepted_requests, k)
 
-    def _evaluate_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
+    def _evaluate_bundle(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int,
                          bundle: Sequence[int]):
         """
         the min-max range of the delivery time windows of all requests inside the cluster
         """
         bundle_delivery_vertices = [instance.pickup_delivery_pair(request)[1] for request in bundle]
 
-        bundle_tw_open = [solution.tw_open[delivery] for delivery in bundle_delivery_vertices]
-        bundle_tw_close = [solution.tw_close[delivery] for delivery in bundle_delivery_vertices]
+        bundle_tw_open = [instance.tw_open[delivery] for delivery in bundle_delivery_vertices]
+        bundle_tw_close = [instance.tw_close[delivery] for delivery in bundle_delivery_vertices]
         min_open: dt.datetime = min(bundle_tw_open)
         max_close: dt.datetime = max(bundle_tw_close)
         # negative value: low temporal range means high valuation
@@ -564,13 +564,13 @@ class TemporalRangeBundle(RequestSelectionBehaviorBundle):
 
 
 class SpatioTemporalBundle(RequestSelectionBehaviorBundle):
-    def _create_bundles(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, k: int):
+    def _create_bundles(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, k: int):
         """
         create all possible bundles of size k
         """
         return itertools.combinations(solution.carriers[carrier].accepted_requests, k)
 
-    def _evaluate_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
+    def _evaluate_bundle(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int,
                          bundle: Sequence[int]):
         """a weighted sum of spatial and temporal measures"""
         # spatial
@@ -610,14 +610,14 @@ class LosSchulteBundle(RequestSelectionBehaviorBundle):
 
     """
 
-    def _create_bundles(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int, k: int):
+    def _create_bundles(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, k: int):
         """
         create all possible bundles of size k
         """
         bundles = itertools.combinations(solution.carriers[carrier].accepted_requests, k)
         return bundles
 
-    def _evaluate_bundle(self, instance: it.PDPInstance, solution: slt.CAHDSolution, carrier: int,
+    def _evaluate_bundle(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int,
                          bundle: Sequence[int]):
         # must invert again, since RequestSelectionBehaviorBundle searches for the maximum valuation and request
         # selection for the minimum

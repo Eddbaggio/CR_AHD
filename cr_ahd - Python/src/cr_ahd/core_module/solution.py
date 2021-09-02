@@ -10,7 +10,7 @@ from src.cr_ahd.utility_module import utils as ut
 
 class CAHDSolution:
     # default, empty solution
-    def __init__(self, instance: it.PDPInstance):
+    def __init__(self, instance: it.MDPDPTWInstance):
         self.id_ = instance.id_
         self.meta = instance.meta
 
@@ -22,16 +22,10 @@ class CAHDSolution:
         # store a lookup-table to get a request's tour index
         self.request_to_tour_assignment: List[int] = [None for _ in range(instance.num_requests)]
         # store a lookup-table to get vertex's position inside its tour
-        self.vertex_position_in_tour: List[int] = [None for _ in range(instance.num_depots + instance.num_requests * 2)]
+        # self.vertex_position_in_tour: List[int] = [None for _ in range(instance.num_depots + instance.num_requests * 2)]
 
-        # basically no prior time windows for all VERTICES
-        self.tw_open: List = np.full(instance.num_depots + 2 * instance.num_requests, ut.START_TIME).tolist()
-        self.tw_close: List = np.full(instance.num_depots + 2 * instance.num_requests, ut.END_TIME).tolist()
-
+        self.tours: List[tr.Tour] = []
         self.carriers = [AHDSolution(c) for c in range(instance.num_carriers)]
-
-        # one depot per carrier, can be adjusted externally for multi-depot, single-carrier problems
-        self.carrier_depots = [[depot] for depot in range(instance.num_depots)]
 
         # solver configuration and other meta data
         self.solver_config = {config: None for config in ut.solver_config}
@@ -44,7 +38,7 @@ class CAHDSolution:
                                               PDPLargeInterTourNeighborhood=0)
 
     def __str__(self):
-        s = f'Solution {self.id_}\nProfit={round(self.sum_profit(), 2)}'
+        s = f'Solution {self.id_}\nObjective={round(self.objective(), 2)}'
         s += '\n'
         for c in self.carriers:
             s += str(c)
@@ -66,14 +60,17 @@ class CAHDSolution:
     def sum_revenue(self):
         return sum(c.sum_revenue() for c in self.carriers)
 
-    def sum_profit(self):
-        return sum(c.sum_profit() for c in self.carriers)
+    def objective(self):
+        return sum(c.objective() for c in self.carriers)
+
+    def tmp_sum_profit(self):
+        return sum(c.objective() for c in self.carriers)
 
     def num_carriers(self):
         return len(self.carriers)
 
     def num_tours(self):
-        return sum(c.num_tours() for c in self.carriers)
+        return len(self.tours)
 
     def num_routing_stops(self):
         return sum(c.num_routing_stops() for c in self.carriers)
@@ -89,7 +86,7 @@ class CAHDSolution:
             self.carriers[c].assigned_requests.append(r)
             self.carriers[c].unrouted_requests.append(r)
 
-    def free_requests_from_carriers(self, instance: it.PDPInstance, requests: Sequence[int]):
+    def free_requests_from_carriers(self, instance: it.MDPDPTWInstance, requests: Sequence[int]):
         """
         removes the given requests from their route and sets them to be unassigned and not accepted (not_accepted !=
         rejected)
@@ -100,11 +97,10 @@ class CAHDSolution:
         """
         for request in requests:
             carrier_: AHDSolution = self.carriers[self.request_to_carrier_assignment[request]]
-            tour_ = carrier_.tours[self.request_to_tour_assignment[request]]
+            tour_ = self.tours[self.request_to_tour_assignment[request]]
             for vertex in instance.pickup_delivery_pair(request):
-                pos = self.vertex_position_in_tour[vertex]
+                pos = tour_._vertex_pos[vertex]
                 tour_.pop_and_update(instance, self, [pos])
-                self.vertex_position_in_tour[vertex] = None
 
             self.request_to_tour_assignment[request] = None
 
@@ -115,7 +111,7 @@ class CAHDSolution:
             self.request_to_carrier_assignment[request] = np.nan
             self.unassigned_requests.append(request)
 
-    def unroute_request(self, instance:it.PDPInstance, requests: List[int]):
+    def unroute_request(self, instance: it.MDPDPTWInstance, requests: List[int]):
         """
         remove the selected requests from their current tour and set them as unassigned without retracting them from
         the carrier. Thus, the given requests will be unrouted
@@ -139,7 +135,8 @@ class CAHDSolution:
             'id_': self.id_,
             'num_carriers': self.num_carriers(),
             'carrier_depots': self.carrier_depots,
-            'sum_profit': self.sum_profit(),
+            'objective': self.objective(),
+            'sum_profit': self.tmp_sum_profit(),
             'sum_travel_distance': self.sum_travel_distance(),
             'sum_travel_duration': self.sum_travel_duration(),
             # 'sum_wait_duration': self.sum_wait_duration(),
@@ -174,24 +171,27 @@ class AHDSolution:
         self.unrouted_requests: List = []
         self.routed_requests: List = []
         self.acceptance_rate: float = 0
-        self.tours: List[tr.Tour] = []
+        self.tour_ids: List[int] = []   # list of tour IDs of the tours that belong to this solution/carrier
 
     def __str__(self):
         s = f'---// Carrier ID: {self.id_} //---' \
-            f'\tProfit={round(self.sum_profit(), 4)}, ' \
+            f'\tObjective={round(self.objective(), 4)}, ' \
             f'Acceptance Rate={round(self.acceptance_rate, 2)}, ' \
             f'Assigned={self.assigned_requests}, ' \
             f'Accepted={self.accepted_requests}, ' \
-            f'Unrouted={self.unrouted_requests},' \
-            f' Routed={self.routed_requests}'
+            f'Unrouted={self.unrouted_requests}, ' \
+            f'Routed={self.routed_requests}'
         s += '\n'
-        for tour_ in self.tours:
+        for tour_ in self.tours():
             s += str(tour_)
             s += '\n'
         return s
 
-    def num_routing_stops(self):
-        return sum(t.num_routing_stops for t in self.tours)
+    def tours(self, solution: CAHDSolution):
+        return (solution.tours[x] for x in self.tour_ids)
+
+    def num_routing_stops(self, solution: CAHDSolution):
+        return sum(t.num_routing_stops for t in self.tours(solution))
 
     def sum_travel_distance(self):
         return sum(t.sum_travel_distance for t in self.tours)
@@ -208,11 +208,11 @@ class AHDSolution:
     def sum_revenue(self):
         return sum(t.sum_revenue for t in self.tours)
 
-    def sum_profit(self):
+    def objective(self):
         return sum(t.sum_profit for t in self.tours)
 
     def num_tours(self):
-        return len(self.tours)
+        return len(self.tour_ids)
 
     def as_dict(self):
         return {
@@ -227,7 +227,7 @@ class AHDSolution:
             # 'id_': self.id_,
             'num_tours': self.num_tours(),
             'num_routing_stops': self.num_routing_stops(),
-            'sum_profit': self.sum_profit(),
+            'sum_profit': self.objective(),
             'sum_travel_distance': self.sum_travel_distance(),
             'sum_travel_duration': self.sum_travel_duration(),
             # 'sum_wait_duration': self.sum_wait_duration(),
