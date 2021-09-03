@@ -329,14 +329,15 @@ def validate_solution(instance, solution):
     for carrier in trange(len(solution.carriers), desc=f'Solution validation', disable=True):
         carrier_ = solution.carriers[carrier]
 
-        for tour_ in carrier_.tours(solution):
+        for tour_ in carrier_.tours:
+            assert tour_ is solution.tours[tour_.id_]
             assert tour_.routing_sequence[0] == carrier_.id_
             assert tour_.routing_sequence[-1] == carrier_.id_
 
-            assert tour_._sum_load == 0, instance.id_
-            assert tour_._sum_travel_distance <= instance.vehicles_max_travel_distance, instance.id_
-            assert round(tour_._sum_profit, 4) == round(tour_._sum_revenue - tour_._sum_travel_distance, 4), \
-                f'{instance.id_}: {round(tour_._sum_profit, 4)}!={round(tour_._sum_revenue - tour_._sum_travel_distance, 4)}'
+            assert tour_.sum_load == 0, instance.id_
+            assert tour_.sum_travel_distance <= instance.vehicles_max_travel_distance, instance.id_
+            assert round(tour_.sum_profit, 4) == round(tour_.sum_revenue - tour_.sum_travel_distance, 4), \
+                f'{instance.id_}: {round(tour_.sum_profit, 4)}!={round(tour_.sum_revenue - tour_.sum_travel_distance, 4)}'
 
             # iterate over the tour
             for i in trange(1, len(tour_.routing_sequence), desc=f'Tour {tour_.id_}', disable=True):
@@ -351,18 +352,18 @@ def validate_solution(instance, solution):
 
                 # waiting times
                 assert tour_.service_time_sequence[i] == tour_.arrival_time_sequence[i] + \
-                       tour_._wait_duration_sequence[i], msg
-                assert tour_._wait_duration_sequence[i] == max(
+                       tour_.wait_duration_sequence[i], msg
+                assert tour_.wait_duration_sequence[i] == max(
                     dt.timedelta(0), instance.tw_open[vertex] - tour_.arrival_time_sequence[i]), msg
 
                 # max_shift times
                 if instance.vertex_type(vertex) != 'depot':
-                    assert tour_._max_shift_sequence[i] == min(
-                        instance.tw_close[vertex] - tour_._service_time_sequence[i],
-                        tour_._wait_duration_sequence[i + 1] + tour_._max_shift_sequence[i + 1]
+                    assert tour_.max_shift_sequence[i] == min(
+                        instance.tw_close[vertex] - tour_.service_time_sequence[i],
+                        tour_.wait_duration_sequence[i + 1] + tour_.max_shift_sequence[i + 1]
                     ), msg
                 else:
-                    assert tour_._max_shift_sequence[i] == instance.tw_close[vertex] - tour_._service_time_sequence[i]
+                    assert tour_.max_shift_sequence[i] == instance.tw_close[vertex] - tour_.service_time_sequence[i]
 
                 # tw constraint
                 assert instance.tw_open[vertex] <= tour_.service_time_sequence[i] <= instance.tw_close[vertex], \
@@ -378,10 +379,10 @@ def validate_solution(instance, solution):
 
                 # meta data
                 if instance.vertex_type(vertex) != 'depot':
-                    assert tour_._vertex_pos[vertex] == i, msg
-                    assert tour_.arrival_time_sequence[i] == tour_._arrival_time_dict[vertex], msg
-                    assert tour_.service_time_sequence[i] == tour_._service_time_dict[vertex], msg
-                    assert tour_._max_shift_sequence[i] == tour_._max_shift_dict[vertex], msg
+                    assert tour_.vertex_pos[vertex] == i, msg
+                    assert tour_.arrival_time_sequence[i] == tour_.arrival_time_dict[vertex], msg
+                    assert tour_.service_time_sequence[i] == tour_.service_time_dict[vertex], msg
+                    assert tour_.max_shift_sequence[i] == tour_.max_shift_dict[vertex], msg
 
                     # tour assignment record
                     request = instance.request_from_vertex(vertex)
@@ -404,7 +405,7 @@ SPEED_KMH = 60  # vehicle speed (set to 60 to treat distance = time)
 solver_config = ['solution_algorithm',
                  'tour_construction',
                  'tour_improvement',
-                 'time_window_management',
+                 # 'time_window_management',
                  'time_window_offering',
                  'time_window_selection',
                  'auction_tour_construction',

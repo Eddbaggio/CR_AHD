@@ -219,7 +219,7 @@ def bundle_total_travel_distance(instance: it.MDPDPTWInstance,
 
     # initialize temporary tour with the earliest request
     depot_pickup, depot_delivery = instance.pickup_delivery_pair(depot_request)
-    tmp_tour_ = tr.Tour('tmp', instance, depot_pickup)
+    tmp_tour_ = tr.Tour('tmp', depot_pickup)
     tmp_tour_.insert_and_update(instance, [1], [depot_delivery])
 
     # insert all remaining requests of the bundle

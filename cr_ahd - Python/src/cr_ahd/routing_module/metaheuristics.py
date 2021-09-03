@@ -12,7 +12,7 @@ from src.cr_ahd.utility_module import utils as ut, profiling as pr
 
 logger = logging.getLogger(__name__)
 
-TIME_MAX = float(10)  # 0.05 is roughly the time required by the VND procedure to exhaust all neighborhoods
+TIME_MAX = float(2)  # 0.05 is roughly the time required by the VND procedure to exhaust all neighborhoods
 
 
 class PDPTWMetaHeuristic(ABC):
@@ -250,7 +250,7 @@ class PDPTWVariableNeighborhoodDescent(PDPTWMetaHeuristic):
         k = 0
         while k < len(intra_tour_neighborhoods):
             neighborhood = intra_tour_neighborhoods[k]
-            all_moves = [move for move in neighborhood.feasible_move_generator_for_tour(instance, solution, tour_)]
+            all_moves = [move for move in neighborhood.feasible_move_generator_for_tour(instance, tour_)]
             if any(all_moves):
                 best_move = min(all_moves, key=lambda x: x[0])
                 if self.acceptance_criterion_tour(best_move):

@@ -305,12 +305,12 @@ def _add_carrier_solution(fig: go.Figure, instance, solution: slt.CAHDSolution, 
     fig.add_trace(depot_scatter)
     scatter_traces.append(depot_scatter)
 
-    for tour in solution.carriers[carrier].tour_ids:
-        tour_scatter = _make_tour_scatter(instance, solution, carrier, tour)
+    for tour_id in solution.carriers[carrier].tour_ids:
+        tour_scatter = _make_tour_scatter(instance, solution, carrier, tour_id)
         fig.add_trace(tour_scatter)
         scatter_traces.append(tour_scatter)
 
-        edges = _make_tour_edges(instance, solution, carrier, tour)
+        edges = _make_tour_edges(instance, solution, carrier, tour_id)
         for edge in edges:
             fig.add_annotation(edge)
         edge_traces.append(edges)

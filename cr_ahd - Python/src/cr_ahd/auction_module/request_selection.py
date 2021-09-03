@@ -117,7 +117,7 @@ class MarginalProfit(RequestSelectionBehaviorIndividual):
         travel_distance_with_request = tour_.sum_travel_distance
 
         # create a new tour without the request
-        tmp_tour_ = tr.Tour('tmp', instance, tour_.routing_sequence[0])
+        tmp_tour_ = tr.Tour('tmp', tour_.routing_sequence[0])
         requests_in_tour_ = None  # TODO need to find all requests in that tour_
         requests_in_tour_.remove(request)
 

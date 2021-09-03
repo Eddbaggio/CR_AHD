@@ -34,7 +34,7 @@ class Solver:
         """
 
         '''
-        # using a starting solution messed up the solver config that is stored with the solution
+        # using a starting solution messed up the solver config that is stored with that solution
         if starting_solution is None:
             solution = slt.CAHDSolution(instance)
         else:
@@ -65,7 +65,7 @@ class Solver:
     def update_solution_solver_config(self, solution):
         solution.solver_config['tour_construction'] = self.tour_construction.__class__.__name__
         solution.solver_config['tour_improvement'] = self.tour_improvement.name
-        solution.solver_config['time_window_management'] = self.time_window_management.__class__.__name__
+        # solution.solver_config['time_window_management'] = self.time_window_management.__class__.__name__
         solution.solver_config[
             'time_window_offering'] = self.time_window_management.time_window_offering.__class__.__name__
         solution.solver_config[

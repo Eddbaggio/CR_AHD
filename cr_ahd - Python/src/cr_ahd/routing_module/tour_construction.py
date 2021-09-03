@@ -96,16 +96,16 @@ class PDPParallelInsertionConstruction(ABC):
         best_pickup_pos = None
         best_delivery_pos = None
 
-        for tour in solution.carriers[carrier].tour_ids:
+        for tour_id in solution.carriers[carrier].tour_ids:
 
             delta, pickup_pos, delivery_pos = self.best_insertion_for_request_in_tour(
                 instance,
                 solution,
-                solution.tours[tour],
+                solution.tours[tour_id],
                 request)
             if delta < best_delta:
                 best_delta = delta
-                best_tour = tour
+                best_tour = tour_id
                 best_pickup_pos = pickup_pos
                 best_delivery_pos = delivery_pos
 
@@ -153,7 +153,7 @@ class PDPParallelInsertionConstruction(ABC):
             raise ut.ConstraintViolationError(f'Cannot create new route with request {request} for carrier {carrier}.'
                                               f' Max. number of vehicles is {instance.carriers_max_num_tours}!'
                                               f' ({instance.id_})')
-        tour_ = tr.Tour(solution.num_tours(), instance, depot_index=carrier_.id_)
+        tour_ = tr.Tour(solution.num_tours(), depot_index=carrier_.id_)
 
         if tour_.insertion_feasibility_check(instance, [1, 2], instance.pickup_delivery_pair(request)):
             tour_.insert_and_update(instance, [1, 2], instance.pickup_delivery_pair(request))
@@ -165,6 +165,7 @@ class PDPParallelInsertionConstruction(ABC):
 
         solution.tours.append(tour_)
         carrier_.tour_ids.append(tour_.id_)
+        carrier_.tours.append(tour_)
         carrier_.unrouted_requests.remove(request)
         carrier_.routed_requests.append(request)
         return
@@ -224,8 +225,7 @@ class MinTimeShiftInsertion(PDPParallelInsertionConstruction):
 
             for delivery_pos in range(pickup_pos + 1, len(tour_) + 1):
                 # c1 + c2 + c3 = max_shift_delta; i.e. the decrease in max_shift due to the insertions
-                delta = tour_.insert_max_shift_delta(instance, solution,
-                                                     [pickup_pos, delivery_pos],
+                delta = tour_.insert_max_shift_delta(instance, [pickup_pos, delivery_pos],
                                                      [pickup_vertex, delivery_vertex])
 
                 update_best = True

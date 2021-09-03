@@ -1,6 +1,7 @@
 import logging
 import logging.config
 import multiprocessing
+import random
 from copy import deepcopy
 from pathlib import Path
 from typing import List, Union, Tuple, Dict
@@ -89,7 +90,7 @@ def parameter_generator():
         (bg.GeneticAlgorithm, dict(population_size=300,
                                    num_generations=100,
                                    mutation_rate=0.5,
-                                   generation_gap=0.9,)
+                                   generation_gap=0.9, )
          ),
         # (bg.BestOfAllBundlings, dict()),
         (bg.RandomMaxKPartition, dict())
@@ -251,19 +252,23 @@ def write_solution_summary_to_multiindex_df(solutions_per_instance: List[List[sl
 
     # write to disk
     df.to_csv(ut.unique_path(ut.output_dir_GH, 'evaluation_agg_' + agg_level + '_#{:03d}' + '.csv'))
-    df.to_excel(ut.unique_path(ut.output_dir_GH, 'evaluation_agg_' + agg_level + '_#{:03d}' + '.xlsx'), merge_cells=False)
+    df.to_excel(ut.unique_path(ut.output_dir_GH, 'evaluation_agg_' + agg_level + '_#{:03d}' + '.xlsx'),
+                merge_cells=False)
     return df.reset_index().fillna('None').set_index(keys=index)
 
 
 if __name__ == '__main__':
     def cr_ahd():
         logger.info(f'START {datetime.now()}')
+        random.seed()
 
-        # paths = [Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/test.dat')]
         paths = sorted(
             list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
             key=ut.natural_sort_key)
-        paths = paths[:1]
+        run, rad, n = 6, 1, 0  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
+        instance_idx = run * 6 + rad * 2 + n
+        instance_idx = random.choice(range(len(paths)))
+        paths = paths[instance_idx:instance_idx + 1]
 
         if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=True)

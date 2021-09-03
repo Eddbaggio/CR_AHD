@@ -51,8 +51,7 @@ class RandomRemovalShake(Shake):
 
     def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, num_requests: int):
         carrier_ = solution.carriers[carrier]
-        for tour in range(carrier_.num_tours()):
-            tour_ = carrier_.tours[tour]
+        for tour_ in carrier_.tours:
             removed = self.execute_on_tour(instance, solution, tour_, num_requests)
             for request in removed:
                 carrier_.unrouted_requests.append(request)
@@ -60,6 +59,8 @@ class RandomRemovalShake(Shake):
 
     def execute_on_tour(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, tour_: tr.Tour, num_requests: int):
         num_requests = min(num_requests, round(len(tour_)/2)-1)
+        # todo randomize the num_request by replacing the num_request parameter by max_num_requests and randomly choose
+        #  from [1, max_num_requests]
         if num_requests > 0:
             routed = []
             for vertex in tour_.routing_sequence[1:-1]:
@@ -71,9 +72,9 @@ class RandomRemovalShake(Shake):
             removal_indices = []
             for request in removed:
                 pickup, delivery = instance.pickup_delivery_pair(request)
-                removal_indices.append(solution.vertex_position_in_tour[pickup])
-                removal_indices.append(solution.vertex_position_in_tour[delivery])
-            tour_.pop_and_update(instance, solution, sorted(removal_indices))
+                removal_indices.append(tour_.vertex_pos[pickup])
+                removal_indices.append(tour_.vertex_pos[delivery])
+            tour_.pop_and_update(instance, sorted(removal_indices))
             return removed
         else:
             return []
