@@ -134,8 +134,10 @@ class PDPMove(IntraTourNeighborhood):
         tour_copy_ = deepcopy(tour_)
         # test all requests
         for old_pickup_pos in range(1, len(tour_copy_) - 2):
-            vertex = tour_copy_.routing_sequence[
-                old_pickup_pos]  # FIXME gives the wrong index sometimes! for some reason the wrong one is stored
+            vertex = tour_copy_.routing_sequence[old_pickup_pos]
+
+            # TODO remove this assertion once I am certain the correct vertex_pos ist stored
+            assert old_pickup_pos == tour_copy_.vertex_pos[vertex]
 
             # skip if its a delivery vertex
             if instance.vertex_type(vertex) == "delivery":
@@ -218,7 +220,7 @@ class PDPTwoOpt(IntraTourNeighborhood):
         # iterate over all moves
         for i in range(0, len(tour_) - 3):
             for j in range(i + 2, len(tour_) - 1):
-
+                # computing the distance delta assumes symmetric distances
                 delta = 0
 
                 # savings of removing the edges (i, i+1) and (j, j+1)
@@ -248,7 +250,8 @@ class PDPTwoOpt(IntraTourNeighborhood):
 
         logger.debug(f'PDPTwoOpt: [{delta}] Reverse section between {i} and {j}')
 
-        tour_.reverse_section(instance, i, j)
+        popped = tour_.pop_and_update(instance, list(range(i + 1, j + 1)))
+        tour_.insert_and_update(instance, range(i + 1, j + 1), list(reversed(popped)))
         pass
 
 

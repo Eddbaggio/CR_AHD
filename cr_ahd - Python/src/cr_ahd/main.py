@@ -47,7 +47,7 @@ def parameter_generator():
         # mh.PDPTWSequentialLocalSearch(neighborhoods),
         mh.PDPTWIteratedLocalSearch(neighborhoods),
         mh.PDPTWVariableNeighborhoodDescent(neighborhoods),
-        mh.PDPTWSimulatedAnnealing(neighborhoods),
+        # mh.PDPTWSimulatedAnnealing(neighborhoods),
         mh.NoMetaheuristic([]),
     ]
 
@@ -265,10 +265,10 @@ if __name__ == '__main__':
         paths = sorted(
             list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
             key=ut.natural_sort_key)
-        run, rad, n = 6, 1, 0  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
+        run, rad, n = 12, 0, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
         instance_idx = run * 6 + rad * 2 + n
-        instance_idx = random.choice(range(len(paths)))
-        paths = paths[instance_idx:instance_idx + 1]
+        # instance_idx = random.choice(range(len(paths)))
+        paths = paths[:60]
 
         if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=True)
@@ -283,8 +283,8 @@ if __name__ == '__main__':
                      color=['solution_algorithm', secondary_parameter, ],
                      # color=secondary_parameter,
                      # category='rad', facet_col=None, facet_row='n',
-                     category='run', facet_col='rad', facet_row='n',
-                     # category='solution_algorithm', facet_col=None, facet_row=None,
+                     # category='run', facet_col='rad', facet_row='n',
+                     category='solution_algorithm', facet_col=None, facet_row=None,
                      show=True,
                      html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix())
 

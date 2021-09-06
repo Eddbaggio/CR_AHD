@@ -71,7 +71,7 @@ class Tour:
             'routing_sequence': self.routing_sequence,
             'arrival_schedule': self.arrival_time_sequence,
             'wait_sequence': self.wait_duration_sequence,
-            '_max_shift_sequence': self.max_shift_sequence,
+            'max_shift_sequence': self.max_shift_sequence,
             'service_schedule': self.service_time_sequence,
         }
 
@@ -128,10 +128,14 @@ class Tour:
         j = insertion_vertex
         k = self.routing_sequence[insertion_index]
 
-        # [1] if vertex is a delivery vertex -> check precedence
+        # [1] check precedence (only if the counterpart vertex is already in the tour)
         if instance.vertex_type(j) == 'delivery':
             pickup = j - instance.num_requests
-            if self.vertex_pos[pickup] > insertion_index:
+            if pickup in self.vertex_pos and self.vertex_pos[pickup] > insertion_index:
+                return False
+        elif instance.vertex_type(j) == 'pickup':
+            delivery = j + instance.num_requests
+            if delivery in self.vertex_pos and self.vertex_pos[delivery] <= insertion_index:
                 return False
 
         # [2] check max tour distance
@@ -189,7 +193,7 @@ class Tour:
             # check all insertions sequentially
             for idx, (pos, vertex) in enumerate(zip(insertion_indices, insertion_vertices)):
                 if copy._single_insertion_feasibility_check(instance, pos, vertex):
-                    if idx < len(insertion_indices) - 1:
+                    if idx < len(insertion_indices) - 1:  # to skip the last temporary insertion
                         copy._single_insert_and_update(instance, pos, vertex)
                 else:
                     return False
@@ -337,7 +341,8 @@ class Tour:
 
             max_shift_j = min(instance.tw_close[vertex] - self.service_time_sequence[index],
                               self.wait_duration_sequence[index + 1] + self.max_shift_sequence[index + 1])
-            self.max_shift_sequence[index] = max_shift_j
+            self.max_shift_sequence[index] = max_shift_j  # FIXME max_shift_is negative sometimes
+            assert max_shift_j > dt.timedelta(0)
             if instance.vertex_type(vertex) != "depot":
                 self.max_shift_dict[vertex] = max_shift_j
         pass
@@ -367,6 +372,7 @@ class Tour:
 
         # ===== [1] POP =====
         popped = self.routing_sequence.pop(pop_index)
+        self.vertex_pos.pop(popped)
 
         index = pop_index
         i_vertex = self.routing_sequence[index - 1]
@@ -411,7 +417,7 @@ class Tour:
         if instance.vertex_type(k_vertex) != "depot":
             self.arrival_time_dict[k_vertex] = arrival_k
 
-            # update waiting time at k_vertex (more complicated than in insert) - can only increase
+        # update waiting time at k_vertex (more complicated than in insert) - can only increase
         wait_k = max(dt.timedelta(0), instance.tw_open[k_vertex] - self.arrival_time_sequence[index])
         self.wait_duration_sequence[index] = wait_k
         if instance.vertex_type(k_vertex) != "depot":

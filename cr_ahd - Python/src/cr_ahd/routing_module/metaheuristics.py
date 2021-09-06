@@ -27,7 +27,8 @@ class PDPTWMetaHeuristic(ABC):
         self.name = f'{self.__class__.__name__}{[n.__class__.__name__ for n in self.neighborhoods]}'
 
     @abstractmethod
-    def execute(self, instance: it.MDPDPTWInstance, original_solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
+    def execute(self, instance: it.MDPDPTWInstance, original_solution: slt.CAHDSolution,
+                carriers=None) -> slt.CAHDSolution:
         pass
 
     @abstractmethod
@@ -86,7 +87,8 @@ class LocalSearchFirst(PDPTWMetaHeuristic):
     local search heuristic using the first improvement strategy
     """
 
-    def execute(self, instance: it.MDPDPTWInstance, original_solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
+    def execute(self, instance: it.MDPDPTWInstance, original_solution: slt.CAHDSolution,
+                carriers=None) -> slt.CAHDSolution:
         best_solution = deepcopy(original_solution)
         assert len(self.neighborhoods) == 1, 'Local Search can use a single neighborhood only!'
         if carriers is None:
@@ -126,7 +128,8 @@ class LocalSearchFirst(PDPTWMetaHeuristic):
 class LocalSearchBest(PDPTWMetaHeuristic):
     """implements a the local search heuristic using the best improvement strategy, i.e. steepest descent"""
 
-    def execute(self, instance: it.MDPDPTWInstance, original_solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
+    def execute(self, instance: it.MDPDPTWInstance, original_solution: slt.CAHDSolution,
+                carriers=None) -> slt.CAHDSolution:
         best_solution = deepcopy(original_solution)
         assert len(self.neighborhoods) == 1, 'Local Search must have a single neighborhood only!'
         if carriers is None:
@@ -166,7 +169,8 @@ class PDPTWSequentialLocalSearch(PDPTWMetaHeuristic):
     used.
     """
 
-    def execute(self, instance: it.MDPDPTWInstance, original_solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
+    def execute(self, instance: it.MDPDPTWInstance, original_solution: slt.CAHDSolution,
+                carriers=None) -> slt.CAHDSolution:
         best_solution = deepcopy(original_solution)
         if carriers is None:
             carriers = range(len(best_solution.carriers))
@@ -216,7 +220,8 @@ class PDPTWVariableNeighborhoodDescent(PDPTWMetaHeuristic):
     neighborhood
     """
 
-    def execute(self, instance: it.MDPDPTWInstance, original_solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
+    def execute(self, instance: it.MDPDPTWInstance, original_solution: slt.CAHDSolution,
+                carriers=None) -> slt.CAHDSolution:
         best_solution = deepcopy(original_solution)
         if carriers is None:
             carriers = range(len(best_solution.carriers))
@@ -281,13 +286,15 @@ class PDPTWVariableNeighborhoodDescent(PDPTWMetaHeuristic):
             return True
 
 
+# FIXME SA sometimes spits out worse solutions
 class PDPTWSimulatedAnnealing(PDPTWMetaHeuristic):
     def __init__(self, neighborhoods: Sequence[nh.Neighborhood]):
         super().__init__(neighborhoods)
         self.parameters['initial_temperature'] = 0
         self.parameters['temperature'] = 0
 
-    def execute(self, instance: it.MDPDPTWInstance, original_solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
+    def execute(self, instance: it.MDPDPTWInstance, original_solution: slt.CAHDSolution,
+                carriers=None) -> slt.CAHDSolution:
         solution = deepcopy(original_solution)
         if carriers is None:
             carriers = range(len(solution.carriers))
@@ -362,10 +369,11 @@ class PDPTWSimulatedAnnealing(PDPTWMetaHeuristic):
 
 class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
     """
-
+    Uses a perturbation function to explore different regions of the solution space
     """
 
-    def execute(self, instance: it.MDPDPTWInstance, original_solution: slt.CAHDSolution, carriers=None) -> slt.CAHDSolution:
+    def execute(self, instance: it.MDPDPTWInstance, original_solution: slt.CAHDSolution,
+                carriers=None) -> slt.CAHDSolution:
         solution = deepcopy(original_solution)
 
         if carriers is None:

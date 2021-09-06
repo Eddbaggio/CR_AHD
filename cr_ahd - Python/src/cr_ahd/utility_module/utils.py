@@ -326,67 +326,74 @@ def indices_to_nested_lists(indices: Sequence[int], elements: Sequence):
 def validate_solution(instance, solution):
     assert solution.num_carriers() > 0
 
-    for carrier in trange(len(solution.carriers), desc=f'Solution validation', disable=True):
-        carrier_ = solution.carriers[carrier]
+    for carrier_id in trange(len(solution.carriers), desc=f'Solution validation', disable=True):
+        carrier = solution.carriers[carrier_id]
 
-        for tour_ in carrier_.tours:
-            assert tour_ is solution.tours[tour_.id_]
-            assert tour_.routing_sequence[0] == carrier_.id_
-            assert tour_.routing_sequence[-1] == carrier_.id_
+        for tour in carrier.tours:
+            assert tour is solution.tours[tour.id_]
+            assert tour.routing_sequence[0] == carrier.id_
+            assert tour.routing_sequence[-1] == carrier.id_
 
-            assert tour_.sum_load == 0, instance.id_
-            assert tour_.sum_travel_distance <= instance.vehicles_max_travel_distance, instance.id_
-            assert round(tour_.sum_profit, 4) == round(tour_.sum_revenue - tour_.sum_travel_distance, 4), \
-                f'{instance.id_}: {round(tour_.sum_profit, 4)}!={round(tour_.sum_revenue - tour_.sum_travel_distance, 4)}'
+            assert tour.sum_load == 0, instance.id_
+            assert tour.sum_travel_distance <= instance.vehicles_max_travel_distance, instance.id_
+            assert round(tour.sum_profit, 4) == round(tour.sum_revenue - tour.sum_travel_distance, 4), \
+                f'{instance.id_}: {round(tour.sum_profit, 4)}!={round(tour.sum_revenue - tour.sum_travel_distance, 4)}'
 
-            # iterate over the tour
-            for i in trange(1, len(tour_.routing_sequence), desc=f'Tour {tour_.id_}', disable=True):
-                predecessor = tour_.routing_sequence[i - 1]
-                vertex = tour_.routing_sequence[i]
-                msg = f'{instance.id_}, tour {tour_.id_}, vertex {vertex} at index {i}'
+            validate_tour(instance, tour)
 
-                # routing and service time constraint
-                assert tour_.arrival_time_sequence[i] == tour_.service_time_sequence[i - 1] + \
-                       instance.vertex_service_duration[predecessor] + \
-                       instance.travel_duration([predecessor], [vertex]), msg
+            # tour assignment record
+            for i in trange(1, len(tour.routing_sequence), desc=f'Tour {tour.id_}', disable=True):
+                vertex = tour.routing_sequence[i]
+                request = instance.request_from_vertex(vertex)
+                assert solution.request_to_tour_assignment[
+                           request] == tour.id_, f'{instance.id_}, tour {tour.id_}, vertex {vertex} at index {i}'
 
-                # waiting times
-                assert tour_.service_time_sequence[i] == tour_.arrival_time_sequence[i] + \
-                       tour_.wait_duration_sequence[i], msg
-                assert tour_.wait_duration_sequence[i] == max(
-                    dt.timedelta(0), instance.tw_open[vertex] - tour_.arrival_time_sequence[i]), msg
 
-                # max_shift times
-                if instance.vertex_type(vertex) != 'depot':
-                    assert tour_.max_shift_sequence[i] == min(
-                        instance.tw_close[vertex] - tour_.service_time_sequence[i],
-                        tour_.wait_duration_sequence[i + 1] + tour_.max_shift_sequence[i + 1]
-                    ), msg
-                else:
-                    assert tour_.max_shift_sequence[i] == instance.tw_close[vertex] - tour_.service_time_sequence[i]
+def validate_tour(instance, tour):
+    # iterate over the tour
+    for i in trange(1, len(tour.routing_sequence), desc=f'Tour {tour.id_}', disable=True):
+        predecessor = tour.routing_sequence[i - 1]
+        vertex = tour.routing_sequence[i]
+        msg = f'{instance.id_}, tour {tour.id_}, vertex {vertex} at index {i}'
 
-                # tw constraint
-                assert instance.tw_open[vertex] <= tour_.service_time_sequence[i] <= instance.tw_close[vertex], \
-                    msg
+        # routing and service time constraint
+        assert tour.arrival_time_sequence[i] == tour.service_time_sequence[i - 1] + \
+               instance.vertex_service_duration[predecessor] + \
+               instance.travel_duration([predecessor], [vertex]), msg
 
-                # precedence constraint
-                if instance.vertex_type(vertex) == 'pickup':
-                    assert vertex + instance.num_requests in tour_.routing_sequence[i:], msg
-                elif instance.vertex_type(vertex) == 'delivery':
-                    assert vertex - instance.num_requests in tour_.routing_sequence[:i], msg
-                else:
-                    assert vertex in range(instance.num_carriers), msg
+        # waiting times
+        assert tour.service_time_sequence[i] == tour.arrival_time_sequence[i] + \
+               tour.wait_duration_sequence[i], msg
+        assert tour.wait_duration_sequence[i] == max(
+            dt.timedelta(0), instance.tw_open[vertex] - tour.arrival_time_sequence[i]), msg
 
-                # meta data
-                if instance.vertex_type(vertex) != 'depot':
-                    assert tour_.vertex_pos[vertex] == i, msg
-                    assert tour_.arrival_time_sequence[i] == tour_.arrival_time_dict[vertex], msg
-                    assert tour_.service_time_sequence[i] == tour_.service_time_dict[vertex], msg
-                    assert tour_.max_shift_sequence[i] == tour_.max_shift_dict[vertex], msg
+        # max_shift times
+        if instance.vertex_type(vertex) != 'depot':
+            assert tour.max_shift_sequence[i] == min(
+                instance.tw_close[vertex] - tour.service_time_sequence[i],
+                tour.wait_duration_sequence[i + 1] + tour.max_shift_sequence[i + 1]
+            ), msg
+        else:
+            assert tour.max_shift_sequence[i] == instance.tw_close[vertex] - tour.service_time_sequence[i]
 
-                    # tour assignment record
-                    request = instance.request_from_vertex(vertex)
-                    assert solution.request_to_tour_assignment[request] == tour_.id_, msg
+        # tw constraint
+        assert instance.tw_open[vertex] <= tour.service_time_sequence[i] <= instance.tw_close[vertex], \
+            msg
+
+        # precedence constraint
+        if instance.vertex_type(vertex) == 'pickup':
+            assert vertex + instance.num_requests in tour.routing_sequence[i:], msg
+        elif instance.vertex_type(vertex) == 'delivery':
+            assert vertex - instance.num_requests in tour.routing_sequence[:i], msg
+        else:
+            assert vertex in range(instance.num_carriers), msg
+
+        # meta data
+        if instance.vertex_type(vertex) != 'depot':
+            assert tour.vertex_pos[vertex] == i, msg
+            assert tour.arrival_time_sequence[i] == tour.arrival_time_dict[vertex], msg
+            assert tour.service_time_sequence[i] == tour.service_time_dict[vertex], msg
+            assert tour.max_shift_sequence[i] == tour.max_shift_dict[vertex], msg
 
 
 random.seed(0)
