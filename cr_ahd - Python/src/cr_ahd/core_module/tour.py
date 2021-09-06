@@ -331,6 +331,7 @@ class Tour:
 
             # update max_shift of k_vertex
             max_shift_k = self.max_shift_sequence[k_index] - time_shift_k
+            assert max_shift_k >= dt.timedelta(0)
             self.max_shift_sequence[k_index] = max_shift_k
             if instance.vertex_type(k_vertex) != "depot":
                 self.max_shift_dict[k_vertex] = max_shift_k
@@ -341,8 +342,8 @@ class Tour:
 
             max_shift_j = min(instance.tw_close[vertex] - self.service_time_sequence[index],
                               self.wait_duration_sequence[index + 1] + self.max_shift_sequence[index + 1])
+            assert max_shift_j >= dt.timedelta(0)
             self.max_shift_sequence[index] = max_shift_j  # FIXME max_shift_is negative sometimes
-            assert max_shift_j > dt.timedelta(0)
             if instance.vertex_type(vertex) != "depot":
                 self.max_shift_dict[vertex] = max_shift_j
         pass

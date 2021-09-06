@@ -231,7 +231,7 @@ class MaxCliqueTourInitialization(ABC):
                         arcs[k][j] = 0
                         arcs[j][k] = 0
                     # remove j from graph nodes
-                    nodes.execute(j)
+                    nodes.remove(j)
                     # mark j
                     marked[j] = True
             pass

@@ -47,7 +47,8 @@ def parameter_generator():
         # mh.PDPTWSequentialLocalSearch(neighborhoods),
         mh.PDPTWIteratedLocalSearch(neighborhoods),
         mh.PDPTWVariableNeighborhoodDescent(neighborhoods),
-        # mh.PDPTWSimulatedAnnealing(neighborhoods),
+        mh.PDPTWReducedVariableNeighborhoodSearch(neighborhoods),
+        mh.PDPTWSimulatedAnnealing(neighborhoods),
         mh.NoMetaheuristic([]),
     ]
 
@@ -268,7 +269,7 @@ if __name__ == '__main__':
         run, rad, n = 12, 0, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
         instance_idx = run * 6 + rad * 2 + n
         # instance_idx = random.choice(range(len(paths)))
-        paths = paths[:60]
+        paths = paths[:24]
 
         if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=True)
@@ -282,9 +283,9 @@ if __name__ == '__main__':
                      values='sum_profit',
                      color=['solution_algorithm', secondary_parameter, ],
                      # color=secondary_parameter,
-                     # category='rad', facet_col=None, facet_row='n',
+                     category='rad', facet_col=None, facet_row='n',
                      # category='run', facet_col='rad', facet_row='n',
-                     category='solution_algorithm', facet_col=None, facet_row=None,
+                     # category='solution_algorithm', facet_col=None, facet_row=None,
                      show=True,
                      html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix())
 

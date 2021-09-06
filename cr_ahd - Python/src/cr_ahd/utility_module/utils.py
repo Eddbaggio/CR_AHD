@@ -342,8 +342,7 @@ def validate_solution(instance, solution):
             validate_tour(instance, tour)
 
             # tour assignment record
-            for i in trange(1, len(tour.routing_sequence), desc=f'Tour {tour.id_}', disable=True):
-                vertex = tour.routing_sequence[i]
+            for vertex in tour.routing_sequence[1:-1]:
                 request = instance.request_from_vertex(vertex)
                 assert solution.request_to_tour_assignment[
                            request] == tour.id_, f'{instance.id_}, tour {tour.id_}, vertex {vertex} at index {i}'
