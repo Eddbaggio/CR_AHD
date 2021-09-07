@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 def parameter_generator():
     """
-    generate dicts with all parameters that shall be tested and are required to initialize a solver.
+    generate dicts with all parameters are required to initialize a slv.Solver.
     """
     neighborhoods: List[nh.Neighborhood] = [  # these are fixed at the moment, i.e. not looped over
         nh.PDPMove(),
@@ -45,10 +45,10 @@ def parameter_generator():
         # mh.LocalSearchBest([neighborhoods[0]]),
         # mh.LocalSearchBest([neighborhoods[1]]),
         # mh.PDPTWSequentialLocalSearch(neighborhoods),
-        mh.PDPTWIteratedLocalSearch(neighborhoods),
-        mh.PDPTWVariableNeighborhoodDescent(neighborhoods),
-        mh.PDPTWReducedVariableNeighborhoodSearch(neighborhoods),
-        mh.PDPTWSimulatedAnnealing(neighborhoods),
+        # mh.PDPTWIteratedLocalSearch(neighborhoods),
+        # mh.PDPTWVariableNeighborhoodDescent(neighborhoods),
+        # mh.PDPTWReducedVariableNeighborhoodSearch(neighborhoods),
+        # mh.PDPTWSimulatedAnnealing(neighborhoods),
         mh.NoMetaheuristic([]),
     ]
 
@@ -60,7 +60,7 @@ def parameter_generator():
 
     nums_submitted_requests: List[int] = [
         # 3,
-        # 4,
+        4,
         # 5
     ]
 
@@ -94,7 +94,7 @@ def parameter_generator():
                                    generation_gap=0.9, )
          ),
         # (bg.BestOfAllBundlings, dict()),
-        (bg.RandomMaxKPartition, dict())
+        # (bg.RandomMaxKPartition, dict())
     ]
 
     bundling_valuations: List[bv.BundlingValuation.__class__] = [
@@ -161,7 +161,7 @@ def execute_all(instance: it.MDPDPTWInstance, plot=False):
             solutions.append(deepcopy(solution))
 
         except Exception as e:
-            logger.error(f'{e}\nFailed on instance {instance} with solver {solver.__class__.__name__}')
+            logger.error(f'{e}\nFailed on instance {instance} with solver {solver.__class__.__name__} at {datetime.now()}')
             raise e
             solution = slt.CAHDSolution(instance)  # create an empty solution for failed instances
             solver.update_solution_solver_config(solution)
@@ -268,8 +268,8 @@ if __name__ == '__main__':
             key=ut.natural_sort_key)
         run, rad, n = 12, 0, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
         instance_idx = run * 6 + rad * 2 + n
-        # instance_idx = random.choice(range(len(paths)))
-        paths = paths[:24]
+        instance_idx = random.choice(range(len(paths)))
+        paths = paths[instance_idx:instance_idx+1]
 
         if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=True)

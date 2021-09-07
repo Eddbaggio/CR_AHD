@@ -76,7 +76,8 @@ class RequestSelectionBehaviorIndividual(RequestSelectionBehavior, ABC):
         return auction_request_pool, original_bundling_labels
 
     @abstractmethod
-    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, request: int):
+    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int,
+                          request: int):
         """compute the valuation of the given request for the carrier"""
         pass
 
@@ -86,7 +87,8 @@ class Random(RequestSelectionBehaviorIndividual):
     returns a random selection of unrouted requests
     """
 
-    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, request: int):
+    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int,
+                          request: int):
         return random.random()
 
 
@@ -105,12 +107,13 @@ class MarginalProfit(RequestSelectionBehaviorIndividual):
     this is not yet functional.
     """
 
-    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, request: int):
+    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int,
+                          request: int):
         raise NotImplementedError
         # find the request's tour:
         # TODO: would be faster if the tour was stored somewhere as a lookup but this is fine for now
         pickup, delivery = instance.pickup_delivery_pair(request)
-        for t in solution.carriers[carrier].tours:
+        for t in solution.carriers[carrier_id].tours:
             if pickup in t.routing_sequence:
                 tour_ = t
                 break
@@ -151,27 +154,22 @@ class MarginalProfitProxy(RequestSelectionBehaviorIndividual):
     from its tour
     """
 
-    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, request: int):
+    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int,
+                          request: int):
         # find the request's tour:
-        tour_ = solution.carriers[carrier].tours[solution.request_to_tour_assignment[request]]
+        tour = solution.tours[solution.request_to_tour_assignment[request]]
         pickup, delivery = instance.pickup_delivery_pair(request)
 
-        pickup_pos = tour_.routing_sequence.index(pickup)
-        delivery_pos = tour_.routing_sequence.index(delivery)
-
-        pickup_predecessor = tour_.routing_sequence[pickup_pos - 1]
-        pickup_successor = tour_.routing_sequence[pickup_pos + 1]
-        delivery_predecessor = tour_.routing_sequence[delivery_pos - 1]
-        delivery_successor = tour_.routing_sequence[delivery_pos + 1]
+        pickup_pos = tour.vertex_pos[pickup]
+        delivery_pos = tour.vertex_pos[delivery]
 
         # marginal fulfillment cost for the request
-        travel_distance_delta = instance.distance([pickup_predecessor, pickup], [pickup, pickup_successor]) - \
-                                instance.distance([pickup_predecessor], [pickup_successor]) + \
-                                instance.distance([delivery_predecessor, delivery], [delivery, delivery_successor]) - \
-                                instance.distance([delivery_predecessor], [delivery_successor])
+        marginal_fulfillment_cost = - tour.pop_distance_delta(instance, [pickup_pos, delivery_pos])
 
-        # return marginal profit = revenue - fulfillment cost
-        return instance.vertex_revenue[delivery] - travel_distance_delta
+        # marginal profit = revenue - fulfillment cost
+        marginal_profit = instance.vertex_revenue[delivery] - marginal_fulfillment_cost
+
+        return marginal_profit
 
 
 class MinDistanceToForeignDepotDMin(RequestSelectionBehaviorIndividual):
@@ -180,10 +178,11 @@ class MinDistanceToForeignDepotDMin(RequestSelectionBehaviorIndividual):
     MINIMUM of the distances (pickup - depot) and (delivery - depot)
     """
 
-    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, request: int):
+    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int,
+                          request: int):
 
-        foreign_depots = solution.carrier_depots[:]
-        foreign_depots.pop(carrier)
+        foreign_depots = list(range(instance.num_carriers))
+        foreign_depots.pop(carrier_id)
         foreign_depots = ut.flatten(foreign_depots)
 
         dist_min = float('inf')
@@ -201,11 +200,11 @@ class MinDistanceToForeignDepotDSum(RequestSelectionBehaviorIndividual):
     SUM of the distances (pickup - depot) and (delivery - depot)
     """
 
-    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, request: int):
+    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int,
+                          request: int):
 
-        foreign_depots = solution.carrier_depots[:]
-        foreign_depots.pop(carrier)
-        foreign_depots = ut.flatten(foreign_depots)
+        foreign_depots = list(range(instance.num_carriers))
+        foreign_depots.pop(carrier_id)
 
         dist_min = float('inf')
         for depot in foreign_depots:
@@ -226,23 +225,23 @@ class ComboRaw(RequestSelectionBehaviorIndividual):
     summing up the distances between the pickup node pr and the delivery node dr to the depot (oc or oa).
     """
 
-    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, request: int):
+    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int,
+                          request: int):
         # weighting factors
         alpha1 = 1
         alpha2 = 1
         alpha3 = 1
 
         # [i] distance to the depot of one of the collaborating carriers
-        min_dist_to_foreign_depot = MinDistanceToForeignDepotDSum(None)._evaluate_request(instance, solution, carrier,
-                                                                                          request)
+        min_dist_to_foreign_depot = MinDistanceToForeignDepotDSum(None)._evaluate_request(instance, solution,
+                                                                                          carrier_id, request)
 
         # [ii] marginal profit
-        marginal_profit = MarginalProfitProxy(None)._evaluate_request(instance, solution, carrier, request)
+        marginal_profit = MarginalProfitProxy(None)._evaluate_request(instance, solution, carrier_id, request)
 
         # [iii] distance to the carrier's own depot
         pickup, delivery = instance.pickup_delivery_pair(request)
-        assert len(solution.carrier_depots[carrier]) == 1
-        own_depot = solution.carrier_depots[carrier][0]
+        own_depot = solution.carriers[carrier_id].id_
         dist_to_own_depot = instance.distance([pickup, delivery], [own_depot, own_depot])
 
         # weighted sum of non-standardized [i], [ii], [iii]
@@ -281,11 +280,11 @@ class ComboStandardized(RequestSelectionBehaviorIndividual):
         alpha2 = 1
         alpha3 = 1
 
-        for carrier in range(instance.num_carriers):
-            k = _abs_num_requests(solution.carriers[carrier], self.num_submitted_requests)
+        for carrier_id in range(instance.num_carriers):
+            k = _abs_num_requests(solution.carriers[carrier_id], self.num_submitted_requests)
             valuations = []
-            for request in solution.carriers[carrier].accepted_requests:
-                valuation = self._evaluate_request(instance, solution, carrier, request)
+            for request in solution.carriers[carrier_id].accepted_requests:
+                valuation = self._evaluate_request(instance, solution, carrier_id, request)
                 valuations.append(valuation)
 
             # normalize the valuation components
@@ -302,30 +301,30 @@ class ComboStandardized(RequestSelectionBehaviorIndividual):
                 valuations.append(weighted_valuation)
 
             # pick the WORST k evaluated requests (from ascending order)
-            selected = [r for _, r in sorted(zip(valuations, solution.carriers[carrier].accepted_requests))][:k]
+            selected = [r for _, r in sorted(zip(valuations, solution.carriers[carrier_id].accepted_requests))][:k]
             selected.sort()
 
             for request in selected:
                 solution.free_requests_from_carriers(instance, [request])
                 auction_request_pool.append(request)
-                original_bundling_labels.append(carrier)
+                original_bundling_labels.append(carrier_id)
 
         return auction_request_pool, original_bundling_labels
 
-    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, request: int) -> \
+    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int,
+                          request: int) -> \
             Tuple[float, float, float]:
 
         # [i] distance to the depot of one of the collaborating carriers
-        min_dist_to_foreign_depot = MinDistanceToForeignDepotDSum(None)._evaluate_request(instance, solution, carrier,
-                                                                                          request)
+        min_dist_to_foreign_depot = MinDistanceToForeignDepotDSum(None)._evaluate_request(instance, solution,
+                                                                                          carrier_id, request)
 
         # [ii] marginal profit
-        marginal_profit = MarginalProfitProxy(None)._evaluate_request(instance, solution, carrier, request)
+        marginal_profit = MarginalProfitProxy(None)._evaluate_request(instance, solution, carrier_id, request)
 
         # [iii] distance to the carrier's own depot
         pickup, delivery = instance.pickup_delivery_pair(request)
-        assert len(solution.carrier_depots[carrier]) == 1
-        own_depot = solution.carrier_depots[carrier][0]
+        own_depot = solution.carriers[carrier_id].id_
         dist_to_own_depot = instance.distance([pickup, delivery], [own_depot, own_depot])
 
         return min_dist_to_foreign_depot, marginal_profit, dist_to_own_depot
@@ -337,7 +336,8 @@ class PackedTW(RequestSelectionBehaviorIndividual):
     profitability
     """
 
-    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, request: int):
+    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int,
+                          request: int):
         pass
 
 

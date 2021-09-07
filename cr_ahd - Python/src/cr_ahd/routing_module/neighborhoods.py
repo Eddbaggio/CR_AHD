@@ -17,7 +17,7 @@ class Neighborhood(ABC):
         """
         :return: generator that returns the next found move upon calling the next() method on it. Each move is a
         tuple containing all necessary information to see whether to accept that move and the information to execute
-        a move. The first element of that tuple is always the delta in travel distance.
+        a move. The first element of that tuple is always the delta *IN TRAVEL DISTANCE*.
         """
         pass
 

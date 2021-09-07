@@ -137,7 +137,7 @@ def bundle_vertex_to_centroid_travel_dist(instance: it.MDPDPTWInstance,
     for request in bundle:
         pickup, delivery = instance.pickup_delivery_pair(request)
         # the centroid index for the distance matrix
-        centroid_idx = instance.num_depots + 2 * instance.num_requests + bundle_idx
+        centroid_idx = instance.num_carriers + 2 * instance.num_requests + bundle_idx
         travel_dist_to_centroid.append(
             (extended_distance_matrix[pickup][centroid_idx], extended_distance_matrix[delivery][centroid_idx]))
     return travel_dist_to_centroid
@@ -495,14 +495,14 @@ class LosSchulteBundlingValuation(BundlingValuation):
             for i, request0 in enumerate(bundle[:-1]):
                 p0, d0 = instance.pickup_delivery_pair(request0)
                 # adjust vertex indices to account for depots
-                p0 -= instance.num_depots
-                d0 -= instance.num_depots
+                p0 -= instance.num_carriers
+                d0 -= instance.num_carriers
 
                 for j, request1 in enumerate(bundle[i + 1:]):
                     p1, d1 = instance.pickup_delivery_pair(request1)
                     # adjust vertex indices to account for depots
-                    p1 -= instance.num_depots
-                    d1 -= instance.num_depots
+                    p1 -= instance.num_carriers
+                    d1 -= instance.num_carriers
 
                     # compute request_similarity between requests 0 and 1 acc. to the paper's formula (1)
                     request_similarity = los_schulte_request_similarity(d0, p0, d1, p1, self.vertex_relatedness_matrix)
@@ -518,8 +518,8 @@ class LosSchulteBundlingValuation(BundlingValuation):
         else:
             p0, d0 = instance.pickup_delivery_pair(bundle[0])
             # adjust vertex indices to account for depots
-            p0 -= instance.num_depots
-            d0 -= instance.num_depots
+            p0 -= instance.num_carriers
+            d0 -= instance.num_carriers
             # todo: cluster weights acc. to cluster size?
             bundle_valuation = self.vertex_relatedness_matrix[p0][d0]
 

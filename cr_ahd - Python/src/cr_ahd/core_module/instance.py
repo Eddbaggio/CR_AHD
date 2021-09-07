@@ -48,7 +48,7 @@ class MDPDPTWInstance:
         self.meta = dict((k.strip(), int(v.strip()))
                          for k, v in (item.split('=')
                                       for item in id_.split('+')))
-        self.num_depots = len(carrier_depots_x)
+        self.num_carriers = len(carrier_depots_x)
         self.num_carriers = len(carrier_depots_x)
         self.vehicles_max_load = max_vehicle_load
         self.vehicles_max_travel_distance = max_tour_length
@@ -60,9 +60,9 @@ class MDPDPTWInstance:
         self.x_coords = [*carrier_depots_x, *requests_pickup_x, *requests_delivery_x]
         self.y_coords = [*carrier_depots_y, *requests_pickup_y, *requests_delivery_y]
         self.request_to_carrier_assignment = requests_initial_carrier_assignment
-        self.vertex_revenue = [*[0] * (self.num_depots + len(requests)), *requests_revenue]
-        self.vertex_load = [*[0] * self.num_depots, *requests_pickup_load, *requests_delivery_load]
-        self.vertex_service_duration = (*[dt.timedelta(0)] * self.num_depots,
+        self.vertex_revenue = [*[0] * (self.num_carriers + len(requests)), *requests_revenue]
+        self.vertex_load = [*[0] * self.num_carriers, *requests_pickup_load, *requests_delivery_load]
+        self.vertex_service_duration = (*[dt.timedelta(0)] * self.num_carriers,
                                         *requests_pickup_service_time,
                                         *requests_delivery_service_time)
         self.tw_open = [*carrier_depots_tw_open, *request_pickup_time_window_open, *request_delivery_time_window_open]
@@ -77,7 +77,7 @@ class MDPDPTWInstance:
         logger.debug(f'{id_}: created')
 
     def __str__(self):
-        return f'Instance {self.id_} with {len(self.requests)} customers, {self.num_carriers} carriers and {self.num_depots} depots'
+        return f'Instance {self.id_} with {len(self.requests)} customers, {self.num_carriers} carriers'
 
     @property
     def id_(self):
@@ -113,18 +113,18 @@ class MDPDPTWInstance:
         if request >= self.num_requests:
             raise IndexError(
                 f'you asked for request {request} but instance {self.id_} only has {self.num_requests} requests')
-        return self.num_depots + request, self.num_depots + self.num_requests + request
+        return self.num_carriers + request, self.num_carriers + self.num_requests + request
 
     def request_from_vertex(self, vertex: int):
-        if vertex < self.num_depots:
+        if vertex < self.num_carriers:
             raise IndexError(f'you provided vertex {vertex} but that is a depot vertex, not a request vertex')
-        elif vertex >= self.num_depots + 2 * self.num_requests:
+        elif vertex >= self.num_carriers + 2 * self.num_requests:
             raise IndexError(
-                f'you provided vertex {vertex} but there are only {self.num_depots + 2 * self.num_requests} vertices')
-        elif vertex <= self.num_depots + self.num_requests - 1:  # pickup vertex
-            return vertex - self.num_depots
+                f'you provided vertex {vertex} but there are only {self.num_carriers + 2 * self.num_requests} vertices')
+        elif vertex <= self.num_carriers + self.num_requests - 1:  # pickup vertex
+            return vertex - self.num_carriers
         else:  # delivery vertex
-            return vertex - self.num_depots - self.num_requests
+            return vertex - self.num_carriers - self.num_requests
 
     def coords(self, vertex: int):
         """returns a tuple of (x, y) coordinates for the vertex"""
@@ -148,11 +148,11 @@ class MDPDPTWInstance:
         return file_name
 
     def vertex_type(self, vertex: int):
-        if vertex < self.num_depots:
+        if vertex < self.num_carriers:
             return "depot"
-        elif vertex < self.num_depots + self.num_requests:
+        elif vertex < self.num_carriers + self.num_requests:
             return "pickup"
-        elif vertex < self.num_depots + 2 * self.num_requests:
+        elif vertex < self.num_carriers + 2 * self.num_requests:
             return "delivery"
         else:
             raise IndexError(f'Vertex index {vertex} out of range')

@@ -34,11 +34,11 @@ class BiddingBehavior(ABC):
         for b in tqdm.trange(len(bundles), desc='Bidding', disable=True):
             # assert [b[i] < b[i+1] for i in range(len(b)-1]  # make sure bundles are sorted?
             carrier_bundle_bids = []
-            for carrier in range(instance.num_carriers):
-                logger.debug(f'Carrier {carrier} generating bids for bundle {b}')
+            for carrier_id in range(instance.num_carriers):
+                logger.debug(f'Carrier {carrier_id} generating bids for bundle {b}')
 
-                value_without_bundle = solution.carriers[carrier].objective()
-                value_with_bundle = self._value_with_bundle(instance, solution, bundles[b], carrier)
+                value_without_bundle = solution.carriers[carrier_id].objective()
+                value_with_bundle = self._value_with_bundle(instance, solution, bundles[b], carrier_id)
                 bid = value_with_bundle - value_without_bundle
 
                 carrier_bundle_bids.append(bid)
@@ -47,11 +47,12 @@ class BiddingBehavior(ABC):
         solution.bidding_behavior = self.__class__.__name__
         return bundle_bids
 
-    def _create_tmp_carrier_copy_with_bundle(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
-                                             bundle: Sequence[int], carrier: int):
+    @staticmethod
+    def _create_tmp_carrier_copy_with_bundle(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+                                             bundle: Sequence[int], carrier_id: int):
         # create a temporary copy to compute the correct bids
         tmp_carrier = instance.num_carriers  # ID
-        tmp_carrier_ = deepcopy(solution.carriers[carrier])
+        tmp_carrier_ = deepcopy(solution.carriers[carrier_id])
 
         # add the bundle to the carriers assigned and accepted requests
         tmp_carrier_.assigned_requests.extend(bundle)
@@ -64,27 +65,27 @@ class BiddingBehavior(ABC):
         tmp_carrier_.unrouted_requests.sort()
 
         solution.carriers.append(tmp_carrier_)
-        solution.carrier_depots.append(solution.carrier_depots[carrier])
+        solution.carrier_depots.append(solution.carrier_depots[carrier_id])
 
         return tmp_carrier, tmp_carrier_
 
     @abstractmethod
     def _value_with_bundle(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, bundle: Sequence[int],
-                           carrier: int):
+                           carrier_id: int):
         pass
 
 
 class DynamicInsertion(BiddingBehavior):
     def _value_with_bundle(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, bundle: Sequence[int],
-                           carrier: int):
-        tmp_carrier, tmp_carrier_ = self._create_tmp_carrier_copy_with_bundle(instance, solution, bundle, carrier)
+                           carrier_id: int):
+        tmp_carrier_id, tmp_carrier = self._create_tmp_carrier_copy_with_bundle(instance, solution, bundle, carrier_id)
 
-        # insert bundle's requests 'dynamically', i.e. in their order inside the tmp_carrier_.unrouted list
+        # insert bundle's requests 'dynamically', i.e. in order of the tmp_carrier_.unrouted list
         try:
-            while tmp_carrier_.unrouted_requests:
-                request = tmp_carrier_.unrouted_requests[0]
-                self.tour_construction.insert_single(instance, solution, tmp_carrier, request)
-            with_bundle = tmp_carrier_.objective()
+            while tmp_carrier.unrouted_requests:
+                request = tmp_carrier.unrouted_requests[0]
+                self.tour_construction.insert_single(instance, solution, tmp_carrier_id, request)
+            with_bundle = tmp_carrier.objective()
         except ut.ConstraintViolationError:
             with_bundle = -float('inf')
         finally:
@@ -101,25 +102,26 @@ class DynamicInsertionAndImprove(BiddingBehavior):
     of request arrival to mimic the dynamic request arrival process within the acceptance phase. Afterwards, an
     improvement is executed using the defined metaheuristic.
     """
+
     def _value_with_bundle(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, bundle: Sequence[int],
-                           carrier: int):
+                           carrier_id: int):
 
         # create temporary copy of the carrier
-        tmp_carrier, tmp_carrier_ = self._create_tmp_carrier_copy_with_bundle(instance, solution, bundle, carrier)
+        tmp_carrier_id, tmp_carrier = self._create_tmp_carrier_copy_with_bundle(instance, solution, bundle, carrier_id)
 
         # reset the temporary carrier's solution and start from scratch instead
-        tmp_carrier_.clear_routes()
+        tmp_carrier.clear_routes()
 
-        # assign and insert requests of the bundle
+        # assign and insert (original + bundle) requests
         try:
-            while tmp_carrier_.unrouted_requests:
-                request = tmp_carrier_.unrouted_requests[0]
-                self.tour_construction.insert_single(instance, solution, tmp_carrier, request)
+            while tmp_carrier.unrouted_requests:
+                request = tmp_carrier.unrouted_requests[0]
+                self.tour_construction.insert_single(instance, solution, tmp_carrier_id, request)
             # start_time = time.time()
-            tmp_solution = self.tour_improvement.execute(instance, solution, [tmp_carrier])
+            tmp_solution = self.tour_improvement.execute(instance, solution, [tmp_carrier_id])
             # print(time.time() - start_time)
             with_bundle = tmp_solution.carriers[
-                tmp_carrier].objective()  # todo: CHECK WHETHER THE TMP_CARRIER IS CORRECT! TOUR IMPROVEMENT DOES NOT OPERATE IN PLACE ANY LONGER
+                tmp_carrier_id].objective()  # todo: CHECK WHETHER THE TMP_CARRIER IS CORRECT! TOUR IMPROVEMENT DOES NOT OPERATE IN PLACE ANY LONGER
         except ut.ConstraintViolationError:
             with_bundle = -float('inf')
         finally:
