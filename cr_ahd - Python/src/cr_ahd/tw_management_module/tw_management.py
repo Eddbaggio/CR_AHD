@@ -17,17 +17,16 @@ class TWManagement(ABC):
         self.time_window_selection = time_window_selection
 
     @abstractmethod
-    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, request: int):
+    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution, request: int):
         pass
 
 
 class TWManagementNoTW(TWManagement):
-    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, request: int):
+    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution, request: int):
         # TODO: this does not consider the possibility that a carrier may still have to reject a customer even if she
         #  has the full time horizon as a time window
-        carrier_ = solution.carriers[carrier]
-        carrier_.accepted_requests.append(request)
-        carrier_.acceptance_rate = len(carrier_.accepted_requests) / len(carrier_.assigned_requests)
+        carrier.accepted_requests.append(request)
+        carrier.acceptance_rate = len(carrier.accepted_requests) / len(carrier.assigned_requests)
         return True
 
 
@@ -38,8 +37,7 @@ class TWManagementSingle(TWManagement):
     NOTE: modifies the instance in place (adding the time window information)!
     """
 
-    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, request: int):
-        carrier_ = solution.carriers[carrier]
+    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution, request: int):
         offer_set = self.time_window_offering.execute(instance, solution, carrier, request)  # which TWs to offer?
         selected_tw = self.time_window_selection.execute(offer_set, request)  # which TW is selected?
         pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
@@ -51,8 +49,8 @@ class TWManagementSingle(TWManagement):
             # set the TW open and close times for the delivery vertex
             instance.tw_open[delivery_vertex] = selected_tw.open
             instance.tw_close[delivery_vertex] = selected_tw.close
-            carrier_.accepted_requests.append(request)
-            carrier_.acceptance_rate = len(carrier_.accepted_requests) / len(carrier_.assigned_requests)
+            carrier.accepted_requests.append(request)
+            carrier.acceptance_rate = len(carrier.accepted_requests) / len(carrier.assigned_requests)
             return True
 
         # in case no feasible TW exists for a given request
@@ -60,7 +58,7 @@ class TWManagementSingle(TWManagement):
             logger.error(f'[{instance.id_}] No feasible TW can be offered from Carrier {carrier} to request {request}')
             instance.tw_open[delivery_vertex] = ut.START_TIME
             instance.tw_close[delivery_vertex] = ut.START_TIME
-            carrier_.rejected_requests.append(request)
-            carrier_.unrouted_requests.pop(0)
-            carrier_.acceptance_rate = len(carrier_.accepted_requests) / len(carrier_.assigned_requests)
+            carrier.rejected_requests.append(request)
+            carrier.unrouted_requests.pop(0)
+            carrier.acceptance_rate = len(carrier.accepted_requests) / len(carrier.assigned_requests)
             return False

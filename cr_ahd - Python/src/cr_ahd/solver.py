@@ -96,14 +96,16 @@ class Solver:
         while solution.unassigned_requests:
             # assign the next request
             request = solution.unassigned_requests[0]
-            carrier = instance.request_to_carrier_assignment[request]
-            solution.assign_requests_to_carriers([request], [carrier])
+            carrier_id = instance.request_to_carrier_assignment[request]
+            carrier = solution.carriers[carrier_id]
+            solution.assign_requests_to_carriers([request], [carrier_id])
 
             # find the tw for the request
             accepted = self.time_window_management.execute(instance, solution, carrier, request)
 
             # build tours with the assigned request if it was accepted
             if accepted:
+
                 self.tour_construction.insert_single(instance, solution, carrier, request)
 
         ut.validate_solution(instance, solution)  # check to make sure everything's functional

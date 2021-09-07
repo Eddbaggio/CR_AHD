@@ -2,7 +2,7 @@ import datetime as dt
 import json
 import logging.config
 from pathlib import Path
-from typing import Tuple, Sequence
+from typing import Tuple, Sequence, List
 
 import numpy as np
 import pandas as pd
@@ -59,7 +59,7 @@ class MDPDPTWInstance:
         self.num_requests_per_carrier = self.num_requests // self.num_carriers
         self.x_coords = [*carrier_depots_x, *requests_pickup_x, *requests_delivery_x]
         self.y_coords = [*carrier_depots_y, *requests_pickup_y, *requests_delivery_y]
-        self.request_to_carrier_assignment = requests_initial_carrier_assignment
+        self.request_to_carrier_assignment: List[int] = requests_initial_carrier_assignment
         self.vertex_revenue = [*[0] * (self.num_carriers + len(requests)), *requests_revenue]
         self.vertex_load = [*[0] * self.num_carriers, *requests_pickup_load, *requests_delivery_load]
         self.vertex_service_duration = (*[dt.timedelta(0)] * self.num_carriers,

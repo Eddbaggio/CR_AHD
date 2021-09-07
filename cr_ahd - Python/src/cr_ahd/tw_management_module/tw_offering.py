@@ -6,7 +6,7 @@ from src.cr_ahd.utility_module import utils as ut
 
 
 class TWOfferingBehavior(abc.ABC):
-    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, request: int):
+    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution, request: int):
         pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
         # make sure that the request has not been given a tw yet
         assert instance.tw_open[delivery_vertex] in (ut.START_TIME, None)
@@ -22,7 +22,7 @@ class TWOfferingBehavior(abc.ABC):
     @abc.abstractmethod
     def _evaluate_time_window(self, instance: it.MDPDPTWInstance,
                               solution: slt.CAHDSolution,
-                              carrier: int,
+                              carrier: slt.AHDSolution,
                               request: int,
                               tw: ut.TimeWindow):
         pass
@@ -33,7 +33,7 @@ class FeasibleTW(TWOfferingBehavior):
             self,
             instance: it.MDPDPTWInstance,
             solution: slt.CAHDSolution,
-            carrier: int,
+            carrier: slt.AHDSolution,
             request: int,
             tw: ut.TimeWindow
     ):
@@ -41,16 +41,15 @@ class FeasibleTW(TWOfferingBehavior):
         :return: 1 if TW is feasible, -1 else
         """
 
-        carrier_ = solution.carriers[carrier]
         pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
         # temporarily set the time window under consideration
         instance.tw_open[delivery_vertex] = tw.open
         instance.tw_close[delivery_vertex] = tw.close
 
         # can the carrier open a new pendulum tour and insert the request there?
-        if carrier_.num_tours() < instance.carriers_max_num_tours:
+        if carrier.num_tours() < instance.carriers_max_num_tours:
 
-            tmp_tour_ = tr.Tour('tmp', carrier_.id_)
+            tmp_tour_ = tr.Tour('tmp', carrier.id_)
             if tmp_tour_.insertion_feasibility_check(instance, [1, 2], [pickup_vertex, delivery_vertex]):
                 # undo the setting of the time window and return
                 instance.tw_open[delivery_vertex] = ut.START_TIME
@@ -58,7 +57,7 @@ class FeasibleTW(TWOfferingBehavior):
                 return 1
 
         # if no feasible new tour can be built, can the request be inserted into one of the existing tours?
-        for tmp_tour_ in carrier_.tours:
+        for tmp_tour_ in carrier.tours:
             for pickup_pos in range(1, len(tmp_tour_)):
                 for delivery_pos in range(pickup_pos + 1, len(tmp_tour_) + 1):
                     if tmp_tour_.insertion_feasibility_check(instance,

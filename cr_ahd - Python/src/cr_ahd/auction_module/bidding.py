@@ -84,7 +84,7 @@ class DynamicInsertion(BiddingBehavior):
         try:
             while tmp_carrier.unrouted_requests:
                 request = tmp_carrier.unrouted_requests[0]
-                self.tour_construction.insert_single(instance, solution, tmp_carrier_id, request)
+                self.tour_construction.insert_single(instance, solution, tmp_carrier, request)
             with_bundle = tmp_carrier.objective()
         except ut.ConstraintViolationError:
             with_bundle = -float('inf')
@@ -116,7 +116,7 @@ class DynamicInsertionAndImprove(BiddingBehavior):
         try:
             while tmp_carrier.unrouted_requests:
                 request = tmp_carrier.unrouted_requests[0]
-                self.tour_construction.insert_single(instance, solution, tmp_carrier_id, request)
+                self.tour_construction.insert_single(instance, solution, tmp_carrier, request)
             # start_time = time.time()
             tmp_solution = self.tour_improvement.execute(instance, solution, [tmp_carrier_id])
             # print(time.time() - start_time)

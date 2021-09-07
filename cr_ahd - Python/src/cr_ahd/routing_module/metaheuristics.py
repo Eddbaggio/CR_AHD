@@ -451,12 +451,13 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
         else:
             return False
 
-    def perturbation(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, num_requests: int):
+    def perturbation(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int, num_requests: int):
         solution_copy = deepcopy(solution)
+        carrier = solution_copy.carriers[carrier_id]
         try:
             # destroy
             # TODO test different shakes
-            sh.RandomRemovalShake().execute(instance, solution_copy, carrier, num_requests)
+            sh.RandomRemovalShake().execute(instance, solution_copy, carrier_id, num_requests)
             # repair
             # TODO test different repairs
             cns.MinTravelDistanceInsertion().insert_all(instance, solution_copy, carrier)

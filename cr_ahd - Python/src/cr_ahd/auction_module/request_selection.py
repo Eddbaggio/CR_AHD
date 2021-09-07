@@ -76,7 +76,7 @@ class RequestSelectionBehaviorIndividual(RequestSelectionBehavior, ABC):
         return auction_request_pool, original_bundling_labels
 
     @abstractmethod
-    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int,
+    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int,  # TODO change carrier_id: int to carrier: slt.AHDSolution
                           request: int):
         """compute the valuation of the given request for the carrier"""
         pass
@@ -110,30 +110,26 @@ class MarginalProfit(RequestSelectionBehaviorIndividual):
     def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int,
                           request: int):
         raise NotImplementedError
-        # find the request's tour:
-        # TODO: would be faster if the tour was stored somewhere as a lookup but this is fine for now
-        pickup, delivery = instance.pickup_delivery_pair(request)
-        for t in solution.carriers[carrier_id].tours:
-            if pickup in t.routing_sequence:
-                tour_ = t
-                break
-        travel_distance_with_request = tour_.sum_travel_distance
+
+        tour = solution.tours[solution.request_to_tour_assignment[request]]
+
+        travel_distance_with_request = tour.sum_travel_distance
 
         # create a new tour without the request
-        tmp_tour_ = tr.Tour('tmp', tour_.routing_sequence[0])
-        requests_in_tour_ = None  # TODO need to find all requests in that tour_
-        requests_in_tour_.remove(request)
+        tmp_tour = tr.Tour('tmp', tour.routing_sequence[0])
+        requests_in_tour = tour.requests.copy()
+        requests_in_tour.remove(request)
 
         insertion = cns.MinTravelDistanceInsertion()
-        for insert_request in requests_in_tour_:
+        for insert_request in requests_in_tour:
             delta, pickup_pos, delivery_pos = insertion.best_insertion_for_request_in_tour(instance, solution,
-                                                                                           tmp_tour_, insert_request)
-            insertion.execute_insertion_in_tour(instance, solution, tmp_tour_, request, pickup_pos, delivery_pos)
-        # improvement
+                                                                                           tmp_tour, insert_request)
+            insertion.execute_insertion_in_tour(instance, solution, tmp_tour, request, pickup_pos, delivery_pos)
+        # improvement TODO: tour improvement method should be a parameter
         mh.PDPTWVariableNeighborhoodDescent([ls.PDPMove(), ls.PDPTwoOpt()]).execute_on_tour(instance,
                                                                                             solution,
-                                                                                            tmp_tour_)
-        travel_distance_without_request = tmp_tour_.sum_travel_distance
+                                                                                            tmp_tour)
+        travel_distance_without_request = tmp_tour.sum_travel_distance
 
         return travel_distance_with_request - travel_distance_without_request
 

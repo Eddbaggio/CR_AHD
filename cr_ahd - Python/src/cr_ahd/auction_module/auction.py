@@ -87,9 +87,9 @@ class Auction(ABC):
         # clear the solution and do a dynamic re-optimization + improvement
         solution.clear_carrier_routes()
         timer = pr.Timer()
-        for carrier in range(len(solution.carriers)):
-            while solution.carriers[carrier].unrouted_requests:
-                request = solution.carriers[carrier].unrouted_requests[0]
+        for carrier in solution.carriers:
+            while carrier.unrouted_requests:
+                request = carrier.unrouted_requests[0]
                 self.tour_construction.insert_single(instance, solution, carrier, request)
         timer.write_duration_to_solution(solution, 'runtime_final_construction')
         timer = pr.Timer()
