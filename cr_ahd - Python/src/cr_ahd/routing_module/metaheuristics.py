@@ -12,7 +12,7 @@ from src.cr_ahd.utility_module import utils as ut, profiling as pr
 
 logger = logging.getLogger(__name__)
 
-TIME_MAX = float(2)  # 0.05 is roughly the time required by the VND procedure to exhaust all neighborhoods
+TIME_MAX = float(0.05)  # 0.05 is roughly the time required by the VND procedure to exhaust all neighborhoods
 
 
 class PDPTWMetaHeuristic(ABC):
@@ -46,7 +46,7 @@ class PDPTWMetaHeuristic(ABC):
         pass
 
     def update_trajectory(self, k, move, accepted):
-        self.trajectory.append((self.neighborhoods[k].__name__, move, accepted))
+        self.trajectory.append((self.neighborhoods[k].__class__.__name__, move, accepted))
         pass
 
 
@@ -470,7 +470,7 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
 
             # repair
             # TODO test different repairs
-            cns.MinTravelDistanceInsertion().insert_all(instance, solution_copy, carrier)
+            cns.MinTravelDistanceInsertion().insert_all(instance, solution_copy, carrier.id_)
 
             return solution_copy
 

@@ -32,7 +32,6 @@ class BiddingBehavior(ABC):
 
         bundle_bids = []
         for b in tqdm.trange(len(bundles), desc='Bidding', disable=True):
-            # assert [b[i] < b[i+1] for i in range(len(b)-1]  # make sure bundles are sorted?
             carrier_bundle_bids = []
             for carrier in solution.carriers:
                 logger.debug(f'Carrier {carrier.id_} generating bids for bundle {b}')
@@ -88,11 +87,11 @@ class DynamicInsertionAndImprove(BiddingBehavior):
         # reset the temporary carrier's solution and start from scratch instead
         carrier_copy.clear_routes()
 
-        # sequentially insert requests (original + bundle)
+        # sequentially insert requests (original + bundle) just as if it was the acceptance phase
         try:
             while carrier_copy.unrouted_requests:
                 request = carrier_copy.unrouted_requests[0]
-                self.tour_construction.insert_single(instance, solution_copy, carrier_copy, request)
+                self.tour_construction.insert_single(instance, solution_copy, carrier_copy.id_, request)
 
             solution_copy_improved = self.tour_improvement.execute(instance, solution_copy, [carrier_id])
             carrier_copy_improved = solution_copy_improved.carriers[carrier_copy.id_]

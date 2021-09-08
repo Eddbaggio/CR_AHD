@@ -10,39 +10,38 @@ logger = logging.getLogger(__name__)
 
 
 class PDPParallelInsertionConstruction(ABC):
-    def insert_all(self,
-                   instance: it.MDPDPTWInstance,
-                   solution: slt.CAHDSolution,  # FIXME if the solution is necessary, the carriers MUST be given as indices to avoid inconsistencies and confusion
-                   carrier: slt.AHDSolution):
+    def insert_all(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int):
         """inserts ALL unrouted requests of the specified carrier"""
+        carrier = solution.carriers[carrier_id]
         while carrier.unrouted_requests:
             request, tour, pickup_pos, delivery_pos = self.best_insertion_for_carrier(instance, carrier)
 
             # when for a given request no tour can be found, create a new tour and start over
             # this will fail if max_num_vehicles is exceeded
             if tour is None:
-                self.create_new_tour_with_request(instance, solution.num_tours(), solution, carrier, request)
+                self.create_new_tour_with_request(instance, solution.num_tours(), solution, carrier_id, request)
 
             # otherwise insert as suggested
             else:
-                self.execute_insertion(instance, solution, carrier, request, tour, pickup_pos, delivery_pos)
+                self.execute_insertion(instance, solution, carrier_id, request, tour.id_, pickup_pos, delivery_pos)
 
         pass
 
     def insert_single(self,
                       instance: it.MDPDPTWInstance,
                       solution: slt.CAHDSolution,
-                      carrier: slt.AHDSolution,  # FIXME if the solution is necessary, the carriers MUST be given as indices to avoid inconsistencies and confusion
+                      carrier_id: int,
                       request: int):
         """
         Take a single (!) unrouted customer of the given carrier and insert it in the best position.\n
         NOTE: Function alters the solution in place
         """
+        carrier = solution.carriers[carrier_id]
         insertion_criteria, tour, pickup_pos, delivery_pos = self.best_insertion_for_request(instance, carrier, request)
         if tour is None:
-            self.create_new_tour_with_request(instance, solution.num_tours(), solution, carrier, request)
+            self.create_new_tour_with_request(instance, solution.num_tours(), solution, carrier_id, request)
         else:
-            self.execute_insertion(instance, solution, carrier, request, tour, pickup_pos, delivery_pos)
+            self.execute_insertion(instance, solution, carrier_id, request, tour.id_, pickup_pos, delivery_pos)
 
         pass
 
@@ -124,12 +123,13 @@ class PDPParallelInsertionConstruction(ABC):
     @staticmethod
     def execute_insertion(instance: it.MDPDPTWInstance,
                           solution: slt.CAHDSolution,
-                          carrier: slt.AHDSolution,
+                          carrier_id: int,
                           request: int,
-                          tour: tr.Tour,
+                          tour_id: int,
                           pickup_pos: int,
                           delivery_pos: int):
-
+        carrier = solution.carriers[carrier_id]
+        tour = solution.tours[tour_id]
         pickup, delivery = instance.pickup_delivery_pair(request)
         tour.insert_and_update(instance, [pickup_pos, delivery_pos], [pickup, delivery])
         tour.requests.add(request)
@@ -138,10 +138,11 @@ class PDPParallelInsertionConstruction(ABC):
         carrier.routed_requests.append(request)
 
     @staticmethod
-    def execute_insertion_in_tour(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, tour: tr.Tour,
+    def execute_insertion_in_tour(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, tour_id: int,
                                   request: int, pickup_pos: int, delivery_pos: int):
 
         pickup, delivery = instance.pickup_delivery_pair(request)
+        tour = solution.tours[tour_id]
         tour.insert_and_update(instance, [pickup_pos, delivery_pos], [pickup, delivery])
         solution.request_to_tour_assignment[instance.request_from_vertex(pickup)] = tour.id_
 
@@ -149,8 +150,9 @@ class PDPParallelInsertionConstruction(ABC):
                                      instance: it.MDPDPTWInstance,
                                      tour_id: int,
                                      solution: slt.CAHDSolution,
-                                     carrier: slt.AHDSolution,  # fixme provide carriers by index!
+                                     carrier_id: int,
                                      request: int):
+        carrier = solution.carriers[carrier_id]
         if carrier.num_tours() >= instance.carriers_max_num_tours:
             raise ut.ConstraintViolationError(
                 f'Cannot create new route with request {request} for carrier {carrier.id_}.'
@@ -252,7 +254,10 @@ class MinTimeShiftInsertion(PDPParallelInsertionConstruction):
 
 class TimeShiftRegretInsertion(PDPParallelInsertionConstruction):
     # gotta override this method for regret measures
-    def best_insertion_for_request(self, instance: it.MDPDPTWInstance, carrier: int, request: int):
+    def best_insertion_for_request(self,
+                                   instance: it.MDPDPTWInstance,
+                                   carrier: slt.AHDSolution,
+                                   request: int) -> Tuple[float, tr.Tour, int, int]:
         """For the given request, finds the best combination of (a) tour, (b) pickup position and (c) delivery position
          for the best insertion. Best, in this case, is defined by the inheriting class (e.g. lowest cost increase or
          least time shift).
@@ -268,9 +273,7 @@ class TimeShiftRegretInsertion(PDPParallelInsertionConstruction):
 
         for tour in carrier.tours:
 
-            delta, pickup_pos, delivery_pos = self.best_insertion_for_request_in_tour(instance, solution.carriers[
-                carrier].tours[
-                tour], request)
+            delta, pickup_pos, delivery_pos = self.best_insertion_for_request_in_tour(instance, tour, request)
             best_insertion_for_request_in_tour.append((delta, pickup_pos, delivery_pos))
 
             if delta < best_delta:
@@ -293,7 +296,10 @@ class TimeShiftRegretInsertion(PDPParallelInsertionConstruction):
 
 class TravelDistanceRegretInsertion(PDPParallelInsertionConstruction):
     # gotta override this method for regret measures
-    def best_insertion_for_request(self, instance: it.MDPDPTWInstance, carrier: int, request: int):
+    def best_insertion_for_request(self,
+                                   instance: it.MDPDPTWInstance,
+                                   carrier: slt.AHDSolution,
+                                   request: int) -> Tuple[float, tr.Tour, int, int]:
         # steal the regret implementation from time shift
         return TimeShiftRegretInsertion().best_insertion_for_request(instance, carrier, request)
 

@@ -90,7 +90,7 @@ class Auction(ABC):
         for carrier in solution.carriers:
             while carrier.unrouted_requests:
                 request = carrier.unrouted_requests[0]
-                self.tour_construction.insert_single(instance, solution, carrier, request)
+                self.tour_construction.insert_single(instance, solution, carrier.id_, request)
         timer.write_duration_to_solution(solution, 'runtime_final_construction')
         timer = pr.Timer()
         solution = self.tour_improvement.execute(instance, solution)

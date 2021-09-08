@@ -160,7 +160,7 @@ def bar_chart(df: pd.DataFrame,
                  y=values,
                  title=title,
                  color=splitters['color'],
-                 color_discrete_sequence=ut.univie_colors_100+ut.univie_colors_60,
+                 color_discrete_sequence=ut.univie_colors_100 + ut.univie_colors_60,
                  facet_row=splitters['facet_row'],
                  facet_col=splitters['facet_col'],
                  text=values,
@@ -282,8 +282,11 @@ def print_top_level_stats(df: pd.DataFrame, secondary_parameters: List[str]):
 
         # collaboration gain
         print('=============/ collaboration gains /=============')
-        for name1, group1 in solution_df.groupby(['solution_algorithm', *secondary_parameters], dropna=False):
-            for name2, group2 in solution_df.groupby(['solution_algorithm', *secondary_parameters], dropna=False):
+        secondary_parameters_categorical = [param for param in secondary_parameters if 'runtime' not in param]
+        for name1, group1 in solution_df.groupby(['solution_algorithm', *secondary_parameters_categorical],
+                                                 dropna=False):
+            for name2, group2 in solution_df.groupby(['solution_algorithm', *secondary_parameters_categorical],
+                                                     dropna=False):
                 if name1 == name2:
                     continue
                 print(f"{name1}/{name2}")
@@ -308,10 +311,10 @@ def print_top_level_stats(df: pd.DataFrame, secondary_parameters: List[str]):
                     if not all(collaborative > isolated):
                         warnings.warn(f'{name}: Collaborative is worse than Isolated!')
             '''
-            for name, group in solution_df.groupby(['rad', 'n', 'run']):
+            for name, group in solution_df.groupby(['run', 'rad', 'n', *secondary_parameters_categorical]):
                 grouped = group.groupby('solution_algorithm')
                 isolated = grouped.get_group('IsolatedPlanning')
-                for _, collaborative in grouped.get_group('CollaborativePlanning').groupby(secondary_parameter):
+                for _, collaborative in grouped.get_group('CollaborativePlanning').groupby(secondary_parameters):
                     if not isolated.squeeze()['sum_profit'] <= collaborative.squeeze()['sum_profit']:
                         warnings.warn(f'{name}: Collaborative is worse than Isolated!')
 
@@ -319,9 +322,16 @@ def print_top_level_stats(df: pd.DataFrame, secondary_parameters: List[str]):
 if __name__ == '__main__':
     df = pd.read_csv(
         "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home "
-        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_agg_solution_#018.csv",
+        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_agg_solution_#022.csv",
     )
-    df.fillna('None', inplace=True)
+    df.fillna(value=dict(runtime_request_selection=0,
+                         runtime_auction_bundle_pool_generation=0,
+                         runtime_bidding=0,
+                         runtime_winner_determination=0,
+                         runtime_final_construction=0,
+                         runtime_final_improvement=0,),
+              inplace=True)
+    df.fillna(value='None', inplace=True)
     df.set_index(['rad', 'n', 'run', ] + ut.solver_config, inplace=True)  # add 'carrier_id_' if agg_level==carrier
     secondary_parameter = 'tour_improvement'
     print_top_level_stats(df, [secondary_parameter])

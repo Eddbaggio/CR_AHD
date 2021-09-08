@@ -45,7 +45,7 @@ def parameter_generator():
         # mh.LocalSearchBest([neighborhoods[0]]),
         # mh.LocalSearchBest([neighborhoods[1]]),
         # mh.PDPTWSequentialLocalSearch(neighborhoods),
-        # mh.PDPTWIteratedLocalSearch(neighborhoods),
+        mh.PDPTWIteratedLocalSearch(neighborhoods),
         # mh.PDPTWVariableNeighborhoodDescent(neighborhoods),
         # mh.PDPTWReducedVariableNeighborhoodSearch(neighborhoods),
         # mh.PDPTWSimulatedAnnealing(neighborhoods),
@@ -108,13 +108,11 @@ def parameter_generator():
         for tour_improvement in tour_improvements:
             for time_window_management in time_window_managements:
                 # Isolated Planning Parameters, no auction
-                """
                 yield dict(tour_construction=tour_construction,
                            tour_improvement=tour_improvement,
                            time_window_management=time_window_management,
                            auction=False,
                            )
-               """
                 for num_submitted_requests in nums_submitted_requests:
                     for request_selection in request_selections:
                         for num_auction_bundles in nums_auction_bundles:
@@ -143,7 +141,7 @@ def parameter_generator():
 
 def execute_all(instance: it.MDPDPTWInstance, plot=False):
     """
-    :param instance: (custom) instance that will we (deep)copied for each algorithm
+    :param instance:
     :return: evaluation metrics (Instance.evaluation_metrics) of all the solutions obtained
     """
     solutions = []
@@ -268,10 +266,10 @@ if __name__ == '__main__':
         paths = sorted(
             list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
             key=ut.natural_sort_key)
-        run, rad, n = 12, 0, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
+        run, rad, n = 10, 0, 0  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
         instance_idx = run * 6 + rad * 2 + n
-        instance_idx = random.choice(range(len(paths)))
-        paths = paths[instance_idx:instance_idx+1]
+        # instance_idx = random.choice(range(len(paths)))
+        paths = paths[instance_idx:instance_idx+2]
 
         if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=True)
@@ -285,8 +283,8 @@ if __name__ == '__main__':
                      values='sum_profit',
                      color=['solution_algorithm', secondary_parameter, ],
                      # color=secondary_parameter,
-                     category='rad', facet_col=None, facet_row='n',
-                     # category='run', facet_col='rad', facet_row='n',
+                     # category='rad', facet_col=None, facet_row='n',
+                     category='run', facet_col='rad', facet_row='n',
                      # category='solution_algorithm', facet_col=None, facet_row=None,
                      show=True,
                      html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix())

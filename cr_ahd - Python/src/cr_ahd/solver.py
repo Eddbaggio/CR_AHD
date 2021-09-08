@@ -106,7 +106,7 @@ class Solver:
             # build tours with the assigned request if it was accepted
             if accepted:
 
-                self.tour_construction.insert_single(instance, solution, carrier, request)
+                self.tour_construction.insert_single(instance, solution, carrier.id_, request)
 
         ut.validate_solution(instance, solution)  # check to make sure everything's functional
         return instance, solution

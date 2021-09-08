@@ -89,6 +89,6 @@ class Timer(object):
             if add_to_existing:
                 solution.timings[name] += self.duration
             else:
-                raise KeyError
+                raise KeyError(f'Name {name} already exists but add_to_existing was set to {add_to_existing}')
         else:
             solution.timings[name] = self.duration
