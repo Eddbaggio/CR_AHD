@@ -243,3 +243,4 @@ class AHDSolution:
         self.unrouted_requests = self.accepted_requests[:]
         self.routed_requests.clear()
         self.tours.clear()
+        self.tour_ids.clear()

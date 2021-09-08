@@ -232,7 +232,7 @@ def bundle_total_travel_distance(instance: it.MDPDPTWInstance,
         pickup, delivery = instance.pickup_delivery_pair(request)
 
         # set check_feasibility to False since only the tour length is of interest here
-        insertion = tour_construction.best_insertion_for_request_in_tour(instance, solution, tmp_tour_, request, False)
+        insertion = tour_construction.best_insertion_for_request_in_tour(instance, tmp_tour_, request, False)
         delta, pickup_pos, delivery_pos = insertion
 
         # if no feasible insertion exists, return inf for the travel distance
@@ -245,7 +245,7 @@ def bundle_total_travel_distance(instance: it.MDPDPTWInstance,
     return tmp_tour_.sum_travel_distance
 
 
-def los_schulte_vertex_similarity(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, vertex1: int, vertex2: int):
+def los_schulte_vertex_similarity(instance: it.MDPDPTWInstance, vertex1: int, vertex2: int):
     """
     Following [1] Los, J., Schulte, F., Gansterer, M., Hartl, R. F., Spaan, M. T. J., & Negenborn, R. R. (2020).
     Decentralized combinatorial auctions for dynamic and large-scale collaborative vehicle routing.
@@ -384,7 +384,7 @@ class BundlingValuation(ABC):
         """evaluate a bundling"""
         pass
 
-    def preprocessing(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, auction_request_pool: Sequence[int]):
+    def preprocessing(self, instance: it.MDPDPTWInstance, auction_request_pool: Sequence[int]):
         pass
 
 
@@ -525,7 +525,7 @@ class LosSchulteBundlingValuation(BundlingValuation):
 
         return bundle_valuation
 
-    def preprocessing(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, auction_request_pool: Sequence[int]):
+    def preprocessing(self, instance: it.MDPDPTWInstance, auction_request_pool: Sequence[int]):
         """
         pre-compute the pairwise relatedness matrix for all vertices
         """
@@ -540,28 +540,23 @@ class LosSchulteBundlingValuation(BundlingValuation):
                 pickup2, delivery2 = instance.pickup_delivery_pair(request2)
 
                 # [1] pickup1 <> delivery1
-                self.vertex_relatedness_matrix[i][i + n] = los_schulte_vertex_similarity(
-                    instance, solution, pickup1, delivery1)
+                self.vertex_relatedness_matrix[i][i + n] = los_schulte_vertex_similarity(instance, pickup1, delivery1)
 
                 # [2] pickup1 <> pickup2
-                self.vertex_relatedness_matrix[i][j] = los_schulte_vertex_similarity(
-                    instance, solution, pickup1, pickup2)
+                self.vertex_relatedness_matrix[i][j] = los_schulte_vertex_similarity(instance, pickup1, pickup2)
 
                 # [3] pickup1 <> delivery2
-                self.vertex_relatedness_matrix[i][j + n] = los_schulte_vertex_similarity(
-                    instance, solution, pickup1, delivery2)
+                self.vertex_relatedness_matrix[i][j + n] = los_schulte_vertex_similarity(instance, pickup1, delivery2)
 
                 # [4] delivery1 <> pickup2
-                self.vertex_relatedness_matrix[i + n][j] = los_schulte_vertex_similarity(
-                    instance, solution, delivery1, pickup2)
+                self.vertex_relatedness_matrix[i + n][j] = los_schulte_vertex_similarity(instance, delivery1, pickup2)
 
                 # [5] delivery1 <> delivery2
-                self.vertex_relatedness_matrix[i + n][j + n] = los_schulte_vertex_similarity(
-                    instance, solution, delivery1, delivery2)
+                self.vertex_relatedness_matrix[i + n][j + n] = los_schulte_vertex_similarity(instance, delivery1,
+                                                                                             delivery2)
 
                 # [6] pickup2 <> delivery2
-                self.vertex_relatedness_matrix[j][j + n] = los_schulte_vertex_similarity(
-                    instance, solution, pickup2, delivery2)
+                self.vertex_relatedness_matrix[j][j + n] = los_schulte_vertex_similarity(instance, pickup2, delivery2)
 
 
 class RandomBundlingValuation(BundlingValuation):

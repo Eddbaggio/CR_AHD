@@ -1,18 +1,15 @@
 import datetime as dt
 import itertools
 import logging
-import math
 import random
 from abc import ABC, abstractmethod
 from math import comb, sqrt
 from typing import Sequence, Tuple
 
-import numpy as np
-
+from src.cr_ahd.auction_module import bundle_valuation as bv
 from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
 from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh, neighborhoods as ls
 from src.cr_ahd.utility_module import utils as ut
-from src.cr_ahd.auction_module import bundle_valuation as bv
 
 logger = logging.getLogger(__name__)
 
@@ -57,26 +54,26 @@ class RequestSelectionBehaviorIndividual(RequestSelectionBehavior, ABC):
         """
         auction_request_pool = []
         original_bundling_labels = []
-        for carrier in range(instance.num_carriers):
-            k = _abs_num_requests(solution.carriers[carrier], self.num_submitted_requests)
+        for carrier in solution.carriers:
+            k = _abs_num_requests(carrier, self.num_submitted_requests)
             valuations = []
-            for request in solution.carriers[carrier].accepted_requests:
+            for request in carrier.accepted_requests:
                 valuation = self._evaluate_request(instance, solution, carrier, request)
                 valuations.append(valuation)
 
             # pick the WORST k evaluated requests (from ascending order)
-            selected = [r for _, r in sorted(zip(valuations, solution.carriers[carrier].accepted_requests))][:k]
+            selected = [r for _, r in sorted(zip(valuations, carrier.accepted_requests))][:k]
             selected.sort()
 
             for request in selected:
                 solution.free_requests_from_carriers(instance, [request])
                 auction_request_pool.append(request)
-                original_bundling_labels.append(carrier)
+                original_bundling_labels.append(carrier.id_)
 
         return auction_request_pool, original_bundling_labels
 
     @abstractmethod
-    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int,  # TODO change carrier_id: int to carrier: slt.AHDSolution
+    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution,
                           request: int):
         """compute the valuation of the given request for the carrier"""
         pass
@@ -87,7 +84,7 @@ class Random(RequestSelectionBehaviorIndividual):
     returns a random selection of unrouted requests
     """
 
-    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int,
+    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution,
                           request: int):
         return random.random()
 
@@ -107,7 +104,7 @@ class MarginalProfit(RequestSelectionBehaviorIndividual):
     this is not yet functional.
     """
 
-    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int,
+    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution,
                           request: int):
         raise NotImplementedError
 
@@ -122,8 +119,8 @@ class MarginalProfit(RequestSelectionBehaviorIndividual):
 
         insertion = cns.MinTravelDistanceInsertion()
         for insert_request in requests_in_tour:
-            delta, pickup_pos, delivery_pos = insertion.best_insertion_for_request_in_tour(instance, solution,
-                                                                                           tmp_tour, insert_request)
+            delta, pickup_pos, delivery_pos = insertion.best_insertion_for_request_in_tour(instance, tmp_tour,
+                                                                                           insert_request)
             insertion.execute_insertion_in_tour(instance, solution, tmp_tour, request, pickup_pos, delivery_pos)
         # improvement TODO: tour improvement method should be a parameter
         mh.PDPTWVariableNeighborhoodDescent([ls.PDPMove(), ls.PDPTwoOpt()]).execute_on_tour(instance,
@@ -150,7 +147,7 @@ class MarginalProfitProxy(RequestSelectionBehaviorIndividual):
     from its tour
     """
 
-    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int,
+    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution,
                           request: int):
         # find the request's tour:
         tour = solution.tours[solution.request_to_tour_assignment[request]]
@@ -174,12 +171,11 @@ class MinDistanceToForeignDepotDMin(RequestSelectionBehaviorIndividual):
     MINIMUM of the distances (pickup - depot) and (delivery - depot)
     """
 
-    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int,
+    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution,
                           request: int):
 
         foreign_depots = list(range(instance.num_carriers))
-        foreign_depots.pop(carrier_id)
-        foreign_depots = ut.flatten(foreign_depots)
+        foreign_depots.pop(carrier.id_)
 
         dist_min = float('inf')
         for depot in foreign_depots:
@@ -196,11 +192,11 @@ class MinDistanceToForeignDepotDSum(RequestSelectionBehaviorIndividual):
     SUM of the distances (pickup - depot) and (delivery - depot)
     """
 
-    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int,
+    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution,
                           request: int):
 
         foreign_depots = list(range(instance.num_carriers))
-        foreign_depots.pop(carrier_id)
+        foreign_depots.pop(carrier.id_)
 
         dist_min = float('inf')
         for depot in foreign_depots:
@@ -221,7 +217,7 @@ class ComboRaw(RequestSelectionBehaviorIndividual):
     summing up the distances between the pickup node pr and the delivery node dr to the depot (oc or oa).
     """
 
-    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int,
+    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution,
                           request: int):
         # weighting factors
         alpha1 = 1
@@ -230,14 +226,14 @@ class ComboRaw(RequestSelectionBehaviorIndividual):
 
         # [i] distance to the depot of one of the collaborating carriers
         min_dist_to_foreign_depot = MinDistanceToForeignDepotDSum(None)._evaluate_request(instance, solution,
-                                                                                          carrier_id, request)
+                                                                                          carrier, request)
 
         # [ii] marginal profit
-        marginal_profit = MarginalProfitProxy(None)._evaluate_request(instance, solution, carrier_id, request)
+        marginal_profit = MarginalProfitProxy(None)._evaluate_request(instance, solution, carrier, request)
 
         # [iii] distance to the carrier's own depot
         pickup, delivery = instance.pickup_delivery_pair(request)
-        own_depot = solution.carriers[carrier_id].id_
+        own_depot = carrier.id_
         dist_to_own_depot = instance.distance([pickup, delivery], [own_depot, own_depot])
 
         # weighted sum of non-standardized [i], [ii], [iii]
@@ -276,11 +272,11 @@ class ComboStandardized(RequestSelectionBehaviorIndividual):
         alpha2 = 1
         alpha3 = 1
 
-        for carrier_id in range(instance.num_carriers):
-            k = _abs_num_requests(solution.carriers[carrier_id], self.num_submitted_requests)
+        for carrier in solution.carriers:
+            k = _abs_num_requests(carrier, self.num_submitted_requests)
             valuations = []
-            for request in solution.carriers[carrier_id].accepted_requests:
-                valuation = self._evaluate_request(instance, solution, carrier_id, request)
+            for request in carrier.accepted_requests:
+                valuation = self._evaluate_request(instance, solution, carrier, request)
                 valuations.append(valuation)
 
             # normalize the valuation components
@@ -297,30 +293,30 @@ class ComboStandardized(RequestSelectionBehaviorIndividual):
                 valuations.append(weighted_valuation)
 
             # pick the WORST k evaluated requests (from ascending order)
-            selected = [r for _, r in sorted(zip(valuations, solution.carriers[carrier_id].accepted_requests))][:k]
+            selected = [r for _, r in sorted(zip(valuations, carrier.accepted_requests))][:k]
             selected.sort()
 
             for request in selected:
                 solution.free_requests_from_carriers(instance, [request])
                 auction_request_pool.append(request)
-                original_bundling_labels.append(carrier_id)
+                original_bundling_labels.append(carrier.id_)
 
         return auction_request_pool, original_bundling_labels
 
-    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int,
+    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution,
                           request: int) -> \
             Tuple[float, float, float]:
 
         # [i] distance to the depot of one of the collaborating carriers
         min_dist_to_foreign_depot = MinDistanceToForeignDepotDSum(None)._evaluate_request(instance, solution,
-                                                                                          carrier_id, request)
+                                                                                          carrier, request)
 
         # [ii] marginal profit
-        marginal_profit = MarginalProfitProxy(None)._evaluate_request(instance, solution, carrier_id, request)
+        marginal_profit = MarginalProfitProxy(None)._evaluate_request(instance, solution, carrier, request)
 
         # [iii] distance to the carrier's own depot
         pickup, delivery = instance.pickup_delivery_pair(request)
-        own_depot = solution.carriers[carrier_id].id_
+        own_depot = carrier.id_
         dist_to_own_depot = instance.distance([pickup, delivery], [own_depot, own_depot])
 
         return min_dist_to_foreign_depot, marginal_profit, dist_to_own_depot
@@ -332,7 +328,7 @@ class PackedTW(RequestSelectionBehaviorIndividual):
     profitability
     """
 
-    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int,
+    def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution,
                           request: int):
         pass
 
@@ -351,15 +347,14 @@ class RequestSelectionBehaviorNeighbor(RequestSelectionBehavior, ABC):
         auction_request_pool = []
         original_bundling_labels = []
 
-        for carrier in range(instance.num_carriers):
-            carrier_ = solution.carriers[carrier]
-            k = _abs_num_requests(carrier_, self.num_submitted_requests)
+        for carrier in solution.carriers:
+            k = _abs_num_requests(carrier, self.num_submitted_requests)
 
             # find an initial request
             initial_request = self._find_initial_request(instance, solution, carrier)
 
             # find the best k-1 neighboring ones
-            neighbors = self._find_neighbors(instance, solution, carrier, initial_request, k - 1)
+            neighbors = self._find_neighbors(instance, carrier, initial_request, k - 1)
 
             best_bundle = [initial_request] + neighbors
             best_bundle.sort()
@@ -375,18 +370,19 @@ class RequestSelectionBehaviorNeighbor(RequestSelectionBehavior, ABC):
         return auction_request_pool, original_bundling_labels
 
     @abstractmethod
-    def _find_initial_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int):
+    def _find_initial_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution):
         pass
 
     @staticmethod
-    def _find_neighbors(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, initial_request: int,
+    def _find_neighbors(instance: it.MDPDPTWInstance,
+                        carrier: slt.AHDSolution,
+                        initial_request: int,
                         num_neighbors: int):
         """
         "Any further request s ∈ Ra is selected based on its closeness to r. Closeness is determined by the sum of
         distances between four nodes (pickup nodes pr , ps and delivery nodes dr , ds )."
 
         :param instance:
-        :param solution:
         :param carrier:
         :param initial_request: r
         :param num_neighbors:
@@ -395,7 +391,7 @@ class RequestSelectionBehaviorNeighbor(RequestSelectionBehavior, ABC):
         init_pickup, init_delivery = instance.pickup_delivery_pair(initial_request)
 
         neighbor_valuations = []
-        for neighbor in solution.carriers[carrier].accepted_requests:
+        for neighbor in carrier.accepted_requests:
             if neighbor == initial_request:
                 neighbor_valuations.append(float('inf'))
 
@@ -406,7 +402,7 @@ class RequestSelectionBehaviorNeighbor(RequestSelectionBehavior, ABC):
 
         # sort by valuations
         best_neigh = [neigh for val, neigh in
-                      sorted(zip(neighbor_valuations, solution.carriers[carrier].accepted_requests))]
+                      sorted(zip(neighbor_valuations, carrier.accepted_requests))]
 
         return best_neigh[:num_neighbors]
 
@@ -417,10 +413,10 @@ class MarginalProfitProxyNeighbor(RequestSelectionBehaviorNeighbor):
     its closeness to r.
     """
 
-    def _find_initial_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int):
+    def _find_initial_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution):
         min_marginal_profit = float('inf')
         initial_request = None
-        for request in solution.carriers[carrier].accepted_requests:
+        for request in carrier.accepted_requests:
             marginal_profit = MarginalProfitProxy(1)._evaluate_request(instance, solution, carrier, request)
             if marginal_profit < min_marginal_profit:
                 min_marginal_profit = marginal_profit
@@ -443,18 +439,17 @@ class RequestSelectionBehaviorBundle(RequestSelectionBehavior, ABC):
         auction_request_pool = []
         original_bundling_labels = []
 
-        for carrier in range(instance.num_carriers):
-            carrier_ = solution.carriers[carrier]
-            k = _abs_num_requests(carrier_, self.num_submitted_requests)
+        for carrier in solution.carriers:
+            k = _abs_num_requests(carrier, self.num_submitted_requests)
 
             # make the bundles that shall be evaluated
-            bundles = self._create_bundles(instance, solution, carrier, k)
+            bundles = self._create_bundles(instance, carrier, k)
 
             # find the bundle with the MAXIMUM valuation for the given carrier
             best_bundle = None
             best_bundle_valuation = -float('inf')
             for bundle in bundles:
-                bundle_valuation = self._evaluate_bundle(instance, solution, carrier, bundle)
+                bundle_valuation = self._evaluate_bundle(instance, carrier, bundle)
                 if bundle_valuation > best_bundle_valuation:
                     best_bundle = bundle
                     best_bundle_valuation = bundle_valuation
@@ -470,12 +465,11 @@ class RequestSelectionBehaviorBundle(RequestSelectionBehavior, ABC):
         return auction_request_pool, original_bundling_labels
 
     @abstractmethod
-    def _create_bundles(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, k: int):
+    def _create_bundles(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, k: int):
         pass
 
     @abstractmethod
-    def _evaluate_bundle(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int,
-                         bundle: Sequence[int]):
+    def _evaluate_bundle(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, bundle: Sequence[int]):
         # TODO It could literally be a bundle_valuation strategy that is executed here. Not a bundlING_valuation though
         pass
 
@@ -485,14 +479,13 @@ class SpatialBundleDSum(RequestSelectionBehaviorBundle):
     Gansterer & Hartl (2016) refer to this one as 'cluster'
     """
 
-    def _create_bundles(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, k: int):
+    def _create_bundles(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, k: int):
         """
         create all possible bundles of size k
         """
-        return itertools.combinations(solution.carriers[carrier].accepted_requests, k)
+        return itertools.combinations(carrier.accepted_requests, k)
 
-    def _evaluate_bundle(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int,
-                         bundle: Sequence[int]):
+    def _evaluate_bundle(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, bundle: Sequence[int]):
         """
         the sum of travel distances of all pairs of requests in this cluster, where the travel distance of a request
         pair is defined as the distance between their origins (pickup locations) plus the distance between
@@ -512,14 +505,13 @@ class SpatialBundleDMax(RequestSelectionBehaviorBundle):
     Gansterer & Hartl (2016) refer to this one as 'cluster'
     """
 
-    def _create_bundles(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, k: int):
+    def _create_bundles(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, k: int):
         """
         create all possible bundles of size k
         """
-        return itertools.combinations(solution.carriers[carrier].accepted_requests, k)
+        return itertools.combinations(carrier.accepted_requests, k)
 
-    def _evaluate_bundle(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int,
-                         bundle: Sequence[int]):
+    def _evaluate_bundle(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, bundle: Sequence[int]):
         """
         the sum of travel distances of all pairs of requests in this cluster, where the travel distance of a request
         pair is defined as the distance between their origins (pickup locations) plus the distance between
@@ -537,14 +529,13 @@ class SpatialBundleDMax(RequestSelectionBehaviorBundle):
 
 
 class TemporalRangeBundle(RequestSelectionBehaviorBundle):
-    def _create_bundles(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, k: int):
+    def _create_bundles(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, k: int):
         """
         create all possible bundles of size k
         """
-        return itertools.combinations(solution.carriers[carrier].accepted_requests, k)
+        return itertools.combinations(carrier.accepted_requests, k)
 
-    def _evaluate_bundle(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int,
-                         bundle: Sequence[int]):
+    def _evaluate_bundle(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, bundle: Sequence[int]):
         """
         the min-max range of the delivery time windows of all requests inside the cluster
         """
@@ -560,24 +551,21 @@ class TemporalRangeBundle(RequestSelectionBehaviorBundle):
 
 
 class SpatioTemporalBundle(RequestSelectionBehaviorBundle):
-    def _create_bundles(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, k: int):
+    def _create_bundles(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, k: int):
         """
         create all possible bundles of size k
         """
-        return itertools.combinations(solution.carriers[carrier].accepted_requests, k)
+        return itertools.combinations(carrier.accepted_requests, k)
 
-    def _evaluate_bundle(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int,
-                         bundle: Sequence[int]):
+    def _evaluate_bundle(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, bundle: Sequence[int]):
         """a weighted sum of spatial and temporal measures"""
         # spatial
-        spatial_evaluation = SpatialBundleDSum(self.num_submitted_requests)._evaluate_bundle(instance, solution,
-                                                                                             carrier,
-                                                                                             bundle)
+        spatial_evaluation = SpatialBundleDSum(self.num_submitted_requests)._evaluate_bundle(instance, carrier, bundle)
         # normalize to range [0, 1]
         max_pickup_delivery_dist = 0
         min_pickup_delivery_dist = float('inf')
-        for i, request1 in enumerate(solution.carriers[carrier].accepted_requests[:-1]):
-            for request2 in solution.carriers[carrier].accepted_requests[i + 1:]:
+        for i, request1 in enumerate(carrier.accepted_requests[:-1]):
+            for request2 in carrier.accepted_requests[i + 1:]:
                 d = instance.distance(instance.pickup_delivery_pair(request1), instance.pickup_delivery_pair(request2))
                 if d > max_pickup_delivery_dist:
                     max_pickup_delivery_dist = d
@@ -589,8 +577,8 @@ class SpatioTemporalBundle(RequestSelectionBehaviorBundle):
         spatial_evaluation = -(spatial_evaluation - min_spatial) / (max_spatial - min_spatial)
 
         # temporal range
-        temporal_evaluation = TemporalRangeBundle(self.num_submitted_requests)._evaluate_bundle(instance, solution,
-                                                                                                carrier, bundle)
+        temporal_evaluation = TemporalRangeBundle(self.num_submitted_requests)._evaluate_bundle(instance, carrier,
+                                                                                                bundle)
         # normalize to range [0, 1]
         min_temporal_range = ut.TW_LENGTH.total_seconds()
         max_temporal_range = (ut.TIME_HORIZON.close - ut.TIME_HORIZON.open).total_seconds()
@@ -606,25 +594,20 @@ class LosSchulteBundle(RequestSelectionBehaviorBundle):
 
     """
 
-    def _create_bundles(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, k: int):
+    def _create_bundles(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, k: int):
         """
         create all possible bundles of size k
         """
-        bundles = itertools.combinations(solution.carriers[carrier].accepted_requests, k)
+        bundles = itertools.combinations(carrier.accepted_requests, k)
         return bundles
 
-    def _evaluate_bundle(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int,
-                         bundle: Sequence[int]):
+    def _evaluate_bundle(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, bundle: Sequence[int]):
         # must invert again, since RequestSelectionBehaviorBundle searches for the maximum valuation and request
         # selection for the minimum
         bundle_valuation = bv.LosSchulteBundlingValuation()
-        bundle_valuation.preprocessing(instance, solution, None)
+        bundle_valuation.preprocessing(instance, None)
         return 1 / bundle_valuation.evaluate_bundle(instance, bundle)
 
 # class TimeShiftCluster(RequestSelectionBehaviorCluster):
 #     """Selects the cluster that yields the highest temporal flexibility when removed"""
-#     def _create_bundles(self, instance, solution, carrier, k):
-#         """
-#         create all possible bundles of size k
-#         """
-#         return itertools.combinations(solution.carriers[carrier].accepted_requests, k)
+#     pass

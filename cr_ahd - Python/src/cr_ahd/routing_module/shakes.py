@@ -17,13 +17,11 @@ class Shake(ABC):
     """
 
     @abstractmethod
-    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int,
-                num_requests: int):
+    def execute(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, num_requests: int):
         """
         Perform the Shake step on each tour of the given carrier. Currently, no intra-tour shakes do exist!
 
         :param instance:
-        :param solution:
         :param carrier:
         :param num_requests:
         :return:
@@ -31,12 +29,11 @@ class Shake(ABC):
         pass
 
     @abstractmethod
-    def execute_on_tour(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, tour_: tr.Tour, num_requests: int):
+    def execute_on_tour(self, instance: it.MDPDPTWInstance, tour: tr.Tour, num_requests: int):
         """
         Perform the shaking operation on the given tour
 
         :param instance:
-        :param solution:
         :param tour_:
         :param num_requests:
         :return:
@@ -49,21 +46,20 @@ class RandomRemovalShake(Shake):
     removes num_requests random requests from each given tour
     """
 
-    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, num_requests: int):
-        carrier_ = solution.carriers[carrier]
-        for tour_ in carrier_.tours:
-            removed = self.execute_on_tour(instance, solution, tour_, num_requests)
+    def execute(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, num_requests: int):
+        for tour_ in carrier.tours:
+            removed = self.execute_on_tour(instance, tour_, num_requests)
             for request in removed:
-                carrier_.unrouted_requests.append(request)
-                carrier_.routed_requests.remove(request)
+                carrier.unrouted_requests.append(request)
+                carrier.routed_requests.remove(request)
 
-    def execute_on_tour(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, tour_: tr.Tour, num_requests: int):
-        num_requests = min(num_requests, round(len(tour_)/2)-1)
-        # todo randomize the num_request by replacing the num_request parameter by max_num_requests and randomly choose
+    def execute_on_tour(self, instance: it.MDPDPTWInstance, tour: tr.Tour, num_requests: int):
+        num_requests = min(num_requests, round(len(tour)/2)-1)
+        # TODO randomize the num_request by replacing the num_request parameter by max_num_requests and randomly choose
         #  from [1, max_num_requests]
         if num_requests > 0:
             routed = []
-            for vertex in tour_.routing_sequence[1:-1]:
+            for vertex in tour.routing_sequence[1:-1]:
                 request = instance.request_from_vertex(vertex)
                 if request not in routed:
                     routed.append(request)
@@ -72,9 +68,9 @@ class RandomRemovalShake(Shake):
             removal_indices = []
             for request in removed:
                 pickup, delivery = instance.pickup_delivery_pair(request)
-                removal_indices.append(tour_.vertex_pos[pickup])
-                removal_indices.append(tour_.vertex_pos[delivery])
-            tour_.pop_and_update(instance, sorted(removal_indices))
+                removal_indices.append(tour.vertex_pos[pickup])
+                removal_indices.append(tour.vertex_pos[delivery])
+            tour.pop_and_update(instance, sorted(removal_indices))
             return removed
         else:
             return []

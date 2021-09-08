@@ -114,7 +114,7 @@ class LimitedBundlePoolGenerationBehavior(ABC):
                 auction_request_pool: Sequence[int],
                 original_bundling_labels: Sequence[int]):
         # random.seed(0)
-        self.preprocessing(instance, solution, auction_request_pool)
+        self.preprocessing(instance, auction_request_pool)
         auction_bundle_pool = self._generate_auction_bundles(instance, solution, auction_request_pool,
                                                              original_bundling_labels)
         return auction_bundle_pool
@@ -125,8 +125,8 @@ class LimitedBundlePoolGenerationBehavior(ABC):
                                   original_bundling_labels: Sequence[int]):
         pass
 
-    def preprocessing(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, auction_request_pool: Sequence[int]):
-        self.bundling_valuation.preprocessing(instance, solution, auction_request_pool)
+    def preprocessing(self, instance: it.MDPDPTWInstance, auction_request_pool: Sequence[int]):
+        self.bundling_valuation.preprocessing(instance, auction_request_pool)
         pass
 
 

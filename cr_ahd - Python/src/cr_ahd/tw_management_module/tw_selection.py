@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class TWSelectionBehavior(abc.ABC):
-    # TODO maybe in the future, i have to store also time window preferences / tw selection behavior in the instance
+    # NOTE maybe in the future, i have to store also time window preferences / tw selection behavior in the instance
     def execute(self, tw_offer_set: List[TimeWindow], request: int):
         # may return False if no TW fits the preference
         if tw_offer_set:

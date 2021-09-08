@@ -55,7 +55,7 @@ class TWManagementSingle(TWManagement):
 
         # in case no feasible TW exists for a given request
         else:
-            logger.error(f'[{instance.id_}] No feasible TW can be offered from Carrier {carrier} to request {request}')
+            logger.error(f'[{instance.id_}] No feasible TW can be offered from Carrier {carrier.id_} to request {request}')
             instance.tw_open[delivery_vertex] = ut.START_TIME
             instance.tw_close[delivery_vertex] = ut.START_TIME
             carrier.rejected_requests.append(request)

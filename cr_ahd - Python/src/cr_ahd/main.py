@@ -108,11 +108,13 @@ def parameter_generator():
         for tour_improvement in tour_improvements:
             for time_window_management in time_window_managements:
                 # Isolated Planning Parameters, no auction
+                """
                 yield dict(tour_construction=tour_construction,
                            tour_improvement=tour_improvement,
                            time_window_management=time_window_management,
                            auction=False,
                            )
+               """
                 for num_submitted_requests in nums_submitted_requests:
                     for request_selection in request_selections:
                         for num_auction_bundles in nums_auction_bundles:
