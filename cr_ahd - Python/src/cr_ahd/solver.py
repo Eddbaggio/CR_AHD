@@ -1,7 +1,7 @@
 import logging.config
 import random
 from copy import deepcopy
-from typing import Union
+from typing import Union, Tuple
 import time
 
 from src.cr_ahd.utility_module import utils as ut, profiling as pr
@@ -27,26 +27,25 @@ class Solver:
         self.auction = auction
 
     def execute(self, instance: it.MDPDPTWInstance,
-                # starting_solution: slt.CAHDSolution = None
-                ):
+                starting_solution: slt.CAHDSolution = None
+                ) -> Tuple[it.MDPDPTWInstance, slt.CAHDSolution]:
         """
         apply the concrete solution algorithm
         """
 
-        '''
-        # using a starting solution messed up the solver config that is stored with that solution
+        # TODO using a starting solution messed up the solver config that is stored with that solution
         if starting_solution is None:
             solution = slt.CAHDSolution(instance)
         else:
             solution = starting_solution
-        '''
-        solution = slt.CAHDSolution(instance)
+            solution.timings.clear()
+
+        # solution = slt.CAHDSolution
 
         self.update_solution_solver_config(solution)
-
+        random.seed(0)
         logger.info(f'{instance.id_}: Solving {solution.solver_config}')
 
-        random.seed(0)
         timer = pr.Timer()
         instance, solution = self._acceptance_phase(instance, solution)
         timer.write_duration_to_solution(solution, 'runtime_acceptance_phase')
@@ -58,9 +57,10 @@ class Solver:
         if self.auction:
             solution = self._auction_phase(instance, solution)
 
-        logger.info(f'{instance.id_}: Success {solution.solver_config}')
+        ut.validate_solution(instance, solution)
+        logger.info(f'{instance.id_}: Success [{solution.timings["runtime_total"]}] {solution.solver_config}')
 
-        return solution
+        return instance, solution
 
     def update_solution_solver_config(self, solution):
         """
@@ -110,7 +110,7 @@ class Solver:
 
             # build tours with the assigned request if it was accepted
             if accepted:
-                self.tour_construction.insert_single(instance, solution, carrier.id_, request)
+                self.tour_construction.insert_single_request(instance, solution, carrier.id_, request)
 
             # removeme
             # if request == carrier_id*instance.num_requests_per_carrier+instance.num_requests_per_carrier-1:
@@ -136,7 +136,7 @@ class Solver:
         ini.MaxCliqueTourInitialization().execute(instance, solution)
 
         # construct_static initial solution
-        self.tour_construction.insert_all(instance, solution, carrier)
+        self.tour_construction.insert_all_requests(instance, solution, carrier)
 
         ut.validate_solution(instance, solution)
         return solution

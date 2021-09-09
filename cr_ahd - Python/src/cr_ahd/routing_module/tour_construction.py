@@ -10,8 +10,11 @@ logger = logging.getLogger(__name__)
 
 
 class PDPParallelInsertionConstruction(ABC):
-    def insert_all(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int):
-        """inserts ALL unrouted requests of the specified carrier"""
+    def insert_all_requests(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int):
+        """
+        Inserts all unrouted requests of the specified carrier into tours. Repeatedly finds the "best" insertion,
+        defined by the request, the tour and the insertion positions. "best" is defined by the inheriting classes.
+        """
         carrier = solution.carriers[carrier_id]
         while carrier.unrouted_requests:
             request, tour, pickup_pos, delivery_pos = self.best_insertion_for_carrier(instance, carrier)
@@ -27,11 +30,11 @@ class PDPParallelInsertionConstruction(ABC):
 
         pass
 
-    def insert_single(self,
-                      instance: it.MDPDPTWInstance,
-                      solution: slt.CAHDSolution,
-                      carrier_id: int,
-                      request: int):
+    def insert_single_request(self,
+                              instance: it.MDPDPTWInstance,
+                              solution: slt.CAHDSolution,
+                              carrier_id: int,
+                              request: int):
         """
         Take a single (!) unrouted customer of the given carrier and insert it in the best position.\n
         NOTE: Function alters the solution in place

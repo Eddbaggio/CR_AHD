@@ -95,9 +95,6 @@ class PDPMove(IntraTourNeighborhood):
         for old_pickup_pos in range(1, len(tour_copy) - 2):
             vertex = tour_copy.routing_sequence[old_pickup_pos]
 
-            # TODO remove this assertion once I am certain the correct vertex_pos ist stored
-            assert old_pickup_pos == tour_copy.vertex_pos[vertex]
-
             # skip if its a delivery vertex
             if instance.vertex_type(vertex) == "delivery":
                 continue
@@ -187,13 +184,15 @@ class PDPTwoOpt(IntraTourNeighborhood):
                     yield move
 
     def feasibility_check(self, instance: it.MDPDPTWInstance, move):
+        tour: tr.Tour
         delta, tour, i, j = move
 
         # create a copy to check feasibility
-        tour_copy: tr.Tour = deepcopy(tour)
         pop_indices = list(range(i + 1, j + 1))
-        popped = tour_copy.pop_and_update(instance, pop_indices)
-        return tour_copy.insertion_feasibility_check(instance, range(i + 1, j + 1), list(reversed(popped)))
+        popped = tour.pop_and_update(instance, pop_indices)
+        feasibility = tour.insertion_feasibility_check(instance, range(i + 1, j + 1), list(reversed(popped)))
+        tour.insert_and_update(instance, pop_indices, popped)
+        return feasibility
 
     def execute_move(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, move):
         delta, tour, i, j = move

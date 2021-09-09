@@ -60,7 +60,7 @@ class NoMetaheuristic(PDPTWMetaHeuristic):
 
     def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
                 carrier_ids: List[int] = None) -> slt.CAHDSolution:
-        return deepcopy(solution)
+        return solution
 
     def execute_on_carrier(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution):
         pass
@@ -416,7 +416,7 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
     def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
                 carrier_ids: List[int] = None) -> slt.CAHDSolution:
         solution = deepcopy(solution)
-        best_solution = solution
+        best_solution = deepcopy(solution)
         num_requests = 2
         random.seed(99)  # to ensure same perturbations in (a) post-acceptance and (b) bidding improvement
         if carrier_ids is None:
@@ -424,19 +424,13 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
 
         for carrier_id in carrier_ids:
 
-            # if carrier_id == 0:  # REMOVEME for debugging
-            #     print(f'ILS: carrier 0 before ILS:\n {solution.carriers[0]}')
-
-            solution = self.local_search(instance, solution, [carrier_id])
+            self.local_search(instance, solution, [carrier_id])
             self.start_time = time.time()
             self.iter_count = 0
 
             while not self.stopping_criterion():
                 solution_new = self.perturbation(instance, solution, carrier_id, num_requests)
-                solution_new = self.local_search(instance, solution_new, [carrier_id])
-
-                # if carrier_id == 0:  # REMOVEME for debugging
-                #     print(f'ILS: carrier 0 profit, iter {self.iter_count}: {solution_new.carriers[0].sum_profit()}')
+                self.local_search(instance, solution_new, [carrier_id])
 
                 if solution_new.objective() > best_solution.objective():
                     best_solution = solution_new
@@ -466,16 +460,17 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
 
     def perturbation(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int,
                      num_requests: int) -> slt.CAHDSolution:
+        # TODO copying is expensive. Can I do this without copying?
         solution_copy = deepcopy(solution)
         carrier_copy = solution_copy.carriers[carrier_id]
         try:
-            # destroy
+            # destroy/shake
             # TODO test different shakes
             sh.RandomRemovalShake().execute(instance, carrier_copy, num_requests)
 
             # repair
             # TODO test different repairs
-            cns.MinTravelDistanceInsertion().insert_all(instance, solution_copy, carrier_copy.id_)
+            cns.MinTravelDistanceInsertion().insert_all_requests(instance, solution_copy, carrier_copy.id_)
 
             return solution_copy
 
@@ -485,11 +480,13 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
             return solution
 
     def local_search(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_ids: List[int]):
-        solution_copy = deepcopy(solution)
+        """
+        improves the solution in place
+        """
         # TODO neighborhood should be a parameter instead of an arbitrary choice
-        random_neighborhood = self.neighborhoods[0]
-        LocalSearchFirst([random_neighborhood]).execute(instance, solution_copy, carrier_ids)
-        return solution_copy
+        arbitrary_neighborhood = self.neighborhoods[0]
+        LocalSearchFirst([arbitrary_neighborhood]).execute(instance, solution, carrier_ids)
+        pass
 
     def stopping_criterion(self):
         if time.time() - self.start_time < TIME_MAX and self.iter_count < ITER_MAX:

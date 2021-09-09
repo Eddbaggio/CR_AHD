@@ -322,7 +322,7 @@ def print_top_level_stats(df: pd.DataFrame, secondary_parameters: List[str]):
 if __name__ == '__main__':
     df = pd.read_csv(
         "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home "
-        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_agg_solution_#022.csv",
+        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_agg_solution_#026.csv",
     )
     df.fillna(value=dict(runtime_request_selection=0,
                          runtime_auction_bundle_pool_generation=0,
@@ -337,7 +337,7 @@ if __name__ == '__main__':
     print_top_level_stats(df, [secondary_parameter])
     bar_chart(df,
               title='',
-              values='sum_profit',
+              values='runtime_bidding',
               # color=['solution_algorithm','tour_improvement',],
               color=['solution_algorithm', secondary_parameter, ],
               # category='rad', facet_col=None, facet_row='n',

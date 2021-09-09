@@ -24,13 +24,9 @@ class Tour:
         self.routing_sequence: List[int] = []  # vertices in order of service
         self.vertex_pos: Dict[int, int] = dict()  # mapping each vertex to its routing index
         self.arrival_time_sequence: List[dt.datetime] = []  # arrival time of each vertex
-        self.arrival_time_dict: Dict[int, dt.datetime] = dict()
         self.service_time_sequence: List[dt.datetime] = []  # start of service time of each vertex
-        self.service_time_dict: Dict[int, dt.datetime] = dict()
         self.wait_duration_sequence: List[dt.timedelta] = []  # required for efficient feasibility checks
-        self.wait_duration_dict: Dict[int, dt.timedelta] = dict()
         self.max_shift_sequence: List[dt.timedelta] = []  # required for efficient feasibility checks
-        self.max_shift_dict: Dict[int, dt.timedelta] = dict()
 
         # sums
         self.sum_travel_distance: float = 0.0
@@ -187,7 +183,7 @@ class Tour:
             # sanity check whether insertion positions are sorted in ascending order
             assert all(insertion_indices[i] < insertion_indices[i + 1] for i in range(len(insertion_indices) - 1))
 
-            # create a temporary copy
+            # create a temporary copy # TODO this is very computationally expensive, is there a cheaper way? -> not really
             copy = deepcopy(self)
 
             # check all insertions sequentially
@@ -232,22 +228,18 @@ class Tour:
                     instance.vertex_service_duration[i_vertex] + \
                     instance.travel_duration([i_vertex], [j_vertex])
         self.arrival_time_sequence.insert(insertion_index, arrival_j)
-        self.arrival_time_dict[j_vertex] = arrival_j
 
         # calculate start of service at j_vertex
-        service_j = max(instance.tw_open[j_vertex], self.arrival_time_dict[j_vertex])
+        service_j = max(instance.tw_open[j_vertex], arrival_j)
         self.service_time_sequence.insert(insertion_index, service_j)
-        self.service_time_dict[j_vertex] = service_j
 
         # calculate wait duration at j_vertex
-        wait_j = max(dt.timedelta(0), instance.tw_open[j_vertex] - self.arrival_time_dict[j_vertex])
+        wait_j = max(dt.timedelta(0), instance.tw_open[j_vertex] - arrival_j)
         self.wait_duration_sequence.insert(insertion_index, wait_j)
-        self.wait_duration_dict[j_vertex] = wait_j
 
         # set max_shift of j_vertex temporarily to 0, will be updated further down
         max_shift_j = dt.timedelta(0)
         self.max_shift_sequence.insert(insertion_index, max_shift_j)
-        self.max_shift_dict[j_vertex] = max_shift_j
 
         # ===== [2] UPDATE =====
         # dist_shift: total distance consumption of inserting j_vertex in between i_vertex and k_vertex
@@ -260,7 +252,7 @@ class Tour:
                               instance.travel_duration([j_vertex], [k_vertex]) - \
                               instance.travel_duration([i_vertex], [k_vertex])
         time_shift_j = travel_time_shift_j + \
-                       self.wait_duration_dict[j_vertex] + \
+                       wait_j + \
                        instance.vertex_service_duration[j_vertex]
 
         # update sums
@@ -273,8 +265,6 @@ class Tour:
         # update arrival at k_vertex
         arrival_k = self.arrival_time_sequence[k_index] + time_shift_j
         self.arrival_time_sequence[k_index] = arrival_k
-        if instance.vertex_type(k_vertex) != "depot":
-            self.arrival_time_dict[k_vertex] = arrival_k
 
         # time_shift_k: how much of j_vertex's time shift is still available after waiting at k_vertex
         time_shift_k = max(dt.timedelta(0), time_shift_j - self.wait_duration_sequence[k_index])
@@ -282,20 +272,14 @@ class Tour:
         # update waiting time at k_vertex
         wait_k = max(dt.timedelta(0), self.wait_duration_sequence[k_index] - time_shift_j)
         self.wait_duration_sequence[k_index] = wait_k
-        if instance.vertex_type(k_vertex) != "depot":
-            self.wait_duration_dict[k_vertex] = wait_k
 
         # update start of service at k_vertex
         service_k = self.service_time_sequence[k_index] + time_shift_k
         self.service_time_sequence[k_index] = service_k
-        if instance.vertex_type(k_vertex) != "depot":
-            self.service_time_dict[k_vertex] = service_k
 
         # update max shift of k_vertex
         max_shift_k = self.max_shift_sequence[k_index] - time_shift_k
         self.max_shift_sequence[k_index] = max_shift_k
-        if instance.vertex_type(k_vertex) != "depot":
-            self.max_shift_dict[k_vertex] = max_shift_k
 
         # increase vertex position record by 1 for all vertices succeeding j_vertex
         for vertex in self.routing_sequence[insertion_index + 1: -1]:
@@ -312,29 +296,20 @@ class Tour:
             # update arrival at k_vertex
             arrival_k = self.arrival_time_sequence[k_index] + time_shift_j
             self.arrival_time_sequence[k_index] = arrival_k
-            if instance.vertex_type(k_vertex) != "depot":
-                self.arrival_time_dict[k_vertex] = arrival_k
 
             time_shift_k = max(dt.timedelta(0), time_shift_j - self.wait_duration_sequence[k_index])
 
             # update wait duration
             wait_k = max(dt.timedelta(0), self.wait_duration_sequence[k_index] - time_shift_j)
             self.wait_duration_sequence[k_index] = wait_k
-            if instance.vertex_type(k_vertex) != "depot":
-                self.wait_duration_dict[k_vertex] = wait_k
 
             # update service start time of k_vertex
             service_k = self.service_time_sequence[k_index] + time_shift_k
             self.service_time_sequence[k_index] = service_k
-            if instance.vertex_type(k_vertex) != "depot":
-                self.service_time_dict[k_vertex] = service_k
 
             # update max_shift of k_vertex
             max_shift_k = self.max_shift_sequence[k_index] - time_shift_k
-            assert max_shift_k >= dt.timedelta(0)
             self.max_shift_sequence[k_index] = max_shift_k
-            if instance.vertex_type(k_vertex) != "depot":
-                self.max_shift_dict[k_vertex] = max_shift_k
 
         # update max_shift for visit j_vertex and visits PRECEDING the inserted vertex j_vertex
         for index in range(insertion_index, -1, -1):
@@ -342,10 +317,7 @@ class Tour:
 
             max_shift_j = min(instance.tw_close[vertex] - self.service_time_sequence[index],
                               self.wait_duration_sequence[index + 1] + self.max_shift_sequence[index + 1])
-            assert max_shift_j >= dt.timedelta(0)
-            self.max_shift_sequence[index] = max_shift_j  # FIXME max_shift_is negative sometimes
-            if instance.vertex_type(vertex) != "depot":
-                self.max_shift_dict[vertex] = max_shift_j
+            self.max_shift_sequence[index] = max_shift_j
         pass
 
     def insert_and_update(self, instance, insertion_indices: Sequence[int], insertion_vertices: Sequence[int]):
@@ -381,16 +353,12 @@ class Tour:
         k_vertex = self.routing_sequence[index]  # k_vertex has taken the place of j_vertex after j_vertex was removed
 
         self.arrival_time_sequence.pop(pop_index)
-        self.arrival_time_dict.pop(j_vertex)
 
         self.service_time_sequence.pop(pop_index)
-        self.service_time_dict.pop(j_vertex)
 
         wait_j = self.wait_duration_sequence.pop(pop_index)
-        self.wait_duration_dict.pop(j_vertex)
 
         self.max_shift_sequence.pop(pop_index)
-        self.max_shift_dict.pop(j_vertex)
 
         # ===== [2] UPDATE =====
 
@@ -415,14 +383,10 @@ class Tour:
         # update the arrival at k_vertex
         arrival_k = self.arrival_time_sequence[index] + time_shift_j
         self.arrival_time_sequence[index] = arrival_k
-        if instance.vertex_type(k_vertex) != "depot":
-            self.arrival_time_dict[k_vertex] = arrival_k
 
         # update waiting time at k_vertex (more complicated than in insert) - can only increase
         wait_k = max(dt.timedelta(0), instance.tw_open[k_vertex] - self.arrival_time_sequence[index])
         self.wait_duration_sequence[index] = wait_k
-        if instance.vertex_type(k_vertex) != "depot":
-            self.wait_duration_dict[k_vertex] = wait_k
 
         # time_shift_k: how much of i_vertex's time shift is still available after waiting at k_vertex?
         time_shift_k = min(dt.timedelta(0), time_shift_j + self.wait_duration_sequence[index])
@@ -430,14 +394,10 @@ class Tour:
         # update start of service at k_vertex
         service_k = max(instance.tw_open[k_vertex], self.arrival_time_sequence[index])
         self.service_time_sequence[index] = service_k
-        if instance.vertex_type(k_vertex) != "depot":
-            self.service_time_dict[k_vertex] = service_k
 
         # update max shift of k_vertex
         max_shift_k = self.max_shift_sequence[index] - time_shift_k
         self.max_shift_sequence[index] = max_shift_k
-        if instance.vertex_type(k_vertex) != "depot":
-            self.max_shift_dict[k_vertex] = max_shift_k
 
         # decrease vertex position record by 1 for all vertices succeeding j_vertex
         for vertex in self.routing_sequence[pop_index: -1]:
@@ -454,28 +414,20 @@ class Tour:
             # update arrival at k_vertex
             arrival_k = self.arrival_time_sequence[index] + time_shift_j
             self.arrival_time_sequence[index] = arrival_k
-            if instance.vertex_type(k_vertex) != "depot":
-                self.arrival_time_dict[k_vertex] = arrival_k
 
             # update wait time at k_vertex
             wait_k = max(dt.timedelta(0), instance.tw_open[k_vertex] - self.arrival_time_sequence[index])
             self.wait_duration_sequence[index] = wait_k
-            if instance.vertex_type(k_vertex) != "depot":
-                self.wait_duration_dict[k_vertex] = wait_k
 
             time_shift_k = min(dt.timedelta(0), time_shift_j + self.wait_duration_sequence[index])
 
             # service start time of k_vertex
             service_k = max(instance.tw_open[k_vertex], self.arrival_time_sequence[index])
             self.service_time_sequence[index] = service_k
-            if instance.vertex_type(k_vertex) != "depot":
-                self.service_time_dict[k_vertex] = service_k
 
             # update max_shift of k_vertex
             max_shift_k = self.max_shift_sequence[index] - time_shift_k
             self.max_shift_sequence[index] = max_shift_k
-            if instance.vertex_type(k_vertex) != "depot":
-                self.max_shift_dict[k_vertex] = max_shift_k
 
         # update max_shift for visits PRECEDING the removed vertex j_vertex
         for index in range(pop_index - 1, -1, -1):
@@ -483,8 +435,6 @@ class Tour:
             max_shift_i = min(instance.tw_close[vertex] - self.service_time_sequence[index],
                               self.wait_duration_sequence[index + 1] + self.max_shift_sequence[index + 1])
             self.max_shift_sequence[index] = max_shift_i
-            if instance.vertex_type(vertex) != "depot":
-                self.max_shift_dict[vertex] = max_shift_i
 
         return popped
 
@@ -508,22 +458,6 @@ class Tour:
 
         # reverse the popped array again to return vertices in the expected order
         return list(reversed(popped))
-
-    def reverse_section(self, instance, i, j):
-        """
-        reverses a section of the route by connecting i->j and i+1 -> j+1.
-        If reversal is infeasible, will raise InsertionError (and undoes the attempted reversal)
-
-        Example: \n
-        >> tour.sequence = [0, 1, 2, 3, 4, 0] \n
-        >> tour.reverse_section(1, 4) \n
-        >> print (tour.sequence) \n
-        >> [0, 1, 4, 3, 2, 0]
-        """
-
-        for k in range(1, j - i):
-            popped = self.pop_and_update(instance, [i + 1])
-            self.insert_and_update(instance, [j - k + 1], popped)
 
     def pop_distance_delta(self, instance, pop_indices: Sequence[int]):
         """
@@ -667,7 +601,7 @@ class Tour:
             # sanity check whether insertion positions are sorted in ascending order
             assert all(insertion_indices[i] < insertion_indices[i + 1] for i in range(len(insertion_indices) - 1))
 
-            # create a temporary copy
+            # create a temporary copy # TODO this is very computationally expensive, is there a cheaper way? -> not really
             copy = deepcopy(self)
 
             # check all insertions sequentially

@@ -390,10 +390,6 @@ def validate_tour(instance, tour):
         # meta data
         if instance.vertex_type(vertex) != 'depot':
             assert tour.vertex_pos[vertex] == i, msg
-            assert tour.arrival_time_sequence[i] == tour.arrival_time_dict[vertex], msg
-            assert tour.service_time_sequence[i] == tour.service_time_dict[vertex], msg
-            assert tour.max_shift_sequence[i] == tour.max_shift_dict[vertex], msg
-
 
 random.seed(0)
 DISTANCE_SCALING = 1

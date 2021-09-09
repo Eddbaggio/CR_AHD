@@ -147,21 +147,21 @@ def execute_all(instance: it.MDPDPTWInstance, plot=False):
     solutions = []
     isolated_planning_starting_solution = None
     for solver_params in parameter_generator():
-
         solver = slv.Solver(**solver_params)
         try:
             timer = pr.Timer()
-            solution = solver.execute(instance,
-                                      # isolated_planning_starting_solution
-                                      )
+            if not solver.auction:  # isolated planning
+                tw_instance, solution = solver.execute(instance, None)
+                starting_solution = solution
+            else:  # collaborative planning can use starting solution & instance having the assigned time windows
+                tw_instance, solution = solver.execute(tw_instance, starting_solution)
             timer.write_duration_to_solution(solution, 'runtime_total')
-            # if solution.solver_config['solution_algorithm'] == 'IsolatedPlanning':
-            #     isolated_planning_starting_solution = solution
             solution.write_to_json()
             solutions.append(deepcopy(solution))
 
         except Exception as e:
-            logger.error(f'{e}\nFailed on instance {instance} with solver {solver.__class__.__name__} at {datetime.now()}')
+            logger.error(
+                f'{e}\nFailed on instance {instance} with solver {solver.__class__.__name__} at {datetime.now()}')
             raise e
             solution = slt.CAHDSolution(instance)  # create an empty solution for failed instances
             solver.update_solution_solver_config(solution)
@@ -269,7 +269,7 @@ if __name__ == '__main__':
         run, rad, n = 10, 0, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
         instance_idx = run * 6 + rad * 2 + n
         # instance_idx = random.choice(range(len(paths)))
-        paths = paths[instance_idx:instance_idx+1]
+        paths = paths[instance_idx:instance_idx + 1]
 
         if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=True)
@@ -280,7 +280,7 @@ if __name__ == '__main__':
         secondary_parameter = 'tour_improvement'
         ev.bar_chart(df,
                      title='',
-                     values='sum_profit',
+                     values='runtime_total',
                      color=['solution_algorithm', secondary_parameter, ],
                      # color=secondary_parameter,
                      # category='rad', facet_col=None, facet_row='n',

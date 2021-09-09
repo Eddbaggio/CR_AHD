@@ -160,7 +160,9 @@ class MarginalProfitProxy(RequestSelectionBehaviorIndividual):
         marginal_fulfillment_cost = - tour.pop_distance_delta(instance, [pickup_pos, delivery_pos])
 
         # marginal profit = revenue - fulfillment cost
-        marginal_profit = instance.vertex_revenue[delivery] - marginal_fulfillment_cost
+        marginal_profit = instance.vertex_revenue[delivery] + \
+                          instance.vertex_revenue[pickup] - \
+                          marginal_fulfillment_cost
 
         return marginal_profit
 

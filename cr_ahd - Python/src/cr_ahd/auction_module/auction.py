@@ -1,13 +1,12 @@
 import logging
 import warnings
 from abc import ABC
-from copy import deepcopy
 
 from src.cr_ahd.auction_module import request_selection as rs, bundle_generation as bg, bidding as bd, \
     winner_determination as wd
 from src.cr_ahd.core_module import instance as it, solution as slt
 from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh
-from src.cr_ahd.utility_module import utils as ut, profiling as pr
+from src.cr_ahd.utility_module import profiling as pr
 
 logger = logging.getLogger(__name__)
 
@@ -87,21 +86,24 @@ class Auction(ABC):
             logger.warning(f'No requests have been submitted!')
 
         # ===== Final Routing =====
-        # clear the solution and do a dynamic re-optimization + improvement
-        solution.clear_carrier_routes()
+        # clear the solution and run dynamic insertion + improvement
+        solution.clear_carrier_routes()  # clear everything that was left after Request Selection
+
         timer = pr.Timer()
         for carrier in solution.carriers:
             while carrier.unrouted_requests:
                 request = carrier.unrouted_requests[0]
-                self.tour_construction.insert_single(instance, solution, carrier.id_, request)
+                self.tour_construction.insert_single_request(instance, solution, carrier.id_, request)
         timer.write_duration_to_solution(solution, 'runtime_final_construction')
+
         timer = pr.Timer()
         solution = self.tour_improvement.execute(instance, solution)
         timer.write_duration_to_solution(solution, 'runtime_final_improvement')
+
         profit_after = [carrier.sum_profit() for carrier in solution.carriers]
 
         if not sum(profit_before) <= sum(profit_after):
-            warnings.warn(f'Global result is worse after the auction than it was before the auction [{instance.id_}]')
+            warnings.warn(f'Global result is worse after the auction than it was before the auction! [{instance.id_}]')
 
         return solution
 

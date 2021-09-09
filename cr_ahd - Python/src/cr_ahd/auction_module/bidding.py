@@ -1,5 +1,4 @@
 import logging
-import time
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import List, Sequence
@@ -7,8 +6,8 @@ from typing import List, Sequence
 import tqdm
 
 from src.cr_ahd.core_module import instance as it, solution as slt
-from src.cr_ahd.routing_module import tour_construction as cns, tour_initialization as ini, metaheuristics as mh
-from src.cr_ahd.utility_module import utils as ut, profiling as pr
+from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh
+from src.cr_ahd.utility_module import utils as ut
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +83,7 @@ class DynamicInsertionAndImprove(BiddingBehavior):
     def _value_with_bundle(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, bundle: Sequence[int],
                            carrier_id: int):
 
+        # TODO this is very computationally expensive, is there a cheaper way?
         solution_copy = deepcopy(solution)
         carrier_copy = solution_copy.carriers[carrier_id]
         self._add_bundle_to_carrier(bundle, carrier_copy)
@@ -95,13 +95,11 @@ class DynamicInsertionAndImprove(BiddingBehavior):
         try:
             while carrier_copy.unrouted_requests:
                 request = carrier_copy.unrouted_requests[0]
-                self.tour_construction.insert_single(instance, solution_copy, carrier_copy.id_, request)
+                self.tour_construction.insert_single_request(instance, solution_copy, carrier_copy.id_, request)
 
             solution_copy_improved = self.tour_improvement.execute(instance, solution_copy, [carrier_id])
             carrier_copy_improved = solution_copy_improved.carriers[carrier_copy.id_]
 
-            # FIXME why is this assertion raised? why are they not the same object?
-            assert carrier_copy is solution_copy.carriers[carrier_id]
             with_bundle = carrier_copy_improved.objective()
 
         except ut.ConstraintViolationError:
