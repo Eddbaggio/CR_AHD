@@ -52,7 +52,7 @@ class WinnerDeterminationBehavior(ABC):
 
 class MaxBidGurobiCAP1(WinnerDeterminationBehavior):
     """
-    Set Packing Formulation for the Combinatorial Auction Problem / Winner Determination Problem
+    Set Partitioning Formulation for the Combinatorial Auction Problem / Winner Determination Problem
     Following Vries,S.de, & Vohra,R.V. (2003). Combinatorial Auctions: A Survey.
     https://doi.org/10.1287/ijoc.15.3.284.16077
     CAP1
@@ -82,8 +82,8 @@ class MaxBidGurobiCAP1(WinnerDeterminationBehavior):
         m.setObjective(y.prod(coeff), GRB.MAXIMIZE)
 
         # constraints: each request is assigned to exactly one carrier
-        # (set covering: assigned to at least one carrier
-        # set packing: assigned to at most one carrier)
+        # (set covering: assigned to *at least* one carrier
+        # set packing: assigned to *at most* one carrier)
         for request in auction_pool:
             expr = gp.LinExpr()
             for b, bundle in enumerate(bundles):
@@ -133,7 +133,7 @@ class MaxBidGurobiCAP2(WinnerDeterminationBehavior):
         max_bids = [bids_matrix[b][max_bidders[b]] for b in range(len(bids_matrix))]
 
         # model
-        m = gp.Model(name="Set Packing/Covering/Partitioning Problem")
+        m = gp.Model(name="Set Packing?/Covering?/Partitioning? Problem")
         m.setParam('OutputFlag', 0)
 
         # variables: is a bundle assigned to the max bidder or not?

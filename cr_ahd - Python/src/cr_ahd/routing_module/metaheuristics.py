@@ -13,6 +13,7 @@ from src.cr_ahd.utility_module import utils as ut, profiling as pr
 logger = logging.getLogger(__name__)
 
 TIME_MAX = float(0.05)  # 0.05 is roughly the time required by the VND procedure to exhaust all neighborhoods
+ITER_MAX = 5  # better to use iter_max in some cases to obtain the same results in post-acceptance and bidding
 
 
 class PDPTWMetaHeuristic(ABC):
@@ -20,6 +21,7 @@ class PDPTWMetaHeuristic(ABC):
         self.neighborhoods = neighborhoods
         self.improved = False
         self.start_time = None
+        self.iter_count = None
         self.parameters = dict()
         self.trajectory = []  # collection of all accepted & executed moves
 
@@ -28,9 +30,6 @@ class PDPTWMetaHeuristic(ABC):
     @abstractmethod
     def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
                 carrier_ids: List[int] = None) -> slt.CAHDSolution:
-        # FIXME since execute does not work without the solution, the carriers should be int indices to avoid confusion.
-        #  (cannot make this independent of the solution because ILS requires it.) The current state allows to pass
-        #  carriers that are not part of the solution which may return unintended results!
         pass
 
     # @abstractmethod
@@ -187,13 +186,11 @@ class PDPTWSequentialLocalSearch(PDPTWMetaHeuristic):
                 self.improved = True
                 while not self.stopping_criterion():
                     self.improved = False
-                    accepted = False
-                    while accepted is False:
+                    while self.improved is False:
                         try:
                             move = next(move_generator)
                             if self.acceptance_criterion(instance, move):
                                 neighborhood.execute_move(instance, best_solution, move)
-                                accepted = True
                                 self.improved = True
                                 self.update_trajectory(k, move, True)
                                 move_generator = neighborhood.feasible_move_generator_for_carrier(instance, carrier)
@@ -421,19 +418,26 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
         solution = deepcopy(solution)
         best_solution = solution
         num_requests = 2
+        random.seed(99)  # to ensure same perturbations in (a) post-acceptance and (b) bidding improvement
         if carrier_ids is None:
             carrier_ids = [x.id_ for x in best_solution.carriers]
 
-        solution = self.local_search(instance, solution, carrier_ids)
-
         for carrier_id in carrier_ids:
-            carrier = solution.carriers[carrier_id]
 
+            # if carrier_id == 0:  # REMOVEME for debugging
+            #     print(f'ILS: carrier 0 before ILS:\n {solution.carriers[0]}')
+
+            solution = self.local_search(instance, solution, [carrier_id])
             self.start_time = time.time()
+            self.iter_count = 0
 
             while not self.stopping_criterion():
-                solution_new = self.perturbation(instance, solution, carrier, num_requests)
-                solution_new = self.local_search(instance, solution_new, carrier_ids)
+                solution_new = self.perturbation(instance, solution, carrier_id, num_requests)
+                solution_new = self.local_search(instance, solution_new, [carrier_id])
+
+                # if carrier_id == 0:  # REMOVEME for debugging
+                #     print(f'ILS: carrier 0 profit, iter {self.iter_count}: {solution_new.carriers[0].sum_profit()}')
+
                 if solution_new.objective() > best_solution.objective():
                     best_solution = solution_new
 
@@ -442,6 +446,7 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
                 if self.acceptance_criterion(instance, move):
                     # self.update_trajectory()
                     solution = solution_new
+                self.iter_count += 1
 
         return best_solution
 
@@ -454,23 +459,23 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
         :return:
         """
         delta, solution, solution_new = move
-        if solution.objective() > solution_new.objective() > solution.objective() * 0.9:
+        if solution_new.objective() >= solution.objective() * 0.9:
             return True
         else:
             return False
 
-    def perturbation(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution,
+    def perturbation(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int,
                      num_requests: int) -> slt.CAHDSolution:
         solution_copy = deepcopy(solution)
-        carrier = solution_copy.carriers[carrier.id_]
+        carrier_copy = solution_copy.carriers[carrier_id]
         try:
             # destroy
             # TODO test different shakes
-            sh.RandomRemovalShake().execute(instance, carrier, num_requests)
+            sh.RandomRemovalShake().execute(instance, carrier_copy, num_requests)
 
             # repair
             # TODO test different repairs
-            cns.MinTravelDistanceInsertion().insert_all(instance, solution_copy, carrier.id_)
+            cns.MinTravelDistanceInsertion().insert_all(instance, solution_copy, carrier_copy.id_)
 
             return solution_copy
 
@@ -481,13 +486,13 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
 
     def local_search(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_ids: List[int]):
         solution_copy = deepcopy(solution)
-        # TODO neighborhood should be a parameter instead of random choice
-        random_neighborhood = random.choice(self.neighborhoods)
+        # TODO neighborhood should be a parameter instead of an arbitrary choice
+        random_neighborhood = self.neighborhoods[0]
         LocalSearchFirst([random_neighborhood]).execute(instance, solution_copy, carrier_ids)
         return solution_copy
 
     def stopping_criterion(self):
-        if time.time() - self.start_time < TIME_MAX:
+        if time.time() - self.start_time < TIME_MAX and self.iter_count < ITER_MAX:
             return False
         else:
             return True

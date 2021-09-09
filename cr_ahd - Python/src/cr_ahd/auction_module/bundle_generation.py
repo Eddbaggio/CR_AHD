@@ -1,21 +1,20 @@
-import abc
 import logging
 import random
 from abc import ABC, abstractmethod
-from typing import Iterable, Sequence, List, Callable, Union, Tuple
+from typing import Sequence, List, Callable
 
 import numpy as np
-from sklearn.cluster import KMeans
 import tqdm
+from sklearn.cluster import KMeans
 
 from src.cr_ahd.auction_module import bundle_valuation as bv
 from src.cr_ahd.core_module import instance as it, solution as slt
-from src.cr_ahd.utility_module import utils as ut, profiling as pr
+from src.cr_ahd.utility_module import utils as ut
 
 logger = logging.getLogger(__name__)
 
 """
-!!! NAMING CONVENTION !!!
+===== NAMING CONVENTION =====
 
 auction_request_pool: Sequence[int][int]
     a sequence of request indices of the requests that were submitted to be auctioned
@@ -113,7 +112,6 @@ class LimitedBundlePoolGenerationBehavior(ABC):
                 solution: slt.CAHDSolution,
                 auction_request_pool: Sequence[int],
                 original_bundling_labels: Sequence[int]):
-        # random.seed(0)
         self.preprocessing(instance, auction_request_pool)
         auction_bundle_pool = self._generate_auction_bundles(instance, solution, auction_request_pool,
                                                              original_bundling_labels)
@@ -413,7 +411,8 @@ class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
         return offspring
 
     @staticmethod
-    def _crossover_geo(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, auction_request_pool, parent1, parent2):
+    def _crossover_geo(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, auction_request_pool, parent1,
+                       parent2):
         """
         In this operator, we try to keep potentially good parts of existing bundles by combining the parents using
         geographic information. First, we calculate the center of each request, which is the midpoint between pickup

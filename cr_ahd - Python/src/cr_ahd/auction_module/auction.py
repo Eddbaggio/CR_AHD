@@ -1,4 +1,5 @@
 import logging
+import warnings
 from abc import ABC
 from copy import deepcopy
 
@@ -48,11 +49,13 @@ class Auction(ABC):
         logger.debug(f'running auction {self.__class__.__name__}')
 
         # ===== Request Selection =====
+        profit_before = [carrier.sum_profit() for carrier in solution.carriers]
         timer = pr.Timer()
         auction_request_pool, original_bundling_labels = self.request_selection.execute(instance, solution)
         timer.write_duration_to_solution(solution, 'runtime_request_selection')
 
         if auction_request_pool:
+            profit_after_rs = [carrier.sum_profit() for carrier in solution.carriers]
             logger.debug(f'requests {auction_request_pool} have been submitted to the auction pool')
 
             # ===== Bundle Generation =====
@@ -95,6 +98,10 @@ class Auction(ABC):
         timer = pr.Timer()
         solution = self.tour_improvement.execute(instance, solution)
         timer.write_duration_to_solution(solution, 'runtime_final_improvement')
+        profit_after = [carrier.sum_profit() for carrier in solution.carriers]
+
+        if not sum(profit_before) <= sum(profit_after):
+            warnings.warn(f'Global result is worse after the auction than it was before the auction [{instance.id_}]')
 
         return solution
 

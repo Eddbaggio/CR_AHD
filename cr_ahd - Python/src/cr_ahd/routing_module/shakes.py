@@ -34,7 +34,7 @@ class Shake(ABC):
         Perform the shaking operation on the given tour
 
         :param instance:
-        :param tour_:
+        :param tour:
         :param num_requests:
         :return:
         """
@@ -47,8 +47,8 @@ class RandomRemovalShake(Shake):
     """
 
     def execute(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, num_requests: int):
-        for tour_ in carrier.tours:
-            removed = self.execute_on_tour(instance, tour_, num_requests)
+        for tour in carrier.tours:
+            removed = self.execute_on_tour(instance, tour, num_requests)
             for request in removed:
                 carrier.unrouted_requests.append(request)
                 carrier.routed_requests.remove(request)

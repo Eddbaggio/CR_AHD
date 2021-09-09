@@ -63,6 +63,11 @@ class Solver:
         return solution
 
     def update_solution_solver_config(self, solution):
+        """
+        The solver config describes the solution methods and used to solve an instance. For post-processing and
+        comparing solutions it is thus useful to store the methods' names with the solution.
+        """
+
         solution.solver_config['tour_construction'] = self.tour_construction.__class__.__name__
         solution.solver_config['tour_improvement'] = self.tour_improvement.name
         # solution.solver_config['time_window_management'] = self.time_window_management.__class__.__name__
@@ -105,10 +110,13 @@ class Solver:
 
             # build tours with the assigned request if it was accepted
             if accepted:
-
                 self.tour_construction.insert_single(instance, solution, carrier.id_, request)
 
-        ut.validate_solution(instance, solution)  # check to make sure everything's functional
+            # removeme
+            # if request == carrier_id*instance.num_requests_per_carrier+instance.num_requests_per_carrier-1:
+            #     print('\n')
+
+        ut.validate_solution(instance, solution)  # safety check to make sure everything's functional
         return instance, solution
 
     def _improvement_phase(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution):

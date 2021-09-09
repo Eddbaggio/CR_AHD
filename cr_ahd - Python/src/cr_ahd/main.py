@@ -46,7 +46,7 @@ def parameter_generator():
         # mh.LocalSearchBest([neighborhoods[1]]),
         # mh.PDPTWSequentialLocalSearch(neighborhoods),
         mh.PDPTWIteratedLocalSearch(neighborhoods),
-        # mh.PDPTWVariableNeighborhoodDescent(neighborhoods),
+        mh.PDPTWVariableNeighborhoodDescent(neighborhoods),
         # mh.PDPTWReducedVariableNeighborhoodSearch(neighborhoods),
         # mh.PDPTWSimulatedAnnealing(neighborhoods),
         mh.NoMetaheuristic([]),
@@ -266,10 +266,10 @@ if __name__ == '__main__':
         paths = sorted(
             list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
             key=ut.natural_sort_key)
-        run, rad, n = 10, 0, 0  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
+        run, rad, n = 10, 0, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
         instance_idx = run * 6 + rad * 2 + n
         # instance_idx = random.choice(range(len(paths)))
-        paths = paths[instance_idx:instance_idx+2]
+        paths = paths[instance_idx:instance_idx+1]
 
         if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=True)
@@ -298,15 +298,15 @@ if __name__ == '__main__':
 
     # PROFILING
     cProfile.run('cr_ahd()', ut.output_dir.joinpath('cr_ahd_stats'))
-    """
+    # """
     # STATS
     p = pstats.Stats(ut.output_dir.joinpath('cr_ahd_stats').as_posix())
     # remove the extraneous path from all the module names:
     p.strip_dirs()
-    # sorts the profile by cumulative time in a function, and then only prints the ten most significant lines:
+    # sorts the profile by cumulative time in a function, and then only prints the n most significant lines:
     p.sort_stats('cumtime').print_stats(50)
     # see what functions were looping a lot, and taking a lot of time:
     p.sort_stats('tottime').print_stats(20)
     p.sort_stats('ncalls').print_stats(20)
     # p.print_callers(20)
-    """
+    # """

@@ -38,12 +38,19 @@ class PDPParallelInsertionConstruction(ABC):
         """
         carrier = solution.carriers[carrier_id]
         insertion_criteria, tour, pickup_pos, delivery_pos = self.best_insertion_for_request(instance, carrier, request)
+
         if tour is None:
             self.create_new_tour_with_request(instance, solution.num_tours(), solution, carrier_id, request)
         else:
             self.execute_insertion(instance, solution, carrier_id, request, tour.id_, pickup_pos, delivery_pos)
 
-        pass
+        # REMOVEME print insertions of *original* requests
+        # if all([x in range(carrier_id*instance.num_requests_per_carrier, carrier_id*instance.num_requests_per_carrier+instance.num_requests_per_carrier) for x in carrier.accepted_requests]):
+        #     if tour is None:
+        #         print(f'Request {request:02d} insertion: *tour {solution.num_tours()-1:02d}, pickup_pos: 01, delivery_pos: 02, sum_profit: {carrier.sum_profit()}')
+        #     else:
+        #         print(f'Request {request:02d} insertion:  tour {tour.id_:02d}, pickup_pos: {pickup_pos:02d}, delivery_pos: {delivery_pos:02d}, sum_profit: {carrier.sum_profit()}')
+        # pass
 
     def best_insertion_for_carrier(self,
                                    instance: it.MDPDPTWInstance,
