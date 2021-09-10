@@ -325,6 +325,8 @@ class Tour:
         Inserts insertion_vertices at insertion_indices & updates the necessary data, e.g., arrival times.
         """
         assert all(insertion_indices[i] < insertion_indices[i + 1] for i in range(len(insertion_indices) - 1))
+        if isinstance(self.id_, int):
+            logger.debug(f'Tour {self.id_}: Inserting {insertion_vertices} at {insertion_indices}')
 
         # execute all insertions sequentially:
         for index, vertex in zip(insertion_indices, insertion_vertices):
