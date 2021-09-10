@@ -1,6 +1,6 @@
 import datetime as dt
 import json
-from typing import List, Sequence, Dict
+from typing import List, Sequence, Dict, Union
 
 import numpy as np
 
@@ -20,7 +20,7 @@ class CAHDSolution:
         # the current REQUEST-to-carrier (not vertex-to-carrier) allocation, initialized with nan for all requests
         self.request_to_carrier_assignment: List[int] = [None for _ in range(instance.num_requests)]
         # store a lookup-table to get a request's tour index
-        self.request_to_tour_assignment: List[int] = [None for _ in range(instance.num_requests)]
+        # self.request_to_tour_assignment: List[int] = [None for _ in range(instance.num_requests)]  # NOTE removed for now, only required in rare cases
         # store a lookup-table to get vertex's position inside its tour
 
         self.tours: List[tr.Tour] = []
@@ -94,14 +94,15 @@ class CAHDSolution:
         :param requests:
         :return:
         """
+        raise NotImplementedError
         for request in requests:
             carrier_: AHDSolution = self.carriers[self.request_to_carrier_assignment[request]]
-            tour_ = self.tours[self.request_to_tour_assignment[request]]
+            # tour_ = self.tours[self.request_to_tour_assignment[request]]
             for vertex in instance.pickup_delivery_pair(request):
                 pos = tour_.vertex_pos[vertex]
                 tour_.pop_and_update(instance, [pos])
 
-            self.request_to_tour_assignment[request] = None
+            # self.request_to_tour_assignment[request] = None
 
             # retract the request from the carrier
             carrier_.assigned_requests.remove(request)
@@ -157,6 +158,12 @@ class CAHDSolution:
         with open(path, mode='w') as f:
             json.dump({'summary': self.summary(), 'solution': self.as_dict()}, f, indent=4, cls=ut.MyJSONEncoder)
         pass
+
+    def tour_of_request(self, request: int) -> Union[tr.Tour, None]:
+        for tour in self.tours:
+            if request in tour.requests:
+                return tour
+        return None
 
 
 class AHDSolution:

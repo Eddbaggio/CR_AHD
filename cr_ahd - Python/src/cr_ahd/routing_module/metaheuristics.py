@@ -106,7 +106,7 @@ class LocalSearchFirst(PDPTWMetaHeuristic):
                     while not self.acceptance_criterion(instance, move):
                         self.update_trajectory(0, move, False)
                         move = next(move_gen)
-                    neighborhood.execute_move(instance, best_solution, move)
+                    neighborhood.execute_move(instance, move)
                     self.update_trajectory(0, move, True)
                     self.improved = True
                 except StopIteration:
@@ -148,7 +148,7 @@ class LocalSearchBest(PDPTWMetaHeuristic):
                     best_move = min(all_moves, key=lambda x: x[0])
                     if self.acceptance_criterion(instance, best_move):
                         self.update_trajectory(0, best_move, True)
-                        neighborhood.execute_move(instance, best_solution, best_move)
+                        neighborhood.execute_move(instance, best_move)
                         self.improved = True
         return best_solution
 
@@ -190,7 +190,7 @@ class PDPTWSequentialLocalSearch(PDPTWMetaHeuristic):
                         try:
                             move = next(move_generator)
                             if self.acceptance_criterion(instance, move):
-                                neighborhood.execute_move(instance, best_solution, move)
+                                neighborhood.execute_move(instance, move)
                                 self.improved = True
                                 self.update_trajectory(k, move, True)
                                 move_generator = neighborhood.feasible_move_generator_for_carrier(instance, carrier)
@@ -228,7 +228,7 @@ class PDPTWVariableNeighborhoodDescent(PDPTWMetaHeuristic):
             carrier_ids = [x.id_ for x in best_solution.carriers]
 
         for carrier_id in carrier_ids:
-            carrier = solution.carriers[carrier_id]
+            carrier = best_solution.carriers[carrier_id]
             self.parameters['k'] = 0
             self.start_time = time.time()
             while not self.stopping_criterion():
@@ -237,7 +237,7 @@ class PDPTWVariableNeighborhoodDescent(PDPTWMetaHeuristic):
                 if any(all_moves):
                     best_move = min(all_moves, key=lambda x: x[0])
                     if self.acceptance_criterion(instance, best_move):
-                        neighborhood.execute_move(instance, best_solution, best_move)
+                        neighborhood.execute_move(instance, best_move)
                         # ut.validate_solution(instance, best_solution)
                         self.update_trajectory(self.parameters['k'], best_move, True)
                         self.parameters['k'] = 0
@@ -262,7 +262,7 @@ class PDPTWVariableNeighborhoodDescent(PDPTWMetaHeuristic):
             if any(all_moves):
                 best_move = min(all_moves, key=lambda x: x[0])
                 if self.acceptance_criterion_tour(best_move):
-                    neighborhood.execute_move(instance, solution, best_move)
+                    neighborhood.execute_move(instance, best_move)
                     self.update_trajectory(self.parameters['k'], best_move, True)
                     self.parameters['k'] = 0
                 else:
@@ -312,7 +312,7 @@ class PDPTWReducedVariableNeighborhoodSearch(PDPTWVariableNeighborhoodDescent):
                 if any(all_moves):
                     random_move = random.choice(all_moves)
                     if self.acceptance_criterion(instance, random_move):
-                        neighborhood.execute_move(instance, best_solution, random_move)
+                        neighborhood.execute_move(instance, random_move)
                         # ut.validate_solution(instance, best_solution)
                         self.update_trajectory(self.parameters['k'], random_move, True)
                         self.parameters['k'] = 0
@@ -358,7 +358,7 @@ class PDPTWSimulatedAnnealing(PDPTWMetaHeuristic):
                     move = random.choice(all_moves)
 
                     if self.acceptance_criterion(instance, move):
-                        neighborhood.execute_move(instance, solution, move)
+                        neighborhood.execute_move(instance, move)
                         self.update_trajectory(self.parameters['k'], move, True)
                         # update the best solution
                         if solution.objective() > best_solution.objective():

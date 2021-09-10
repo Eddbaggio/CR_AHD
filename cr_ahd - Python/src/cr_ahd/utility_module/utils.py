@@ -341,11 +341,11 @@ def validate_solution(instance, solution):
 
             validate_tour(instance, tour)
 
-            # tour assignment record
-            for vertex in tour.routing_sequence[1:-1]:
-                request = instance.request_from_vertex(vertex)
-                assert solution.request_to_tour_assignment[
-                           request] == tour.id_, f'{instance.id_}, tour {tour.id_}, vertex {vertex} at index {i}'
+            # request-to-tour assignment record
+            # for vertex in tour.routing_sequence[1:-1]:
+            #     request = instance.request_from_vertex(vertex)
+            #     assert solution.request_to_tour_assignment[
+            #                request] == tour.id_, f'{instance.id_}, tour {tour.id_}, vertex {vertex} at index {i}'
 
 
 def validate_tour(instance, tour):

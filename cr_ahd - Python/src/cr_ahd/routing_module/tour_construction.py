@@ -143,7 +143,7 @@ class PDPParallelInsertionConstruction(ABC):
         pickup, delivery = instance.pickup_delivery_pair(request)
         tour.insert_and_update(instance, [pickup_pos, delivery_pos], [pickup, delivery])
         tour.requests.add(request)
-        solution.request_to_tour_assignment[request] = tour.id_  # TODO extract this for solution-independence?
+        # solution.request_to_tour_assignment[request] = tour.id_  # TODO extract this for solution-independence?
         carrier.unrouted_requests.remove(request)
         carrier.routed_requests.append(request)
 
@@ -154,7 +154,7 @@ class PDPParallelInsertionConstruction(ABC):
         pickup, delivery = instance.pickup_delivery_pair(request)
         tour = solution.tours[tour_id]
         tour.insert_and_update(instance, [pickup_pos, delivery_pos], [pickup, delivery])
-        solution.request_to_tour_assignment[instance.request_from_vertex(pickup)] = tour.id_
+        # solution.request_to_tour_assignment[instance.request_from_vertex(pickup)] = tour.id_# TODO extract this for solution-independence?
 
     def create_new_tour_with_request(self,
                                      instance: it.MDPDPTWInstance,
@@ -173,7 +173,7 @@ class PDPParallelInsertionConstruction(ABC):
         if tour.insertion_feasibility_check(instance, [1, 2], instance.pickup_delivery_pair(request)):
             tour.insert_and_update(instance, [1, 2], instance.pickup_delivery_pair(request))
             tour.requests.add(request)
-            solution.request_to_tour_assignment[request] = tour.id_  # TODO extract this for solution-independence?
+            # solution.request_to_tour_assignment[request] = tour.id_  # TODO extract this for solution-independence?
 
         else:
             raise ut.ConstraintViolationError(
