@@ -2,13 +2,12 @@ import logging.config
 import random
 from copy import deepcopy
 from typing import Union, Tuple
-import time
 
-from src.cr_ahd.utility_module import utils as ut, profiling as pr
 from src.cr_ahd.auction_module import auction as au
-from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
+from src.cr_ahd.core_module import instance as it, solution as slt
 from src.cr_ahd.routing_module import tour_construction as cns, tour_initialization as ini, metaheuristics as mh
 from src.cr_ahd.tw_management_module import tw_management as twm
+from src.cr_ahd.utility_module import utils as ut, profiling as pr
 
 logger = logging.getLogger(__name__)
 
@@ -57,8 +56,8 @@ class Solver:
         if self.auction:
             solution = self._auction_phase(instance, solution)
 
+        logger.info(f'{instance.id_}: Success {solution.solver_config}')
         ut.validate_solution(instance, solution)
-        logger.info(f'{instance.id_}: Success [{solution.timings["runtime_total"]}] {solution.solver_config}')
 
         return instance, solution
 
@@ -98,23 +97,27 @@ class Solver:
     def _acceptance_phase(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution):
         instance = deepcopy(instance)
         solution = deepcopy(solution)
-        while solution.unassigned_requests:
-            # assign the next request
-            request = solution.unassigned_requests[0]
-            carrier_id = instance.request_to_carrier_assignment[request]
-            carrier = solution.carriers[carrier_id]
-            solution.assign_requests_to_carriers([request], [carrier_id])
 
-            # find the tw for the request
-            accepted = self.time_window_management.execute(instance, solution, carrier, request)
+        num_intermediate_auctions = 2
+        i = 0
+        while solution.unassigned_requests:  # FIXME in collaborative, when starting solution is used, the whole while loop is skipped, making intermediate auctions impossible
+            # request = solution.unassigned_requests[0]
+            for request in range(i, instance.num_requests, instance.num_requests_per_carrier):
+                carrier_id = instance.request_to_carrier_assignment[request]
+                carrier = solution.carriers[carrier_id]
+                solution.assign_requests_to_carriers([request], [carrier_id])
 
-            # build tours with the assigned request if it was accepted
-            if accepted:
-                self.tour_construction.insert_single_request(instance, solution, carrier.id_, request)
+                # find the tw for the request
+                accepted = self.time_window_management.execute(instance, carrier, request)
 
-            # removeme
-            # if request == carrier_id*instance.num_requests_per_carrier+instance.num_requests_per_carrier-1:
-            #     print('\n')
+                # build tours with the assigned request if it was accepted
+                if accepted:
+                    self.tour_construction.insert_single_request(instance, solution, carrier.id_, request)
+
+            if self.auction and i > 0 and i * instance.num_carriers % (instance.num_requests / (num_intermediate_auctions + 1)) < 1:
+                self._auction_phase(instance, solution)
+
+            i += 1
 
         ut.validate_solution(instance, solution)  # safety check to make sure everything's functional
         return instance, solution

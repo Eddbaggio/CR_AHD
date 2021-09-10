@@ -6,7 +6,7 @@ from src.cr_ahd.utility_module import utils as ut
 
 
 class TWOfferingBehavior(abc.ABC):
-    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution, request: int):
+    def execute(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, request: int):
         pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
         # make sure that the request has not been given a tw yet
         assert instance.tw_open[delivery_vertex] in (ut.START_TIME, None)
@@ -14,29 +14,20 @@ class TWOfferingBehavior(abc.ABC):
 
         tw_valuations = []
         for tw in ut.ALL_TW:
-            tw_valuations.append(self._evaluate_time_window(instance, solution, carrier, request, tw))
+            tw_valuations.append(self._evaluate_time_window(instance, carrier, request, tw))
         offered_time_windows = list(sorted(zip(tw_valuations, ut.ALL_TW), key=lambda x: x[0]))
         offered_time_windows = [tw for valuation, tw in offered_time_windows if valuation >= 0]
         return offered_time_windows
 
     @abc.abstractmethod
-    def _evaluate_time_window(self, instance: it.MDPDPTWInstance,
-                              solution: slt.CAHDSolution,
-                              carrier: slt.AHDSolution,
-                              request: int,
+    def _evaluate_time_window(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, request: int,
                               tw: ut.TimeWindow):
         pass
 
 
 class FeasibleTW(TWOfferingBehavior):
-    def _evaluate_time_window(
-            self,
-            instance: it.MDPDPTWInstance,
-            solution: slt.CAHDSolution,
-            carrier: slt.AHDSolution,
-            request: int,
-            tw: ut.TimeWindow
-    ):
+    def _evaluate_time_window(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, request: int,
+                              tw: ut.TimeWindow):
         """
         :return: 1 if TW is feasible, -1 else
         """

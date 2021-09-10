@@ -91,11 +91,14 @@ def bar_chart(df: pd.DataFrame,
     # if any of facet_col, facet_row, color, category is a sequence, merge the levels into one
     already_joined = []
     for k, v in splitters.items():
-        if isinstance(v, (List, Tuple)):
-            splitters[k] = '-'.join(v)
-            if v not in already_joined:
-                solution_df = merge_index_levels(solution_df, v)
-                already_joined.append(v)
+        if isinstance(v, (List, Tuple)) :
+            if len(v) > 1:
+                splitters[k] = '-'.join(v)
+                if v not in already_joined:
+                    solution_df = merge_index_levels(solution_df, v)
+                    already_joined.append(v)
+            else:
+                splitters[k] = v[0]
 
     # group by facets, colors and categories
     px_ready = solution_df.groupby([x for x in set(splitters.values()) if x], dropna=False).agg('mean')
@@ -322,14 +325,14 @@ def print_top_level_stats(df: pd.DataFrame, secondary_parameters: List[str]):
 if __name__ == '__main__':
     df = pd.read_csv(
         "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home "
-        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_agg_solution_#026.csv",
+        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_agg_solution_#030.csv",
     )
     df.fillna(value=dict(runtime_request_selection=0,
                          runtime_auction_bundle_pool_generation=0,
                          runtime_bidding=0,
                          runtime_winner_determination=0,
                          runtime_final_construction=0,
-                         runtime_final_improvement=0,),
+                         runtime_final_improvement=0, ),
               inplace=True)
     df.fillna(value='None', inplace=True)
     df.set_index(['rad', 'n', 'run', ] + ut.solver_config, inplace=True)  # add 'carrier_id_' if agg_level==carrier
@@ -337,11 +340,11 @@ if __name__ == '__main__':
     print_top_level_stats(df, [secondary_parameter])
     bar_chart(df,
               title='',
-              values='runtime_bidding',
+              values='runtime_total',
               # color=['solution_algorithm','tour_improvement',],
-              color=['solution_algorithm', secondary_parameter, ],
-              # category='rad', facet_col=None, facet_row='n',
-              category='run', facet_col='rad', facet_row='n',
+              color=['solution_algorithm'], # secondary_parameter, ],
+              category='rad', facet_col=None, facet_row='n',
+              # category='run', facet_col='rad', facet_row='n',
               show=True,
               # width=700,
               # height=450,

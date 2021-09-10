@@ -45,11 +45,11 @@ def parameter_generator():
         # mh.LocalSearchBest([neighborhoods[0]]),
         # mh.LocalSearchBest([neighborhoods[1]]),
         # mh.PDPTWSequentialLocalSearch(neighborhoods),
-        mh.PDPTWIteratedLocalSearch(neighborhoods),
+        # mh.PDPTWIteratedLocalSearch(neighborhoods),
         mh.PDPTWVariableNeighborhoodDescent(neighborhoods),
         # mh.PDPTWReducedVariableNeighborhoodSearch(neighborhoods),
         # mh.PDPTWSimulatedAnnealing(neighborhoods),
-        mh.NoMetaheuristic([]),
+        # mh.NoMetaheuristic([]),
     ]
 
     time_window_managements: List[twm.TWManagement] = [
@@ -156,13 +156,14 @@ def execute_all(instance: it.MDPDPTWInstance, plot=False):
             else:  # collaborative planning can use starting solution & instance having the assigned time windows
                 tw_instance, solution = solver.execute(tw_instance, starting_solution)
             timer.write_duration_to_solution(solution, 'runtime_total')
+            logger.info(f'{instance.id_}: Solved in {solution.timings["runtime_total"]}')
             solution.write_to_json()
             solutions.append(deepcopy(solution))
 
         except Exception as e:
             logger.error(
                 f'{e}\nFailed on instance {instance} with solver {solver.__class__.__name__} at {datetime.now()}')
-            raise e
+            # raise e
             solution = slt.CAHDSolution(instance)  # create an empty solution for failed instances
             solver.update_solution_solver_config(solution)
             solution.write_to_json()
@@ -266,7 +267,7 @@ if __name__ == '__main__':
         paths = sorted(
             list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
             key=ut.natural_sort_key)
-        run, rad, n = 10, 0, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
+        run, rad, n = 1, 2, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
         instance_idx = run * 6 + rad * 2 + n
         # instance_idx = random.choice(range(len(paths)))
         paths = paths[instance_idx:instance_idx + 1]
@@ -279,8 +280,8 @@ if __name__ == '__main__':
         df = write_solution_summary_to_multiindex_df(solutions, 'solution')
         secondary_parameter = 'tour_improvement'
         ev.bar_chart(df,
-                     title='',
-                     values='runtime_total',
+                     title='Full run',
+                     values='sum_profit',
                      color=['solution_algorithm', secondary_parameter, ],
                      # color=secondary_parameter,
                      # category='rad', facet_col=None, facet_row='n',

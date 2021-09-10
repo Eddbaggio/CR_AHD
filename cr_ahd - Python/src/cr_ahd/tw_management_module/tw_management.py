@@ -17,12 +17,12 @@ class TWManagement(ABC):
         self.time_window_selection = time_window_selection
 
     @abstractmethod
-    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution, request: int):
+    def execute(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, request: int):
         pass
 
 
 class TWManagementNoTW(TWManagement):
-    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution, request: int):
+    def execute(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, request: int):
         # TODO: this does not consider the possibility that a carrier may still have to reject a customer even if she
         #  has the full time horizon as a time window
         carrier.accepted_requests.append(request)
@@ -37,8 +37,8 @@ class TWManagementSingle(TWManagement):
     NOTE: modifies the instance in place (adding the time window information)!
     """
 
-    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution, request: int):
-        offer_set = self.time_window_offering.execute(instance, solution, carrier, request)  # which TWs to offer?
+    def execute(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, request: int):
+        offer_set = self.time_window_offering.execute(instance, carrier, request)  # which TWs to offer?
         selected_tw = self.time_window_selection.execute(offer_set, request)  # which TW is selected?
         pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
         instance.tw_open[pickup_vertex] = ut.START_TIME
