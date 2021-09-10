@@ -94,20 +94,20 @@ class CAHDSolution:
         :param requests:
         :return:
         """
-        raise NotImplementedError
+
         for request in requests:
-            carrier_: AHDSolution = self.carriers[self.request_to_carrier_assignment[request]]
-            # tour_ = self.tours[self.request_to_tour_assignment[request]]
+            carrier: AHDSolution = self.carriers[self.request_to_carrier_assignment[request]]
+            tour = self.tour_of_request(request)
             for vertex in instance.pickup_delivery_pair(request):
-                pos = tour_.vertex_pos[vertex]
-                tour_.pop_and_update(instance, [pos])
+                pos = tour.vertex_pos[vertex]
+                tour.pop_and_update(instance, [pos])
 
             # self.request_to_tour_assignment[request] = None
 
             # retract the request from the carrier
-            carrier_.assigned_requests.remove(request)
-            carrier_.accepted_requests.remove(request)
-            carrier_.routed_requests.remove(request)
+            carrier.assigned_requests.remove(request)
+            carrier.accepted_requests.remove(request)
+            carrier.routed_requests.remove(request)
             self.request_to_carrier_assignment[request] = np.nan
             self.unassigned_requests.append(request)
 
@@ -159,7 +159,7 @@ class CAHDSolution:
             json.dump({'summary': self.summary(), 'solution': self.as_dict()}, f, indent=4, cls=ut.MyJSONEncoder)
         pass
 
-    def tour_of_request(self, request: int) -> Union[tr.Tour, None]:
+    def tour_of_request(self, request: int) -> tr.Tour:
         for tour in self.tours:
             if request in tour.requests:
                 return tour

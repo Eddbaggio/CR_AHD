@@ -115,7 +115,7 @@ class Solver:
         before = solution.objective()
         solution = self.tour_improvement.execute(instance, solution)
         ut.validate_solution(instance, solution)
-        assert solution.objective() >= before
+        assert round(solution.objective(), 4) >= round(before, 4)
         return solution
 
     def _static_routing(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution):

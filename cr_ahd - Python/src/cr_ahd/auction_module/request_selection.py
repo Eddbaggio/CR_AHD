@@ -108,7 +108,7 @@ class MarginalProfit(RequestSelectionBehaviorIndividual):
                           request: int):
         raise NotImplementedError
 
-        # tour = solution.tours[solution.request_to_tour_assignment[request]]
+        tour = solution.tour_of_request(request)
 
         travel_distance_with_request = tour.sum_travel_distance
 
@@ -150,7 +150,10 @@ class MarginalProfitProxy(RequestSelectionBehaviorIndividual):
     def _evaluate_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution,
                           request: int):
         # find the request's tour:
-        # tour = solution.tours[solution.request_to_tour_assignment[request]]
+        # TODO slow search algorithm. I intentionally avoided to have a request_to_tour
+        #  assignment array in the solution because keeping it updated meant ugly dependencies on the CAHDSolution
+        #  class for many functions
+        tour = solution.tour_of_request(request)
         pickup, delivery = instance.pickup_delivery_pair(request)
 
         pickup_pos = tour.vertex_pos[pickup]

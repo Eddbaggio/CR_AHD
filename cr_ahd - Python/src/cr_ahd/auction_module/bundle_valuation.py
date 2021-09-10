@@ -6,12 +6,11 @@ from typing import Sequence, Tuple, List, final
 
 import numpy as np
 from scipy.spatial.distance import squareform, pdist
-from sklearn.preprocessing import normalize
 
 from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
 from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh, \
     neighborhoods as nh
-from src.cr_ahd.utility_module import utils as ut, profiling as pr
+from src.cr_ahd.utility_module import utils as ut
 
 
 # ======================================================================================================================
@@ -318,16 +317,18 @@ def ropke_pisinger_request_similarity(instance: it.MDPDPTWInstance,
                                   for x in instance._distance_matrix]
     distance = normalized_distance_matrix[pickup_0][pickup_1] + normalized_distance_matrix[delivery_0][delivery_1]
 
-    carriers = [solution.request_to_carrier_assignment[r] for r in (request_0, request_1)]
-    # tours = [solution.request_to_tour_assignment[r] for r in (request_0, request_1)]
-    tour_0_, tour_1_ = [solution.carriers[c].tours[t] for c, t in zip(carriers, tours)]
+    # TODO slow search algorithm. I intentionally avoided to have a request_to_tour assignment array in the solution
+    #  because keeping it updated meant ugly dependencies on the CAHDSolution class for many functions
+    tour_0, tour_1 = [solution.tour_of_request(r) for r in (request_0, request_1)]
 
-    positions = [solution.vertex_position_in_tour[vertex] for vertex in (pickup_0, delivery_0, pickup_1, delivery_1)]
+    pickup_pos_0 = tour_0.vertex_pos[pickup_0]
+    delivery_pos_0 = tour_0.vertex_pos[delivery_0]
+    pickup_pos_1 = tour_1.vertex_pos[pickup_1]
+    delivery_pos_1 = tour_1.vertex_pos[delivery_1]
 
-    pickup_pos_0, delivery_pos_0, pickup_pos_1, delivery_pos_1 = positions
-
-    arrival_time_delta = (abs(tour_0_.arrival_time_sequence[pickup_pos_0] - tour_1_.arrival_time_sequence[pickup_pos_1]) +
-                          abs(tour_0_.arrival_time_sequence[delivery_pos_0] - tour_1_.arrival_time_sequence[delivery_pos_1])
+    arrival_time_delta = (abs(tour_0.arrival_time_sequence[pickup_pos_0] - tour_1.arrival_time_sequence[pickup_pos_1]) +
+                          abs(tour_0.arrival_time_sequence[delivery_pos_0] - tour_1.arrival_time_sequence[
+                              delivery_pos_1])
                           ).total_seconds()
     # normalize time [0, 1]
     start_time_delta = (ut.START_TIME - dt.datetime.min).total_seconds()
@@ -396,6 +397,7 @@ class GHProxyBundlingValuation(BundlingValuation):
     total_travel_distance for a bundle is estimated by a very rough proxy function (bundle_total_travel_distance_proxy)
 
     """
+
     def evaluate_bundling(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
                           bundling: List[List[int]]) -> float:
         """

@@ -4,139 +4,19 @@ import multiprocessing
 import random
 from copy import deepcopy
 from pathlib import Path
-from typing import List, Union, Tuple, Dict
+from typing import List
 from datetime import datetime
-import os
 import cProfile
-import pstats
 import pandas as pd
 from tqdm import tqdm
 
-import src.cr_ahd.solver as slv
-from src.cr_ahd.auction_module import auction as au, request_selection as rs, bundle_generation as bg, bidding as bd, \
-    winner_determination as wd, bundle_valuation as bv
+import src.cr_ahd.solver_module.solver as slv
 from src.cr_ahd.core_module import instance as it, solution as slt
-from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh, neighborhoods as nh
-from src.cr_ahd.tw_management_module import tw_management as twm, tw_selection as tws, tw_offering as two
+from src.cr_ahd.solver_module.param_gen import parameter_generator
 from src.cr_ahd.utility_module import utils as ut, evaluation as ev, cr_ahd_logging as log, profiling as pr
 
 logging.config.dictConfig(log.LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
-
-
-def parameter_generator():
-    """
-    generate dicts with all parameters are required to initialize a slv.Solver.
-    """
-    neighborhoods: List[nh.Neighborhood] = [  # these are fixed at the moment, i.e. not looped over
-        nh.PDPMove(),
-        nh.PDPTwoOpt(),
-        # nh.PDPRelocate()
-    ]
-
-    tour_constructions: List[cns.PDPParallelInsertionConstruction] = [
-        cns.MinTravelDistanceInsertion(),
-        # cns.MinTimeShiftInsertion()
-    ]
-
-    tour_improvements: List = [
-        # mh.LocalSearchFirst([neighborhoods[0]]),
-        # mh.LocalSearchFirst([neighborhoods[1]]),
-        # mh.LocalSearchBest([neighborhoods[0]]),
-        # mh.LocalSearchBest([neighborhoods[1]]),
-        # mh.PDPTWSequentialLocalSearch(neighborhoods),
-        # mh.PDPTWIteratedLocalSearch(neighborhoods),
-        mh.PDPTWVariableNeighborhoodDescent(neighborhoods),
-        # mh.PDPTWReducedVariableNeighborhoodSearch(neighborhoods),
-        # mh.PDPTWSimulatedAnnealing(neighborhoods),
-        mh.NoMetaheuristic([]),
-    ]
-
-    time_window_managements: List[twm.TWManagement] = [
-        twm.TWManagementSingle(two.FeasibleTW(),
-                               tws.UnequalPreference()),
-        # twm.TWManagementNoTW(None, None)
-    ]
-
-    nums_submitted_requests: List[int] = [
-        # 3,
-        4,
-        # 5
-    ]
-
-    request_selections: List[rs.RequestSelectionBehavior.__class__] = [
-        # rs.Random,
-        # rs.SpatialBundleDSum,  # the original 'cluster' strategy by Gansterer & Hartl (2016)
-        # rs.SpatialBundleDMax,
-        # rs.MinDistanceToForeignDepotDMin,
-        # rs.MarginalProfitProxy,
-        # rs.MarginalProfitProxyNeighbor,
-        # rs.ComboRaw,
-        rs.ComboStandardized,
-        # rs.LosSchulteBundle,
-        # rs.TemporalRangeCluster,
-        # TODO SpatioTemporalCluster is not yet good enough & sometimes even infeasible
-        # rs.SpatioTemporalCluster,
-    ]
-
-    nums_auction_bundles: List[int] = [
-        # 50,
-        100,
-        # 200,
-        # 300,
-        # 500
-    ]
-
-    bundle_generations: List[Tuple[bg.LimitedBundlePoolGenerationBehavior.__class__, Dict[str, float]]] = [
-        (bg.GeneticAlgorithm, dict(population_size=300,
-                                   num_generations=100,
-                                   mutation_rate=0.5,
-                                   generation_gap=0.9, )
-         ),
-        # (bg.BestOfAllBundlings, dict()),
-        # (bg.RandomMaxKPartition, dict())
-    ]
-
-    bundling_valuations: List[bv.BundlingValuation.__class__] = [
-        bv.GHProxyBundlingValuation,
-        # bv.MinDistanceBundlingValuation,
-        # bv.LosSchulteBundlingValuation,
-        # bv.RandomBundlingValuation,
-    ]
-
-    for tour_construction in tour_constructions:
-        for tour_improvement in tour_improvements:
-            for time_window_management in time_window_managements:
-                # Isolated Planning Parameters, no auction
-                yield dict(tour_construction=tour_construction,
-                           tour_improvement=tour_improvement,
-                           time_window_management=time_window_management,
-                           auction=False,
-                           )
-                for num_submitted_requests in nums_submitted_requests:
-                    for request_selection in request_selections:
-                        for num_auction_bundles in nums_auction_bundles:
-                            for bundle_generation, bundle_generation_kwargs in bundle_generations:
-                                for bundling_valuation in bundling_valuations:
-                                    # auction for collaborative planning
-                                    auction = au.Auction(tour_construction,
-                                                         tour_improvement,
-                                                         request_selection(num_submitted_requests),
-                                                         bundle_generation(num_auction_bundles=num_auction_bundles,
-                                                                           bundling_valuation=bundling_valuation(),
-                                                                           **bundle_generation_kwargs
-                                                                           ),
-                                                         bidding=bd.DynamicInsertionAndImprove(tour_construction,
-                                                                                               tour_improvement),
-                                                         winner_determination=wd.MaxBidGurobiCAP1(),
-                                                         )
-                                    # collaborative planning
-                                    yield dict(tour_construction=tour_construction,
-                                               tour_improvement=tour_improvement,
-                                               time_window_management=time_window_management,
-                                               auction=auction,
-                                               )
-    pass
 
 
 def execute_all(instance: it.MDPDPTWInstance, plot=False):
@@ -269,8 +149,8 @@ if __name__ == '__main__':
             key=ut.natural_sort_key)
         run, rad, n = 1, 2, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
         i = run * 6 + rad * 2 + n
-        i = random.choice(range(len(paths)))
-        paths = paths[60:72]
+        # i = random.choice(range(len(paths)))
+        paths = paths[:12]
 
         if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=True)
