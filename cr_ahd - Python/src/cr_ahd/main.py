@@ -46,7 +46,7 @@ def parameter_generator():
         # mh.LocalSearchBest([neighborhoods[1]]),
         # mh.PDPTWSequentialLocalSearch(neighborhoods),
         # mh.PDPTWIteratedLocalSearch(neighborhoods),
-        # mh.PDPTWVariableNeighborhoodDescent(neighborhoods),
+        mh.PDPTWVariableNeighborhoodDescent(neighborhoods),
         # mh.PDPTWReducedVariableNeighborhoodSearch(neighborhoods),
         # mh.PDPTWSimulatedAnnealing(neighborhoods),
         mh.NoMetaheuristic([]),
@@ -60,7 +60,7 @@ def parameter_generator():
 
     nums_submitted_requests: List[int] = [
         # 3,
-        # 4,
+        4,
         # 5
     ]
 
@@ -270,7 +270,7 @@ if __name__ == '__main__':
         run, rad, n = 1, 2, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
         instance_idx = run * 6 + rad * 2 + n
         # instance_idx = random.choice(range(len(paths)))
-        paths = paths[instance_idx:instance_idx + 1]
+        paths = paths[:]
 
         if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=True)
@@ -280,7 +280,7 @@ if __name__ == '__main__':
         df = write_solution_summary_to_multiindex_df(solutions, 'solution')
         secondary_parameter = 'tour_improvement'
         ev.bar_chart(df,
-                     title='NEW',
+                     title='',
                      values='sum_profit',
                      color=['solution_algorithm', secondary_parameter, ],
                      # color=secondary_parameter,
@@ -299,7 +299,7 @@ if __name__ == '__main__':
 
     # PROFILING
     cProfile.run('cr_ahd()', ut.output_dir.joinpath('cr_ahd_stats'))
-    # """
+    """
     # STATS
     p = pstats.Stats(ut.output_dir.joinpath('cr_ahd_stats').as_posix())
     # remove the extraneous path from all the module names:
@@ -310,4 +310,4 @@ if __name__ == '__main__':
     p.sort_stats('tottime').print_stats(20)
     p.sort_stats('ncalls').print_stats(20)
     # p.print_callers(20)
-    # """
+    """

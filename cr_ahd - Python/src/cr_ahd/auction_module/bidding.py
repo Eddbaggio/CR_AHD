@@ -83,7 +83,6 @@ class DynamicInsertionAndImprove(BiddingBehavior):
     def _value_with_bundle(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, bundle: Sequence[int],
                            carrier_id: int):
 
-        # TODO this is very computationally expensive, is there a cheaper way?
         solution_copy = deepcopy(solution)
         carrier_copy = solution_copy.carriers[carrier_id]
         self._add_bundle_to_carrier(bundle, carrier_copy)

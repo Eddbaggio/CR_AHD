@@ -460,7 +460,6 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
 
     def perturbation(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int,
                      num_requests: int) -> slt.CAHDSolution:
-        # TODO copying is expensive. Can I do this without copying?
         solution_copy = deepcopy(solution)
         carrier_copy = solution_copy.carriers[carrier_id]
         try:

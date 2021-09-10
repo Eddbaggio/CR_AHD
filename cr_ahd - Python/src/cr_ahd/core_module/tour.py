@@ -56,8 +56,31 @@ class Tour:
                f'Revenue:\t{self.sum_revenue}\n' \
                f'Profit:\t\t{self.sum_profit}\n'
 
+    def __repr__(self):
+        return f'Tour {self.id_}'
+
     def __len__(self):
         return len(self.routing_sequence)
+
+    def __deepcopy__(self, memodict={}):
+        cls = self.__class__
+        result = cls.__new__(cls)
+
+        setattr(result, 'id_', self.id_)
+        setattr(result, 'requests', self.requests.copy())
+        setattr(result, 'routing_sequence', self.routing_sequence[:])
+        setattr(result, 'vertex_pos', self.vertex_pos.copy())
+        setattr(result, 'arrival_time_sequence', self.arrival_time_sequence[:])
+        setattr(result, 'service_time_sequence', self.service_time_sequence[:])
+        setattr(result, 'wait_duration_sequence', self.wait_duration_sequence[:])
+        setattr(result, 'max_shift_sequence', self.max_shift_sequence[:])
+        setattr(result, 'sum_travel_distance', self.sum_travel_distance)
+        setattr(result, 'sum_travel_duration', self.sum_travel_duration)
+        setattr(result, 'sum_load', self.sum_load)
+        setattr(result, 'sum_revenue', self.sum_revenue)
+        setattr(result, 'sum_profit', self.sum_profit)
+
+        return result
 
     @property
     def num_routing_stops(self):
@@ -184,7 +207,6 @@ class Tour:
             # sanity check whether insertion positions are sorted in ascending order
             assert all(insertion_indices[i] < insertion_indices[i + 1] for i in range(len(insertion_indices) - 1))
 
-            # create a temporary copy # TODO this is very computationally expensive, is there a cheaper way? -> not really
             copy = deepcopy(self)
 
             # check all insertions sequentially
@@ -288,7 +310,6 @@ class Tour:
 
         # update data for all visits AFTER j_vertex until (a) shift == 0 or (b) the end is reached
         while time_shift_k > dt.timedelta(0) and k_index + 1 < len(self.routing_sequence):
-
             # move one forward
             k_index += 1
             k_vertex = self.routing_sequence[k_index]
@@ -408,7 +429,6 @@ class Tour:
 
         # update data for all visits AFTER j_vertex until (a) shift == 0 or (b) the end is reached
         while time_shift_k < dt.timedelta(0) and index + 1 < len(self.routing_sequence):
-
             # move one forward
             index += 1
             k_vertex = self.routing_sequence[index]
@@ -482,7 +502,6 @@ class Tour:
             delta -= instance.distance([i_vertex, j_vertex], [j_vertex, k_vertex])
 
         # must ensure that no edges are counted twice. Naive implementation with a tmp_routing_sequence
-        # TODO pretty sure this could be done without a temporary copy to save time
         else:
             assert all(pop_indices[i] < pop_indices[i + 1] for i in
                        range(len(pop_indices) - 1)), f'Pop indices {pop_indices} are not in correct order'
@@ -604,7 +623,7 @@ class Tour:
             # sanity check whether insertion positions are sorted in ascending order
             assert all(insertion_indices[i] < insertion_indices[i + 1] for i in range(len(insertion_indices) - 1))
 
-            # create a temporary copy # TODO this is very computationally expensive, is there a cheaper way? -> not really
+            # create a temporary copy
             copy = deepcopy(self)
 
             # check all insertions sequentially
@@ -651,7 +670,6 @@ def single_insertion_feasibility_check(routing_sequence: Sequence[int],
 
     :return: True if the insertion of the insertion_vertex at insertion_position is feasible, False otherwise
     """
-    # TODO these functions need testing!
 
     i = routing_sequence[insertion_index - 1]
     j = insertion_vertex

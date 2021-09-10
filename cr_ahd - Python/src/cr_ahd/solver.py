@@ -32,14 +32,11 @@ class Solver:
         apply the concrete solution algorithm
         """
 
-        # TODO using a starting solution messed up the solver config that is stored with that solution
         if starting_solution is None:
             solution = slt.CAHDSolution(instance)
         else:
             solution = starting_solution
             solution.timings.clear()
-
-        # solution = slt.CAHDSolution
 
         self.update_solution_solver_config(solution)
         random.seed(0)

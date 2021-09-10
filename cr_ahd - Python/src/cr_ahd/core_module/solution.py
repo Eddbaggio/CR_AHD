@@ -1,6 +1,6 @@
 import datetime as dt
 import json
-from typing import List, Sequence
+from typing import List, Sequence, Dict
 
 import numpy as np
 
@@ -11,11 +11,11 @@ from src.cr_ahd.utility_module import utils as ut
 class CAHDSolution:
     # default, empty solution
     def __init__(self, instance: it.MDPDPTWInstance):
-        self.id_ = instance.id_
-        self.meta = instance.meta
+        self.id_: str = instance.id_
+        self.meta: Dict[str, int] = instance.meta
 
         # requests that are not assigned to any carrier
-        self.unassigned_requests = list(instance.requests)
+        self.unassigned_requests: List[int] = list(instance.requests)
 
         # the current REQUEST-to-carrier (not vertex-to-carrier) allocation, initialized with nan for all requests
         self.request_to_carrier_assignment: List[int] = [None for _ in range(instance.num_requests)]
@@ -44,14 +44,14 @@ class CAHDSolution:
             s += '\n'
         return s
 
+    def __repr__(self):
+        return f'CAHDSolution for {self.id_}'
+
     def sum_travel_distance(self):
         return sum(c.sum_travel_distance() for c in self.carriers)
 
     def sum_travel_duration(self):
         return sum((c.sum_travel_duration() for c in self.carriers), dt.timedelta(0))
-
-    # def sum_wait_duration(self):
-    #     return sum((c.sum_wait_duration() for c in self.carriers), dt.timedelta(0))
 
     def sum_load(self):
         return sum(c.sum_load() for c in self.carriers)
@@ -169,7 +169,7 @@ class AHDSolution:
         self.unrouted_requests: List = []
         self.routed_requests: List = []
         self.acceptance_rate: float = 0
-        self.tour_ids: List[int] = []   # list of tour IDs of the tours that belong to this solution/carrier
+        self.tour_ids: List[int] = []  # list of tour IDs of the tours that belong to this solution/carrier
         self.tours: List[tr.Tour] = []
 
     def __str__(self):
@@ -186,8 +186,8 @@ class AHDSolution:
             s += '\n'
         return s
 
-    # def tours(self, solution: CAHDSolution):
-    #     return (solution.tours[x] for x in self.tour_ids)
+    def __repr__(self):
+        return f'Carrier (AHDSolution) {self.id_}'
 
     def num_routing_stops(self):
         return sum(t.num_routing_stops for t in self.tours)
@@ -197,9 +197,6 @@ class AHDSolution:
 
     def sum_travel_duration(self):
         return sum((t.sum_travel_duration for t in self.tours), dt.timedelta(0))
-
-    # def sum_wait_duration(self):
-    #     return sum((t.sum_wait_duration for t in self.tours), dt.timedelta(0))
 
     def sum_load(self):
         return sum(t.sum_load for t in self.tours)

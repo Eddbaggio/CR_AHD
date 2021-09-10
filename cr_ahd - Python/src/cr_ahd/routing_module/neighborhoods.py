@@ -228,7 +228,6 @@ class PDPRelocate(InterTourNeighborhood):
 
     def feasible_move_generator_for_carrier(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution):
         raise NotImplementedError
-        # TODO has not been adjusted for independence from CAHDSolution
         solution = deepcopy(solution)
 
         for old_tour in range(carrier.num_tours()):

@@ -45,9 +45,7 @@ class MDPDPTWInstance:
         :param id_: unique identifier
         """
         self._id_ = id_
-        self.meta = dict((k.strip(), int(v.strip()))
-                         for k, v in (item.split('=')
-                                      for item in id_.split('+')))
+        self.meta = dict((k.strip(), int(v.strip())) for k, v in (item.split('=') for item in id_.split('+')))
         self.num_carriers = len(carrier_depots_x)
         self.num_carriers = len(carrier_depots_x)
         self.vehicles_max_load = max_vehicle_load
@@ -66,7 +64,8 @@ class MDPDPTWInstance:
                                         *requests_pickup_service_time,
                                         *requests_delivery_service_time)
         self.tw_open = [*carrier_depots_tw_open, *request_pickup_time_window_open, *request_delivery_time_window_open]
-        self.tw_close = [*carrier_depots_tw_close, *request_pickup_time_window_close, *request_delivery_time_window_close]
+        self.tw_close = [*carrier_depots_tw_close, *request_pickup_time_window_close,
+                         *request_delivery_time_window_close]
 
         # compute the distance and travel time matrix
         # need to ceil the distances due to floating point precision!
@@ -183,7 +182,8 @@ def read_gansterer_hartl_mv(path: Path, num_carriers=3) -> MDPDPTWInstance:
                            requests_delivery_y=(requests['delivery_y'] * ut.DISTANCE_SCALING).tolist(),
                            requests_revenue=(requests['revenue'] * ut.REVENUE_SCALING).tolist(),
                            requests_pickup_service_time=[x.to_pytimedelta() for x in requests['pickup_service_time']],
-                           requests_delivery_service_time=[x.to_pytimedelta() for x in requests['delivery_service_time']],
+                           requests_delivery_service_time=[x.to_pytimedelta() for x in
+                                                           requests['delivery_service_time']],
                            requests_pickup_load=requests['load'].tolist(),
                            requests_delivery_load=(-requests['load']).tolist(),
                            request_pickup_time_window_open=[ut.START_TIME for _ in range(len(requests) * 2)],
