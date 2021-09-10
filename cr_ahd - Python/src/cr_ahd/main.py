@@ -36,7 +36,7 @@ def execute_all(instance: it.MDPDPTWInstance, plot=False):
             else:  # collaborative planning can use starting solution & instance having the assigned time windows
                 tw_instance, solution = solver.execute(tw_instance, starting_solution)
             timer.write_duration_to_solution(solution, 'runtime_total')
-            logger.info(f'{instance.id_}: Solved in {solution.timings["runtime_total"]}')
+            # logger.info(f'{instance.id_}: Solved in {solution.timings["runtime_total"]}')
             solution.write_to_json()
             solutions.append(deepcopy(solution))
 
@@ -150,7 +150,7 @@ if __name__ == '__main__':
         run, rad, n = 1, 2, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
         i = run * 6 + rad * 2 + n
         # i = random.choice(range(len(paths)))
-        paths = paths[:12]
+        paths = paths[i:i+1]
 
         if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=True)

@@ -70,6 +70,7 @@ class RandomRemovalShake(Shake):
                 pickup, delivery = instance.pickup_delivery_pair(request)
                 removal_indices.append(tour.vertex_pos[pickup])
                 removal_indices.append(tour.vertex_pos[delivery])
+                tour.requests.remove(request)
             tour.pop_and_update(instance, sorted(removal_indices))
             return removed
         else:

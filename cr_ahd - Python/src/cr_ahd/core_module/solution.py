@@ -98,11 +98,8 @@ class CAHDSolution:
         for request in requests:
             carrier: AHDSolution = self.carriers[self.request_to_carrier_assignment[request]]
             tour = self.tour_of_request(request)
-            for vertex in instance.pickup_delivery_pair(request):
-                pos = tour.vertex_pos[vertex]
-                tour.pop_and_update(instance, [pos])
-
-            # self.request_to_tour_assignment[request] = None
+            tour.pop_and_update(instance, [tour.vertex_pos[v] for v in instance.pickup_delivery_pair(request)])
+            tour.requests.remove(request)
 
             # retract the request from the carrier
             carrier.assigned_requests.remove(request)

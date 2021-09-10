@@ -57,6 +57,7 @@ class TourInitializationBehavior(ABC):
             tour_id = solution.num_tours()
             tour = tr.Tour(tour_id, best_depot)
             tour.insert_and_update(instance, [1, 2], instance.pickup_delivery_pair(best_request))
+            tour.requests.add(request)
             # solution.request_to_tour_assignment[best_request] = carrier_.num_tours()
             carrier_.tours.append(tour)
             carrier_.unrouted_requests.remove(best_request)
@@ -157,6 +158,7 @@ class MaxCliqueTourInitialization(ABC):
                 tour_id = solution.num_tours()
                 tour = tr.Tour(tour_id, solution.carrier_depots[carrier][0])
                 tour.insert_and_update(instance, [1, 2], instance.pickup_delivery_pair(seed))
+                tour.requests.add(seed)
                 # solution.request_to_tour_assignment[seed] = carrier_.num_tours()
                 carrier_.tours.append(tour)
                 carrier_.unrouted_requests.pop(i)
@@ -185,6 +187,7 @@ class MaxCliqueTourInitialization(ABC):
                     raise ut.ConstraintViolationError(
                         message=f'[{instance.id_}] Request {i_request} cannot feasibly be served by carrier {carrier}!')
                 tour_.insert_and_update(instance, [1, 2], [i_pickup, i_delivery])
+                tour_.requests.add(i_request)
                 # solution.request_to_tour_assignment[i_request] = tour_.id_
 
                 # try all insertion positions to see whether all are infeasible

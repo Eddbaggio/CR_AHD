@@ -283,7 +283,8 @@ class PDPRelocate(InterTourNeighborhood):
         delta, carrier, old_tour, old_pickup_pos, old_delivery_pos, new_tour, new_pickup_pos, new_delivery_pos = move
 
         pickup, delivery = old_tour.pop_and_update(instance, [old_pickup_pos, old_delivery_pos])
-
+        request = instance.request_from_vertex(pickup)
+        old_tour.requests.remove(request)
         logger.debug(f'PDPRelocate: [{delta}] Relocate vertices {pickup} and {delivery} from '
                      f'Tour {old_tour.id_} {old_pickup_pos, old_delivery_pos} to '
                      f'Tour {new_tour.id_} {new_pickup_pos, new_delivery_pos}')
@@ -293,9 +294,7 @@ class PDPRelocate(InterTourNeighborhood):
             carrier.tours.remove(old_tour)
 
         new_tour.insert_and_update(instance, [new_pickup_pos, new_delivery_pos], [pickup, delivery])
-        # raise NotImplementedError  # FIXME solution is not available here
-        # solution.request_to_tour_assignment[instance.request_from_vertex(pickup)] = new_tour.id_
-
+        new_tour.requests.add(request)
         pass
 
 

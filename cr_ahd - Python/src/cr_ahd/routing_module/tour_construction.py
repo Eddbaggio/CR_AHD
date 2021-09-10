@@ -154,6 +154,7 @@ class PDPParallelInsertionConstruction(ABC):
         pickup, delivery = instance.pickup_delivery_pair(request)
         tour = solution.tours[tour_id]
         tour.insert_and_update(instance, [pickup_pos, delivery_pos], [pickup, delivery])
+        tour.requests.add(request)
         # solution.request_to_tour_assignment[instance.request_from_vertex(pickup)] = tour.id_# TODO extract this for solution-independence?
 
     def create_new_tour_with_request(self,

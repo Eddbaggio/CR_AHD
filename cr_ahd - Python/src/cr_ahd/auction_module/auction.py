@@ -6,7 +6,7 @@ from src.cr_ahd.auction_module import request_selection as rs, bundle_generation
     winner_determination as wd
 from src.cr_ahd.core_module import instance as it, solution as slt
 from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh
-from src.cr_ahd.utility_module import profiling as pr
+from src.cr_ahd.utility_module import profiling as pr, utils as ut
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +51,7 @@ class Auction(ABC):
         profit_before = [carrier.sum_profit() for carrier in solution.carriers]
         timer = pr.Timer()
         auction_request_pool, original_bundling_labels = self.request_selection.execute(instance, solution)
+        original_bundles = ut.indices_to_nested_lists(original_bundling_labels, auction_request_pool)
         timer.write_duration_to_solution(solution, 'runtime_request_selection')
 
         if auction_request_pool:
