@@ -46,10 +46,10 @@ def parameter_generator():
         # mh.LocalSearchBest([neighborhoods[1]]),
         # mh.PDPTWSequentialLocalSearch(neighborhoods),
         # mh.PDPTWIteratedLocalSearch(neighborhoods),
-        mh.PDPTWVariableNeighborhoodDescent(neighborhoods),
+        # mh.PDPTWVariableNeighborhoodDescent(neighborhoods),
         # mh.PDPTWReducedVariableNeighborhoodSearch(neighborhoods),
         # mh.PDPTWSimulatedAnnealing(neighborhoods),
-        # mh.NoMetaheuristic([]),
+        mh.NoMetaheuristic([]),
     ]
 
     time_window_managements: List[twm.TWManagement] = [
@@ -60,7 +60,7 @@ def parameter_generator():
 
     nums_submitted_requests: List[int] = [
         # 3,
-        4,
+        # 4,
         # 5
     ]
 
@@ -280,7 +280,7 @@ if __name__ == '__main__':
         df = write_solution_summary_to_multiindex_df(solutions, 'solution')
         secondary_parameter = 'tour_improvement'
         ev.bar_chart(df,
-                     title='Full run',
+                     title='NEW',
                      values='sum_profit',
                      color=['solution_algorithm', secondary_parameter, ],
                      # color=secondary_parameter,
