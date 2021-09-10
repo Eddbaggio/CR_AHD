@@ -98,26 +98,18 @@ class Solver:
         instance = deepcopy(instance)
         solution = deepcopy(solution)
 
-        num_intermediate_auctions = 2
-        i = 0
         while solution.unassigned_requests:  # FIXME in collaborative, when starting solution is used, the whole while loop is skipped, making intermediate auctions impossible
-            # request = solution.unassigned_requests[0]
-            for request in range(i, instance.num_requests, instance.num_requests_per_carrier):
-                carrier_id = instance.request_to_carrier_assignment[request]
-                carrier = solution.carriers[carrier_id]
-                solution.assign_requests_to_carriers([request], [carrier_id])
+            request = solution.unassigned_requests[0]
+            carrier_id = instance.request_to_carrier_assignment[request]
+            carrier = solution.carriers[carrier_id]
+            solution.assign_requests_to_carriers([request], [carrier_id])
 
-                # find the tw for the request
-                accepted = self.time_window_management.execute(instance, carrier, request)
+            # find the tw for the request
+            accepted = self.time_window_management.execute(instance, carrier, request)
 
-                # build tours with the assigned request if it was accepted
-                if accepted:
-                    self.tour_construction.insert_single_request(instance, solution, carrier.id_, request)
-
-            if self.auction and i > 0 and i * instance.num_carriers % (instance.num_requests / (num_intermediate_auctions + 1)) < 1:
-                self._auction_phase(instance, solution)
-
-            i += 1
+            # build tours with the assigned request if it was accepted
+            if accepted:
+                self.tour_construction.insert_single_request(instance, solution, carrier.id_, request)
 
         ut.validate_solution(instance, solution)  # safety check to make sure everything's functional
         return instance, solution

@@ -15,7 +15,8 @@ class Tour:
         :param id_: unique tour identifier
         :param depot_index: may be different to the id! id's can exist twice temporarily if a carrier is copied!
         """
-        logger.debug(f'Initializing tour {id_}')
+        if isinstance(id_, int):
+            logger.debug(f'Initializing tour {id_}')
 
         self.id_ = id_
         self.requests: Set[int] = set()  # collection of routed requests, in order of insertion! not in order of pickup
