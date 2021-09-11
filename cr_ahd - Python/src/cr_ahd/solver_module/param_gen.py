@@ -31,7 +31,7 @@ def parameter_generator():
         mh.PDPTWVariableNeighborhoodDescent(neighborhoods),
         # mh.PDPTWReducedVariableNeighborhoodSearch(neighborhoods),
         # mh.PDPTWSimulatedAnnealing(neighborhoods),
-        mh.NoMetaheuristic([]),
+        # mh.NoMetaheuristic([]),
     ]
 
     time_window_managements: List[twm.TWManagement] = [

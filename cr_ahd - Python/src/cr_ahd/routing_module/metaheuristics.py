@@ -12,7 +12,7 @@ from src.cr_ahd.utility_module import utils as ut, profiling as pr
 
 logger = logging.getLogger(__name__)
 
-TIME_MAX = float('inf')  # 0.05 is roughly the time required by the VND procedure to exhaust all neighborhoods
+TIME_MAX = float(1)  # 0.05 is roughly the time required by the VND procedure to exhaust all neighborhoods
 ITER_MAX = float('inf')  # better to use iter_max in some cases to obtain same results in post-acceptance & bidding
 
 
@@ -44,8 +44,8 @@ class PDPTWMetaHeuristic(ABC):
     def stopping_criterion(self):
         pass
 
-    def update_trajectory(self, k, move, accepted):
-        self.trajectory.append((self.neighborhoods[k].__class__.__name__, move, accepted))
+    def update_trajectory(self, name: str, move: tuple, accepted: bool):
+        self.trajectory.append((name, move, accepted))
         pass
 
 
@@ -104,10 +104,10 @@ class LocalSearchFirst(PDPTWMetaHeuristic):
                 try:
                     move = next(move_gen)  # may be feasible but not improving
                     while not self.acceptance_criterion(instance, move):
-                        self.update_trajectory(0, move, False)
+                        self.update_trajectory(neighborhood.__class__.__name__, move, False)
                         move = next(move_gen)
                     neighborhood.execute_move(instance, move)
-                    self.update_trajectory(0, move, True)
+                    self.update_trajectory(neighborhood.__class__.__name__, move, True)
                     self.improved = True
                 except StopIteration:
                     break  # exit the while loop (while-condition is false anyway)
@@ -147,7 +147,7 @@ class LocalSearchBest(PDPTWMetaHeuristic):
                 if any(all_moves):
                     best_move = min(all_moves, key=lambda x: x[0])
                     if self.acceptance_criterion(instance, best_move):
-                        self.update_trajectory(0, best_move, True)
+                        self.update_trajectory(neighborhood.__class__.__name__, best_move, True)
                         neighborhood.execute_move(instance, best_move)
                         self.improved = True
         return best_solution
@@ -192,7 +192,7 @@ class PDPTWSequentialLocalSearch(PDPTWMetaHeuristic):
                             if self.acceptance_criterion(instance, move):
                                 neighborhood.execute_move(instance, move)
                                 self.improved = True
-                                self.update_trajectory(k, move, True)
+                                self.update_trajectory(neighborhood.__class__.__name__, move, True)
                                 move_generator = neighborhood.feasible_move_generator_for_carrier(instance, carrier)
                         except StopIteration:
                             # StopIteration occurs if there are no neighbors that can be returned by the move_generator
@@ -415,21 +415,26 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
 
     def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
                 carrier_ids: List[int] = None) -> slt.CAHDSolution:
+        # FIXME: ILS sometimes returns worse solutions
+        raise NotImplementedError
         solution = deepcopy(solution)
-        best_solution = deepcopy(solution)
-        num_requests = 2
+        best_best_solution = solution
+
+        perturbation_num_requests = 2
         random.seed(99)  # to ensure same perturbations in (a) post-acceptance and (b) bidding improvement
+
         if carrier_ids is None:
-            carrier_ids = [x.id_ for x in best_solution.carriers]
+            carrier_ids = [x.id_ for x in solution.carriers]
 
         for carrier_id in carrier_ids:
 
             self.local_search(instance, solution, [carrier_id])
-            self.start_time = time.time()
+            best_solution = solution
             self.iter_count = 0
+            self.start_time = time.time()
 
             while not self.stopping_criterion():
-                solution_new = self.perturbation(instance, solution, carrier_id, num_requests)
+                solution_new = self.perturbation(instance, solution, carrier_id, perturbation_num_requests)
                 self.local_search(instance, solution_new, [carrier_id])
 
                 if solution_new.objective() > best_solution.objective():
@@ -438,11 +443,14 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
                 delta = solution_new.sum_travel_distance() - solution.sum_travel_distance()
                 move = (delta, solution, solution_new)
                 if self.acceptance_criterion(instance, move):
-                    # self.update_trajectory()
+                    self.update_trajectory('ILS Perturbation', move, True)
                     solution = solution_new
                 self.iter_count += 1
 
-        return best_solution
+            if best_solution.objective() > best_best_solution.objective():
+                best_best_solution = best_solution
+
+        return best_best_solution
 
     def acceptance_criterion(self, instance: it.MDPDPTWInstance, move: tuple):
         """

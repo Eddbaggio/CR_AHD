@@ -147,10 +147,10 @@ if __name__ == '__main__':
         paths = sorted(
             list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
             key=ut.natural_sort_key)
-        run, rad, n = 1, 2, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
+        run, rad, n = 2, 1, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
         i = run * 6 + rad * 2 + n
         # i = random.choice(range(len(paths)))
-        paths = paths[i:i+1]
+        paths = paths[:]
 
         if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=True)
