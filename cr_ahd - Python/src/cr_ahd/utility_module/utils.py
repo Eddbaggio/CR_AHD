@@ -391,6 +391,7 @@ def validate_tour(instance, tour):
         if instance.vertex_type(vertex) != 'depot':
             assert tour.vertex_pos[vertex] == i, msg
 
+
 random.seed(0)
 DISTANCE_SCALING = 1
 REVENUE_SCALING = DISTANCE_SCALING
@@ -404,22 +405,34 @@ ALL_TW = [TimeWindow(e, min(e + TW_LENGTH, END_TIME)) for e in
 TIME_HORIZON = TimeWindow(START_TIME, END_TIME)
 SPEED_KMH = 60  # vehicle speed (set to 60 to treat distance = time)
 
-solver_config = ['solution_algorithm',
-                 'tour_construction',
-                 'tour_improvement',
-                 # 'time_window_management',
-                 'time_window_offering',
-                 'time_window_selection',
-                 'auction_tour_construction',
-                 'auction_tour_improvement',
-                 'num_submitted_requests',
-                 'request_selection',
-                 'bundle_generation',
-                 'bundling_valuation',
-                 'num_auction_bundles',
-                 'bidding',
-                 'winner_determination',
-                 ]
+solver_config = [
+    'tour_construction',
+    'tour_improvement',
+    'time_window_offering',
+    'time_window_selection',
+    'num_int_auctions',
+    'solution_algorithm',
+    'int_auction_tour_construction',
+    'int_auction_tour_improvement',
+    'int_auction_num_submitted_requests',
+    'int_auction_request_selection',
+    'int_auction_bundle_generation',
+    'int_auction_bundling_valuation',
+    'int_auction_num_auction_bundles',
+    'int_auction_bidding',
+    'int_auction_winner_determination',
+    'int_auction_num_auction_rounds',
+    'fin_auction_tour_construction',
+    'fin_auction_tour_improvement',
+    'fin_auction_num_submitted_requests',
+    'fin_auction_request_selection',
+    'fin_auction_bundle_generation',
+    'fin_auction_bundling_valuation',
+    'fin_auction_num_auction_bundles',
+    'fin_auction_bidding',
+    'fin_auction_winner_determination',
+    'fin_auction_num_auction_rounds'
+]
 
 if __name__ == '__main__':
     pass

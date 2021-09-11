@@ -9,6 +9,9 @@ logger = logging.getLogger(__name__)
 
 
 class Neighborhood(ABC):
+    def __init__(self):
+        self.name = self.__class__.__name__
+
     @abstractmethod
     def feasible_move_generator_for_carrier(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution):
         """

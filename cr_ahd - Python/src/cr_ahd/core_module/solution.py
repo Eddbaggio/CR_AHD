@@ -19,9 +19,6 @@ class CAHDSolution:
 
         # the current REQUEST-to-carrier (not vertex-to-carrier) allocation, initialized with nan for all requests
         self.request_to_carrier_assignment: List[int] = [None for _ in range(instance.num_requests)]
-        # store a lookup-table to get a request's tour index
-        # self.request_to_tour_assignment: List[int] = [None for _ in range(instance.num_requests)]  # NOTE removed for now, only required in rare cases
-        # store a lookup-table to get vertex's position inside its tour
 
         self.tours: List[tr.Tour] = []
         self.carriers: List[AHDSolution] = [AHDSolution(c) for c in range(instance.num_carriers)]

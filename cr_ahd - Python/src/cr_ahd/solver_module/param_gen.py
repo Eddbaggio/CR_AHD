@@ -3,24 +3,31 @@ from typing import List, Tuple, Dict
 from src.cr_ahd.auction_module import request_selection as rs, bundle_generation as bg, bundle_valuation as bv, \
     auction as au, bidding as bd, winner_determination as wd
 from src.cr_ahd.routing_module import neighborhoods as nh, tour_construction as cns, metaheuristics as mh
-from src.cr_ahd.tw_management_module import tw_management as twm, tw_offering as two, tw_selection as tws
+from src.cr_ahd.tw_management_module import tw_offering as two, tw_selection as tws
 
 
 def parameter_generator():
     """
     generate dicts with all parameters are required to initialize a slv.Solver.
     """
+
+    # ===== FIXED PARAMETERS =====
     neighborhoods: List[nh.Neighborhood] = [  # these are fixed at the moment, i.e. not looped over
         nh.PDPMove(),
         nh.PDPTwoOpt(),
         # nh.PDPRelocate()
     ]
 
-    tour_constructions: List[cns.PDPParallelInsertionConstruction] = [
-        cns.MinTravelDistanceInsertion(),
-        # cns.MinTimeShiftInsertion()
-    ]
+    tour_construction = cns.MinTravelDistanceInsertion()
+    # tour_constructions: List[cns.PDPParallelInsertionConstruction] = [
+    #     cns.MinTravelDistanceInsertion(),
+    #     # cns.MinTimeShiftInsertion()
+    # ]
 
+    time_window_offering = two.FeasibleTW()
+    time_window_selection = tws.UnequalPreference()
+
+    # ===== POTENTIALLY VARIABLE PARAMETERS =====
     tour_improvements: List = [
         # mh.LocalSearchFirst([neighborhoods[0]]),
         # mh.LocalSearchFirst([neighborhoods[1]]),
@@ -32,12 +39,6 @@ def parameter_generator():
         # mh.PDPTWReducedVariableNeighborhoodSearch(neighborhoods),
         # mh.PDPTWSimulatedAnnealing(neighborhoods),
         # mh.NoMetaheuristic([]),
-    ]
-
-    time_window_managements: List[twm.TWManagement] = [
-        twm.TWManagementSingle(two.FeasibleTW(),
-                               tws.UnequalPreference()),
-        # twm.TWManagementNoTW(None, None)
     ]
 
     nums_submitted_requests: List[int] = [
@@ -86,36 +87,49 @@ def parameter_generator():
         # bv.RandomBundlingValuation,
     ]
 
-    for tour_construction in tour_constructions:
-        for tour_improvement in tour_improvements:
-            for time_window_management in time_window_managements:
-                # Isolated Planning Parameters, no auction
-                yield dict(tour_construction=tour_construction,
-                           tour_improvement=tour_improvement,
-                           time_window_management=time_window_management,
-                           auction=False,
-                           )
-                for num_submitted_requests in nums_submitted_requests:
-                    for request_selection in request_selections:
-                        for num_auction_bundles in nums_auction_bundles:
-                            for bundle_generation, bundle_generation_kwargs in bundle_generations:
-                                for bundling_valuation in bundling_valuations:
-                                    # auction for collaborative planning
-                                    auction = au.Auction(tour_construction,
-                                                         tour_improvement,
-                                                         request_selection(num_submitted_requests),
-                                                         bundle_generation(num_auction_bundles=num_auction_bundles,
-                                                                           bundling_valuation=bundling_valuation(),
-                                                                           **bundle_generation_kwargs
-                                                                           ),
-                                                         bidding=bd.DynamicInsertionAndImprove(tour_construction,
-                                                                                               tour_improvement),
-                                                         winner_determination=wd.MaxBidGurobiCAP1(),
-                                                         )
-                                    # collaborative planning
-                                    yield dict(tour_construction=tour_construction,
-                                               tour_improvement=tour_improvement,
-                                               time_window_management=time_window_management,
-                                               auction=auction,
-                                               )
-    pass
+    for tour_improvement in tour_improvements:
+        # Isolated Planning Parameters, no auction
+        yield dict(
+            time_window_offering=time_window_offering,
+            time_window_selection=time_window_selection,
+            tour_construction=cns.MinTravelDistanceInsertion(),
+            tour_improvement=tour_improvement,
+            num_intermediate_auctions=0,
+            intermediate_auction=False,
+            final_auction=False,
+        )
+        for num_submitted_requests in nums_submitted_requests:
+            for request_selection in request_selections:
+                for num_auction_bundles in nums_auction_bundles:
+                    for bundle_generation, bundle_generation_kwargs in bundle_generations:
+                        for bundling_valuation in bundling_valuations:
+                            # final_auction for collaborative planning
+                            final_auction = au.Auction(
+                                tour_construction=tour_construction,
+                                tour_improvement=tour_improvement,
+                                request_selection=request_selection(num_submitted_requests),
+                                bundle_generation=bundle_generation(
+                                    num_auction_bundles=num_auction_bundles,
+                                    bundling_valuation=bundling_valuation(),
+                                    **bundle_generation_kwargs
+                                ),
+                                bidding=bd.DynamicInsertionAndImprove(
+                                    tour_construction,
+                                    tour_improvement
+                                ),
+                                winner_determination=wd.MaxBidGurobiCAP1(),
+                                num_auction_rounds=1
+                            )
+                            # collaborative planning
+                            yield dict(
+                                time_window_offering=time_window_offering,
+                                time_window_selection=time_window_selection,
+                                tour_construction=tour_construction,
+                                tour_improvement=tour_improvement,
+                                num_intermediate_auctions=0,
+                                intermediate_auction=False,
+                                final_auction=final_auction,
+                            )
+
+
+pass

@@ -13,6 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 class WinnerDeterminationBehavior(ABC):
+    def __init__(self):
+        self.name = self.__class__.__name__
+
     def execute(self,
                 instance: it.MDPDPTWInstance,
                 solution: slt.CAHDSolution,

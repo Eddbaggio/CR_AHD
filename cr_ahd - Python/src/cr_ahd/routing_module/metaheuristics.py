@@ -25,7 +25,7 @@ class PDPTWMetaHeuristic(ABC):
         self.parameters = dict()
         self.trajectory = []  # collection of all accepted & executed moves
 
-        self.name = f'{self.__class__.__name__}{[n.__class__.__name__ for n in self.neighborhoods]}'
+        self.name = f'{self.__class__.__name__}{[n.name for n in self.neighborhoods]}'
 
     @abstractmethod
     def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,

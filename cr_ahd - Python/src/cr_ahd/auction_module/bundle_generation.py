@@ -42,6 +42,9 @@ bundling_labels: Sequence[int]
 # =====================================================================================================================
 
 class SingleBundleGenerationBehavior(ABC):
+    def __init__(self):
+        self.name = self.__class__.__name__
+
     @abstractmethod
     def generate_bundling(self, instance: it.MDPDPTWInstance, auction_request_pool: Sequence[int]):
         pass
@@ -66,6 +69,9 @@ class SingleKMeansBundling(SingleBundleGenerationBehavior):
 # =====================================================================================================================
 
 class UnlimitedBundlePoolGenerationBehavior(ABC):
+    def __init__(self):
+        self.name = self.__class__.__name__
+
     def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
                 auction_request_pool: Sequence[int],
                 original_bundling_labels: Sequence[int]):
@@ -106,6 +112,7 @@ class LimitedBundlePoolGenerationBehavior(ABC):
         self.num_auction_bundles = num_auction_bundles
         self.bundling_valuation = bundling_valuation
         self.parameters = kwargs
+        self.name = self.__class__.__name__
 
     def execute(self,
                 instance: it.MDPDPTWInstance,

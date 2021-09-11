@@ -6,6 +6,9 @@ from src.cr_ahd.utility_module import utils as ut
 
 
 class TWOfferingBehavior(abc.ABC):
+    def __init__(self):
+        self.name = self.__class__.__name__
+
     def execute(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, request: int):
         pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
         # make sure that the request has not been given a tw yet

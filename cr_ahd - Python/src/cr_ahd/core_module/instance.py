@@ -78,6 +78,10 @@ class MDPDPTWInstance:
     def __str__(self):
         return f'Instance {self.id_} with {len(self.requests)} customers, {self.num_carriers} carriers'
 
+    # TODO implement deepcopy!
+    # def __deepcopy__(self, memodict={}):
+    #     pass
+
     @property
     def id_(self):
         return self._id_
@@ -155,6 +159,14 @@ class MDPDPTWInstance:
             return "delivery"
         else:
             raise IndexError(f'Vertex index {vertex} out of range')
+
+    def assign_time_window(self, vertex: int, time_window: ut.TimeWindow):
+        """
+        changes the time window of a vertex
+        """
+        assert self.num_carriers <= vertex < self.num_carriers + self.num_requests * 2
+        self.tw_open[vertex] = time_window.open
+        self.tw_close[vertex] = time_window.close
 
 
 def read_gansterer_hartl_mv(path: Path, num_carriers=3) -> MDPDPTWInstance:

@@ -11,7 +11,7 @@ from src.cr_ahd.utility_module import profiling as pr, utils as ut
 logger = logging.getLogger(__name__)
 
 
-class Auction(ABC):
+class Auction:
     def __init__(self,
                  tour_construction: cns.PDPParallelInsertionConstruction,
                  tour_improvement: mh.PDPTWMetaHeuristic,
@@ -19,6 +19,7 @@ class Auction(ABC):
                  bundle_generation: bg.LimitedBundlePoolGenerationBehavior,
                  bidding: bd.BiddingBehavior,
                  winner_determination: wd.WinnerDeterminationBehavior,
+                 num_auction_rounds: int = 1
                  ):
         """
         Auction class can be called with various parameters to create different auction variations
@@ -30,8 +31,6 @@ class Auction(ABC):
         :param bidding: bidding behavior, in bidding, the same construction & improvement methods must be used as
         are specified for this Auction to guarantee consistent, individual-rational auction results
         :param winner_determination:
-        :param reopt_and_improve_after_request_selection: shall a reoptimization happen after the requests have been
-        submitted? As long as I'm doing complete, dynamic reoptimization in bidding, this should be set to True
         """
 
         self.tour_construction = tour_construction
@@ -40,72 +39,88 @@ class Auction(ABC):
         self.bundle_generation = bundle_generation
         self.bidding = bidding
         self.winner_determination = winner_determination
+        self.num_auction_rounds = num_auction_rounds
 
         assert isinstance(self.bidding.tour_construction, type(self.tour_construction))
         assert isinstance(self.bidding.tour_improvement, type(self.tour_improvement))
 
-    def execute_auction(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution) -> slt.CAHDSolution:
+    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution):
+        for auction_round in range(self.num_auction_rounds):
+
+            # auction
+            profit_before = [carrier.sum_profit() for carrier in solution.carriers]
+            solution = self.reallocate_requests(instance, solution)
+
+            # clear and re-optimize
+            solution = self.post_auction_routing(instance, solution)
+            profit_after = [carrier.sum_profit() for carrier in solution.carriers]
+
+            if not sum(profit_before) <= sum(profit_after):
+                warnings.warn(f'Global result is worse after the auction than it was before! [{instance.id_}]')
+
+        return solution
+
+    def reallocate_requests(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution) -> slt.CAHDSolution:
         logger.debug(f'running auction {self.__class__.__name__}')
 
-        # ===== Request Selection =====
-        profit_before = [carrier.sum_profit() for carrier in solution.carriers]
+        # ===== [1] Request Selection =====
         timer = pr.Timer()
         auction_request_pool, original_bundling_labels = self.request_selection.execute(instance, solution)
         original_bundles = ut.indices_to_nested_lists(original_bundling_labels, auction_request_pool)
-        timer.write_duration_to_solution(solution, 'runtime_request_selection')
+        # timer.write_duration_to_solution(solution, 'runtime_request_selection')
 
         if auction_request_pool:
             profit_after_rs = [carrier.sum_profit() for carrier in solution.carriers]
             logger.debug(f'requests {auction_request_pool} have been submitted to the auction pool')
 
-            # ===== Bundle Generation =====
+            # ===== [2] Bundle Generation =====
             timer = pr.Timer()
             auction_bundle_pool = self.bundle_generation.execute(instance, solution, auction_request_pool,
                                                                  original_bundling_labels)
-            timer.write_duration_to_solution(solution, 'runtime_auction_bundle_pool_generation')
+            # timer.write_duration_to_solution(solution, 'runtime_auction_bundle_pool_generation')
             logger.debug(f'bundles {auction_bundle_pool} have been created')
 
-            # ===== Bidding =====
+            # ===== [3] Bidding =====
             logger.debug(f'Generating bids_matrix')
             timer = pr.Timer()
             bids_matrix = self.bidding.execute_bidding(instance, solution, auction_bundle_pool)
-            timer.write_duration_to_solution(solution, 'runtime_bidding')
+            # timer.write_duration_to_solution(solution, 'runtime_bidding')
             logger.debug(f'Bids {bids_matrix} have been created for bundles {auction_bundle_pool}')
 
-            # ===== Winner Determination =====
+            # ===== [4.1] Winner Determination =====
             timer = pr.Timer()
             winner_bundles, bundle_winners = self.winner_determination.execute(instance, solution,
                                                                                auction_request_pool,
                                                                                auction_bundle_pool, bids_matrix)
-            timer.write_duration_to_solution(solution, 'runtime_winner_determination')
+            # timer.write_duration_to_solution(solution, 'runtime_winner_determination')
             # todo: store whether the auction did achieve a reallocation or not
 
-            # ===== Bundle Reallocation =====
+            # ===== [4.2] Bundle Reallocation =====
             self.assign_bundles_to_winners(solution, winner_bundles, bundle_winners)
 
         else:
             logger.warning(f'No requests have been submitted!')
 
-        # ===== Final Routing =====
-        # clear the solution and run dynamic insertion + improvement
-        solution.clear_carrier_routes()  # clear everything that was left after Request Selection
+        return solution
 
+    def post_auction_routing(self, instance, solution):
+        """
+        After requests have been reallocated, this functions performs a complete optimization from scratch: dynamic
+        insertion + improvement
+        :param instance:
+        :param solution:
+        :return:
+        """
+        solution.clear_carrier_routes()  # clear everything that was left after Request Selection
         timer = pr.Timer()
         for carrier in solution.carriers:
             while carrier.unrouted_requests:
                 request = carrier.unrouted_requests[0]
                 self.tour_construction.insert_single_request(instance, solution, carrier.id_, request)
-        timer.write_duration_to_solution(solution, 'runtime_final_construction')
-
+        # timer.write_duration_to_solution(solution, 'runtime_final_dynamic_insertion')
         timer = pr.Timer()
         solution = self.tour_improvement.execute(instance, solution)
-        timer.write_duration_to_solution(solution, 'runtime_final_improvement')
-
-        profit_after = [carrier.sum_profit() for carrier in solution.carriers]
-
-        if not sum(profit_before) <= sum(profit_after):
-            warnings.warn(f'Global result is worse after the auction than it was before the auction! [{instance.id_}]')
-
+        # timer.write_duration_to_solution(solution, 'runtime_final_improvement')
         return solution
 
     @staticmethod

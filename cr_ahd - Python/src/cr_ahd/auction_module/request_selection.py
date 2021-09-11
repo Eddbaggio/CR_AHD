@@ -29,6 +29,7 @@ def _abs_num_requests(carrier_: slt.AHDSolution, num_submitted_requests) -> int:
 class RequestSelectionBehavior(ABC):
     def __init__(self, num_submitted_requests: int):
         self.num_submitted_requests = num_submitted_requests
+        self.name = self.__class__.__name__
 
     @abstractmethod
     def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution):

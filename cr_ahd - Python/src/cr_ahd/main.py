@@ -19,7 +19,7 @@ logging.config.dictConfig(log.LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
 
 
-def execute_all(instance: it.MDPDPTWInstance, plot=False):
+def solve_with_all_solvers(instance: it.MDPDPTWInstance, plot=False):
     """
     :param instance:
     :return: evaluation metrics (Instance.evaluation_metrics) of all the solutions obtained
@@ -30,11 +30,18 @@ def execute_all(instance: it.MDPDPTWInstance, plot=False):
         solver = slv.Solver(**solver_params)
         try:
             timer = pr.Timer()
-            if not solver.auction:  # isolated planning
+
+            # fixme: using a starting solution is tricky when intermediate auctions are possible
+            """
+            if not solver.acceptance.auction:  # isolated planning as starting point for collaborative
                 tw_instance, solution = solver.execute(instance, None)
                 starting_solution = solution
             else:  # collaborative planning can use starting solution & instance having the assigned time windows
                 tw_instance, solution = solver.execute(tw_instance, starting_solution)
+            """
+
+            tw_instance, solution = solver.execute(instance, None)
+
             timer.write_duration_to_solution(solution, 'runtime_total')
             # logger.info(f'{instance.id_}: Solved in {solution.timings["runtime_total"]}')
             solution.write_to_json()
@@ -53,15 +60,21 @@ def execute_all(instance: it.MDPDPTWInstance, plot=False):
 
 
 def s_solve(path: Path, plot=False):
+    """
+    solves a single instance given by the path
+    """
     log.remove_all_file_handlers(logging.getLogger())
     log_file_path = ut.output_dir_GH.joinpath(f'{path.stem}_log.log')
     log.add_file_handler(logging.getLogger(), str(log_file_path))
 
     instance = it.read_gansterer_hartl_mv(path)
-    return execute_all(instance, plot)
+    return solve_with_all_solvers(instance, plot)
 
 
 def m_solve_multi_thread(instance_paths):
+    """
+    solves multiple instances in parallel threads using the multiprocessing library
+    """
     with multiprocessing.Pool(6) as pool:
         solutions = list(
             tqdm(pool.imap(s_solve, instance_paths), total=len(instance_paths), desc="Parallel Solving", disable=False))
@@ -69,6 +82,9 @@ def m_solve_multi_thread(instance_paths):
 
 
 def m_solve_single_thread(instance_paths, plot=False):
+    """
+    solves multiple instances, given by their paths
+    """
     solutions = []
     for path in tqdm(instance_paths, disable=True):
         solver_solutions = s_solve(path, plot=plot)
@@ -146,11 +162,13 @@ if __name__ == '__main__':
 
         paths = sorted(
             list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
-            key=ut.natural_sort_key)
-        run, rad, n = 2, 1, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
-        i = run * 6 + rad * 2 + n
-        # i = random.choice(range(len(paths)))
-        paths = paths[:]
+            key=ut.natural_sort_key
+        )
+
+        run, rad, n = 16, 1, 0  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
+        i = random.choice(range(len(paths)))
+        # i = run * 6 + rad * 2 + n
+        paths = paths[i:i + 6]
 
         if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=True)
@@ -173,6 +191,7 @@ if __name__ == '__main__':
         ev.print_top_level_stats(df, [secondary_parameter])
 
         logger.info(f'END {datetime.now()}')
+
         # send windows to sleep
         # os.system("rundll32.exe powrprof.dll,SetSuspendState 0,1,0")
 

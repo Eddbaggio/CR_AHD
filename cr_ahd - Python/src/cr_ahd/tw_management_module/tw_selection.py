@@ -10,6 +10,9 @@ logger = logging.getLogger(__name__)
 
 
 class TWSelectionBehavior(abc.ABC):
+    def __init__(self):
+        self.name = self.__class__.__name__
+
     # NOTE maybe in the future, i have to store also time window preferences / tw selection behavior in the instance
     def execute(self, tw_offer_set: List[TimeWindow], request: int):
         # may return False if no TW fits the preference
@@ -20,14 +23,14 @@ class TWSelectionBehavior(abc.ABC):
             return False
 
     @abc.abstractmethod
-    def select_tw(self, tw_offer_set: List[TimeWindow], request: int):
+    def select_tw(self, tw_offer_set: List[TimeWindow], request: int) -> TimeWindow:
         pass
 
 
 class UniformPreference(TWSelectionBehavior):
     """Will randomly select a TW """
 
-    def select_tw(self, tw_offer_set: List[TimeWindow], request: int):
+    def select_tw(self, tw_offer_set: List[TimeWindow], request: int) -> TimeWindow:
         return random.choice(tw_offer_set)
 
 
@@ -39,7 +42,7 @@ class UnequalPreference(TWSelectionBehavior):
     Late time windows exhibit a much higher popularity and are requested by 90% of the customers.
     """
 
-    def select_tw(self, tw_offer_set: List[TimeWindow], request: int):
+    def select_tw(self, tw_offer_set: List[TimeWindow], request: int) -> TimeWindow:
         # preference can either be for early (10%) or late (90%) time windows
         pref = random.random()
 
@@ -60,14 +63,14 @@ class UnequalPreference(TWSelectionBehavior):
 class EarlyPreference(TWSelectionBehavior):
     """Will always select the earliest TW available based on the time window opening"""
 
-    def select_tw(self, tw_offer_set: List[TimeWindow], request: int):
+    def select_tw(self, tw_offer_set: List[TimeWindow], request: int) -> TimeWindow:
         return min(tw_offer_set, key=lambda tw: tw.open)
 
 
 class LatePreference(TWSelectionBehavior):
     """Will always select the latest TW available based on the time window closing"""
 
-    def select_tw(self, tw_offer_set: List[TimeWindow], request: int):
+    def select_tw(self, tw_offer_set: List[TimeWindow], request: int) -> TimeWindow:
         return max(tw_offer_set, key=lambda tw: tw.close)
 
 # class PreferEarlyAndLate(TWSelectionBehavior):

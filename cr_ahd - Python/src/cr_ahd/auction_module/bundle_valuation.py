@@ -371,6 +371,8 @@ class BundlingValuation(ABC):
     """
     Class to compute the valuation of a bundling based on some valuation measure(s)
     """
+    def __init__(self):
+        self.name = self.__class__.__name__
 
     @final
     def evaluate_bundling_labels(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,

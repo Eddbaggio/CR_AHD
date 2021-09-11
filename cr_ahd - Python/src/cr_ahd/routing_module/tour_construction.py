@@ -10,6 +10,9 @@ logger = logging.getLogger(__name__)
 
 
 class PDPParallelInsertionConstruction(ABC):
+    def __init__(self):
+        self.name = self.__class__.__name__
+
     def insert_all_requests(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int):
         """
         Inserts all unrouted requests of the specified carrier into tours. Repeatedly finds the "best" insertion,

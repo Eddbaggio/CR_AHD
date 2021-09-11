@@ -18,6 +18,7 @@ class BiddingBehavior(ABC):
                  tour_improvement: mh.PDPTWMetaHeuristic):
         self.tour_construction = tour_construction
         self.tour_improvement = tour_improvement
+        self.name = self.__class__.__name__
 
     def execute_bidding(self,
                         instance: it.MDPDPTWInstance,
