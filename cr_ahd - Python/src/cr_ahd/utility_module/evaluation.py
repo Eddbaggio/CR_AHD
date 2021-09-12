@@ -268,21 +268,6 @@ def print_top_level_stats(df: pd.DataFrame, secondary_parameters: List[str]):
             print(f'{group["num_tours"].astype(bool).sum(axis=0)}/{len(group)} solved by {name}')
         print('\n')
 
-        # # csv
-        # bar_chart = solution_df.groupby('n')
-        # print('=============/ CSV: rad and algorithm /=============')
-        # for name, group in bar_chart:
-        #     print(f'Group: n={name}')
-        #     print(group.reset_index('n')['sum_profit'].unstack('solution_algorithm')[
-        #               ['IsolatedPlanning',
-        #                'CollaborativePlanning',
-        #                'IsolatedPlanningNoTW',
-        #                'CollaborativePlanningNoTW',
-        #                # 'CentralizedPlanning',
-        #                ]].to_csv(), '\n')
-
-        # aggregate the instance types
-
         # collaboration gain
         print('=============/ collaboration gains /=============')
         secondary_parameters_categorical = [param for param in secondary_parameters if 'runtime' not in param]
@@ -294,38 +279,30 @@ def print_top_level_stats(df: pd.DataFrame, secondary_parameters: List[str]):
                     continue
                 print(f"{name1}/{name2}")
                 for stat in ['sum_profit', 'num_tours']:
-                    print(f"{stat}:\t{group1.agg('mean')[stat] / group2.agg('mean')[stat]}")
+                    print(f"{stat}:\t{group1[stat].agg('mean') / group2[stat].agg('mean')}")
                 print('\n')
 
         if 'CollaborativePlanning' in solution_df.index.get_level_values('solution_algorithm'):
             print('=============/ consistency check: collaborative better than isolated? /=============')
-            '''
-            consistency_df = solution_df.droplevel(
-                level=[x for x in solution_df.index.names if x.startswith('auction_')])
-            for name, group in consistency_df.groupby(
-                    consistency_df.index.names.difference(['solution_algorithm', *secondary_parameters]),
-                    as_index=False,
-                    dropna=False):
-                for sec_param in secondary_parameters:
-                    group = group.droplevel(level=group.index.names.difference(['solution_algorithm', sec_param]))
-
-                    collaborative = group.loc['CollaborativePlanning', 'sum_profit']
-                    isolated = group.loc['IsolatedPlanning', 'sum_profit']
-                    if not all(collaborative > isolated):
-                        warnings.warn(f'{name}: Collaborative is worse than Isolated!')
-            '''
+            print(['run', 'rad', 'n', *secondary_parameters_categorical])
             for name, group in solution_df.groupby(['run', 'rad', 'n', *secondary_parameters_categorical]):
                 grouped = group.groupby('solution_algorithm')
-                isolated = grouped.get_group('IsolatedPlanning')
-                for _, collaborative in grouped.get_group('CollaborativePlanning').groupby(secondary_parameters):
-                    if not isolated.squeeze()['sum_profit'] <= collaborative.squeeze()['sum_profit']:
-                        warnings.warn(f'{name}: Collaborative is worse than Isolated!')
+                if all([x in grouped.groups for x in ['CollaborativePlanning', 'IsolatedPlanning']]):
+                    isolated = grouped.get_group('IsolatedPlanning')
+                    for _, collaborative in grouped.get_group('CollaborativePlanning').groupby(secondary_parameters):
+                        if not isolated.squeeze()['sum_profit'] <= collaborative.squeeze()['sum_profit']:
+                            warnings.warn(f'{name}: Collaborative is worse than Isolated!')
+                        else:
+                            print(f'{name}: consistency check successful')
+                else:
+                    print(f'{name}: Cannot compare Isolated and Collaborative, '
+                                  f'since in this group only {grouped.groups.keys()} exist')
 
 
 if __name__ == '__main__':
     df = pd.read_csv(
         "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home "
-        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_agg_solution_#060.csv",
+        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_agg_solution_#070.csv",
     )
     df.fillna(value=dict(runtime_request_selection=0,
                          runtime_auction_bundle_pool_generation=0,
@@ -336,7 +313,7 @@ if __name__ == '__main__':
               inplace=True)
     df.fillna(value='None', inplace=True)
     df.set_index(['rad', 'n', 'run', ] + ut.solver_config, inplace=True)  # add 'carrier_id_' if agg_level==carrier
-    secondary_parameter = 'tour_improvement'
+    secondary_parameter = 'num_int_auctions'
     print_top_level_stats(df, [secondary_parameter])
     bar_chart(df,
               title='',

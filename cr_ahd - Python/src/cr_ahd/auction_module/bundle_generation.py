@@ -258,7 +258,8 @@ class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
         new_population: List[Sequence[int]] = [previous_population[i] for i in elites]
         new_fitness: List[float] = [previous_fitness[i] for i in elites]
         offspring_counter = 0
-        while offspring_counter < self.parameters['population_size'] * self.parameters['generation_gap']:
+        while offspring_counter < min(self.parameters['population_size'] * self.parameters['generation_gap'],
+                                      2 ** len(auction_request_pool) - 1):
 
             # parent selection (get the parent's index first, then the actual parent string/chromosome)
             parent1, parent2 = self._roulette_wheel(previous_fitness, 2)
@@ -286,22 +287,25 @@ class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
         return previous_fitness, previous_population
 
     @staticmethod
-    def generate_bundle_pool(auction_pool, fitness, population: Sequence[Sequence[int]], pool_size):
+    def generate_bundle_pool(auction_request_pool: Sequence[int], fitness, population: Sequence[Sequence[int]],
+                             pool_size: int):
         """
         create the set of bundles that is offered in the auction (carrier must solve routing to place bids on these)
         pool_size may be exceeded to guarantee that ALL bundles of a candidate solution are in the pool (either all or
         none can be in the solution).
         """
-        auction_pool_array = np.array(auction_pool)
+        auction_pool_array = np.array(auction_request_pool)
         bundle_pool = []
 
-        # select the top n candidates, where n = ut.NUM_BUNDLES_TO_AUCTION
-        population_sorted = (bundle for fit, bundle in sorted(zip(fitness, population), reverse=True))
-        while len(bundle_pool) < pool_size:
-            candidate_solution = next(population_sorted)
-            candidate_solution = np.array(candidate_solution)
-            for bundle_idx in range(max(candidate_solution) + 1):
-                bundle = auction_pool_array[candidate_solution == bundle_idx].tolist()
+        # select the top candidates
+        population_sorted = list(bundling_labels
+                                 for fit, bundling_labels in sorted(zip(fitness, population), reverse=True))
+        adjusted_pool_size = min(pool_size, 2**(len(auction_request_pool))-1)
+        while len(bundle_pool) < adjusted_pool_size and population_sorted:
+            bundling_labels = population_sorted.pop(0)
+            bundling_labels = np.array(bundling_labels)
+            for bundle_idx in range(max(bundling_labels) + 1):
+                bundle = auction_pool_array[bundling_labels == bundle_idx].tolist()
                 if bundle not in bundle_pool:
                     bundle_pool.append(bundle)
 
@@ -314,7 +318,7 @@ class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
         :param auction_request_pool:
         :param parent1:
         :param parent2:
-        :param mutation_rate:
+
         :return: the NORMALIZED offspring
         """
         # crossover
@@ -345,14 +349,12 @@ class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
                               ):
         """
         initializes the a population of size population_size. this first generation includes the original bundles as
-        well as a k-means bundling.
+        well as a k-means bundling. the rest is filled with random partitions of the auction_request_pool
 
         :param instance:
         :param solution:
         :param auction_request_pool:
-        :param original_bundles:
-        :param n:
-        :param population_size:
+        :param n: number of carriers
         :return: fitness and population
         """
         population = []
@@ -369,7 +371,7 @@ class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
 
         # fill the rest of the population with random individuals
         i = 1
-        while i < self.parameters['population_size']:
+        while i < min(self.parameters['population_size'], 2 ** len(auction_request_pool) - 1):
             individual = ut.random_max_k_partition_idx(auction_request_pool, n)
             self._normalize_individual(individual)
             if individual in population:

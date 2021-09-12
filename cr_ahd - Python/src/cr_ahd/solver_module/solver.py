@@ -2,6 +2,7 @@ import logging.config
 import random
 from copy import deepcopy
 from typing import Tuple
+import numpy as np
 
 from src.cr_ahd.auction_module import auction as au
 from src.cr_ahd.core_module import instance as it, solution as slt
@@ -41,6 +42,13 @@ class Solver:
         """
 
         # ===== [0] Setup =====
+        if self.intermediate_auction:
+            # define the iterations at which an intermediate auction shall take place
+            int_auction_iter = [
+                round(x)
+                for x in np.linspace(0, instance.num_requests_per_carrier, self.num_intermediate_auctions+1, False)[1:]
+            ]
+
         instance = deepcopy(instance)
         if starting_solution is None:
             solution = slt.CAHDSolution(instance)
@@ -48,8 +56,8 @@ class Solver:
             solution = starting_solution
             solution.timings.clear()
 
-        self.update_solution_solver_config(
-            solution)  # TODO reverse this. it should be a method of the solution not the solver
+        # TODO reverse this. it should be a method of the solution not the solver
+        self.update_solution_solver_config(solution)
         random.seed(0)
         logger.info(f'{instance.id_}: Solving {solution.solver_config}')
 
@@ -94,10 +102,9 @@ class Solver:
 
             # ===== [4] Intermediate Auctions =====
             if self.intermediate_auction:
-                if ((i + 1) * instance.num_carriers) % (
-                        instance.num_requests / (self.num_intermediate_auctions + 1)) == 0:
+                if i in int_auction_iter:
                     timer = pr.Timer()
-                    solution = self.tour_improvement.execute(instance, solution)
+                    # solution = self.tour_improvement.execute(instance, solution)
                     timer.write_duration_to_solution(solution, 'runtime_intermediate_improvements', True)
                     timer = pr.Timer()
                     solution = self.intermediate_auction.execute(instance, solution)

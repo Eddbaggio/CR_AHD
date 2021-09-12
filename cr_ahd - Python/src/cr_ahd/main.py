@@ -1,6 +1,7 @@
 import logging
 import logging.config
 import multiprocessing
+import pstats
 import random
 from copy import deepcopy
 from pathlib import Path
@@ -165,9 +166,9 @@ if __name__ == '__main__':
             key=ut.natural_sort_key
         )
 
-        run, rad, n = 16, 1, 0  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
+        run, rad, n = 16, 0, 0  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
         i = random.choice(range(len(paths)))
-        # i = run * 6 + rad * 2 + n
+        i = run * 6 + rad * 2 + n
         paths = paths[i:i + 1]
 
         if len(paths) < 6:
@@ -198,7 +199,7 @@ if __name__ == '__main__':
 
     # PROFILING
     cProfile.run('cr_ahd()', ut.output_dir.joinpath('cr_ahd_stats'))
-    """
+
     # STATS
     p = pstats.Stats(ut.output_dir.joinpath('cr_ahd_stats').as_posix())
     # remove the extraneous path from all the module names:
@@ -209,4 +210,4 @@ if __name__ == '__main__':
     p.sort_stats('tottime').print_stats(20)
     p.sort_stats('ncalls').print_stats(20)
     # p.print_callers(20)
-    """
+

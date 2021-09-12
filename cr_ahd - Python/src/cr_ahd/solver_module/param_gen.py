@@ -131,11 +131,30 @@ def parameter_generator():
                                 intermediate_auction=False,
                                 final_auction=final_auction,
                             )
-                            for num_intermediate_auctions in range(1, 3):
+                            for num_intermediate_auctions in range(1, 2):  # TODO add proper parameter
+                                # collaborative planning with final AND intermediate auction
+                                # Test 01: 1 intermediate + 1 final with 50% of submitted requests each vs.1 final with 100% of submitted requests
                                 intermediate_auction = au.Auction(
                                     tour_construction=tour_construction,
                                     tour_improvement=tour_improvement,
-                                    request_selection=request_selection(num_submitted_requests),
+                                    request_selection=request_selection(int(num_submitted_requests/2)),  # TODO add proper parameter
+                                    bundle_generation=bundle_generation(
+                                        num_auction_bundles=num_auction_bundles/num_intermediate_auctions,
+                                        bundling_valuation=bundling_valuation(),
+                                        **bundle_generation_kwargs
+                                    ),
+                                    bidding=bd.DynamicInsertionAndImprove(
+                                        tour_construction,
+                                        tour_improvement
+                                    ),
+                                    winner_determination=wd.MaxBidGurobiCAP1(),
+                                    num_auction_rounds=num_final_auction_rounds  # TODO add proper parameter
+                                )
+
+                                final_auction = au.Auction(
+                                    tour_construction=tour_construction,
+                                    tour_improvement=tour_improvement,
+                                    request_selection=request_selection(int(num_submitted_requests/2)),  # TODO add proper parameter
                                     bundle_generation=bundle_generation(
                                         num_auction_bundles=num_auction_bundles/num_intermediate_auctions,
                                         bundling_valuation=bundling_valuation(),
@@ -148,7 +167,7 @@ def parameter_generator():
                                     winner_determination=wd.MaxBidGurobiCAP1(),
                                     num_auction_rounds=num_final_auction_rounds
                                 )
-                                # collaborative planning with intermediate and final auctions
+
                                 yield dict(
                                     time_window_offering=time_window_offering,
                                     time_window_selection=time_window_selection,
