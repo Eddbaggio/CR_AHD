@@ -67,7 +67,7 @@ class Auction:
         timer = pr.Timer()
         auction_request_pool, original_bundling_labels = self.request_selection.execute(instance, solution)
         original_bundles = ut.indices_to_nested_lists(original_bundling_labels, auction_request_pool)
-        # timer.write_duration_to_solution(solution, 'runtime_request_selection')
+        # timer.write_duration_to_solution(solution, 'runtime_request_selection') fixme
 
         if auction_request_pool:
             profit_after_rs = [carrier.sum_profit() for carrier in solution.carriers]
@@ -77,14 +77,14 @@ class Auction:
             timer = pr.Timer()
             auction_bundle_pool = self.bundle_generation.execute(instance, solution, auction_request_pool,
                                                                  original_bundling_labels)
-            # timer.write_duration_to_solution(solution, 'runtime_auction_bundle_pool_generation')
+            # timer.write_duration_to_solution(solution, 'runtime_auction_bundle_pool_generation') fixme
             logger.debug(f'bundles {auction_bundle_pool} have been created')
 
             # ===== [3] Bidding =====
             logger.debug(f'Generating bids_matrix')
             timer = pr.Timer()
             bids_matrix = self.bidding.execute_bidding(instance, solution, auction_bundle_pool)
-            # timer.write_duration_to_solution(solution, 'runtime_bidding')
+            # timer.write_duration_to_solution(solution, 'runtime_bidding') fixme
             logger.debug(f'Bids {bids_matrix} have been created for bundles {auction_bundle_pool}')
 
             # ===== [4.1] Winner Determination =====
@@ -92,7 +92,7 @@ class Auction:
             winner_bundles, bundle_winners = self.winner_determination.execute(instance, solution,
                                                                                auction_request_pool,
                                                                                auction_bundle_pool, bids_matrix)
-            # timer.write_duration_to_solution(solution, 'runtime_winner_determination')
+            # timer.write_duration_to_solution(solution, 'runtime_winner_determination') fixme
             # todo: store whether the auction did achieve a reallocation or not
 
             # ===== [4.2] Bundle Reallocation =====
@@ -120,7 +120,7 @@ class Auction:
         # timer.write_duration_to_solution(solution, 'runtime_final_dynamic_insertion')
         timer = pr.Timer()
         solution = self.tour_improvement.execute(instance, solution)
-        # timer.write_duration_to_solution(solution, 'runtime_final_improvement')
+        # timer.write_duration_to_solution(solution, 'runtime_final_improvement') fixme
         return solution
 
     @staticmethod

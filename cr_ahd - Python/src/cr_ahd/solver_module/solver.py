@@ -48,7 +48,8 @@ class Solver:
             solution = starting_solution
             solution.timings.clear()
 
-        self.update_solution_solver_config(solution)  # TODO reverse this. it should be a method of the solution not the solver
+        self.update_solution_solver_config(
+            solution)  # TODO reverse this. it should be a method of the solution not the solver
         random.seed(0)
         logger.info(f'{instance.id_}: Solving {solution.solver_config}')
 
@@ -92,14 +93,15 @@ class Solver:
                     carrier.acceptance_rate = len(carrier.accepted_requests) / len(carrier.assigned_requests)
 
             # ===== [4] Intermediate Auctions =====
-            if self.intermediate_auction and \
-                    (i * instance.num_carriers) % (instance.num_requests / (self.num_intermediate_auctions + 1)) == 0:
-                timer = pr.Timer()
-                solution = self.tour_improvement.execute(instance, solution)
-                timer.write_duration_to_solution(solution, 'runtime_intermediate_improvement', True)
-                timer = pr.Timer()
-                solution = self.intermediate_auction.execute(instance, solution)
-                timer.write_duration_to_solution(solution, 'runtime_intermediate_auction')
+            if self.intermediate_auction:
+                if ((i + 1) * instance.num_carriers) % (
+                        instance.num_requests / (self.num_intermediate_auctions + 1)) == 0:
+                    timer = pr.Timer()
+                    solution = self.tour_improvement.execute(instance, solution)
+                    timer.write_duration_to_solution(solution, 'runtime_intermediate_improvements', True)
+                    timer = pr.Timer()
+                    solution = self.intermediate_auction.execute(instance, solution)
+                    timer.write_duration_to_solution(solution, 'runtime_intermediate_auctions', True)
 
             i += 1
 
@@ -115,28 +117,8 @@ class Solver:
             timer.write_duration_to_solution(solution, 'runtime_final_auction')
 
         ut.validate_solution(instance, solution)  # safety check to make sure everything's functional
-
-        """ OLD SOLVER VERSION
-        # ===== [2] Customer Acceptance Phase (including intermediate auctions) =====
-        timer = pr.Timer()
-        self.acceptance.execute(instance, solution, True)
-        timer.write_duration_to_solution(solution, 'runtime_acceptance_phase')
-
-        # ===== [3] Tour Improvement Phase =====
-        timer = pr.Timer()
-        before = solution.objective()
-        solution = self.tour_improvement.execute(instance, solution)
-        ut.validate_solution(instance, solution)
-        assert round(solution.objective(), 4) >= round(before, 4)
-        timer.write_duration_to_solution(solution, 'runtime_post_acceptance_improvement')
-
-        # ===== [4] Final Auction Phase =====
-        if self.auction:
-            solution = self.auction.execute(instance, solution)
-
         logger.info(f'{instance.id_}: Success {solution.solver_config}')
-        ut.validate_solution(instance, solution)
-        """
+
         return instance, solution
 
     def update_solution_solver_config(self, solution):  # TODO this should be a method of the solution, not the solver!

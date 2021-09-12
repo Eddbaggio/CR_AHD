@@ -40,10 +40,6 @@ class BiddingBehavior(ABC):
                 value_with_bundle = self._value_with_bundle(instance, solution, bundles[b], carrier.id_)
                 bid = value_with_bundle - value_without_bundle
 
-                # REMOVEME
-                # if all([x in range(carrier.id_*instance.num_requests_per_carrier, carrier.id_*instance.num_requests_per_carrier+instance.num_requests_per_carrier) for x in bundles[b]]):
-                #     print('\n')
-
                 carrier_bundle_bids.append(bid)
 
             bundle_bids.append(carrier_bundle_bids)

@@ -406,12 +406,12 @@ TIME_HORIZON = TimeWindow(START_TIME, END_TIME)
 SPEED_KMH = 60  # vehicle speed (set to 60 to treat distance = time)
 
 solver_config = [
+    'solution_algorithm',
+    'num_int_auctions',
     'tour_construction',
     'tour_improvement',
     'time_window_offering',
     'time_window_selection',
-    'num_int_auctions',
-    'solution_algorithm',
     'int_auction_tour_construction',
     'int_auction_tour_improvement',
     'int_auction_num_submitted_requests',

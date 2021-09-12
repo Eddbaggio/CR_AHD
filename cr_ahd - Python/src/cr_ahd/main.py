@@ -168,7 +168,7 @@ if __name__ == '__main__':
         run, rad, n = 16, 1, 0  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
         i = random.choice(range(len(paths)))
         # i = run * 6 + rad * 2 + n
-        paths = paths[i:i + 6]
+        paths = paths[i:i + 1]
 
         if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=True)
@@ -176,7 +176,7 @@ if __name__ == '__main__':
             solutions = m_solve_multi_thread(paths)
 
         df = write_solution_summary_to_multiindex_df(solutions, 'solution')
-        secondary_parameter = 'tour_improvement'
+        secondary_parameter = 'num_int_auctions'
         ev.bar_chart(df,
                      title='',
                      values='sum_profit',

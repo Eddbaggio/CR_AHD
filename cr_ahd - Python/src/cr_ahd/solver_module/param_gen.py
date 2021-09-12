@@ -26,6 +26,7 @@ def parameter_generator():
 
     time_window_offering = two.FeasibleTW()
     time_window_selection = tws.UnequalPreference()
+    num_final_auction_rounds = 1
 
     # ===== POTENTIALLY VARIABLE PARAMETERS =====
     tour_improvements: List = [
@@ -118,9 +119,9 @@ def parameter_generator():
                                     tour_improvement
                                 ),
                                 winner_determination=wd.MaxBidGurobiCAP1(),
-                                num_auction_rounds=1
+                                num_auction_rounds=num_final_auction_rounds
                             )
-                            # collaborative planning
+                            # collaborative planning with only a final auction
                             yield dict(
                                 time_window_offering=time_window_offering,
                                 time_window_selection=time_window_selection,
@@ -130,6 +131,33 @@ def parameter_generator():
                                 intermediate_auction=False,
                                 final_auction=final_auction,
                             )
+                            for num_intermediate_auctions in range(1, 3):
+                                intermediate_auction = au.Auction(
+                                    tour_construction=tour_construction,
+                                    tour_improvement=tour_improvement,
+                                    request_selection=request_selection(num_submitted_requests),
+                                    bundle_generation=bundle_generation(
+                                        num_auction_bundles=num_auction_bundles/num_intermediate_auctions,
+                                        bundling_valuation=bundling_valuation(),
+                                        **bundle_generation_kwargs
+                                    ),
+                                    bidding=bd.DynamicInsertionAndImprove(
+                                        tour_construction,
+                                        tour_improvement
+                                    ),
+                                    winner_determination=wd.MaxBidGurobiCAP1(),
+                                    num_auction_rounds=num_final_auction_rounds
+                                )
+                                # collaborative planning with intermediate and final auctions
+                                yield dict(
+                                    time_window_offering=time_window_offering,
+                                    time_window_selection=time_window_selection,
+                                    tour_construction=tour_construction,
+                                    tour_improvement=tour_improvement,
+                                    num_intermediate_auctions=num_intermediate_auctions,
+                                    intermediate_auction=intermediate_auction,
+                                    final_auction=final_auction,
+                                )
 
 
 pass
