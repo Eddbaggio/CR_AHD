@@ -296,27 +296,27 @@ def _make_tour_edges(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, c
     return directed_edges
 
 
-def _add_carrier_solution(fig: go.Figure, instance, solution: slt.CAHDSolution, carrier: int):
-    carrier_ = solution.carriers[carrier]
+def _add_carrier_solution(fig: go.Figure, instance, solution: slt.CAHDSolution, carrier_id: int):
+    carrier = solution.carriers[carrier_id]
     scatter_traces = []
     edge_traces = []
 
-    depot_scatter = _make_depot_scatter(instance, solution, carrier)
+    depot_scatter = _make_depot_scatter(instance, solution, carrier_id)
     fig.add_trace(depot_scatter)
     scatter_traces.append(depot_scatter)
 
-    for tour_id in solution.carriers[carrier].tour_ids:
-        tour_scatter = _make_tour_scatter(instance, solution, carrier, tour_id)
+    for tour_id in [tour.id_ for tour in carrier.tours] :
+        tour_scatter = _make_tour_scatter(instance, solution, carrier_id, tour_id)
         fig.add_trace(tour_scatter)
         scatter_traces.append(tour_scatter)
 
-        edges = _make_tour_edges(instance, solution, carrier, tour_id)
+        edges = _make_tour_edges(instance, solution, carrier_id, tour_id)
         for edge in edges:
             fig.add_annotation(edge)
         edge_traces.append(edges)
 
-    if carrier_.unrouted_requests:
-        unrouted_scatter = _make_unrouted_scatter(instance, solution, carrier)
+    if carrier.unrouted_requests:
+        unrouted_scatter = _make_unrouted_scatter(instance, solution, carrier_id)
         fig.add_trace(unrouted_scatter)
         scatter_traces.append(unrouted_scatter)
 
@@ -351,7 +351,8 @@ def plot_solution_2(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, ti
     # custom buttons to hide edges
     button_dicts = []
     for c in range(len(solution.carriers)):
-        for t in range(solution.carriers[c].num_tours()):
+        ahd_solution = solution.carriers[c]
+        for t in range(len(ahd_solution.tours)):
             button_dicts.append(
                 dict(label=f'Carrier {c}, Tour {t}',
                      method='update',

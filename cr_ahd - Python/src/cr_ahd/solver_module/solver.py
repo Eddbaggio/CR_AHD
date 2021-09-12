@@ -44,9 +44,11 @@ class Solver:
         # ===== [0] Setup =====
         if self.intermediate_auction:
             # define the iterations at which an intermediate auction shall take place
-            int_auction_iter = [
-                round(x)
-                for x in np.linspace(0, instance.num_requests_per_carrier, self.num_intermediate_auctions+1, False)[1:]
+            intermediate_auction_timepoints = [
+                round(x) for x in np.linspace(-1,
+                                              instance.num_requests_per_carrier - 1,
+                                              self.num_intermediate_auctions + 1,
+                                              False)[1:]
             ]
 
         instance = deepcopy(instance)
@@ -102,7 +104,7 @@ class Solver:
 
             # ===== [4] Intermediate Auctions =====
             if self.intermediate_auction:
-                if i in int_auction_iter:
+                if i in intermediate_auction_timepoints:
                     timer = pr.Timer()
                     # solution = self.tour_improvement.execute(instance, solution)
                     timer.write_duration_to_solution(solution, 'runtime_intermediate_improvements', True)

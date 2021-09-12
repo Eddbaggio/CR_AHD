@@ -1,6 +1,7 @@
 import logging
 import warnings
 from abc import ABC
+from copy import deepcopy
 
 from src.cr_ahd.auction_module import request_selection as rs, bundle_generation as bg, bidding as bd, \
     winner_determination as wd
@@ -48,16 +49,31 @@ class Auction:
         for auction_round in range(self.num_auction_rounds):
 
             # auction
-            profit_before = [carrier.sum_profit() for carrier in solution.carriers]
+            pre_auction_objective = solution.objective()
+            solution_backup = deepcopy(solution)
             solution = self.reallocate_requests(instance, solution)
 
-            # clear and re-optimize
+            # clears the solution and re-optimize
             solution = self.post_auction_routing(instance, solution)
-            profit_after = [carrier.sum_profit() for carrier in solution.carriers]
 
-            if not sum(profit_before) <= sum(profit_after):
-                warnings.warn(f'Global result is worse after the auction than it was before! [{instance.id_}]')
-
+            if not pre_auction_objective <= solution.objective():
+                """
+                Unfortunately, there are several circumstances that can lead to the post-auction result being worse
+                than the pre-auction solution. In that case, throw a warning and recover the pre-auction solution!
+                Causes:
+                (a) If intermediate auctions are used, any auction other than the first may run into the following 
+                problem: The sorting of assigned requests for a given carrier can be in no order due to request 
+                reassignments in a previous auction. Now, if the current auction's bidding takes place and the carrier
+                bids on his original bundle, this bundle will be in a different order, meaning that dynamic insertion
+                obtains a different - potentially worse - result! SOLUTION: make sure that the dynamic insertion
+                (of the bidding phase) follows the same order as the carrier.assigned_requests list.
+                (b) the metaheuristic used for improvements does not work correctly and returns worse results. This
+                messes up the bidding because the bid on a given carrier's original bundle may be incorrect
+                """
+                raise ValueError(f'{instance.id_}: Post-auction objective is lower than pre-auction objective!,'
+                              f' Recovering the pre-auction solution')
+                solution = solution_backup
+                assert pre_auction_objective == solution.objective()
         return solution
 
     def reallocate_requests(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution) -> slt.CAHDSolution:
@@ -111,7 +127,7 @@ class Auction:
         :param solution:
         :return:
         """
-        solution.clear_carrier_routes()  # clear everything that was left after Request Selection
+        solution.clear_carrier_routes(None)  # clear everything that was left after Request Selection
         timer = pr.Timer()
         for carrier in solution.carriers:
             while carrier.unrouted_requests:

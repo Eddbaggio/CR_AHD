@@ -121,7 +121,8 @@ def write_solution_summary_to_multiindex_df(solutions_per_instance: List[List[sl
 
             elif agg_level == 'tour':
                 for carrier in range(solution.num_carriers()):
-                    for tour in range(solution.carriers[carrier].num_tours()):
+                    ahd_solution = solution.carriers[carrier]
+                    for tour in range(len(ahd_solution.tours)):
                         record = solution.meta.copy()  # rad, n, run, dist
                         record.update(solution.solver_config)
                         record.update(solution.carriers[carrier].tours[tour].summary())
@@ -166,10 +167,10 @@ if __name__ == '__main__':
             key=ut.natural_sort_key
         )
 
-        run, rad, n = 16, 0, 0  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
+        run, rad, n = 1, 1, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
         i = random.choice(range(len(paths)))
         i = run * 6 + rad * 2 + n
-        paths = paths[i:i + 1]
+        paths = paths[:12]
 
         if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=True)
@@ -199,7 +200,7 @@ if __name__ == '__main__':
 
     # PROFILING
     cProfile.run('cr_ahd()', ut.output_dir.joinpath('cr_ahd_stats'))
-
+    """
     # STATS
     p = pstats.Stats(ut.output_dir.joinpath('cr_ahd_stats').as_posix())
     # remove the extraneous path from all the module names:
@@ -210,4 +211,4 @@ if __name__ == '__main__':
     p.sort_stats('tottime').print_stats(20)
     p.sort_stats('ncalls').print_stats(20)
     # p.print_callers(20)
-
+    """

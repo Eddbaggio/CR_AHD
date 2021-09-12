@@ -89,8 +89,9 @@ def parameter_generator():
     ]
 
     for tour_improvement in tour_improvements:
+
         # Isolated Planning Parameters, no auction
-        yield dict(
+        isolated_planning = dict(
             time_window_offering=time_window_offering,
             time_window_selection=time_window_selection,
             tour_construction=cns.MinTravelDistanceInsertion(),
@@ -99,11 +100,14 @@ def parameter_generator():
             intermediate_auction=False,
             final_auction=False,
         )
+        yield isolated_planning
+
         for num_submitted_requests in nums_submitted_requests:
             for request_selection in request_selections:
                 for num_auction_bundles in nums_auction_bundles:
                     for bundle_generation, bundle_generation_kwargs in bundle_generations:
                         for bundling_valuation in bundling_valuations:
+
                             # final_auction for collaborative planning
                             final_auction = au.Auction(
                                 tour_construction=tour_construction,
@@ -121,8 +125,9 @@ def parameter_generator():
                                 winner_determination=wd.MaxBidGurobiCAP1(),
                                 num_auction_rounds=num_final_auction_rounds
                             )
+
                             # collaborative planning with only a final auction
-                            yield dict(
+                            collaborative_planning_final = dict(
                                 time_window_offering=time_window_offering,
                                 time_window_selection=time_window_selection,
                                 tour_construction=tour_construction,
@@ -131,15 +136,17 @@ def parameter_generator():
                                 intermediate_auction=False,
                                 final_auction=final_auction,
                             )
+                            yield collaborative_planning_final
+
                             for num_intermediate_auctions in range(1, 2):  # TODO add proper parameter
                                 # collaborative planning with final AND intermediate auction
                                 # Test 01: 1 intermediate + 1 final with 50% of submitted requests each vs.1 final with 100% of submitted requests
                                 intermediate_auction = au.Auction(
                                     tour_construction=tour_construction,
                                     tour_improvement=tour_improvement,
-                                    request_selection=request_selection(int(num_submitted_requests/2)),  # TODO add proper parameter
+                                    request_selection=request_selection(int(num_submitted_requests / 2)),  # TODO add proper parameter
                                     bundle_generation=bundle_generation(
-                                        num_auction_bundles=num_auction_bundles/num_intermediate_auctions,
+                                        num_auction_bundles=num_auction_bundles / num_intermediate_auctions,
                                         bundling_valuation=bundling_valuation(),
                                         **bundle_generation_kwargs
                                     ),
@@ -154,9 +161,9 @@ def parameter_generator():
                                 final_auction = au.Auction(
                                     tour_construction=tour_construction,
                                     tour_improvement=tour_improvement,
-                                    request_selection=request_selection(int(num_submitted_requests/2)),  # TODO add proper parameter
+                                    request_selection=request_selection(int(num_submitted_requests / 2)),  # TODO add proper parameter
                                     bundle_generation=bundle_generation(
-                                        num_auction_bundles=num_auction_bundles/num_intermediate_auctions,
+                                        num_auction_bundles=num_auction_bundles / num_intermediate_auctions,
                                         bundling_valuation=bundling_valuation(),
                                         **bundle_generation_kwargs
                                     ),
@@ -168,7 +175,7 @@ def parameter_generator():
                                     num_auction_rounds=num_final_auction_rounds
                                 )
 
-                                yield dict(
+                                collaborative_planning_intermediate_final = dict(
                                     time_window_offering=time_window_offering,
                                     time_window_selection=time_window_selection,
                                     tour_construction=tour_construction,
@@ -177,6 +184,8 @@ def parameter_generator():
                                     intermediate_auction=intermediate_auction,
                                     final_auction=final_auction,
                                 )
+
+                                # yield collaborative_planning_intermediate_final
 
 
 pass

@@ -85,7 +85,7 @@ class DynamicInsertionAndImprove(BiddingBehavior):
         self._add_bundle_to_carrier(bundle, carrier_copy)
 
         # reset the temporary carrier's solution and start from scratch instead
-        carrier_copy.clear_routes()
+        solution_copy.clear_carrier_routes([carrier_copy.id_])
 
         # sequentially insert requests (original + bundle) just as if it was the acceptance phase
         try:

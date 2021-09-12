@@ -1,6 +1,6 @@
 import datetime as dt
 import json
-from typing import List, Sequence, Dict, Union
+from typing import List, Sequence, Dict
 
 import numpy as np
 
@@ -105,20 +105,29 @@ class CAHDSolution:
             self.request_to_carrier_assignment[request] = np.nan
             self.unassigned_requests.append(request)
 
-    def unroute_request(self, instance: it.MDPDPTWInstance, requests: List[int]):
+    def clear_carrier_routes(self, carrier_ids):
         """
-        remove the selected requests from their current tour and set them as unassigned without retracting them from
-        the carrier. Thus, the given requests will be unrouted
-
-        :param instance:
-        :param requests:
-        :return:
+        delete all existing routes of the given carrier and move all accepted requests to the list of unrouted requests
+        :param carrier_ids:
         """
+        if carrier_ids is None:
+            carrier_ids = [carrier.id_ for carrier in self.carriers]
 
-    def clear_carrier_routes(self):
-        """delete all existing routes and move all accepted requests to the list of unrouted requests"""
-        for carrier_ in self.carriers:
-            carrier_.clear_routes()
+        for carrier_id in carrier_ids:
+            carrier = self.carriers[carrier_id]
+            carrier.unrouted_requests = carrier.accepted_requests[:]
+            carrier.routed_requests.clear()
+            for tour_id in [tour.id_ for tour in carrier.tours]:
+                self.tours[tour_id] = None
+            carrier.tours.clear()
+
+
+    def get_free_tour_id(self):
+        if None in self.tours:
+            tour_id = self.tours.index(None)
+        else:
+            tour_id = len(self.tours)
+        return tour_id
 
     def as_dict(self):
         """The solution as a nested python dictionary"""
@@ -170,7 +179,6 @@ class AHDSolution:
         self.unrouted_requests: List = []
         self.routed_requests: List = []
         self.acceptance_rate: float = 0
-        self.tour_ids: List[int] = []  # list of tour IDs of the tours that belong to this solution/carrier
         self.tours: List[tr.Tour] = []
 
     def __str__(self):
@@ -182,8 +190,8 @@ class AHDSolution:
             f'Unrouted={self.unrouted_requests}, ' \
             f'Routed={self.routed_requests}'
         s += '\n'
-        for tour_ in self.tours:
-            s += str(tour_)
+        for tour in self.tours:
+            s += str(tour)
             s += '\n'
         return s
 
@@ -211,9 +219,6 @@ class AHDSolution:
     def objective(self):
         return self.sum_profit()
 
-    def num_tours(self):
-        return len(self.tour_ids)
-
     def as_dict(self):
         return {
             # 'id_': self.id_,
@@ -225,7 +230,7 @@ class AHDSolution:
     def summary(self) -> dict:
         return {
             # 'id_': self.id_,
-            'num_tours': self.num_tours(),
+            'num_tours': len(self.tours),
             'num_routing_stops': self.num_routing_stops(),
             'sum_profit': self.objective(),
             'sum_travel_distance': self.sum_travel_distance(),
@@ -237,8 +242,4 @@ class AHDSolution:
             'tour_summaries': {t.id_: t.summary() for t in self.tours}
         }
 
-    def clear_routes(self):
-        self.unrouted_requests = self.accepted_requests[:]
-        self.routed_requests.clear()
-        self.tours.clear()
-        self.tour_ids.clear()
+

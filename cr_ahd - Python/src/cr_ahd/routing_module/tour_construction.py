@@ -25,7 +25,7 @@ class PDPParallelInsertionConstruction(ABC):
             # when for a given request no tour can be found, create a new tour and start over
             # this will fail if max_num_vehicles is exceeded
             if tour is None:
-                self.create_new_tour_with_request(instance, solution.num_tours(), solution, carrier_id, request)
+                self.create_new_tour_with_request(instance, solution, carrier_id, request)
 
             # otherwise insert as suggested
             else:
@@ -46,7 +46,7 @@ class PDPParallelInsertionConstruction(ABC):
         insertion_criteria, tour, pickup_pos, delivery_pos = self.best_insertion_for_request(instance, carrier, request)
 
         if tour is None:
-            self.create_new_tour_with_request(instance, solution.num_tours(), solution, carrier_id, request)
+            self.create_new_tour_with_request(instance, solution, carrier_id, request)
         else:
             self.execute_insertion(instance, solution, carrier_id, request, tour.id_, pickup_pos, delivery_pos)
 
@@ -138,7 +138,6 @@ class PDPParallelInsertionConstruction(ABC):
         pickup, delivery = instance.pickup_delivery_pair(request)
         tour.insert_and_update(instance, [pickup_pos, delivery_pos], [pickup, delivery])
         tour.requests.add(request)
-        # solution.request_to_tour_assignment[request] = tour.id_  # TODO extract this for solution-independence?
         carrier.unrouted_requests.remove(request)
         carrier.routed_requests.append(request)
 
@@ -150,33 +149,31 @@ class PDPParallelInsertionConstruction(ABC):
         tour = solution.tours[tour_id]
         tour.insert_and_update(instance, [pickup_pos, delivery_pos], [pickup, delivery])
         tour.requests.add(request)
-        # solution.request_to_tour_assignment[instance.request_from_vertex(pickup)] = tour.id_# TODO extract this for solution-independence?
 
-    def create_new_tour_with_request(self,
-                                     instance: it.MDPDPTWInstance,
-                                     tour_id: int,
-                                     solution: slt.CAHDSolution,
-                                     carrier_id: int,
+    def create_new_tour_with_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int,
                                      request: int):
         carrier = solution.carriers[carrier_id]
-        if carrier.num_tours() >= instance.carriers_max_num_tours:
+        if len(carrier.tours) >= instance.carriers_max_num_tours:
             raise ut.ConstraintViolationError(
                 f'Cannot create new route with request {request} for carrier {carrier.id_}.'
                 f' Max. number of vehicles is {instance.carriers_max_num_tours}!'
                 f' ({instance.id_})')
+        tour_id = solution.get_free_tour_id()
+        assert tour_id < instance.num_carriers * instance.carriers_max_num_tours
         tour = tr.Tour(tour_id, depot_index=carrier.id_)
 
         if tour.insertion_feasibility_check(instance, [1, 2], instance.pickup_delivery_pair(request)):
             tour.insert_and_update(instance, [1, 2], instance.pickup_delivery_pair(request))
             tour.requests.add(request)
-            # solution.request_to_tour_assignment[request] = tour.id_  # TODO extract this for solution-independence?
 
         else:
             raise ut.ConstraintViolationError(
                 f'Cannot create new route with request {request} for carrier {carrier.id_}.')
 
-        solution.tours.append(tour)  # TODO extract this for solution-independence?
-        carrier.tour_ids.append(tour.id_)
+        if tour_id < len(solution.tours):
+            solution.tours[tour_id] = tour
+        else:
+            solution.tours.append(tour)
         carrier.tours.append(tour)
         carrier.unrouted_requests.remove(request)
         carrier.routed_requests.append(request)
