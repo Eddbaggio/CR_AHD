@@ -328,7 +328,7 @@ def validate_solution(instance, solution):
 
     for carrier_id in trange(len(solution.carriers), desc=f'Solution validation', disable=True):
         carrier = solution.carriers[carrier_id]
-
+        assert len(carrier.unrouted_requests) == 0
         for tour in carrier.tours:
             assert tour is solution.tours[tour.id_]
             assert tour.routing_sequence[0] == carrier.id_

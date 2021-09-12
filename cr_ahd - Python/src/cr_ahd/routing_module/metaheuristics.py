@@ -477,7 +477,7 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
 
             # repair
             # TODO test different repairs
-            cns.MinTravelDistanceInsertion().insert_all_requests(instance, solution_copy, carrier_copy.id_)
+            cns.MinTravelDistanceInsertion().insert_all_unrouted_statically(instance, solution_copy, carrier_copy.id_)
 
             return solution_copy
 

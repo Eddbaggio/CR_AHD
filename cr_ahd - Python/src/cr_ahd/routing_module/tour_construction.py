@@ -13,10 +13,11 @@ class PDPParallelInsertionConstruction(ABC):
     def __init__(self):
         self.name = self.__class__.__name__
 
-    def insert_all_requests(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int):
+    def insert_all_unrouted_statically(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int):
         """
-        Inserts all unrouted requests of the specified carrier into tours. Repeatedly finds the "best" insertion,
-        defined by the request, the tour and the insertion positions. "best" is defined by the inheriting classes.
+        Inserts all unrouted requests of the specified carrier into tours. Repeatedly finds the "best" insertion
+        which is defined by the request, the tour and the insertion positions. "best" is defined by the inheriting
+        classes.
         """
         carrier = solution.carriers[carrier_id]
         while carrier.unrouted_requests:
@@ -31,6 +32,19 @@ class PDPParallelInsertionConstruction(ABC):
             else:
                 self.execute_insertion(instance, solution, carrier_id, request, tour.id_, pickup_pos, delivery_pos)
 
+        pass
+
+    def insert_all_unrouted_dynamically(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+                                        carrier_id: int):
+        """
+        Inserts all unrouted requests of the specified carrier into tours. Repeatedly takes the first request in the
+        list of unrouted requests and inserts it into its "best" position. "best" is defined by the inheriting classes.
+        """
+        raise NotImplementedError(f'This has never been used before, check before removing the Error raise')
+        carrier = solution.carriers[carrier_id]
+        while carrier.unrouted_requests:
+            request = carrier.unrouted_requests[0]
+            self.insert_single_request(instance, solution, carrier_id, request)
         pass
 
     def insert_single_request(self,

@@ -50,11 +50,13 @@ class Auction:
 
             # auction
             pre_auction_objective = solution.objective()
+            # print([(carrier.routed_requests, carrier.unrouted_requests) for carrier in solution.carriers])  # RemoveMe
             solution_backup = deepcopy(solution)
             solution = self.reallocate_requests(instance, solution)
+            # print([(carrier.routed_requests, carrier.unrouted_requests) for carrier in solution.carriers])  # RemoveMe
 
             # clears the solution and re-optimize
-            solution = self.post_auction_routing(instance, solution)
+            solution = self.post_auction_routing_ClearAndReinsertAll(instance, solution)
 
             if not pre_auction_objective <= solution.objective():
                 """
@@ -71,7 +73,7 @@ class Auction:
                 messes up the bidding because the bid on a given carrier's original bundle may be incorrect
                 """
                 raise ValueError(f'{instance.id_}: Post-auction objective is lower than pre-auction objective!,'
-                              f' Recovering the pre-auction solution')
+                                 f' Recovering the pre-auction solution')
                 solution = solution_backup
                 assert pre_auction_objective == solution.objective()
         return solution
@@ -119,10 +121,12 @@ class Auction:
 
         return solution
 
-    def post_auction_routing(self, instance, solution):
+    def post_auction_routing_ClearAndReinsertAll(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution):
         """
-        After requests have been reallocated, this functions performs a complete optimization from scratch: dynamic
-        insertion + improvement
+        After requests have been reallocated, this function builds the new tours based on the new requests. It is
+        important that this routing follows the same steps as the routing approach in the bidding phase to reliably
+        obtain feasible and consistent solutions.
+        Currently, this function performs a complete optimization from scratch: dynamic insertion + improvement
         :param instance:
         :param solution:
         :return:
@@ -133,10 +137,25 @@ class Auction:
             while carrier.unrouted_requests:
                 request = carrier.unrouted_requests[0]
                 self.tour_construction.insert_single_request(instance, solution, carrier.id_, request)
-        # timer.write_duration_to_solution(solution, 'runtime_final_dynamic_insertion')
+        # timer.write_duration_to_solution(solution, 'runtime_final_dynamic_insertion') FixMe
         timer = pr.Timer()
         solution = self.tour_improvement.execute(instance, solution)
         # timer.write_duration_to_solution(solution, 'runtime_final_improvement') fixme
+        return solution
+
+    def post_auction_routing_InsertBundle(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution):
+        """
+        Does NOT clear the routes before inserting yet unrouted requests
+        :param instance:
+        :param solution:
+        :return:
+        """
+        raise NotImplementedError(f'This has never been used before, check before removing the Error raise')
+        for carrier in solution.carriers:
+            while carrier.unrouted_requests:
+                request = carrier.unrouted_requests[0]
+                self.tour_construction.insert_single_request(instance, solution, carrier.id_, request)
+        solution = self.tour_improvement.execute(instance, solution)
         return solution
 
     @staticmethod

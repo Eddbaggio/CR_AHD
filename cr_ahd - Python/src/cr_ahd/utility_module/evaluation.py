@@ -1,9 +1,11 @@
+import time
 import warnings
-from typing import Sequence, List, Tuple
+from typing import Sequence, List, Tuple, Union
 from itertools import zip_longest
 import numpy as np
 import pandas as pd
 import plotly.express as px
+import datetime as dt
 
 import src.cr_ahd.utility_module.utils as ut
 
@@ -60,7 +62,11 @@ def bar_chart(df: pd.DataFrame,
     :param df: multi-index dataframe
     :return:
     """
-    splitters = dict(category=category, color=color, facet_row=facet_row, facet_col=facet_col, )
+
+    splitters = dict(category=category,
+                     color=color,
+                     facet_row=facet_row,
+                     facet_col=facet_col, )
 
     # create annotation
     annotation, _ = single_and_zero_value_indices(df.index, list(splitters.values()))
@@ -91,7 +97,7 @@ def bar_chart(df: pd.DataFrame,
     # if any of facet_col, facet_row, color, category is a sequence, merge the levels into one
     already_joined = []
     for k, v in splitters.items():
-        if isinstance(v, (List, Tuple)) :
+        if isinstance(v, (List, Tuple)):
             if len(v) > 1:
                 splitters[k] = '-'.join(v)
                 if v not in already_joined:
@@ -188,9 +194,14 @@ def bar_chart(df: pd.DataFrame,
 
     # fig.update_yaxes(range=[0, 10000])
     fig.update_xaxes(type='category')
+    if 7 < dt.datetime.now().hour < 20:
+        template = 'plotly_white'
+    else:
+        template = 'plotly_dark'
     fig.update_layout(
         title_font_size=12,
-    )
+        template=template)
+
     if show:
         fig.show(config=config)
 
@@ -296,7 +307,7 @@ def print_top_level_stats(df: pd.DataFrame, secondary_parameters: List[str]):
                             print(f'{name}: consistency check successful')
                 else:
                     print(f'{name}: Cannot compare Isolated and Collaborative, '
-                                  f'since in this group only {grouped.groups.keys()} exist')
+                          f'since in this group only {grouped.groups.keys()} exist')
 
 
 if __name__ == '__main__':

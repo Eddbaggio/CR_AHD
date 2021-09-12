@@ -45,7 +45,7 @@ class Tour:
             self.max_shift_sequence.insert(1, ut.END_TIME - ut.START_TIME)
 
     def __str__(self):
-        return f'Tour ID:\t{self.id_}\n' \
+        return f'Tour ID:\t{self.id_};\tRequests:\t{self.requests}\n' \
                f'Sequence:\t{self.routing_sequence}\n' \
                f'Arrival:\t{[x.strftime("%d-%H:%M:%S") for x in self.arrival_time_sequence]}\n' \
                f'Wait:\t\t{[str(x) for x in self.wait_duration_sequence]}\n' \
@@ -57,7 +57,7 @@ class Tour:
                f'Profit:\t\t{self.sum_profit}\n'
 
     def __repr__(self):
-        return f'Tour {self.id_}'
+        return f'Tour {self.id_} {self.requests}'
 
     def __len__(self):
         return len(self.routing_sequence)

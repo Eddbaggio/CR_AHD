@@ -90,7 +90,7 @@ def parameter_generator():
 
     for tour_improvement in tour_improvements:
 
-        # Isolated Planning Parameters, no auction
+        # ===== Isolated Planning Parameters, no auction =====
         isolated_planning = dict(
             time_window_offering=time_window_offering,
             time_window_selection=time_window_selection,
@@ -108,7 +108,7 @@ def parameter_generator():
                     for bundle_generation, bundle_generation_kwargs in bundle_generations:
                         for bundling_valuation in bundling_valuations:
 
-                            # final_auction for collaborative planning
+                            # ===== final_auction for collaborative planning =====
                             final_auction = au.Auction(
                                 tour_construction=tour_construction,
                                 tour_improvement=tour_improvement,
@@ -118,7 +118,7 @@ def parameter_generator():
                                     bundling_valuation=bundling_valuation(),
                                     **bundle_generation_kwargs
                                 ),
-                                bidding=bd.DynamicInsertionAndImprove(
+                                bidding=bd.ClearAndReinsertAll(
                                     tour_construction,
                                     tour_improvement
                                 ),
@@ -139,8 +139,9 @@ def parameter_generator():
                             yield collaborative_planning_final
 
                             for num_intermediate_auctions in range(1, 2):  # TODO add proper parameter
-                                # collaborative planning with final AND intermediate auction
-                                # Test 01: 1 intermediate + 1 final with 50% of submitted requests each vs.1 final with 100% of submitted requests
+                                # ===== collaborative planning with final AND intermediate auction =====
+                                # Note Test 01: 1 intermediate + 1 final with 50% of submitted requests each vs.1 final
+                                #  with 100% of submitted requests
                                 intermediate_auction = au.Auction(
                                     tour_construction=tour_construction,
                                     tour_improvement=tour_improvement,
@@ -150,7 +151,7 @@ def parameter_generator():
                                         bundling_valuation=bundling_valuation(),
                                         **bundle_generation_kwargs
                                     ),
-                                    bidding=bd.DynamicInsertionAndImprove(
+                                    bidding=bd.ClearAndReinsertAll(
                                         tour_construction,
                                         tour_improvement
                                     ),
@@ -167,7 +168,7 @@ def parameter_generator():
                                         bundling_valuation=bundling_valuation(),
                                         **bundle_generation_kwargs
                                     ),
-                                    bidding=bd.DynamicInsertionAndImprove(
+                                    bidding=bd.ClearAndReinsertAll(
                                         tour_construction,
                                         tour_improvement
                                     ),

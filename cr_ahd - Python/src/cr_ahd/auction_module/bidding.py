@@ -69,12 +69,43 @@ class BiddingBehavior(ABC):
         pass
 
 
-class DynamicInsertionAndImprove(BiddingBehavior):
+class InsertBundle(BiddingBehavior):
+    """
+    The profit for the carrier with the bundle added is calculated by inserting only the bundle's requests into the
+    already existing tours. This is only compatible if the same insertion approach is used after the reallocation, too.
+    """
+
+    def _value_with_bundle(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, bundle: Sequence[int],
+                           carrier_id: int):
+        solution_copy = deepcopy(solution)
+        carrier_copy = solution_copy.carriers[carrier_id]
+        self._add_bundle_to_carrier(bundle, carrier_copy)
+        raise NotImplementedError(f'This has never been used before, check before removing the Error raise')
+
+        # sequentially insert bundle requests
+        try:
+            while carrier_copy.unrouted_requests:
+                request = carrier_copy.unrouted_requests[0]
+                self.tour_construction.insert_single_request(instance, solution_copy, carrier_copy.id_, request)
+
+            solution_copy_improved = self.tour_improvement.execute(instance, solution_copy, [carrier_id])
+            carrier_copy_improved = solution_copy_improved.carriers[carrier_copy.id_]
+
+            with_bundle = carrier_copy_improved.objective()
+
+        except ut.ConstraintViolationError:
+            with_bundle = -float('inf')
+
+        return with_bundle
+
+
+class ClearAndReinsertAll(BiddingBehavior):
     """
     The profit for the carrier WITH the bundle added is calculated by inserting all requests (the ones that already
     belong to the carrier AND the bundle's requests) sequentially in their order of vertex index, i.e. in the order
     of request arrival to mimic the dynamic request arrival process within the acceptance phase. Afterwards, an
     improvement is executed using the defined metaheuristic.
+    Note that this is only compatible if the same dynamic reoptimization is also applied after the reallocation, too.
     """
 
     def _value_with_bundle(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, bundle: Sequence[int],

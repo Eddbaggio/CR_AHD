@@ -51,7 +51,7 @@ def solve_with_all_solvers(instance: it.MDPDPTWInstance, plot=False):
         except Exception as e:
             logger.error(
                 f'{e}\nFailed on instance {instance} with solver {solver.__class__.__name__} at {datetime.now()}')
-            raise e
+            # raise e
             solution = slt.CAHDSolution(instance)  # create an empty solution for failed instances
             solver.update_solution_solver_config(solution)
             solution.write_to_json()
@@ -169,8 +169,8 @@ if __name__ == '__main__':
 
         run, rad, n = 1, 1, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
         i = random.choice(range(len(paths)))
-        i = run * 6 + rad * 2 + n
-        paths = paths[:12]
+        # i = run * 6 + rad * 2 + n
+        paths = paths[:]
 
         if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=True)
@@ -178,7 +178,7 @@ if __name__ == '__main__':
             solutions = m_solve_multi_thread(paths)
 
         df = write_solution_summary_to_multiindex_df(solutions, 'solution')
-        secondary_parameter = 'num_int_auctions'
+        secondary_parameter = 'tour_improvement'
         ev.bar_chart(df,
                      title='',
                      values='sum_profit',
