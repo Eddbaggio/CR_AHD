@@ -124,9 +124,7 @@ class MarginalProfit(RequestSelectionBehaviorIndividual):
                                                                                            insert_request)
             insertion.execute_insertion_in_tour(instance, solution, tmp_tour, request, pickup_pos, delivery_pos)
         # improvement TODO: tour improvement method should be a parameter
-        mh.PDPTWVariableNeighborhoodDescent([ls.PDPMove(), ls.PDPTwoOpt()]).execute_on_tour(instance,
-                                                                                            solution,
-                                                                                            tmp_tour)
+        mh.PDPTWVariableNeighborhoodDescent([ls.PDPMove(), ls.PDPTwoOpt()]).execute_on_tour(instance, tmp_tour)
         travel_distance_without_request = tmp_tour.sum_travel_distance
 
         return travel_distance_with_request - travel_distance_without_request
@@ -466,7 +464,7 @@ class RequestSelectionBehaviorBundle(RequestSelectionBehavior, ABC):
 
                 # update auction pool and original bundling candidate
                 auction_request_pool.append(request)
-                original_bundling_labels.append(carrier)
+                original_bundling_labels.append(carrier.id_)
 
         return auction_request_pool, original_bundling_labels
 
@@ -597,7 +595,9 @@ class SpatioTemporalBundle(RequestSelectionBehaviorBundle):
 
 class LosSchulteBundle(RequestSelectionBehaviorBundle):
     """
-
+    Selects requests based on their combined evaluation of the bundle evaluation measure by [1] Los, J., Schulte, F.,
+    Gansterer, M., Hartl, R. F., Spaan, M. T. J., & Negenborn, R. R. (2020). Decentralized combinatorial auctions for
+    dynamic and large-scale collaborative vehicle routing.
     """
 
     def _create_bundles(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, k: int):
@@ -608,10 +608,10 @@ class LosSchulteBundle(RequestSelectionBehaviorBundle):
         return bundles
 
     def _evaluate_bundle(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, bundle: Sequence[int]):
-        # must invert again, since RequestSelectionBehaviorBundle searches for the maximum valuation and request
         # selection for the minimum
         bundle_valuation = bv.LosSchulteBundlingValuation()
         bundle_valuation.preprocessing(instance, None)
+        # must invert since RequestSelectionBehaviorBundle searches for the maximum valuation and request
         return 1 / bundle_valuation.evaluate_bundle(instance, bundle)
 
 # class TimeShiftCluster(RequestSelectionBehaviorCluster):

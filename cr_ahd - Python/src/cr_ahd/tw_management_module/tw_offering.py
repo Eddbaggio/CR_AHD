@@ -67,3 +67,12 @@ class FeasibleTW(TWOfferingBehavior):
         instance.tw_open[delivery_vertex] = ut.START_TIME
         instance.tw_close[delivery_vertex] = ut.END_TIME
         return -1
+
+
+class NoTw(TWOfferingBehavior):
+    def execute(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, request: int):
+        return [ut.TIME_HORIZON]
+
+    def _evaluate_time_window(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, request: int,
+                              tw: ut.TimeWindow):
+        pass

@@ -248,7 +248,7 @@ class PDPTWVariableNeighborhoodDescent(PDPTWMetaHeuristic):
                     self.parameters['k'] += 1
         return best_solution
 
-    def execute_on_tour(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, tour_: tr.Tour):
+    def execute_on_tour(self, instance: it.MDPDPTWInstance, tour: tr.Tour):
         """
         execute the metaheuristic for a given route (in place) using all available intra-tour neighborhoods. useful if
         a tour shall be improved that does not belong to a carrier. E.g. when estimating the tour length of a bundle
@@ -258,7 +258,7 @@ class PDPTWVariableNeighborhoodDescent(PDPTWMetaHeuristic):
         self.parameters['k'] = 0
         while self.parameters['k'] < len(intra_tour_neighborhoods):
             neighborhood = intra_tour_neighborhoods[self.parameters['k']]
-            all_moves = [move for move in neighborhood.feasible_move_generator_for_tour(instance, tour_)]
+            all_moves = [move for move in neighborhood.feasible_move_generator_for_tour(instance, tour)]
             if any(all_moves):
                 best_move = min(all_moves, key=lambda x: x[0])
                 if self.acceptance_criterion_tour(best_move):
@@ -322,6 +322,9 @@ class PDPTWReducedVariableNeighborhoodSearch(PDPTWVariableNeighborhoodDescent):
                 else:
                     self.parameters['k'] += 1
         return best_solution
+
+    def execute_on_tour(self, instance: it.MDPDPTWInstance, tour: tr.Tour):
+        raise NotImplementedError()
 
 
 class PDPTWSimulatedAnnealing(PDPTWMetaHeuristic):

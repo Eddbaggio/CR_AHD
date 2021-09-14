@@ -4,7 +4,7 @@ import logging
 import random
 from typing import List
 
-from src.cr_ahd.utility_module.utils import TimeWindow, END_TIME, START_TIME
+from src.cr_ahd.utility_module.utils import TimeWindow, END_TIME, START_TIME, TIME_HORIZON
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +23,15 @@ class TWSelectionBehavior(abc.ABC):
             return False
 
     @abc.abstractmethod
+    def select_tw(self, tw_offer_set: List[TimeWindow], request: int) -> TimeWindow:
+        pass
+
+
+class NoTW(TWSelectionBehavior):
+    def execute(self, tw_offer_set: List[TimeWindow], request: int):
+        assert tw_offer_set == [TIME_HORIZON]
+        return TIME_HORIZON
+
     def select_tw(self, tw_offer_set: List[TimeWindow], request: int) -> TimeWindow:
         pass
 

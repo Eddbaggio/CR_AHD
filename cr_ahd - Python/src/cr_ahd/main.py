@@ -167,10 +167,10 @@ if __name__ == '__main__':
             key=ut.natural_sort_key
         )
 
-        run, rad, n = 1, 1, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
+        run, rad, n = 11, 0, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
         i = random.choice(range(len(paths)))
-        # i = run * 6 + rad * 2 + n
-        paths = paths[:]
+        i = run * 6 + rad * 2 + n
+        paths = paths[:60]
 
         if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=True)
@@ -178,9 +178,11 @@ if __name__ == '__main__':
             solutions = m_solve_multi_thread(paths)
 
         df = write_solution_summary_to_multiindex_df(solutions, 'solution')
-        secondary_parameter = 'tour_improvement'
+        secondary_parameter = 'time_window_offering'
+
+        plot_path = ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html')
         ev.bar_chart(df,
-                     title='',
+                     title=str(plot_path.stem),
                      values='sum_profit',
                      color=['solution_algorithm', secondary_parameter, ],
                      # color=secondary_parameter,
@@ -188,7 +190,7 @@ if __name__ == '__main__':
                      category='run', facet_col='rad', facet_row='n',
                      # category='solution_algorithm', facet_col=None, facet_row=None,
                      show=True,
-                     html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix())
+                     html_path=plot_path.as_posix())
 
         ev.print_top_level_stats(df, [secondary_parameter])
 

@@ -1,5 +1,6 @@
 import time
 import warnings
+from pathlib import Path
 from typing import Sequence, List, Tuple, Union
 from itertools import zip_longest
 import numpy as np
@@ -281,20 +282,46 @@ def print_top_level_stats(df: pd.DataFrame, secondary_parameters: List[str]):
 
         # collaboration gain
         print('=============/ collaboration gains /=============')
-        secondary_parameters_categorical = [param for param in secondary_parameters if 'runtime' not in param]
-        for name1, group1 in solution_df.groupby(['solution_algorithm', *secondary_parameters_categorical],
-                                                 dropna=False):
-            for name2, group2 in solution_df.groupby(['solution_algorithm', *secondary_parameters_categorical],
-                                                     dropna=False):
-                if name1 == name2:
-                    continue
-                print(f"{name1}/{name2}")
-                for stat in ['sum_profit', 'num_tours']:
-                    print(f"{stat}:\t{group1[stat].agg('mean') / group2[stat].agg('mean')}")
-                print('\n')
+        columns = ['sum_profit', 'sum_travel_distance', 'num_tours', 'runtime_total']
+        records = []
+        grouped = solution_df.groupby('solution_algorithm')
+        isolated = grouped.get_group('IsolatedPlanning')
+        collaborative = grouped.get_group('CollaborativePlanning')
+        # average overall
+        record = dict(name="CollaborativePlanning / IsolatedPlanning")
+        for x in columns:
+            record[x] = collaborative[x].agg('mean') / isolated[x].agg('mean')
+        records.append(record)
+        # average by different groupings
+        for grouper in [
+            ['rad'],
+            ['n'],
+            secondary_parameters,
+            ['rad', *secondary_parameters],
+            ['rad', 'n'],
+            ['rad', 'n', *secondary_parameters]]:
+            for iso, coll in zip(isolated.groupby(grouper), collaborative.groupby(grouper)):
+                iso_name, iso_group = iso
+                coll_name, coll_group = coll
+                assert coll_name == iso_name
+                if len(grouper) > 1:
+                    filter_name = list("=".join(x) for x in zip(grouper, (str(y) for y in coll_name)))
+                else:
+                    filter_name = f'[\'{grouper[0]}={coll_name}\']'
+                record = dict(name=f'{filter_name}: CollaborativePlanning / IsolatedPlanning')
+                # record = dict(
+                #     name=f'CollaborativePlanning{("=".join(x) for x in zip(grouper, (str(y) for y in coll_name)))} / '
+                #          f'IsolatedPlanning{("=".join(x) for x in zip(grouper, (str(y) for y in iso_name)))}')
+                for x in columns:
+                    record[x] = coll_group[x].agg('mean') / iso_group[x].agg('mean')
+                records.append(record)
+
+        df_collaboration_gains = pd.DataFrame.from_records(records, index='name')
+        print(df_collaboration_gains)
 
         if 'CollaborativePlanning' in solution_df.index.get_level_values('solution_algorithm'):
             print('=============/ consistency check: collaborative better than isolated? /=============')
+            secondary_parameters_categorical = [param for param in secondary_parameters if 'runtime' not in param]
             print(['run', 'rad', 'n', *secondary_parameters_categorical])
             for name, group in solution_df.groupby(['run', 'rad', 'n', *secondary_parameters_categorical]):
                 grouped = group.groupby('solution_algorithm')
@@ -311,10 +338,9 @@ def print_top_level_stats(df: pd.DataFrame, secondary_parameters: List[str]):
 
 
 if __name__ == '__main__':
-    df = pd.read_csv(
-        "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home "
-        "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_agg_solution_#070.csv",
-    )
+    path = "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home " \
+          "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_agg_solution_#090.csv"
+    df = pd.read_csv(path)
     df.fillna(value=dict(runtime_request_selection=0,
                          runtime_auction_bundle_pool_generation=0,
                          runtime_bidding=0,
@@ -324,15 +350,15 @@ if __name__ == '__main__':
               inplace=True)
     df.fillna(value='None', inplace=True)
     df.set_index(['rad', 'n', 'run', ] + ut.solver_config, inplace=True)  # add 'carrier_id_' if agg_level==carrier
-    secondary_parameter = 'num_int_auctions'
+    secondary_parameter = 'time_window_offering'
     print_top_level_stats(df, [secondary_parameter])
     bar_chart(df,
-              title='',
+              title=str(Path(path).stem),
               values='runtime_total',
               # color=['solution_algorithm','tour_improvement',],
-              color=['solution_algorithm', secondary_parameter, ],
-              # category='rad', facet_col=None, facet_row='n',
-              category='run', facet_col='rad', facet_row='n',
+              color=['solution_algorithm'],  # , secondary_parameter, ],
+              category='rad', facet_col=secondary_parameter, facet_row=None,
+              # category='run', facet_col='rad', facet_row='n',
               show=True,
               # width=700,
               # height=450,

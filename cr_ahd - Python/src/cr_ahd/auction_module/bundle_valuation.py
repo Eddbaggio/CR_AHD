@@ -240,7 +240,7 @@ def bundle_total_travel_distance(instance: it.MDPDPTWInstance,
 
         # insert, ignores feasibility!
         tmp_tour_.insert_and_update(instance, [pickup_pos, delivery_pos], [pickup, delivery])
-    tour_improvement.execute_on_tour(instance, solution, tmp_tour_)
+    tour_improvement.execute_on_tour(instance, tmp_tour_)
     return tmp_tour_.sum_travel_distance
 
 
