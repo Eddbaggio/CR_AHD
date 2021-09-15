@@ -164,20 +164,19 @@ class Tour:
             return False
 
         # [3] check time windows (NEW: in constant time!)
-        travel_time_i_j = instance.travel_duration([i], [j])
-        travel_time_j_k = instance.travel_duration([j], [k])
-        travel_time_i_k = instance.travel_duration([i], [k])
-
         # tw condition 1: start of service of j must fit the time window of j
         arrival_time_j = self.service_time_sequence[insertion_index - 1] + \
                          instance.vertex_service_duration[i] + \
-                         travel_time_i_j
+                         instance.travel_duration([i], [j])
         tw_cond1 = arrival_time_j <= instance.tw_close[j]
 
         # tw condition 2: time_shift_j must be limited to the sum of wait_k + max_shift_k
         wait_j = max(dt.timedelta(0), instance.tw_open[j] - arrival_time_j)
-        time_shift_j = travel_time_i_j + wait_j + instance.vertex_service_duration[
-            j] + travel_time_j_k - travel_time_i_k
+        time_shift_j = instance.travel_duration([i], [j]) + \
+                       wait_j + \
+                       instance.vertex_service_duration[j] + \
+                       instance.travel_duration([j], [k]) - \
+                       instance.travel_duration([i], [k])
         wait_k = self.wait_duration_sequence[insertion_index]
         max_shift_k = self.max_shift_sequence[insertion_index]
         tw_cond2 = time_shift_j <= wait_k + max_shift_k
@@ -185,7 +184,7 @@ class Tour:
         if not tw_cond1 or not tw_cond2:
             return False
 
-        # [4] check max vehicle load
+        # [4] check max vehicle load FIXME this is incorrect because it does not consider that load can increase and decrease during the tour!
         if self.sum_load + instance.vertex_load[j] > instance.vehicles_max_load:
             return False
 
@@ -354,6 +353,11 @@ class Tour:
         for index, vertex in zip(insertion_indices, insertion_vertices):
             self._single_insert_and_update(instance, index, vertex)
 
+    # TODO
+    # def insert_request_and_update(self, instance, request:int, pickup_pos:int, delivery_pos:int):
+    #     self.requests.add(request)
+    #     pass
+
     def _single_pop_and_update(self, instance, pop_index: int):
         """
         Following
@@ -461,6 +465,14 @@ class Tour:
 
         return popped
 
+    # TODO
+    # def pop_request_and_update(self, instance,  request: int):
+    #     self.requests.remove(request)
+    #     pickup, delivery = instance.pickup_and_delivery_pair(request)
+    #     self._single_pop_and_update(instance, self.vertex_pos[pickup])
+    #     self._single_pop_and_update(instance, self.vertex_pos[delivery])
+    #     pass
+
     def pop_and_update(self, instance, pop_indices: Sequence[int]):
 
         """
@@ -501,7 +513,7 @@ class Tour:
             delta += instance.distance([i_vertex], [k_vertex])
             delta -= instance.distance([i_vertex, j_vertex], [j_vertex, k_vertex])
 
-        # must ensure that no edges are counted twice. Naive implementation with a tmp_routing_sequence
+        # must ensure that no edges are counted twice. Naive implementation with a tmp_routing_sequence.
         else:
             assert all(pop_indices[i] < pop_indices[i + 1] for i in
                        range(len(pop_indices) - 1)), f'Pop indices {pop_indices} are not in correct order'
@@ -521,7 +533,7 @@ class Tour:
     def insert_distance_delta(self, instance, insertion_indices: List[int], vertices: List[int]):
         """
         returns the distance surplus that is obtained by inserting the insertion_vertices at the insertion_positions.
-        NOTE: Does NOT perform a feasibility check and does NOT actually insert the vertices!
+        NOTE: Does not perform a feasibility check and does not actually insert the vertices!
 
         """
         delta = 0
@@ -538,7 +550,6 @@ class Tour:
             delta -= instance.distance([i_vertex], [k_vertex])
 
         # must ensure that no edges are counted twice. Naive implementation with a tmp_routing_sequence
-        # TODO pretty sure this could be done without a temporary copy, potentially saving time
         else:
             assert all(insertion_indices[i] < insertion_indices[i + 1] for i in range(len(insertion_indices) - 1))
 
@@ -557,7 +568,7 @@ class Tour:
 
     def _single_insert_max_shift_delta(self, instance, insertion_index: int, insertion_vertex: int):
         """
-        returns the change in max_shift time that would be observed if insertion_vertex was placed before
+        returns the change in max_shift time that would be observed if insertion_vertex was placed at
         insertion_index
         """
 
@@ -631,6 +642,7 @@ class Tour:
             for idx, (insertion_index, insertion_vertex) in enumerate(zip(insertion_indices, insertion_vertices)):
                 max_shift_delta = copy._single_insert_max_shift_delta(instance, insertion_index, insertion_vertex)
                 total_max_shift_delta += max_shift_delta
+                copy._single_insert_and_update(instance, insertion_index, insertion_vertex)
             return total_max_shift_delta
 
 

@@ -21,99 +21,81 @@ class TourInitializationBehavior(ABC):
             self._initialize_carrier(instance, solution, carrier)
         pass
 
-    def _initialize_carrier(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int):
-        carrier_ = solution.carriers[carrier]
-        assert carrier_.unrouted_requests
+    def _initialize_carrier(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int):
+        carrier = solution.carriers[carrier_id]
+        assert carrier.unrouted_requests
 
         # create (potentially multiple) initial pendulum tour(s)
         num_pendulum_tours = instance.carriers_max_num_tours
         for pendulum_tour in range(num_pendulum_tours):
 
             best_request = None
-            best_depot = None
             best_evaluation = -float('inf')
 
-            for request in carrier_.unrouted_requests:
+            for request in carrier.unrouted_requests:
 
-                depot_and_evaluations = []
-                for depot in solution.carrier_depots[carrier]:
-                    evaluation = self._request_evaluation(*instance.pickup_delivery_pair(request),
-                                                          **{'x_depot': instance.x_coords[depot],
-                                                             'y_depot': instance.y_coords[depot],
-                                                             'x_coords': instance.x_coords,
-                                                             'y_coords': instance.y_coords,
-                                                             })
-                    depot_and_evaluations.append((depot, evaluation))
-
-                depot, evaluation = min(depot_and_evaluations, key=lambda x: x[1])
+                evaluation = self._request_evaluation(instance, solution, request)
 
                 # update the best known seed
                 if evaluation > best_evaluation:
                     best_request = request
-                    best_depot = depot
                     best_evaluation = evaluation
 
             # create the pendulum tour
-            tour_id = solution.num_tours()
-            tour = tr.Tour(tour_id, best_depot)
-            tour.insert_and_update(instance, [1, 2], instance.pickup_delivery_pair(best_request))
-            tour.requests.add(request)
-            # solution.request_to_tour_assignment[best_request] = carrier_.num_tours()
-            carrier_.tours.append(tour)
-            carrier_.unrouted_requests.remove(best_request)
-            carrier_.routed_requests.append(best_request)
-        pass
+            carrier = solution.carriers[carrier_id]
+            if len(carrier.tours) >= instance.carriers_max_num_tours:
+                raise ut.ConstraintViolationError(
+                    f'Cannot create new route with request {best_request} for carrier {carrier.id_}.'
+                    f' Max. number of vehicles is {instance.carriers_max_num_tours}!'
+                    f' ({instance.id_})')
+            tour_id = solution.get_free_tour_id()
+            assert tour_id < instance.num_carriers * instance.carriers_max_num_tours
+            tour = tr.Tour(tour_id, depot_index=carrier.id_)
+
+            if tour.insertion_feasibility_check(instance, [1, 2], instance.pickup_delivery_pair(best_request)):
+                tour.insert_and_update(instance, [1, 2], instance.pickup_delivery_pair(best_request))
+                tour.requests.add(best_request)
+
+            else:
+                raise ut.ConstraintViolationError(
+                    f'Cannot create new route with request {best_request} for carrier {carrier.id_}.')
+
+            if tour_id < len(solution.tours):
+                solution.tours[tour_id] = tour
+            else:
+                solution.tours.append(tour)
+            carrier.tours.append(tour)
+            carrier.unrouted_requests.remove(best_request)
+            carrier.routed_requests.append(best_request)
+
 
     @abstractmethod
-    def _request_evaluation(self,
-                            pickup_idx: int,
-                            delivery_idx: int,
-                            **kwargs):
-        r"""
-        :param pickup_idx:
-        :param delivery_idx:
-        :param kwargs: \**kwargs:
+    def _request_evaluation(self, instance: it.MDPDPTWInstance, solution:slt.CAHDSolution, request: int):
+        """
         See below
 
-        :Keyword Arguments:
-        * *x_depot*  --
-        * *y_depot*  --
-        * *x_coords*  --
-        * *y_coords*  --
-        * *tw_open*  --
-        * *tw_close*  --
-
+        :param instance:
+        :param solution:
+        :param request:
         :return:
         """
         pass
 
 
 class EarliestDueDateTourInitialization(TourInitializationBehavior):
-    def _request_evaluation(self,
-                            pickup_idx: int,
-                            delivery_idx: int,
-                            **kwargs
-                            ):
+    def _request_evaluation(self, instance, solution, request):
         return - kwargs['tw_close'][delivery_idx].total_seconds
 
 
 class FurthestDistanceTourInitialization(TourInitializationBehavior):
-    def _request_evaluation(self,
-                            pickup_idx: int,
-                            delivery_idx: int,
-                            **kwargs
-                            ):
+    def _request_evaluation(self, instance, solution, request):
         x_midpoint, y_midpoint = ut.midpoint_(kwargs['x_coords'][pickup_idx], kwargs['x_coords'][delivery_idx],
                                               kwargs['y_coords'][pickup_idx], kwargs['y_coords'][delivery_idx])
         return ut.euclidean_distance(kwargs['x_depot'], kwargs['y_depot'], x_midpoint, y_midpoint)
 
 
 class ClosestDistanceTourInitialization(TourInitializationBehavior):
-    def _request_evaluation(self,
-                            pickup_idx: int,
-                            delivery_idx: int,
-                            **kwargs
-                            ):
+    def _request_evaluation(self, instance, solution, request):
         x_midpoint, y_midpoint = ut.midpoint_(kwargs['x_coords'][pickup_idx], kwargs['x_coords'][delivery_idx],
                                               kwargs['y_coords'][pickup_idx], kwargs['y_coords'][delivery_idx])
         return - ut.euclidean_distance(kwargs['x_depot'], kwargs['y_depot'], x_midpoint, y_midpoint)

@@ -12,8 +12,12 @@ from src.cr_ahd.utility_module import utils as ut, profiling as pr
 
 logger = logging.getLogger(__name__)
 
-TIME_MAX = float(1)  # 0.05 is roughly the time required by the VND procedure to exhaust all neighborhoods
-ITER_MAX = float('inf')  # better to use iter_max in some cases to obtain same results in post-acceptance & bidding
+if ut.debugger_is_active():
+    TIME_MAX = float(1)  # 0.05 is roughly the time required by the VND procedure to exhaust all neighborhoods
+    ITER_MAX = float('inf')  # better to use iter_max in some cases to obtain same results in post-acceptance & bidding
+else:
+    TIME_MAX = float(1)  # 0.05 is roughly the time required by the VND procedure to exhaust all neighborhoods
+    ITER_MAX = float('inf')  # better to use iter_max in some cases to obtain same results in post-acceptance & bidding
 
 
 class PDPTWMetaHeuristic(ABC):
@@ -25,7 +29,7 @@ class PDPTWMetaHeuristic(ABC):
         self.parameters = dict()
         self.trajectory = []  # collection of all accepted & executed moves
 
-        self.name = f'{self.__class__.__name__}{[n.name for n in self.neighborhoods]}'
+        self.name = f'{self.__class__.__name__}'
 
     @abstractmethod
     def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
@@ -362,7 +366,7 @@ class PDPTWSimulatedAnnealing(PDPTWMetaHeuristic):
 
                     if self.acceptance_criterion(instance, move):
                         neighborhood.execute_move(instance, move)
-                        self.update_trajectory(self.parameters['k'], move, True)
+                        self.update_trajectory(neighborhood.__class__.__name__, move, True)
                         # update the best solution
                         if solution.objective() > best_solution.objective():
                             best_solution = deepcopy(solution)
@@ -419,7 +423,7 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
     def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
                 carrier_ids: List[int] = None) -> slt.CAHDSolution:
         # FIXME: ILS sometimes returns worse solutions
-        raise NotImplementedError
+        # raise NotImplementedError
         solution = deepcopy(solution)
         best_best_solution = solution
 
@@ -447,7 +451,7 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
                 move = (delta, solution, solution_new)
                 if self.acceptance_criterion(instance, move):
                     self.update_trajectory('ILS Perturbation', move, True)
-                    solution = solution_new
+                    solution = solution_new  # equivalent to execute_move
                 self.iter_count += 1
 
             if best_solution.objective() > best_best_solution.objective():

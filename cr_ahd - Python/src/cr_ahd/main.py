@@ -51,9 +51,10 @@ def solve_with_all_solvers(instance: it.MDPDPTWInstance, plot=False):
         except Exception as e:
             logger.error(
                 f'{e}\nFailed on instance {instance} with solver {solver.__class__.__name__} at {datetime.now()}')
-            # raise e
+            raise e
             solution = slt.CAHDSolution(instance)  # create an empty solution for failed instances
-            solver.update_solution_solver_config(solution)
+            solution.update_solver_config(solver)
+            # solver.update_solution_solver_config(solution)
             solution.write_to_json()
             solutions.append(solution)
 
@@ -138,7 +139,6 @@ def write_solution_summary_to_multiindex_df(solutions_per_instance: List[List[sl
     # df.fillna('None', inplace=True)
 
     # set the multiindex
-
     index = ['rad', 'n', 'run'] + ut.solver_config
     if agg_level == 'carrier':
         index += ['carrier_id_']
@@ -168,9 +168,9 @@ if __name__ == '__main__':
         )
 
         run, rad, n = 11, 0, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
-        i = random.choice(range(len(paths)))
         i = run * 6 + rad * 2 + n
-        paths = paths[:60]
+        i = random.choice(range(len(paths)))
+        paths = paths[:48]
 
         if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=True)
@@ -178,7 +178,7 @@ if __name__ == '__main__':
             solutions = m_solve_multi_thread(paths)
 
         df = write_solution_summary_to_multiindex_df(solutions, 'solution')
-        secondary_parameter = 'time_window_offering'
+        secondary_parameter = 'tour_improvement'
 
         plot_path = ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html')
         ev.bar_chart(df,
@@ -186,9 +186,8 @@ if __name__ == '__main__':
                      values='sum_profit',
                      color=['solution_algorithm', secondary_parameter, ],
                      # color=secondary_parameter,
-                     # category='rad', facet_col=None, facet_row='n',
-                     category='run', facet_col='rad', facet_row='n',
-                     # category='solution_algorithm', facet_col=None, facet_row=None,
+                     category='rad', facet_col='neighborhoods', facet_row='n',
+                     # category='run', facet_col='rad', facet_row='n',
                      show=True,
                      html_path=plot_path.as_posix())
 

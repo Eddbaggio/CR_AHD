@@ -44,6 +44,63 @@ class CAHDSolution:
     def __repr__(self):
         return f'CAHDSolution for {self.id_}'
 
+    def update_solver_config(self, solver):
+        """
+        The solver config describes the solution methods and used to solve an instance. For post-processing and
+        comparing solutions it is thus useful to store the methods' names with the solution.
+        """
+
+        config: Dict[str, str] = self.solver_config
+        int_auction = solver.intermediate_auction
+        fin_auction = solver.final_auction
+        if int_auction or fin_auction:
+            config['solution_algorithm'] = 'CollaborativePlanning'
+        else:
+            config['solution_algorithm'] = 'IsolatedPlanning'
+
+        config['tour_construction'] = solver.tour_construction.name
+        config['tour_improvement'] = solver.tour_improvement.name
+        config['neighborhoods'] = '+'.join([nbh.name for nbh in solver.tour_improvement.neighborhoods])
+        config['time_window_offering'] = solver.time_window_offering.name
+        config['time_window_selection'] = solver.time_window_selection.name
+        config['num_int_auctions'] = solver.num_intermediate_auctions
+
+        if int_auction:
+            config['int_auction_tour_construction'] = int_auction.tour_construction.name
+            config['int_auction_tour_improvement'] = int_auction.tour_improvement.name
+            config['int_auction_neighborhoods'] = '+'.join([nbh.name for nbh in int_auction.tour_improvement.neighborhoods])
+            config['int_auction_num_submitted_requests'] = int_auction.request_selection.num_submitted_requests
+            config['int_auction_request_selection'] = int_auction.request_selection.name
+            config['int_auction_bundle_generation'] = int_auction.bundle_generation.name
+            try:
+                # for bundle generation with LimitedBundlePoolGenerationBehavior
+                config['int_auction_bundling_valuation'] = int_auction.bundle_generation.bundling_valuation.name
+            except KeyError:
+                None
+            config['int_auction_num_auction_bundles'] = int_auction.bundle_generation.num_auction_bundles
+            config['int_auction_bidding'] = int_auction.bidding.name
+            config['int_auction_winner_determination'] = int_auction.winner_determination.name
+            config['int_auction_num_auction_rounds'] = int_auction.num_auction_rounds
+
+        if fin_auction:
+            config['fin_auction_tour_construction'] = fin_auction.tour_construction.name
+            config['fin_auction_tour_improvement'] = fin_auction.tour_improvement.name
+            config['fin_auction_neighborhoods'] = '+'.join([nbh.name for nbh in fin_auction.tour_improvement.neighborhoods])
+            config['fin_auction_num_submitted_requests'] = fin_auction.request_selection.num_submitted_requests
+            config['fin_auction_request_selection'] = fin_auction.request_selection.name
+            config['fin_auction_bundle_generation'] = fin_auction.bundle_generation.name
+            try:
+                # for bundle generation with LimitedBundlePoolGenerationBehavior
+                config['fin_auction_bundling_valuation'] = fin_auction.bundle_generation.bundling_valuation.name
+            except KeyError:
+                None
+            config['fin_auction_num_auction_bundles'] = fin_auction.bundle_generation.num_auction_bundles
+            config['fin_auction_bidding'] = fin_auction.bidding.name
+            config['fin_auction_winner_determination'] = fin_auction.winner_determination.name
+            config['fin_auction_num_auction_rounds'] = fin_auction.num_auction_rounds
+
+        pass
+
     def sum_travel_distance(self):
         return sum(c.sum_travel_distance() for c in self.carriers)
 
@@ -120,7 +177,6 @@ class CAHDSolution:
             for tour_id in [tour.id_ for tour in carrier.tours]:
                 self.tours[tour_id] = None
             carrier.tours.clear()
-
 
     def get_free_tour_id(self):
         if None in self.tours:
@@ -241,5 +297,3 @@ class AHDSolution:
             'acceptance_rate': self.acceptance_rate,
             'tour_summaries': {t.id_: t.summary() for t in self.tours}
         }
-
-

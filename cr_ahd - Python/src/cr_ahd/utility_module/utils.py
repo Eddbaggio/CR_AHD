@@ -1,19 +1,15 @@
+import sys
 import datetime as dt
-import functools
 import itertools
 import json
 import math
 import random
 import re
-import time
 from collections import namedtuple
 from pathlib import Path
-from time import time
 from typing import List, Sequence, Tuple
 
-import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 from matplotlib.colors import LinearSegmentedColormap
 from tqdm import trange
 
@@ -392,6 +388,12 @@ def validate_tour(instance, tour):
             assert tour.vertex_pos[vertex] == i, msg
 
 
+def debugger_is_active() -> bool:
+    """Return if the debugger is currently active"""
+    gettrace = getattr(sys, 'gettrace', lambda: None)
+    return gettrace() is not None
+
+
 random.seed(0)
 DISTANCE_SCALING = 1
 REVENUE_SCALING = DISTANCE_SCALING
@@ -407,13 +409,16 @@ SPEED_KMH = 60  # vehicle speed (set to 60 to treat distance = time)
 
 solver_config = [
     'solution_algorithm',
-    'num_int_auctions',
-    'tour_construction',
     'tour_improvement',
+    'neighborhoods',
+    'tour_construction',
     'time_window_offering',
     'time_window_selection',
+
+    'num_int_auctions',
     'int_auction_tour_construction',
     'int_auction_tour_improvement',
+    'int_auction_neighborhoods',
     'int_auction_num_submitted_requests',
     'int_auction_request_selection',
     'int_auction_bundle_generation',
@@ -422,8 +427,10 @@ solver_config = [
     'int_auction_bidding',
     'int_auction_winner_determination',
     'int_auction_num_auction_rounds',
+
     'fin_auction_tour_construction',
     'fin_auction_tour_improvement',
+    'fin_auction_neighborhoods',
     'fin_auction_num_submitted_requests',
     'fin_auction_request_selection',
     'fin_auction_bundle_generation',

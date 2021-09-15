@@ -235,7 +235,6 @@ class PDPRelocate(InterTourNeighborhood):
         for old_tour in carrier.tours:
 
             # check all requests of the old tour
-            # a pickup can be at most at index n-2 (n is depot, n-1 must be delivery)
             for old_pickup_pos in range(1, len(old_tour) - 2):
                 vertex = old_tour.routing_sequence[old_pickup_pos]
 
@@ -280,9 +279,6 @@ class PDPRelocate(InterTourNeighborhood):
         return new_tour.insertion_feasibility_check(instance, [new_pickup_pos, new_delivery_pos], [pickup, delivery])
 
     def execute_move(self, instance: it.MDPDPTWInstance, move):
-        carrier: slt.AHDSolution
-        old_tour: tr.Tour
-        new_tour: tr.Tour
         delta, carrier, old_tour, old_pickup_pos, old_delivery_pos, new_tour, new_pickup_pos, new_delivery_pos = move
 
         pickup, delivery = old_tour.pop_and_update(instance, [old_pickup_pos, old_delivery_pos])

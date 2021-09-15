@@ -275,10 +275,7 @@ class TimeShiftRegretInsertion(PDPParallelInsertionConstruction):
                                    instance: it.MDPDPTWInstance,
                                    carrier: slt.AHDSolution,
                                    request: int) -> Tuple[float, tr.Tour, int, int]:
-        """For the given request, finds the best combination of (a) tour, (b) pickup position and (c) delivery position
-         for the best insertion. Best, in this case, is defined by the inheriting class (e.g. lowest cost increase or
-         least time shift).
-
+        """
          :returns: (delta, tour, pickup_position, delivery_position) of the best found insertion
          """
         best_delta = float('inf')
