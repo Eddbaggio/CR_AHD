@@ -12,19 +12,13 @@ from src.cr_ahd.utility_module import utils as ut, profiling as pr
 
 logger = logging.getLogger(__name__)
 
-if ut.debugger_is_active():
-    TIME_MAX = float(5)
-    ITER_MAX = float('inf')
-else:
-    TIME_MAX = float(15)
-    ITER_MAX = float('inf')
-
 
 class PDPTWMetaHeuristic(ABC):
-    def __init__(self, neighborhoods: Sequence[nh.Neighborhood]):
+    def __init__(self, neighborhoods: Sequence[nh.Neighborhood], time_limit_per_carrier: float):
         self.neighborhoods = neighborhoods
         self.improved = False
         self.start_time = None
+        self.time_limit_per_carrier = time_limit_per_carrier
         self.iter_count = None
         self.parameters = dict()
         self.trajectory = []  # collection of all accepted & executed moves
@@ -124,7 +118,7 @@ class LocalSearchFirst(PDPTWMetaHeuristic):
             return False
 
     def stopping_criterion(self):
-        if self.improved and time.time() - self.start_time < TIME_MAX:
+        if self.improved and time.time() - self.start_time < self.time_limit_per_carrier:
             return False
         else:
             return True
@@ -163,7 +157,7 @@ class LocalSearchBest(PDPTWMetaHeuristic):
             return False
 
     def stopping_criterion(self):
-        if self.improved and time.time() - self.start_time < TIME_MAX:
+        if self.improved and time.time() - self.start_time < self.time_limit_per_carrier:
             return False
         else:
             return True
@@ -212,7 +206,7 @@ class PDPTWSequentialLocalSearch(PDPTWMetaHeuristic):
             return False
 
     def stopping_criterion(self):
-        if self.improved and time.time() - self.start_time < TIME_MAX:
+        if self.improved and time.time() - self.start_time < self.time_limit_per_carrier:
             return False
         else:
             return True
@@ -288,7 +282,8 @@ class PDPTWVariableNeighborhoodDescent(PDPTWMetaHeuristic):
             return False
 
     def stopping_criterion(self):
-        if self.parameters['k'] < len(self.neighborhoods) and time.time() - self.start_time < TIME_MAX:
+        if self.parameters['k'] < len(
+                self.neighborhoods) and time.time() - self.start_time < self.time_limit_per_carrier:
             return False
         else:
             return True
@@ -348,12 +343,12 @@ class PDPTWVariableNeighborhoodSearch(PDPTWVariableNeighborhoodDescent):
             carrier_ids = [x.id_ for x in best_solution.carriers]
 
         for carrier_id in carrier_ids:
-            carrier = solution.carriers[carrier_id]
             self.parameters['k'] = 0
             self.start_time = time.time()
             while not self.stopping_criterion():
                 neighborhood = self.neighborhoods[self.parameters['k']]
-                all_moves = [move for move in neighborhood.feasible_move_generator_for_carrier(instance, carrier)]
+                all_moves = [move for move in
+                             neighborhood.feasible_move_generator_for_carrier(instance, solution.carriers[carrier_id])]
                 if any(all_moves):
                     random_move = random.choice(all_moves)
                     neighborhood.execute_move(instance, random_move)
@@ -389,13 +384,13 @@ class PDPTWVariableNeighborhoodSearch(PDPTWVariableNeighborhoodDescent):
         """
         # TODO neighborhood should be a parameter instead of an arbitrary choice
         arbitrary_neighborhood = self.neighborhoods[0]
-        solution = LocalSearchFirst([arbitrary_neighborhood]).execute(instance, solution, carrier_ids)
+        solution = LocalSearchFirst([arbitrary_neighborhood], self.time_limit_per_carrier/10).execute(instance, solution, carrier_ids)
         return solution
 
 
 class PDPTWSimulatedAnnealing(PDPTWMetaHeuristic):
-    def __init__(self, neighborhoods: Sequence[nh.Neighborhood]):
-        super().__init__(neighborhoods)
+    def __init__(self, neighborhoods: Sequence[nh.Neighborhood], time_limit_per_carrier: float):
+        super().__init__(neighborhoods, time_limit_per_carrier)
         self.parameters['initial_temperature'] = 0
         self.parameters['temperature'] = 0
         self.parameters['cooling_factor'] = 0.85
@@ -458,7 +453,7 @@ class PDPTWSimulatedAnnealing(PDPTWMetaHeuristic):
             return False
 
     def stopping_criterion(self):
-        if time.time() - self.start_time < TIME_MAX and self.parameters['temperature'] > 1:
+        if time.time() - self.start_time < self.time_limit_per_carrier and self.parameters['temperature'] > 1:
             return False
         else:
             return True
@@ -559,11 +554,11 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
         """
         # TODO neighborhood should be a parameter instead of an arbitrary choice
         arbitrary_neighborhood = self.neighborhoods[0]
-        improved_solution = LocalSearchFirst([arbitrary_neighborhood]).execute(instance, solution, carrier_ids)
+        improved_solution = LocalSearchFirst([arbitrary_neighborhood], self.time_limit_per_carrier/10).execute(instance, solution, carrier_ids)
         return improved_solution
 
     def stopping_criterion(self):
-        if time.time() - self.start_time < TIME_MAX and self.iter_count < ITER_MAX:
+        if time.time() - self.start_time < self.time_limit_per_carrier:
             return False
         else:
             return True

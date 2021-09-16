@@ -60,6 +60,7 @@ class CAHDSolution:
 
         config['tour_construction'] = solver.tour_construction.name
         config['tour_improvement'] = solver.tour_improvement.name
+        config['tour_improvement_time_limit_per_carrier'] = solver.tour_improvement.time_limit_per_carrier
         config['neighborhoods'] = '+'.join([nbh.name for nbh in solver.tour_improvement.neighborhoods])
         config['time_window_offering'] = solver.time_window_offering.name
         config['time_window_selection'] = solver.time_window_selection.name

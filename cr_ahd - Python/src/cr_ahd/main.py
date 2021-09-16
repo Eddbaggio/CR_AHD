@@ -91,7 +91,7 @@ if __name__ == '__main__':
         run, rad, n = 11, 0, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
         i = run * 6 + rad * 2 + n
         i = random.choice(range(len(paths)))
-        paths = paths[i:i+1]
+        paths = paths[:]
 
         # solving
         if len(paths) < 6:
@@ -101,16 +101,16 @@ if __name__ == '__main__':
         df, csv_path = write_solution_summary_to_multiindex_df(solutions, 'solution')
 
         # plotting and evaluation
-        secondary_parameter = 'neighborhoods'
         ev.bar_chart(df,
                      title=str(csv_path.name),
                      values='sum_travel_distance',
                      color=['tour_improvement'],
-                     category='neighborhoods',
-                     facet_col=None,
+                     category='tour_improvement_time_limit_per_carrier',
+                     facet_col='rad',
                      facet_row='n',
                      show=True,
                      html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix())
+        secondary_parameter = 'neighborhoods'
         ev.print_top_level_stats(df, [secondary_parameter])
 
         logger.info(f'END {datetime.now()}')

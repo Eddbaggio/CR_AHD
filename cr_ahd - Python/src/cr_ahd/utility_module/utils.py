@@ -412,6 +412,7 @@ solver_config = [
     'tour_improvement',
     'neighborhoods',
     'tour_construction',
+    'tour_improvement_time_limit_per_carrier',
     'time_window_offering',
     'time_window_selection',
 
