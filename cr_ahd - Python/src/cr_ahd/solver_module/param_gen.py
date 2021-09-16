@@ -9,17 +9,19 @@ def parameter_generator():
     generate dicts with all parameters are required to initialize a slv.Solver.
     """
 
-    neighborhood_collections: List[List[nh.Neighborhood]] = [
-        [
-            nh.PDPMove(),
-            nh.PDPTwoOpt(),
-            nh.PDPRelocate()
-        ],
-    ]
-
     tour_constructions: List[cns.PDPParallelInsertionConstruction] = [
         cns.MinTravelDistanceInsertion(),
         # cns.MinTimeShiftInsertion()
+    ]
+
+    time_window_offerings = [
+        two.FeasibleTW(),
+        two.NoTw()
+    ]
+
+    time_window_selections = [
+        tws.UnequalPreference(),
+        tws.NoTW(),
     ]
 
     tour_improvements: List = [
@@ -36,6 +38,13 @@ def parameter_generator():
         mh.NoMetaheuristic,
     ]
 
+    neighborhood_collections: List[List[nh.Neighborhood]] = [
+        [
+            nh.PDPMove(),
+            nh.PDPTwoOpt(),
+            nh.PDPRelocate()
+        ],
+    ]
     tour_improvement_time_limit: List[int] = [
         1,
         5,
@@ -45,9 +54,7 @@ def parameter_generator():
     for tour_construction in tour_constructions:
         for tour_improvement in tour_improvements:
             for neighborhoods in neighborhood_collections:
-                for time_window_offering, time_window_selection in [(two.FeasibleTW(), tws.UnequalPreference()),
-                                                                    # (two.NoTw(), tws.NoTW())
-                                                                    ]:
+                for time_window_offering, time_window_selection in zip(time_window_offerings, time_window_selections):
                     # ===== Isolated Planning Parameters, no auction =====
                     isolated_planning = dict(
                         time_window_offering=time_window_offering,
@@ -59,4 +66,3 @@ def parameter_generator():
                         final_auction=False,
                     )
                     yield isolated_planning
-pass

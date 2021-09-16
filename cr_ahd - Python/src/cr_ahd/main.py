@@ -1,97 +1,17 @@
-import logging
 import logging.config
-import multiprocessing
-import pstats
 import random
-from copy import deepcopy
 from pathlib import Path
 from typing import List
 from datetime import datetime
 import cProfile
 import pandas as pd
-from tqdm import tqdm
 
-import src.cr_ahd.solver_module.solver as slv
-from src.cr_ahd.core_module import instance as it, solution as slt
-from src.cr_ahd.solver_module.param_gen import parameter_generator
-from src.cr_ahd.utility_module import utils as ut, evaluation as ev, cr_ahd_logging as log, profiling as pr
+from src.cr_ahd.core_module import solution as slt
+from src.cr_ahd.solver_module import workflow as wf
+from src.cr_ahd.utility_module import utils as ut, evaluation as ev, cr_ahd_logging as log
 
 logging.config.dictConfig(log.LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
-
-
-def solve_with_all_solvers(instance: it.MDPDPTWInstance, plot=False):
-    """
-    :param instance:
-    :return: evaluation metrics (Instance.evaluation_metrics) of all the solutions obtained
-    """
-    solutions = []
-    isolated_planning_starting_solution = None
-    for solver_params in parameter_generator():
-        solver = slv.Solver(**solver_params)
-        try:
-            timer = pr.Timer()
-
-            # fixme: using a starting solution is tricky when intermediate auctions are possible
-            """
-            if not solver.acceptance.auction:  # isolated planning as starting point for collaborative
-                tw_instance, solution = solver.execute(instance, None)
-                starting_solution = solution
-            else:  # collaborative planning can use starting solution & instance having the assigned time windows
-                tw_instance, solution = solver.execute(tw_instance, starting_solution)
-            """
-
-            tw_instance, solution = solver.execute(instance, None)
-
-            timer.write_duration_to_solution(solution, 'runtime_total')
-            # logger.info(f'{instance.id_}: Solved in {solution.timings["runtime_total"]}')
-            solution.write_to_json()
-            solutions.append(deepcopy(solution))
-
-        except Exception as e:
-            logger.error(
-                f'{e}\nFailed on instance {instance} with solver {solver.__class__.__name__} at {datetime.now()}')
-            raise e
-            solution = slt.CAHDSolution(instance)  # create an empty solution for failed instances
-            solution.update_solver_config(solver)
-            # solver.update_solution_solver_config(solution)
-            solution.write_to_json()
-            solutions.append(solution)
-
-    return solutions
-
-
-def s_solve(path: Path, plot=False):
-    """
-    solves a single instance given by the path
-    """
-    log.remove_all_file_handlers(logging.getLogger())
-    log_file_path = ut.output_dir_GH.joinpath(f'{path.stem}_log.log')
-    log.add_file_handler(logging.getLogger(), str(log_file_path))
-
-    instance = it.read_gansterer_hartl_mv(path)
-    return solve_with_all_solvers(instance, plot)
-
-
-def m_solve_multi_thread(instance_paths):
-    """
-    solves multiple instances in parallel threads using the multiprocessing library
-    """
-    with multiprocessing.Pool(6) as pool:
-        solutions = list(
-            tqdm(pool.imap(s_solve, instance_paths), total=len(instance_paths), desc="Parallel Solving", disable=False))
-    return solutions
-
-
-def m_solve_single_thread(instance_paths, plot=False):
-    """
-    solves multiple instances, given by their paths
-    """
-    solutions = []
-    for path in tqdm(instance_paths, disable=True):
-        solver_solutions = s_solve(path, plot=plot)
-        solutions.append(solver_solutions)
-    return solutions
 
 
 def write_solution_summary_to_multiindex_df(solutions_per_instance: List[List[slt.CAHDSolution]], agg_level='tour'):
@@ -136,7 +56,6 @@ def write_solution_summary_to_multiindex_df(solutions_per_instance: List[List[sl
 
     df = pd.DataFrame.from_records(df)
     df.drop(columns=['dist'], inplace=True)  # since the distance between depots is always 200 for the GH instances
-    # df.fillna('None', inplace=True)
 
     # set the multiindex
     index = ['rad', 'n', 'run'] + ut.solver_config
@@ -151,9 +70,8 @@ def write_solution_summary_to_multiindex_df(solutions_per_instance: List[List[sl
         df[column] = df[column].dt.total_seconds()
 
     # write to disk
-
     csv_path = ut.unique_path(ut.output_dir_GH, 'evaluation_agg_' + agg_level + '_#{:03d}' + '.csv')
-    df.to_csv(path=csv_path)
+    df.to_csv(path_or_buf=csv_path)
     df.to_excel(ut.unique_path(ut.output_dir_GH, 'evaluation_agg_' + agg_level + '_#{:03d}' + '.xlsx'),
                 merge_cells=False)
     return df.reset_index().fillna('None').set_index(keys=index), csv_path
@@ -161,37 +79,38 @@ def write_solution_summary_to_multiindex_df(solutions_per_instance: List[List[sl
 
 if __name__ == '__main__':
     def cr_ahd():
+        # setup
         logger.info(f'START {datetime.now()}')
         random.seed()
 
+        # select the files to be solved
         paths = sorted(
             list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
             key=ut.natural_sort_key
         )
-
         run, rad, n = 11, 0, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
         i = run * 6 + rad * 2 + n
         i = random.choice(range(len(paths)))
-        paths = paths[:60]
+        paths = paths[i:i+1]
 
+        # solving
         if len(paths) < 6:
-            solutions = m_solve_single_thread(paths, plot=True)
+            solutions = wf.solve_instances(paths, plot=True)
         else:
-            solutions = m_solve_multi_thread(paths)
-
+            solutions = wf.solve_instances_multiprocessing(paths)
         df, csv_path = write_solution_summary_to_multiindex_df(solutions, 'solution')
-        secondary_parameter = 'neighborhoods'
 
+        # plotting and evaluation
+        secondary_parameter = 'neighborhoods'
         ev.bar_chart(df,
                      title=str(csv_path.name),
                      values='sum_travel_distance',
-                     color=['tour_improvement'],  # , secondary_parameter, ],
-                     # color=secondary_parameter,
-                     category='neighborhoods', facet_col=None, facet_row='n',
-                     # category='run', facet_col='rad', facet_row='n',
+                     color=['tour_improvement'],
+                     category='neighborhoods',
+                     facet_col=None,
+                     facet_row='n',
                      show=True,
                      html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix())
-
         ev.print_top_level_stats(df, [secondary_parameter])
 
         logger.info(f'END {datetime.now()}')
