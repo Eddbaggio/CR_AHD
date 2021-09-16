@@ -131,7 +131,7 @@ def solve_instances_multiprocessing(instance_paths):
     return solutions
 
 
-def solve_instances(instance_paths, plot=False):
+def solve_instances(instance_paths):
     """
     solves multiple instances, given by their paths
     """

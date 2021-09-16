@@ -10,8 +10,11 @@ from pathlib import Path
 from typing import List, Sequence, Tuple
 
 import numpy as np
+import pandas as pd
 from matplotlib.colors import LinearSegmentedColormap
 from tqdm import trange
+
+from src.cr_ahd.core_module import solution as slt
 
 Coordinates = namedtuple('Coords', ['x', 'y'])
 
@@ -444,3 +447,66 @@ solver_config = [
 
 if __name__ == '__main__':
     pass
+
+
+def write_solution_summary_to_multiindex_df(solutions_per_instance: List[List[slt.CAHDSolution]], agg_level='tour'):
+    """
+    :param solutions_per_instance: A List of Lists of solutions. First Axis: instance, Second Axis: solver
+    :param agg_level: defines up to which level the solution will be summarized. E.g. if agg_level='carrier' the
+    returned pd.DataFrame contains infos per carrier but not per tour since tours are summarized for each carrier.
+    """
+
+    df = []
+    for instance_solutions in solutions_per_instance:
+        for solution in instance_solutions:
+
+            if agg_level == 'solution':
+                record = solution.meta.copy()  # rad, n, run, dist
+                record.update(solution.solver_config)  # solution_algorithm, tour_construction, request_selection, ...
+                record.update({k: v for k, v in solution.summary().items() if k != 'carrier_summaries'})
+                df.append(record)
+
+            elif agg_level == 'carrier':
+                for carrier in range(solution.num_carriers()):
+                    record = solution.meta.copy()  # rad, n, run, dist
+                    record.update(solution.solver_config)
+                    record.update(solution.carriers[carrier].summary())
+                    record['carrier_id_'] = carrier
+                    record.pop('tour_summaries')
+                    df.append(record)
+
+            elif agg_level == 'tour':
+                for carrier in range(solution.num_carriers()):
+                    ahd_solution = solution.carriers[carrier]
+                    for tour in range(len(ahd_solution.tours)):
+                        record = solution.meta.copy()  # rad, n, run, dist
+                        record.update(solution.solver_config)
+                        record.update(solution.carriers[carrier].tours[tour].summary())
+                        record['carrier_id_'] = carrier
+                        record['tour_id_'] = tour
+                        df.append(record)
+
+            else:
+                raise ValueError
+
+    df = pd.DataFrame.from_records(df)
+    df.drop(columns=['dist'], inplace=True)  # since the distance between depots is always 200 for the GH instances
+
+    # set the multiindex
+    index = ['rad', 'n', 'run'] + ut.solver_config
+    if agg_level == 'carrier':
+        index += ['carrier_id_']
+    if agg_level == 'tour':
+        index += ['tour_id_']
+    df.set_index(keys=index, inplace=True)
+
+    # convert timedelta to seconds
+    for column in df.select_dtypes(include=['timedelta64']):
+        df[column] = df[column].dt.total_seconds()
+
+    # write to disk
+    csv_path = ut.unique_path(ut.output_dir_GH, 'evaluation_agg_' + agg_level + '_#{:03d}' + '.csv')
+    df.to_csv(path_or_buf=csv_path)
+    df.to_excel(ut.unique_path(ut.output_dir_GH, 'evaluation_agg_' + agg_level + '_#{:03d}' + '.xlsx'),
+                merge_cells=False)
+    return df.reset_index().fillna('None').set_index(keys=index), csv_path
