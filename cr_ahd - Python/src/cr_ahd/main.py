@@ -151,10 +151,12 @@ def write_solution_summary_to_multiindex_df(solutions_per_instance: List[List[sl
         df[column] = df[column].dt.total_seconds()
 
     # write to disk
-    df.to_csv(ut.unique_path(ut.output_dir_GH, 'evaluation_agg_' + agg_level + '_#{:03d}' + '.csv'))
+
+    csv_path = ut.unique_path(ut.output_dir_GH, 'evaluation_agg_' + agg_level + '_#{:03d}' + '.csv')
+    df.to_csv(path=csv_path)
     df.to_excel(ut.unique_path(ut.output_dir_GH, 'evaluation_agg_' + agg_level + '_#{:03d}' + '.xlsx'),
                 merge_cells=False)
-    return df.reset_index().fillna('None').set_index(keys=index)
+    return df.reset_index().fillna('None').set_index(keys=index), csv_path
 
 
 if __name__ == '__main__':
@@ -170,26 +172,25 @@ if __name__ == '__main__':
         run, rad, n = 11, 0, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
         i = run * 6 + rad * 2 + n
         i = random.choice(range(len(paths)))
-        paths = paths[:48]
+        paths = paths[:60]
 
         if len(paths) < 6:
             solutions = m_solve_single_thread(paths, plot=True)
         else:
             solutions = m_solve_multi_thread(paths)
 
-        df = write_solution_summary_to_multiindex_df(solutions, 'solution')
-        secondary_parameter = 'tour_improvement'
+        df, csv_path = write_solution_summary_to_multiindex_df(solutions, 'solution')
+        secondary_parameter = 'neighborhoods'
 
-        plot_path = ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html')
         ev.bar_chart(df,
-                     title=str(plot_path.stem),
-                     values='sum_profit',
-                     color=['solution_algorithm', secondary_parameter, ],
+                     title=str(csv_path.name),
+                     values='sum_travel_distance',
+                     color=['tour_improvement'],  # , secondary_parameter, ],
                      # color=secondary_parameter,
-                     category='rad', facet_col='neighborhoods', facet_row='n',
+                     category='neighborhoods', facet_col=None, facet_row='n',
                      # category='run', facet_col='rad', facet_row='n',
                      show=True,
-                     html_path=plot_path.as_posix())
+                     html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix())
 
         ev.print_top_level_stats(df, [secondary_parameter])
 

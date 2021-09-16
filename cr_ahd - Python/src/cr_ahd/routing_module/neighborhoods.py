@@ -24,6 +24,8 @@ class Neighborhood(ABC):
     @abstractmethod
     def execute_move(self, instance: it.MDPDPTWInstance, move: tuple):
         """
+        Executes the neighbourhood move in place.
+
         :param move: tuple containing all necessary information to execute a move. The first element of that tuple is
          always the delta in travel distance. the remaining ones are e.g. current positions and new insertion positions.
         """

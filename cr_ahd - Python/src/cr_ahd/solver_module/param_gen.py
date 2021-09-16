@@ -15,10 +15,6 @@ def parameter_generator():
         [
             nh.PDPMove(),
             nh.PDPTwoOpt(),
-        ],
-        [
-            nh.PDPMove(),
-            nh.PDPTwoOpt(),
             nh.PDPRelocate()
         ],
     ]
@@ -36,9 +32,16 @@ def parameter_generator():
         # mh.PDPTWSequentialLocalSearch,
         mh.PDPTWIteratedLocalSearch,
         mh.PDPTWVariableNeighborhoodDescent,
-        mh.PDPTWReducedVariableNeighborhoodSearch,
+        # mh.PDPTWReducedVariableNeighborhoodSearch,
+        mh.PDPTWVariableNeighborhoodSearch,
         mh.PDPTWSimulatedAnnealing,
         mh.NoMetaheuristic,
+    ]
+
+    tour_improvement_time_limit: List[int] = [
+        1,
+        5,
+        15
     ]
 
     nums_submitted_requests: List[int] = [

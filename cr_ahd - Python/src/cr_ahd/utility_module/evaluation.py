@@ -340,20 +340,18 @@ def print_top_level_stats(df: pd.DataFrame, secondary_parameters: List[str]):
 
 if __name__ == '__main__':
     path = "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home " \
-           "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_agg_solution_#097.csv"
+           "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_agg_solution_#106.csv"
     df = pd.read_csv(path)
     df.fillna(value={col: 0 for col in df.columns if 'runtime' in col}, inplace=True)
     df.fillna(value='None', inplace=True)
     df.set_index(['rad', 'n', 'run', ] + ut.solver_config, inplace=True)  # add 'carrier_id_' if agg_level==carrier
-    secondary_parameter = 'tour_construction'
+    secondary_parameter = 'neighborhoods'
     print_top_level_stats(df, [secondary_parameter])
     bar_chart(df,
-              title=str(Path(path).stem),
-              values='objective',
-              # color=['solution_algorithm','tour_improvement',],
-              color=['tour_construction', ],
-              category='rad', facet_col='tour_improvement', facet_row='n',
-              # category='run', facet_col='rad', facet_row='n',
+              title=str(Path(path).name),
+              values='sum_profit',
+              color=['tour_improvement'],#, secondary_parameter],
+              category='neighborhoods', facet_col=None, facet_row='n',
               show=True,
               # width=700,
               # height=450,

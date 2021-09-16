@@ -13,11 +13,11 @@ from src.cr_ahd.utility_module import utils as ut, profiling as pr
 logger = logging.getLogger(__name__)
 
 if ut.debugger_is_active():
-    TIME_MAX = float(1)  # 0.05 is roughly the time required by the VND procedure to exhaust all neighborhoods
-    ITER_MAX = float('inf')  # better to use iter_max in some cases to obtain same results in post-acceptance & bidding
+    TIME_MAX = float(5)
+    ITER_MAX = float('inf')
 else:
-    TIME_MAX = float(1)  # 0.05 is roughly the time required by the VND procedure to exhaust all neighborhoods
-    ITER_MAX = float('inf')  # better to use iter_max in some cases to obtain same results in post-acceptance & bidding
+    TIME_MAX = float(15)
+    ITER_MAX = float('inf')
 
 
 class PDPTWMetaHeuristic(ABC):
@@ -302,6 +302,7 @@ class PDPTWReducedVariableNeighborhoodSearch(PDPTWVariableNeighborhoodDescent):
 
     def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
                 carrier_ids: List[int] = None) -> slt.CAHDSolution:
+        solution = deepcopy(solution)
         best_solution = deepcopy(solution)
         if carrier_ids is None:
             carrier_ids = [x.id_ for x in best_solution.carriers]
@@ -316,8 +317,9 @@ class PDPTWReducedVariableNeighborhoodSearch(PDPTWVariableNeighborhoodDescent):
                 if any(all_moves):
                     random_move = random.choice(all_moves)
                     if self.acceptance_criterion(instance, random_move):
-                        neighborhood.execute_move(instance, random_move)
+                        neighborhood.execute_move(instance, random_move)  # in place
                         # ut.validate_solution(instance, best_solution)
+                        best_solution = deepcopy(solution)
                         self.update_trajectory(self.parameters['k'], random_move, True)
                         self.parameters['k'] = 0
                     else:
@@ -329,6 +331,66 @@ class PDPTWReducedVariableNeighborhoodSearch(PDPTWVariableNeighborhoodDescent):
 
     def execute_on_tour(self, instance: it.MDPDPTWInstance, tour: tr.Tour):
         raise NotImplementedError()
+
+
+class PDPTWVariableNeighborhoodSearch(PDPTWVariableNeighborhoodDescent):
+    """
+    VNS. a random neighbor from the current neighborhood is drawn and local search is applied. then, the acceptance
+    decision is made
+
+    """
+
+    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+                carrier_ids: List[int] = None) -> slt.CAHDSolution:
+        solution = deepcopy(solution)
+        best_solution = deepcopy(solution)
+        if carrier_ids is None:
+            carrier_ids = [x.id_ for x in best_solution.carriers]
+
+        for carrier_id in carrier_ids:
+            carrier = solution.carriers[carrier_id]
+            self.parameters['k'] = 0
+            self.start_time = time.time()
+            while not self.stopping_criterion():
+                neighborhood = self.neighborhoods[self.parameters['k']]
+                all_moves = [move for move in neighborhood.feasible_move_generator_for_carrier(instance, carrier)]
+                if any(all_moves):
+                    random_move = random.choice(all_moves)
+                    neighborhood.execute_move(instance, random_move)
+                    solution_improved = self.local_search(instance, solution, [carrier_id])
+                    if self.acceptance_criterion(instance, (solution_improved, best_solution)):
+                        # ut.validate_solution(instance, best_solution)
+                        solution = solution_improved
+                        self.update_trajectory(self.parameters['k'], random_move, True)
+                        self.parameters['k'] = 0
+                        if solution_improved.objective() > best_solution.objective():
+                            best_solution = deepcopy(solution_improved)
+                    else:
+                        self.update_trajectory(self.parameters['k'], random_move, False)
+                        self.parameters['k'] += 1
+                else:
+                    self.parameters['k'] += 1
+        return best_solution
+
+    def acceptance_criterion(self, instance, move: tuple):
+        # accept slight degradations: Threshold acceptance
+        solution_improved, best_solution = move
+        if solution_improved.objective() >= best_solution.objective() * 0.9:
+            return True
+        else:
+            return False
+
+    def execute_on_tour(self, instance: it.MDPDPTWInstance, tour: tr.Tour):
+        raise NotImplementedError()
+
+    def local_search(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_ids: List[int]):
+        """
+        improves the solution in place
+        """
+        # TODO neighborhood should be a parameter instead of an arbitrary choice
+        arbitrary_neighborhood = self.neighborhoods[0]
+        solution = LocalSearchFirst([arbitrary_neighborhood]).execute(instance, solution, carrier_ids)
+        return solution
 
 
 class PDPTWSimulatedAnnealing(PDPTWMetaHeuristic):
@@ -422,8 +484,6 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
 
     def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
                 carrier_ids: List[int] = None) -> slt.CAHDSolution:
-        # FIXME: ILS sometimes returns worse solutions
-        # raise NotImplementedError
         solution = deepcopy(solution)
         best_best_solution = solution
 
@@ -442,7 +502,7 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
 
             while not self.stopping_criterion():
                 solution_new = self.perturbation(instance, solution, carrier_id, perturbation_num_requests)
-                self.local_search(instance, solution_new, [carrier_id])
+                solution_new = self.local_search(instance, solution_new, [carrier_id])
 
                 if solution_new.objective() > best_solution.objective():
                     best_solution = solution_new
@@ -499,8 +559,8 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
         """
         # TODO neighborhood should be a parameter instead of an arbitrary choice
         arbitrary_neighborhood = self.neighborhoods[0]
-        LocalSearchFirst([arbitrary_neighborhood]).execute(instance, solution, carrier_ids)
-        pass
+        improved_solution = LocalSearchFirst([arbitrary_neighborhood]).execute(instance, solution, carrier_ids)
+        return improved_solution
 
     def stopping_criterion(self):
         if time.time() - self.start_time < TIME_MAX and self.iter_count < ITER_MAX:
