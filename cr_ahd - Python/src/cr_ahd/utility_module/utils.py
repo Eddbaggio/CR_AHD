@@ -14,8 +14,6 @@ import pandas as pd
 from matplotlib.colors import LinearSegmentedColormap
 from tqdm import trange
 
-from src.cr_ahd.core_module import solution as slt
-
 Coordinates = namedtuple('Coords', ['x', 'y'])
 
 
@@ -445,11 +443,8 @@ solver_config = [
     'fin_auction_num_auction_rounds'
 ]
 
-if __name__ == '__main__':
-    pass
 
-
-def write_solution_summary_to_multiindex_df(solutions_per_instance: List[List[slt.CAHDSolution]], agg_level='tour'):
+def write_solution_summary_to_multiindex_df(solutions_per_instance, agg_level='tour'):
     """
     :param solutions_per_instance: A List of Lists of solutions. First Axis: instance, Second Axis: solver
     :param agg_level: defines up to which level the solution will be summarized. E.g. if agg_level='carrier' the
@@ -493,7 +488,7 @@ def write_solution_summary_to_multiindex_df(solutions_per_instance: List[List[sl
     df.drop(columns=['dist'], inplace=True)  # since the distance between depots is always 200 for the GH instances
 
     # set the multiindex
-    index = ['rad', 'n', 'run'] + ut.solver_config
+    index = ['rad', 'n', 'run'] + solver_config
     if agg_level == 'carrier':
         index += ['carrier_id_']
     if agg_level == 'tour':
@@ -505,8 +500,9 @@ def write_solution_summary_to_multiindex_df(solutions_per_instance: List[List[sl
         df[column] = df[column].dt.total_seconds()
 
     # write to disk
-    csv_path = ut.unique_path(ut.output_dir_GH, 'evaluation_agg_' + agg_level + '_#{:03d}' + '.csv')
+    output_dir.mkdir(exist_ok=True, parents=True)
+    csv_path = unique_path(output_dir, 'evaluation_agg_' + agg_level + '_#{:03d}' + '.csv')
     df.to_csv(path_or_buf=csv_path)
-    df.to_excel(ut.unique_path(ut.output_dir_GH, 'evaluation_agg_' + agg_level + '_#{:03d}' + '.xlsx'),
+    df.to_excel(unique_path(output_dir, 'evaluation_agg_' + agg_level + '_#{:03d}' + '.xlsx'),
                 merge_cells=False)
     return df.reset_index().fillna('None').set_index(keys=index), csv_path
