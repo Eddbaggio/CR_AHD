@@ -19,7 +19,7 @@ if __name__ == '__main__':
 
         # select the files to be solved
         paths = sorted(
-            list(Path('../../../data/Input/Gansterer_Hartl/3carriers/MV_instances/').iterdir()),
+            list(Path('data/Input/').iterdir()),
             key=ut.natural_sort_key
         )
         run, rad, n = 11, 0, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
