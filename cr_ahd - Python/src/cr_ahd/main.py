@@ -4,9 +4,9 @@ from pathlib import Path
 from datetime import datetime
 import cProfile
 
-from src.cr_ahd.solver_module import workflow as wf
-from src.cr_ahd.utility_module import utils as ut, evaluation as ev, cr_ahd_logging as log
-from src.cr_ahd.utility_module.utils import write_solution_summary_to_multiindex_df
+from solver_module import workflow as wf
+from utility_module import utils as ut, evaluation as ev, cr_ahd_logging as log
+from utility_module.utils import write_solution_summary_to_multiindex_df
 
 logging.config.dictConfig(log.LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
@@ -43,7 +43,7 @@ if __name__ == '__main__':
                      facet_col='rad',
                      facet_row='n',
                      show=True,
-                     html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix())
+                     html_path=ut.unique_path(ut.output_dir, 'CAHD_#{:03d}.html').as_posix())
         secondary_parameter = 'neighborhoods'
         ev.print_top_level_stats(df, [secondary_parameter])
 

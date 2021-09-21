@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 
-import src.cr_ahd.utility_module.utils as ut
+import utility_module.utils as ut
 
 labels = {'num_carriers': 'Number of Carriers',
           'travel_distance': 'Travel Distance',

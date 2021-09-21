@@ -1,7 +1,7 @@
 from typing import List, Tuple, Dict
 
-from src.cr_ahd.routing_module import neighborhoods as nh, tour_construction as cns, metaheuristics as mh
-from src.cr_ahd.tw_management_module import tw_offering as two, tw_selection as tws
+from routing_module import neighborhoods as nh, tour_construction as cns, metaheuristics as mh
+from tw_management_module import tw_offering as two, tw_selection as tws
 
 
 def parameter_generator():

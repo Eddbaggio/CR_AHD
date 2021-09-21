@@ -6,9 +6,9 @@ from copy import deepcopy
 from math import exp, log
 from typing import Sequence, List, Union
 
-from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
-from src.cr_ahd.routing_module import neighborhoods as nh, shakes as sh, tour_construction as cns
-from src.cr_ahd.utility_module import utils as ut, profiling as pr
+from core_module import instance as it, solution as slt, tour as tr
+from routing_module import neighborhoods as nh, shakes as sh, tour_construction as cns
+from utility_module import utils as ut, profiling as pr
 
 logger = logging.getLogger(__name__)
 

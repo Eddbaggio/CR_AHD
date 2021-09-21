@@ -6,9 +6,9 @@ from pathlib import Path
 
 from tqdm import tqdm
 
-from src.cr_ahd.core_module import instance as it, solution as slt
-from src.cr_ahd.solver_module import param_gen as pg, solver as slv
-from src.cr_ahd.utility_module import profiling as pr, cr_ahd_logging as log, utils as ut
+from core_module import instance as it, solution as slt
+from solver_module import param_gen as pg, solver as slv
+from utility_module import profiling as pr, cr_ahd_logging as log, utils as ut
 
 logging.config.dictConfig(log.LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
@@ -49,7 +49,7 @@ def solve_single_instance(path: Path):
     solves a single instance given by the path with all parameters defined in the parameter generator
     """
     log.remove_all_file_handlers(logging.getLogger())
-    log_file_path = ut.output_dir_GH.joinpath(f'{path.stem}_log.log')
+    log_file_path = ut.output_dir.joinpath(f'{path.stem}_log.log')
     log.add_file_handler(logging.getLogger(), str(log_file_path))
 
     instance = it.read_gansterer_hartl_mv(path)
@@ -113,7 +113,7 @@ def solve_instance(path: Path):
     solves a single instance given by the path
     """
     log.remove_all_file_handlers(logging.getLogger())
-    log_file_path = ut.output_dir_GH.joinpath(f'{path.stem}_log.log')
+    log_file_path = ut.output_dir.joinpath(f'{path.stem}_log.log')
     log.add_file_handler(logging.getLogger(), str(log_file_path))
 
     instance = it.read_gansterer_hartl_mv(path)

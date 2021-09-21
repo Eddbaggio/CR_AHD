@@ -45,7 +45,7 @@ LOGGING_CONFIG = {
             'level': 'INFO',
             'formatter': 'standard',
             'class': 'logging.FileHandler',
-            'filename': '../../../data/Output/cr_ahd_log.log',
+            'filename': './data/Output/cr_ahd_log.log',
             'mode': 'w',
         },
     },

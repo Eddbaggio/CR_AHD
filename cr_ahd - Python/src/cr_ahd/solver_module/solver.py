@@ -3,11 +3,11 @@ import random
 from copy import deepcopy
 from typing import Tuple
 
-from src.cr_ahd.core_module import instance as it, solution as slt
-from src.cr_ahd.routing_module import metaheuristics as mh
-from src.cr_ahd.routing_module import tour_construction as cns
-from src.cr_ahd.tw_management_module import tw_offering as two, tw_selection as tws
-from src.cr_ahd.utility_module import utils as ut, profiling as pr
+from core_module import instance as it, solution as slt
+from routing_module import metaheuristics as mh
+from routing_module import tour_construction as cns
+from tw_management_module import tw_offering as two, tw_selection as tws
+from utility_module import utils as ut, profiling as pr
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,8 @@ class Solver:
 
     def execute(self,
                 instance: it.MDPDPTWInstance,
-                starting_solution: slt.CAHDSolution = None
+                starting_solution: slt.CAHDSolution = None,
+                verbose = False
                 ) -> Tuple[it.MDPDPTWInstance, slt.CAHDSolution]:
 
         # ===== [0] Setup =====
@@ -46,7 +47,10 @@ class Solver:
 
         solution.update_solver_config(self)
         random.seed(0)
-        logger.info(f'{instance.id_}: Solving {solution.solver_config}')
+        if verbose:
+            logger.info(f'{instance.id_}: Solving {solution.solver_config}')
+        else:
+            logger.debug(f'{instance.id_}: Solving {solution.solver_config}')
 
         i = 0
         while solution.unassigned_requests:
@@ -79,7 +83,11 @@ class Solver:
                         timer.write_duration_to_solution(solution, 'runtime_dynamic_insertion', True)
 
                     else:  # in case (a) the offer set was empty or (b) the customer did not select any time window
-                        logger.error(f'[{instance.id_}] No feasible TW can be offered '
+                        if verbose:
+                            logger.error(f'[{instance.id_}] No feasible TW can be offered '
+                                     f'from Carrier {carrier.id_} to request {request}')
+                        else:
+                            logger.debug(f'[{instance.id_}] No feasible TW can be offered '
                                      f'from Carrier {carrier.id_} to request {request}')
                         instance.assign_time_window(delivery_vertex, ut.TIME_HORIZON)
                         carrier.rejected_requests.append(request)
@@ -95,6 +103,9 @@ class Solver:
         assert int(before_improvement) <= int(solution.objective()), instance.id_
 
         ut.validate_solution(instance, solution)  # safety check to make sure everything's functional
-        logger.info(f'{instance.id_}: Success {solution.solver_config}')
+        if verbose:
+            logger.info(f'{instance.id_}: Success {solution.solver_config}')
+        else:
+            logger.debug(f'{instance.id_}: Success {solution.solver_config}')
 
         return instance, solution

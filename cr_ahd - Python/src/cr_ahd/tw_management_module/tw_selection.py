@@ -4,7 +4,7 @@ import logging
 import random
 from typing import List
 
-from src.cr_ahd.utility_module.utils import TimeWindow, END_TIME, START_TIME, TIME_HORIZON
+from utility_module.utils import TimeWindow, END_TIME, START_TIME, TIME_HORIZON
 
 logger = logging.getLogger(__name__)
 

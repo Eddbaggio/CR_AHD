@@ -30,11 +30,11 @@ class TimeWindow:
 
 
 working_dir = Path()
-data_dir = working_dir.absolute().parent.parent.parent.joinpath('data')
+data_dir = working_dir.absolute().joinpath('data')
 input_dir = data_dir.joinpath('Input')
 
 output_dir = data_dir.joinpath('Output')
-output_dir_GH = output_dir.joinpath('Gansterer_Hartl')
+output_dir.mkdir(parents=True, exist_ok=True)
 
 # alpha 100%
 univie_colors_100 = [
@@ -503,6 +503,6 @@ def write_solution_summary_to_multiindex_df(solutions_per_instance, agg_level='t
     output_dir.mkdir(exist_ok=True, parents=True)
     csv_path = unique_path(output_dir, 'evaluation_agg_' + agg_level + '_#{:03d}' + '.csv')
     df.to_csv(path_or_buf=csv_path)
-    df.to_excel(unique_path(output_dir, 'evaluation_agg_' + agg_level + '_#{:03d}' + '.xlsx'),
-                merge_cells=False)
+    # df.to_excel(unique_path(output_dir, 'evaluation_agg_' + agg_level + '_#{:03d}' + '.xlsx'),
+    #             merge_cells=False)
     return df.reset_index().fillna('None').set_index(keys=index), csv_path
