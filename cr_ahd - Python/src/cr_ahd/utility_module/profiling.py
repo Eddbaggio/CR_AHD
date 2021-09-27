@@ -2,7 +2,7 @@ import time
 from functools import wraps
 from typing import Callable
 
-import src.cr_ahd.core_module.solution as slt
+import core_module.solution as slt
 
 '''
 def timing(f: Callable):

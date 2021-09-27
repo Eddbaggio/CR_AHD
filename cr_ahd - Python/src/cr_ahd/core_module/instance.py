@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from scipy.spatial.distance import pdist, squareform
 
-import src.cr_ahd.utility_module.utils as ut
+import utility_module.utils as ut
 
 logger = logging.getLogger(__name__)
 

@@ -1,8 +1,8 @@
 import abc
 import datetime as dt
 
-from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
-from src.cr_ahd.utility_module import utils as ut
+from core_module import instance as it, solution as slt, tour as tr
+from utility_module import utils as ut
 
 
 class TWOfferingBehavior(abc.ABC):

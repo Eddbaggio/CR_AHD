@@ -3,7 +3,7 @@ import logging.config
 from copy import deepcopy
 from typing import List, Sequence, Set, Dict
 
-import src.cr_ahd.utility_module.utils as ut
+import utility_module.utils as ut
 
 logger = logging.getLogger(__name__)
 
