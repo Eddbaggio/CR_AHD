@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 
-import utility_module.utils as ut
+import utils as ut
 
 labels = {'num_carriers': 'Number of Carriers',
           'travel_distance': 'Travel Distance',
@@ -23,18 +23,14 @@ category_orders = {'solution_algorithm': ['IsolatedPlanning',
                    'rad': [150,
                            200,
                            300],
-                   'solution_algorithm-request_selection': [('IsolatedPlanning', 'None'),
-                                                            ('CollaborativePlanning', 'SpatialCluster'),
-                                                            ('CollaborativePlanning', 'TemporalRangeCluster')
-                                                            ],
                    'num_auction_bundles': [
                        # 50,
                        100,
                        # 200,
                        300,
                        # 500
-                   ],
-                   }
+],
+}
 
 config = dict({'scrollZoom': True})
 
@@ -250,9 +246,9 @@ def bar_chart(df: pd.DataFrame,
             y=-0.1,
             xanchor="center",
             x=0.5)
-    #     title_font_size=12,
-    #     template=template
-        )
+        #     title_font_size=12,
+        #     template=template
+    )
 
     if show:
         fig.show(config=config)
@@ -348,7 +344,7 @@ def print_top_level_stats(df: pd.DataFrame, secondary_parameters: List[str]):
                 secondary_parameters,
                 ['rad', *secondary_parameters],
                 ['rad', 'n'],
-                ['rad', 'n', *secondary_parameters]]:
+                    ['rad', 'n', *secondary_parameters]]:
                 for iso, coll in zip(isolated.groupby(grouper), collaborative.groupby(grouper)):
                     iso_name, iso_group = iso
                     coll_name, coll_group = coll
@@ -388,7 +384,7 @@ def print_top_level_stats(df: pd.DataFrame, secondary_parameters: List[str]):
 
 if __name__ == '__main__':
     path = "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home " \
-           "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_agg_solution_#006.csv"
+           "Deliveries/01_Code/data/Output/evaluation_agg_solution_#001.csv"
     df = pd.read_csv(path)
     df.fillna(value={col: 0 for col in df.columns if 'runtime' in col}, inplace=True)
     df.fillna(value='None', inplace=True)
@@ -397,17 +393,17 @@ if __name__ == '__main__':
     # df = df[df.n == 15]
 
     df.set_index(['rad', 'n', 'run', ] + ut.solver_config, inplace=True)  # add 'carrier_id_' if agg_level==carrier
-    secondary_parameter = 'tour_improvement'
-    print_top_level_stats(df, [secondary_parameter])
+    secondary_parameter = 'num_int_auctions'
+    # print_top_level_stats(df, [secondary_parameter])
     bar_chart(df,
               title=str(Path(path).name),
-              values='runtime_final_improvement',
-              color=['tour_improvement'],
-              category='rad',
-              facet_col='tour_improvement_time_limit_per_carrier',
+              values='sum_profit',
+              color=['solution_algorithm', secondary_parameter],
+              category='run',
+              facet_col='rad',
               facet_row='n',
               show=True,
-              width=1000*0.85,
-              height=450*0.85*1.8,
+              # width=1000 * 0.85,
+              # height=450 * 0.85 * 1.8,
               # html_path=ut.unique_path(Path("C:/Users/Elting/Desktop"), 'CAHD_#{:03d}.html').as_posix()
               )

@@ -7,7 +7,7 @@ from auction_module import auction as au,\
     bundle_generation as bg, \
     bidding as bd,\
     winner_determination as wd,\
-    bundling_valuation as bv
+    bundle_valuation as bv
 
 
 def parameter_generator():
@@ -37,7 +37,7 @@ def parameter_generator():
         # mh.PDPTWReducedVariableNeighborhoodSearch,
         # mh.PDPTWVariableNeighborhoodSearch,
         # mh.PDPTWSimulatedAnnealing,
-        mh.NoMetaheuristic,
+        # mh.NoMetaheuristic,
     ]
 
     neighborhood_collections: List[List[nh.Neighborhood]] = [
@@ -131,7 +131,7 @@ def parameter_generator():
                                                 # ===== final_auction for collaborative planning =====
                                                 final_auction = au.Auction(
                                                     tour_construction=tour_construction,
-                                                    tour_improvement=tour_improvement(neighborhoods),
+                                                    tour_improvement=tour_improvement(neighborhoods, tour_improvement_time_limit),
                                                     request_selection=request_selection(num_submitted_requests),
                                                     bundle_generation=bundle_generation(
                                                         num_auction_bundles=num_auction_bundles,
@@ -140,7 +140,7 @@ def parameter_generator():
                                                     ),
                                                     bidding=bd.ClearAndReinsertAll(
                                                         tour_construction,
-                                                        tour_improvement(neighborhoods)
+                                                        tour_improvement(neighborhoods, tour_improvement_time_limit)
                                                     ),
                                                     winner_determination=wd.MaxBidGurobiCAP1(),
                                                     num_auction_rounds=num_final_auction_rounds
@@ -151,7 +151,7 @@ def parameter_generator():
                                                     time_window_offering=time_window_offering,
                                                     time_window_selection=time_window_selection,
                                                     tour_construction=tour_construction,
-                                                    tour_improvement=tour_improvement(neighborhoods),
+                                                    tour_improvement=tour_improvement(neighborhoods, tour_improvement_time_limit),
                                                     num_intermediate_auctions=0,
                                                     intermediate_auction=False,
                                                     final_auction=final_auction,
@@ -164,7 +164,7 @@ def parameter_generator():
                                                 #  1 final with 100% of submitted requests
                                                 intermediate_auction = au.Auction(
                                                     tour_construction=tour_construction,
-                                                    tour_improvement=tour_improvement(neighborhoods),
+                                                    tour_improvement=tour_improvement(neighborhoods, tour_improvement_time_limit),
                                                     request_selection=request_selection(
                                                         int(num_submitted_requests / 2)),  # TODO add proper parameter
                                                     bundle_generation=bundle_generation(
@@ -174,7 +174,7 @@ def parameter_generator():
                                                     ),
                                                     bidding=bd.ClearAndReinsertAll(
                                                         tour_construction,
-                                                        tour_improvement(neighborhoods)
+                                                        tour_improvement(neighborhoods, tour_improvement_time_limit)
                                                     ),
                                                     winner_determination=wd.MaxBidGurobiCAP1(),
                                                     num_auction_rounds=num_final_auction_rounds  # TODO add proper parameter
@@ -182,7 +182,7 @@ def parameter_generator():
 
                                                 final_auction = au.Auction(
                                                     tour_construction=tour_construction,
-                                                    tour_improvement=tour_improvement(neighborhoods),
+                                                    tour_improvement=tour_improvement(neighborhoods, tour_improvement_time_limit),
                                                     request_selection=request_selection(
                                                         int(num_submitted_requests / 2)),  # TODO add proper parameter
                                                     bundle_generation=bundle_generation(
@@ -192,7 +192,7 @@ def parameter_generator():
                                                     ),
                                                     bidding=bd.ClearAndReinsertAll(
                                                         tour_construction,
-                                                        tour_improvement(neighborhoods)
+                                                        tour_improvement(neighborhoods, tour_improvement_time_limit)
                                                     ),
                                                     winner_determination=wd.MaxBidGurobiCAP1(),
                                                     num_auction_rounds=num_final_auction_rounds
@@ -202,7 +202,7 @@ def parameter_generator():
                                                     time_window_offering=time_window_offering,
                                                     time_window_selection=time_window_selection,
                                                     tour_construction=tour_construction,
-                                                    tour_improvement=tour_improvement(neighborhoods),
+                                                    tour_improvement=tour_improvement(neighborhoods, tour_improvement_time_limit),
                                                     num_intermediate_auctions=num_intermediate_auctions,
                                                     intermediate_auction=intermediate_auction,
                                                     final_auction=final_auction,

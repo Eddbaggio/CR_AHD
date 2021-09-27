@@ -98,8 +98,14 @@ class MaxBidGurobiCAP1(WinnerDeterminationBehavior):
         for c in range(instance.num_carriers):
             m.addLConstr(y.sum('*', c), GRB.LESS_EQUAL, 1, f'single bundle {c}')
 
+        # write
+        path = ut.output_dir.joinpath(f'{solution.num_carriers()}carriers',
+                                      solution.id_ + '_' + solution.solver_config['solution_algorithm'])
+        path = ut.unique_path(path.parent, path.stem + 'WDP_#{:03d}.lp')
+        path.parent.mkdir(parents=True, exist_ok=True)
+        m.write(str(path))
+
         # solve
-        m.write(str(ut.output_dir_GH.joinpath('WDP.lp')))
         m.optimize()
         assert m.Status == GRB.OPTIMAL
 
