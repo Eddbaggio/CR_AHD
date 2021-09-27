@@ -7,9 +7,9 @@ import numpy as np
 import tqdm
 from sklearn.cluster import KMeans
 
-from src.cr_ahd.auction_module import bundle_valuation as bv
-from src.cr_ahd.core_module import instance as it, solution as slt
-from src.cr_ahd.utility_module import utils as ut
+from auction_module import bundle_valuation as bv
+from core_module import instance as it, solution as slt
+from utility_module import utils as ut
 
 logger = logging.getLogger(__name__)
 

@@ -7,10 +7,10 @@ from typing import Sequence, Tuple, List, final
 import numpy as np
 from scipy.spatial.distance import squareform, pdist
 
-from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
-from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh, \
+from core_module import instance as it, solution as slt, tour as tr
+from routing_module import tour_construction as cns, metaheuristics as mh, \
     neighborhoods as nh
-from src.cr_ahd.utility_module import utils as ut
+from utility_module import utils as ut
 
 
 # ======================================================================================================================

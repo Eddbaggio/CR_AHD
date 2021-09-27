@@ -25,7 +25,7 @@ if __name__ == '__main__':
         run, rad, n = 11, 0, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
         i = run * 6 + rad * 2 + n
         i = random.choice(range(len(paths)))
-        paths = paths[:]
+        paths = paths[:1]
 
         # solving
         if len(paths) < 6:

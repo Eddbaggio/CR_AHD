@@ -6,8 +6,8 @@ import numpy as np
 import gurobipy as gp
 from gurobipy import GRB
 
-from src.cr_ahd.core_module import instance as it, solution as slt
-from src.cr_ahd.utility_module import utils as ut
+from core_module import instance as it, solution as slt
+from utility_module import utils as ut
 
 logger = logging.getLogger(__name__)
 

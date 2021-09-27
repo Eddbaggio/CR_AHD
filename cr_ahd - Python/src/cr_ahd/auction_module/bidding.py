@@ -5,9 +5,9 @@ from typing import List, Sequence
 
 import tqdm
 
-from src.cr_ahd.core_module import instance as it, solution as slt
-from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh
-from src.cr_ahd.utility_module import utils as ut
+from core_module import instance as it, solution as slt
+from routing_module import tour_construction as cns, metaheuristics as mh
+from utility_module import utils as ut
 
 logger = logging.getLogger(__name__)
 

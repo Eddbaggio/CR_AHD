@@ -3,11 +3,11 @@ import warnings
 from abc import ABC
 from copy import deepcopy
 
-from src.cr_ahd.auction_module import request_selection as rs, bundle_generation as bg, bidding as bd, \
+from auction_module import request_selection as rs, bundle_generation as bg, bidding as bd, \
     winner_determination as wd
-from src.cr_ahd.core_module import instance as it, solution as slt
-from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh
-from src.cr_ahd.utility_module import profiling as pr, utils as ut
+from core_module import instance as it, solution as slt
+from routing_module import tour_construction as cns, metaheuristics as mh
+from utility_module import profiling as pr, utils as ut
 
 logger = logging.getLogger(__name__)
 

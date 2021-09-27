@@ -4,12 +4,12 @@ from copy import deepcopy
 from typing import Tuple
 import numpy as np
 
-from src.cr_ahd.auction_module import auction as au
-from src.cr_ahd.core_module import instance as it, solution as slt
-from src.cr_ahd.routing_module import metaheuristics as mh
-from src.cr_ahd.routing_module import tour_construction as cns
-from src.cr_ahd.tw_management_module import tw_offering as two, tw_selection as tws
-from src.cr_ahd.utility_module import utils as ut, profiling as pr
+from auction_module import auction as au
+from core_module import instance as it, solution as slt
+from routing_module import metaheuristics as mh
+from routing_module import tour_construction as cns
+from tw_management_module import tw_offering as two, tw_selection as tws
+from utility_module import utils as ut, profiling as pr
 
 logger = logging.getLogger(__name__)
 

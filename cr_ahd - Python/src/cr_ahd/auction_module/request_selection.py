@@ -6,10 +6,10 @@ from abc import ABC, abstractmethod
 from math import comb, sqrt
 from typing import Sequence, Tuple
 
-from src.cr_ahd.auction_module import bundle_valuation as bv
-from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
-from src.cr_ahd.routing_module import tour_construction as cns, metaheuristics as mh, neighborhoods as ls
-from src.cr_ahd.utility_module import utils as ut
+from auction_module import bundle_valuation as bv
+from core_module import instance as it, solution as slt, tour as tr
+from routing_module import tour_construction as cns, metaheuristics as mh, neighborhoods as ls
+from utility_module import utils as ut
 
 logger = logging.getLogger(__name__)
 
