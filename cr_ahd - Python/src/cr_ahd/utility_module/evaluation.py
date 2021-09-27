@@ -1,14 +1,13 @@
-import time
+import datetime as dt
 import warnings
 from pathlib import Path
-from typing import Sequence, List, Tuple, Union
-from itertools import zip_longest
+from typing import Sequence, List, Tuple
+
 import numpy as np
 import pandas as pd
 import plotly.express as px
-import datetime as dt
 
-import src.cr_ahd.utility_module.utils as ut
+import utility_module.utils as ut
 
 labels = {'num_carriers': 'Number of Carriers',
           'travel_distance': 'Travel Distance',
@@ -209,6 +208,55 @@ def bar_chart(df: pd.DataFrame,
     if html_path:
         fig.write_html(html_path, )
 
+    # box plot
+    fig = px.box(solution_df.reset_index(),
+                 # points='all',
+                 x=splitters['category'],
+                 y=values,
+                 title=title,
+                 color=splitters['color'],
+                 color_discrete_sequence=ut.univie_colors_100 + ut.univie_colors_60,
+                 facet_row=splitters['facet_row'],
+                 facet_col=splitters['facet_col'],
+                 template='plotly_white',
+                 hover_data=px_ready.columns.values,
+                 boxmode='group',
+                 category_orders=category_orders,
+                 width=width,
+                 height=height,
+                 )
+    # add annotation
+    # fig.add_annotation(
+    #     x=1,
+    #     y=0,
+    #     xanchor='left',
+    #     yanchor='bottom',
+    #     xref='paper',
+    #     yref='paper',
+    #     showarrow=False,
+    #     align='left',
+    #     text=annotation)
+
+    # fig.update_yaxes(range=[0, 10000])
+    fig.update_xaxes(type='category')
+    if 7 < dt.datetime.now().hour < 20:
+        template = 'plotly_white'
+    else:
+        template = 'plotly_dark'
+    fig.update_layout(
+        legend=dict(
+            orientation="h",
+            yanchor="top",
+            y=-0.1,
+            xanchor="center",
+            x=0.5)
+    #     title_font_size=12,
+    #     template=template
+        )
+
+    if show:
+        fig.show(config=config)
+
 
 def single_and_zero_value_indices(multiindex: pd.MultiIndex, ignore=None):
     """
@@ -340,20 +388,26 @@ def print_top_level_stats(df: pd.DataFrame, secondary_parameters: List[str]):
 
 if __name__ == '__main__':
     path = "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home " \
-           "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_agg_solution_#106.csv"
+           "Deliveries/01_Code/data/Output/Gansterer_Hartl/evaluation_agg_solution_#006.csv"
     df = pd.read_csv(path)
     df.fillna(value={col: 0 for col in df.columns if 'runtime' in col}, inplace=True)
     df.fillna(value='None', inplace=True)
+
+    # df = df[df.tour_improvement_time_limit_per_carrier == 10]
+    # df = df[df.n == 15]
+
     df.set_index(['rad', 'n', 'run', ] + ut.solver_config, inplace=True)  # add 'carrier_id_' if agg_level==carrier
-    secondary_parameter = 'neighborhoods'
+    secondary_parameter = 'tour_improvement'
     print_top_level_stats(df, [secondary_parameter])
     bar_chart(df,
               title=str(Path(path).name),
-              values='sum_profit',
-              color=['tour_improvement'],#, secondary_parameter],
-              category='neighborhoods', facet_col=None, facet_row='n',
+              values='runtime_final_improvement',
+              color=['tour_improvement'],
+              category='rad',
+              facet_col='tour_improvement_time_limit_per_carrier',
+              facet_row='n',
               show=True,
-              # width=700,
-              # height=450,
-              # html_path=ut.unique_path(ut.output_dir_GH, 'CAHD_#{:03d}.html').as_posix()
+              width=1000*0.85,
+              height=450*0.85*1.8,
+              # html_path=ut.unique_path(Path("C:/Users/Elting/Desktop"), 'CAHD_#{:03d}.html').as_posix()
               )

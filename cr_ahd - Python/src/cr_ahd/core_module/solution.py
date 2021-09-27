@@ -4,8 +4,8 @@ from typing import List, Sequence, Dict
 
 import numpy as np
 
-from src.cr_ahd.core_module import instance as it, tour as tr
-from src.cr_ahd.utility_module import utils as ut
+from core_module import instance as it, tour as tr
+from utility_module import utils as ut
 
 
 class CAHDSolution:
@@ -60,6 +60,7 @@ class CAHDSolution:
 
         config['tour_construction'] = solver.tour_construction.name
         config['tour_improvement'] = solver.tour_improvement.name
+        config['tour_improvement_time_limit_per_carrier'] = solver.tour_improvement.time_limit_per_carrier
         config['neighborhoods'] = '+'.join([nbh.name for nbh in solver.tour_improvement.neighborhoods])
         config['time_window_offering'] = solver.time_window_offering.name
         config['time_window_selection'] = solver.time_window_selection.name
@@ -210,7 +211,7 @@ class CAHDSolution:
         return summary
 
     def write_to_json(self):
-        path = ut.output_dir_GH.joinpath(f'{self.num_carriers()}carriers',
+        path = ut.output_dir.joinpath(f'{self.num_carriers()}carriers',
                                          self.id_ + '_' + self.solver_config['solution_algorithm'])
         path = ut.unique_path(path.parent, path.stem + '_#{:03d}' + '.json')
         path.parent.mkdir(parents=True, exist_ok=True)

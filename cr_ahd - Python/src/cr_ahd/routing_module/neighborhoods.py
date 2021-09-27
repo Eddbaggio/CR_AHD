@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import final
 
-from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
+from core_module import instance as it, solution as slt, tour as tr
 
 logger = logging.getLogger(__name__)
 

@@ -2,7 +2,7 @@ import random
 from abc import ABC, abstractmethod
 from typing import final, List
 
-from src.cr_ahd.core_module import instance as it, solution as slt, tour as tr
+from core_module import instance as it, solution as slt, tour as tr
 import logging
 
 logger = logging.getLogger(__name__)
