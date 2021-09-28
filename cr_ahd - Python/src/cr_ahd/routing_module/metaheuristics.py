@@ -6,6 +6,7 @@ from copy import deepcopy
 from math import exp, log
 from typing import Sequence, List, Union
 
+import utility_module.errors
 from core_module import instance as it, solution as slt, tour as tr
 from routing_module import neighborhoods as nh, shakes as sh, tour_construction as cns
 from utility_module import utils as ut, profiling as pr
@@ -543,7 +544,7 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
 
             return solution_copy
 
-        except ut.ConstraintViolationError:
+        except utility_module.errors.ConstraintViolationError:
             # sometimes the shaking cannot be repaired with the given method and will raise a ConstraintViolationError
             # in that case, simply returning the original solution
             return solution

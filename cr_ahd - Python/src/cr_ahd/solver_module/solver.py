@@ -33,6 +33,74 @@ class Solver:
         self.intermediate_auction: au.Auction = intermediate_auction
         self.final_auction: au.Auction = final_auction
 
+        self.config = {
+            'solution_algorithm': 'CollaborativePlanning' if intermediate_auction or final_auction else 'IsolatedPlanning',
+            'tour_improvement': tour_improvement.name,
+            'neighborhoods': '+'.join([nbh.name for nbh in tour_improvement.neighborhoods]),
+            'tour_construction': tour_construction.name,
+            'tour_improvement_time_limit_per_carrier': tour_improvement.time_limit_per_carrier,
+            'time_window_offering': time_window_offering.name,
+            'time_window_selection': time_window_selection.name,
+            'num_int_auctions': num_intermediate_auctions,
+
+            'int_auction_tour_construction': None,
+            'int_auction_tour_improvement': None,
+            'int_auction_neighborhoods': None,
+            'int_auction_num_submitted_requests': None,
+            'int_auction_request_selection': None,
+            'int_auction_bundle_generation': None,
+            'int_auction_bundling_valuation': None,
+            'int_auction_num_auction_bundles': None,
+            'int_auction_bidding': None,
+            'int_auction_winner_determination': None,
+            'int_auction_num_auction_rounds': None,
+            'fin_auction_tour_construction': None,
+            'fin_auction_tour_improvement': None,
+            'fin_auction_neighborhoods': None,
+            'fin_auction_num_submitted_requests': None,
+            'fin_auction_request_selection': None,
+            'fin_auction_bundle_generation': None,
+            'fin_auction_bundling_valuation': None,
+            'fin_auction_num_auction_bundles': None,
+            'fin_auction_bidding': None,
+            'fin_auction_winner_determination': None,
+            'fin_auction_num_auction_rounds': None,
+        }
+
+        if intermediate_auction:
+            self.config.update({
+                'int_auction_tour_construction': intermediate_auction.tour_construction.name,
+                'int_auction_tour_improvement': intermediate_auction.tour_improvement.name,
+                'int_auction_neighborhoods': '+'.join(
+                    [nbh.name for nbh in intermediate_auction.tour_improvement.neighborhoods]),
+                'int_auction_num_submitted_requests': intermediate_auction.request_selection.num_submitted_requests,
+                'int_auction_request_selection': intermediate_auction.request_selection.name,
+                'int_auction_bundle_generation': intermediate_auction.bundle_generation.name,
+                # FIXME not all bundle_generation approaches have a bundling_valuation!
+                'int_auction_bundling_valuation': intermediate_auction.bundle_generation.bundling_valuation.name,
+                'int_auction_num_auction_bundles': intermediate_auction.bundle_generation.num_auction_bundles,
+                'int_auction_bidding': intermediate_auction.bidding.name,
+                'int_auction_winner_determination': intermediate_auction.winner_determination.name,
+                'int_auction_num_auction_rounds': intermediate_auction.num_auction_rounds,
+            })
+
+        if final_auction:
+            self.config.update({
+                'fin_auction_tour_construction': final_auction.tour_construction.name,
+                'fin_auction_tour_improvement': final_auction.tour_improvement.name,
+                'fin_auction_neighborhoods': '+'.join(
+                    [nbh.name for nbh in final_auction.tour_improvement.neighborhoods]),
+                'fin_auction_num_submitted_requests': final_auction.request_selection.num_submitted_requests,
+                'fin_auction_request_selection': final_auction.request_selection.name,
+                'fin_auction_bundle_generation': final_auction.bundle_generation.name,
+                # FIXME not all bundle_generation approaches have a bundling_valuation!
+                'fin_auction_bundling_valuation': final_auction.bundle_generation.bundling_valuation.name,
+                'fin_auction_num_auction_bundles': final_auction.bundle_generation.num_auction_bundles,
+                'fin_auction_bidding': final_auction.bidding.name,
+                'fin_auction_winner_determination': final_auction.winner_determination.name,
+                'fin_auction_num_auction_rounds': final_auction.num_auction_rounds,
+            })
+
     def execute(self,
                 instance: it.MDPDPTWInstance,
                 starting_solution: slt.CAHDSolution = None
@@ -58,8 +126,7 @@ class Solver:
             solution = starting_solution
             solution.timings.clear()
 
-        # TODO reverse this. it should be a method of the solution not the solver
-        solution.update_solver_config(self)
+        solution.solver_config.update(self.config)
         random.seed(0)
         logger.info(f'{instance.id_}: Solving {solution.solver_config}')
 

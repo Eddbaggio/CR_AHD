@@ -1,6 +1,7 @@
 import abc
 import datetime as dt
 
+import tw_management_module.tw
 from core_module import instance as it, solution as slt, tour as tr
 from utility_module import utils as ut
 
@@ -24,13 +25,13 @@ class TWOfferingBehavior(abc.ABC):
 
     @abc.abstractmethod
     def _evaluate_time_window(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, request: int,
-                              tw: ut.TimeWindow):
+                              tw: tw_management_module.tw.TimeWindow):
         pass
 
 
 class FeasibleTW(TWOfferingBehavior):
     def _evaluate_time_window(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, request: int,
-                              tw: ut.TimeWindow):
+                              tw: tw_management_module.tw.TimeWindow):
         """
         :return: 1 if TW is feasible, -1 else
         """
@@ -74,5 +75,5 @@ class NoTw(TWOfferingBehavior):
         return [ut.TIME_HORIZON]
 
     def _evaluate_time_window(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, request: int,
-                              tw: ut.TimeWindow):
+                              tw: tw_management_module.tw.TimeWindow):
         pass

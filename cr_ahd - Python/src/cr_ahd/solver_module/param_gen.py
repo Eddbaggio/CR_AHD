@@ -1,13 +1,13 @@
 from typing import List, Tuple, Dict
 
+from auction_module import auction as au, \
+    request_selection as rs, \
+    bundle_generation as bg, \
+    bidding as bd, \
+    winner_determination as wd, \
+    bundle_valuation as bv
 from routing_module import neighborhoods as nh, tour_construction as cns, metaheuristics as mh
 from tw_management_module import tw_offering as two, tw_selection as tws
-from auction_module import auction as au,\
-    request_selection as rs,\
-    bundle_generation as bg, \
-    bidding as bd,\
-    winner_determination as wd,\
-    bundle_valuation as bv
 
 
 def parameter_generator():
@@ -104,9 +104,10 @@ def parameter_generator():
 
     # ===== Nested Parameter Loops =====
     for tour_construction in tour_constructions:
-        for tour_improvement in tour_improvements:
+        for tour_improvement_class in tour_improvements:
             for neighborhoods in neighborhood_collections:
                 for tour_improvement_time_limit in tour_improvement_time_limits:
+                    tour_improvement = tour_improvement_class(neighborhoods, tour_improvement_time_limit)
                     for time_window_offering, time_window_selection in zip(time_window_offerings,
                                                                            time_window_selections):
                         # ===== Isolated Planning Parameters, no auction =====
@@ -114,7 +115,7 @@ def parameter_generator():
                             time_window_offering=time_window_offering,
                             time_window_selection=time_window_selection,
                             tour_construction=tour_construction,
-                            tour_improvement=tour_improvement(neighborhoods, tour_improvement_time_limit),
+                            tour_improvement=tour_improvement,
                             num_intermediate_auctions=0,
                             intermediate_auction=False,
                             final_auction=False,
@@ -131,17 +132,16 @@ def parameter_generator():
                                                 # ===== final_auction for collaborative planning =====
                                                 final_auction = au.Auction(
                                                     tour_construction=tour_construction,
-                                                    tour_improvement=tour_improvement(neighborhoods, tour_improvement_time_limit),
+                                                    tour_improvement=tour_improvement,
                                                     request_selection=request_selection(num_submitted_requests),
                                                     bundle_generation=bundle_generation(
                                                         num_auction_bundles=num_auction_bundles,
                                                         bundling_valuation=bundling_valuation(),
                                                         **bundle_generation_kwargs
                                                     ),
-                                                    bidding=bd.ClearAndReinsertAll(
-                                                        tour_construction,
-                                                        tour_improvement(neighborhoods, tour_improvement_time_limit)
-                                                    ),
+                                                    bidding=bd.ClearAndReinsertAll(tour_construction,
+                                                                                   tour_improvement
+                                                                                   ),
                                                     winner_determination=wd.MaxBidGurobiCAP1(),
                                                     num_auction_rounds=num_final_auction_rounds
                                                 )
@@ -151,7 +151,7 @@ def parameter_generator():
                                                     time_window_offering=time_window_offering,
                                                     time_window_selection=time_window_selection,
                                                     tour_construction=tour_construction,
-                                                    tour_improvement=tour_improvement(neighborhoods, tour_improvement_time_limit),
+                                                    tour_improvement=tour_improvement,
                                                     num_intermediate_auctions=0,
                                                     intermediate_auction=False,
                                                     final_auction=final_auction,
@@ -160,11 +160,11 @@ def parameter_generator():
 
                                             for num_intermediate_auctions in range(1, 2):  # TODO add proper parameter
                                                 # ===== collaborative planning with final AND intermediate auction =====
-                                                # Note Test 01: 1 intermediate + 1 final with 50% of submitted requests each vs.
-                                                #  1 final with 100% of submitted requests
+                                                # Note Test 01: 1 intermediate + 1 final with 50% of submitted
+                                                #  requests each vs. 1 final with 100% of submitted requests
                                                 intermediate_auction = au.Auction(
                                                     tour_construction=tour_construction,
-                                                    tour_improvement=tour_improvement(neighborhoods, tour_improvement_time_limit),
+                                                    tour_improvement=tour_improvement,
                                                     request_selection=request_selection(
                                                         int(num_submitted_requests / 2)),  # TODO add proper parameter
                                                     bundle_generation=bundle_generation(
@@ -174,15 +174,16 @@ def parameter_generator():
                                                     ),
                                                     bidding=bd.ClearAndReinsertAll(
                                                         tour_construction,
-                                                        tour_improvement(neighborhoods, tour_improvement_time_limit)
+                                                        tour_improvement
                                                     ),
                                                     winner_determination=wd.MaxBidGurobiCAP1(),
-                                                    num_auction_rounds=num_final_auction_rounds  # TODO add proper parameter
+                                                    num_auction_rounds=num_final_auction_rounds
+                                                    # TODO add proper parameter
                                                 )
 
                                                 final_auction = au.Auction(
                                                     tour_construction=tour_construction,
-                                                    tour_improvement=tour_improvement(neighborhoods, tour_improvement_time_limit),
+                                                    tour_improvement=tour_improvement,
                                                     request_selection=request_selection(
                                                         int(num_submitted_requests / 2)),  # TODO add proper parameter
                                                     bundle_generation=bundle_generation(
@@ -192,7 +193,7 @@ def parameter_generator():
                                                     ),
                                                     bidding=bd.ClearAndReinsertAll(
                                                         tour_construction,
-                                                        tour_improvement(neighborhoods, tour_improvement_time_limit)
+                                                        tour_improvement
                                                     ),
                                                     winner_determination=wd.MaxBidGurobiCAP1(),
                                                     num_auction_rounds=num_final_auction_rounds
@@ -202,7 +203,7 @@ def parameter_generator():
                                                     time_window_offering=time_window_offering,
                                                     time_window_selection=time_window_selection,
                                                     tour_construction=tour_construction,
-                                                    tour_improvement=tour_improvement(neighborhoods, tour_improvement_time_limit),
+                                                    tour_improvement=tour_improvement,
                                                     num_intermediate_auctions=num_intermediate_auctions,
                                                     intermediate_auction=intermediate_auction,
                                                     final_auction=final_auction,

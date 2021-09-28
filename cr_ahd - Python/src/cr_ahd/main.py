@@ -4,9 +4,10 @@ from pathlib import Path
 from datetime import datetime
 import cProfile
 
+import utility_module.io
 from solver_module import workflow as wf
 from utility_module import utils as ut, evaluation as ev, cr_ahd_logging as log
-from utility_module.utils import write_solution_summary_to_multiindex_df
+from utility_module.io import write_solution_summary_to_multiindex_df
 
 logging.config.dictConfig(log.LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
@@ -19,13 +20,13 @@ if __name__ == '__main__':
 
         # select the files to be solved
         paths = sorted(
-            list(Path('data/Input/').iterdir()),
+            list(utility_module.io.input_dir.iterdir()),
             key=ut.natural_sort_key
         )
         run, rad, n = 11, 0, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
         i = run * 6 + rad * 2 + n
         i = random.choice(range(len(paths)))
-        paths = paths[:1]
+        paths = paths[:6]
 
         # solving
         if len(paths) < 6:
@@ -43,7 +44,7 @@ if __name__ == '__main__':
                      facet_col='rad',
                      facet_row='n',
                      show=True,
-                     html_path=ut.unique_path(ut.output_dir, 'CAHD_#{:03d}.html').as_posix())
+                     html_path=utility_module.io.unique_path(utility_module.io.output_dir, 'CAHD_#{:03d}.html').as_posix())
         secondary_parameter = 'neighborhoods'
         ev.print_top_level_stats(df, [secondary_parameter])
 
@@ -54,7 +55,7 @@ if __name__ == '__main__':
 
 
     # PROFILING
-    cProfile.run('cr_ahd()', ut.output_dir.joinpath('cr_ahd_stats'))
+    cProfile.run('cr_ahd()', utility_module.io.output_dir.joinpath('cr_ahd_stats'))
     """
     # STATS
     p = pstats.Stats(ut.output_dir.joinpath('cr_ahd_stats').as_posix())

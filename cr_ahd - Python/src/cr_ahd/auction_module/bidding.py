@@ -5,6 +5,7 @@ from typing import List, Sequence
 
 import tqdm
 
+import utility_module.errors
 from core_module import instance as it, solution as slt
 from routing_module import tour_construction as cns, metaheuristics as mh
 from utility_module import utils as ut
@@ -93,7 +94,7 @@ class InsertBundle(BiddingBehavior):
 
             with_bundle = carrier_copy_improved.objective()
 
-        except ut.ConstraintViolationError:
+        except utility_module.errors.ConstraintViolationError:
             with_bundle = -float('inf')
 
         return with_bundle
@@ -129,7 +130,7 @@ class ClearAndReinsertAll(BiddingBehavior):
 
             with_bundle = carrier_copy_improved.objective()
 
-        except ut.ConstraintViolationError:
+        except utility_module.errors.ConstraintViolationError:
             with_bundle = -float('inf')
 
         return with_bundle

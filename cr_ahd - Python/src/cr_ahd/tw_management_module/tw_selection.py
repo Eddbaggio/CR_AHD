@@ -4,7 +4,8 @@ import logging
 import random
 from typing import List
 
-from utility_module.utils import TimeWindow, END_TIME, START_TIME, TIME_HORIZON
+from utility_module.utils import END_TIME, START_TIME, TIME_HORIZON
+from tw_management_module.tw import TimeWindow
 
 logger = logging.getLogger(__name__)
 

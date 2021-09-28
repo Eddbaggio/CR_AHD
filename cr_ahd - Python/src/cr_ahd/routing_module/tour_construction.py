@@ -3,6 +3,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Tuple, Union
 
+import utility_module.errors
 from core_module import instance as it, solution as slt, tour as tr
 from utility_module import utils as ut
 
@@ -168,7 +169,7 @@ class PDPParallelInsertionConstruction(ABC):
                                      request: int):
         carrier = solution.carriers[carrier_id]
         if len(carrier.tours) >= instance.carriers_max_num_tours:
-            raise ut.ConstraintViolationError(
+            raise utility_module.errors.ConstraintViolationError(
                 f'Cannot create new route with request {request} for carrier {carrier.id_}.'
                 f' Max. number of vehicles is {instance.carriers_max_num_tours}!'
                 f' ({instance.id_})')
@@ -181,7 +182,7 @@ class PDPParallelInsertionConstruction(ABC):
             tour.requests.add(request)
 
         else:
-            raise ut.ConstraintViolationError(
+            raise utility_module.errors.ConstraintViolationError(
                 f'Cannot create new route with request {request} for carrier {carrier.id_}.')
 
         if tour_id < len(solution.tours):

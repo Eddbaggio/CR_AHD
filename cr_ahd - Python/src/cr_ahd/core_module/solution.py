@@ -4,6 +4,7 @@ from typing import List, Sequence, Dict
 
 import numpy as np
 
+import utility_module.io
 from core_module import instance as it, tour as tr
 from utility_module import utils as ut
 
@@ -24,7 +25,7 @@ class CAHDSolution:
         self.carriers: List[AHDSolution] = [AHDSolution(c) for c in range(instance.num_carriers)]
 
         # solver configuration and other meta data
-        self.solver_config = {config: None for config in ut.solver_config}
+        self.solver_config = dict()
         self.timings = dict()
         # TODO find a better way to add available ls neighborhoods automatically
         self.local_search_move_counter = dict(PDPMove=0,
@@ -43,64 +44,6 @@ class CAHDSolution:
 
     def __repr__(self):
         return f'CAHDSolution for {self.id_}'
-
-    def update_solver_config(self, solver):
-        """
-        The solver config describes the solution methods and used to solve an instance. For post-processing and
-        comparing solutions it is thus useful to store the methods' names with the solution.
-        """
-
-        config: Dict[str, str] = self.solver_config
-        int_auction = solver.intermediate_auction
-        fin_auction = solver.final_auction
-        if int_auction or fin_auction:
-            config['solution_algorithm'] = 'CollaborativePlanning'
-        else:
-            config['solution_algorithm'] = 'IsolatedPlanning'
-
-        config['tour_construction'] = solver.tour_construction.name
-        config['tour_improvement'] = solver.tour_improvement.name
-        config['tour_improvement_time_limit_per_carrier'] = solver.tour_improvement.time_limit_per_carrier
-        config['neighborhoods'] = '+'.join([nbh.name for nbh in solver.tour_improvement.neighborhoods])
-        config['time_window_offering'] = solver.time_window_offering.name
-        config['time_window_selection'] = solver.time_window_selection.name
-        config['num_int_auctions'] = solver.num_intermediate_auctions
-
-        if int_auction:
-            config['int_auction_tour_construction'] = int_auction.tour_construction.name
-            config['int_auction_tour_improvement'] = int_auction.tour_improvement.name
-            config['int_auction_neighborhoods'] = '+'.join([nbh.name for nbh in int_auction.tour_improvement.neighborhoods])
-            config['int_auction_num_submitted_requests'] = int_auction.request_selection.num_submitted_requests
-            config['int_auction_request_selection'] = int_auction.request_selection.name
-            config['int_auction_bundle_generation'] = int_auction.bundle_generation.name
-            try:
-                # for bundle generation with LimitedBundlePoolGenerationBehavior
-                config['int_auction_bundling_valuation'] = int_auction.bundle_generation.bundling_valuation.name
-            except KeyError:
-                None
-            config['int_auction_num_auction_bundles'] = int_auction.bundle_generation.num_auction_bundles
-            config['int_auction_bidding'] = int_auction.bidding.name
-            config['int_auction_winner_determination'] = int_auction.winner_determination.name
-            config['int_auction_num_auction_rounds'] = int_auction.num_auction_rounds
-
-        if fin_auction:
-            config['fin_auction_tour_construction'] = fin_auction.tour_construction.name
-            config['fin_auction_tour_improvement'] = fin_auction.tour_improvement.name
-            config['fin_auction_neighborhoods'] = '+'.join([nbh.name for nbh in fin_auction.tour_improvement.neighborhoods])
-            config['fin_auction_num_submitted_requests'] = fin_auction.request_selection.num_submitted_requests
-            config['fin_auction_request_selection'] = fin_auction.request_selection.name
-            config['fin_auction_bundle_generation'] = fin_auction.bundle_generation.name
-            try:
-                # for bundle generation with LimitedBundlePoolGenerationBehavior
-                config['fin_auction_bundling_valuation'] = fin_auction.bundle_generation.bundling_valuation.name
-            except KeyError:
-                None
-            config['fin_auction_num_auction_bundles'] = fin_auction.bundle_generation.num_auction_bundles
-            config['fin_auction_bidding'] = fin_auction.bidding.name
-            config['fin_auction_winner_determination'] = fin_auction.winner_determination.name
-            config['fin_auction_num_auction_rounds'] = fin_auction.num_auction_rounds
-
-        pass
 
     def sum_travel_distance(self):
         return sum(c.sum_travel_distance() for c in self.carriers)
@@ -211,12 +154,12 @@ class CAHDSolution:
         return summary
 
     def write_to_json(self):
-        path = ut.output_dir.joinpath(f'{self.num_carriers()}carriers',
-                                         self.id_ + '_' + self.solver_config['solution_algorithm'])
-        path = ut.unique_path(path.parent, path.stem + '_#{:03d}' + '.json')
+        path = utility_module.io.output_dir.joinpath(f'{self.num_carriers()}carriers',
+                                                     self.id_ + '_' + self.solver_config['solution_algorithm'])
+        path = utility_module.io.unique_path(path.parent, path.stem + '_#{:03d}' + '.json')
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, mode='w') as f:
-            json.dump({'summary': self.summary(), 'solution': self.as_dict()}, f, indent=4, cls=ut.MyJSONEncoder)
+            json.dump({'summary': self.summary(), 'solution': self.as_dict()}, f, indent=4, cls=utility_module.io.MyJSONEncoder)
         pass
 
     def tour_of_request(self, request: int) -> tr.Tour:

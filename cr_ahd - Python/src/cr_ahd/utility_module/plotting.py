@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 from matplotlib.text import Annotation
 import plotly.express as px
 import plotly.graph_objects as go
+
+import tw_management_module.tw
 from core_module import instance as it, solution as slt
 from utility_module import utils as ut
 
@@ -52,7 +54,7 @@ def _make_tour_scatter(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
             f'Request {instance.request_from_vertex(v)}</br>{instance.vertex_type(v)}</br>'
             f'Vertex id: {v}</br>'
             f'Revenue: {instance.vertex_revenue[v]}</br>'
-            f'TW: {ut.TimeWindow(instance.tw_open[v], instance.tw_close[v])}</br>'
+            f'TW: {tw_management_module.tw.TimeWindow(instance.tw_open[v], instance.tw_close[v])}</br>'
             f'Tour\'s Travel Distance: {tour_.sum_travel_distance}')
 
     # colorscale = [(c, ut.univie_colors_100[c]) for c in range(instance.num_carriers)]

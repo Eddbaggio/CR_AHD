@@ -8,6 +8,8 @@ import numpy as np
 import pandas as pd
 from scipy.spatial.distance import pdist, squareform
 
+import tw_management_module.tw
+import utility_module.io
 import utility_module.utils as ut
 
 logger = logging.getLogger(__name__)
@@ -143,10 +145,10 @@ class MDPDPTWInstance:
         # check if any customers are assigned to carriers already and set the file name
         if self.assigned_requests():
             file_name = file_name.with_name(file_name.stem + '_ass')
-        file_name = ut.unique_path(file_name.parent, file_name.stem + '_#{:03d}' + '.json')
+        file_name = utility_module.io.unique_path(file_name.parent, file_name.stem + '_#{:03d}' + '.json')
         file_name.parent.mkdir(parents=True, exist_ok=True)
         with open(file_name, mode='w') as write_file:
-            json.dump(self.to_dict(), write_file, indent=4, cls=ut.MyJSONEncoder)
+            json.dump(self.to_dict(), write_file, indent=4, cls=utility_module.io.MyJSONEncoder)
         # LOGGER.debug(f'{self.id_}: wrote instance to json at {file_name}')
         return file_name
 
@@ -160,7 +162,7 @@ class MDPDPTWInstance:
         else:
             raise IndexError(f'Vertex index {vertex} out of range')
 
-    def assign_time_window(self, vertex: int, time_window: ut.TimeWindow):
+    def assign_time_window(self, vertex: int, time_window: tw_management_module.tw.TimeWindow):
         """
         changes the time window of a vertex
         """

@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 
-import utils as ut
+import utility_module.utils as ut
 
 labels = {'num_carriers': 'Number of Carriers',
           'travel_distance': 'Travel Distance',
@@ -215,23 +215,23 @@ def bar_chart(df: pd.DataFrame,
                  facet_row=splitters['facet_row'],
                  facet_col=splitters['facet_col'],
                  template='plotly_white',
-                 hover_data=px_ready.columns.values,
+                 hover_data=solution_df.reset_index().columns.values,
                  boxmode='group',
                  category_orders=category_orders,
                  width=width,
                  height=height,
                  )
     # add annotation
-    # fig.add_annotation(
-    #     x=1,
-    #     y=0,
-    #     xanchor='left',
-    #     yanchor='bottom',
-    #     xref='paper',
-    #     yref='paper',
-    #     showarrow=False,
-    #     align='left',
-    #     text=annotation)
+    fig.add_annotation(
+        x=1,
+        y=0,
+        xanchor='left',
+        yanchor='bottom',
+        xref='paper',
+        yref='paper',
+        showarrow=False,
+        align='left',
+        text=annotation)
 
     # fig.update_yaxes(range=[0, 10000])
     fig.update_xaxes(type='category')
@@ -239,16 +239,16 @@ def bar_chart(df: pd.DataFrame,
         template = 'plotly_white'
     else:
         template = 'plotly_dark'
-    fig.update_layout(
-        legend=dict(
-            orientation="h",
-            yanchor="top",
-            y=-0.1,
-            xanchor="center",
-            x=0.5)
+    # fig.update_layout(
+    #     legend=dict(
+    #         orientation="h",
+    #         yanchor="top",
+    #         y=-0.1,
+    #         xanchor="center",
+    #         x=0.5)
         #     title_font_size=12,
         #     template=template
-    )
+    # )
 
     if show:
         fig.show(config=config)

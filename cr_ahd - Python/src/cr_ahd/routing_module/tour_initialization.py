@@ -2,6 +2,7 @@ import random
 from abc import ABC, abstractmethod
 from typing import List
 
+import utility_module.errors
 from core_module import instance as it, solution as slt, tour as tr
 from utility_module import utils as ut
 
@@ -44,7 +45,7 @@ class TourInitializationBehavior(ABC):
             # create the pendulum tour
             carrier = solution.carriers[carrier_id]
             if len(carrier.tours) >= instance.carriers_max_num_tours:
-                raise ut.ConstraintViolationError(
+                raise utility_module.errors.ConstraintViolationError(
                     f'Cannot create new route with request {best_request} for carrier {carrier.id_}.'
                     f' Max. number of vehicles is {instance.carriers_max_num_tours}!'
                     f' ({instance.id_})')
@@ -57,7 +58,7 @@ class TourInitializationBehavior(ABC):
                 tour.requests.add(best_request)
 
             else:
-                raise ut.ConstraintViolationError(
+                raise utility_module.errors.ConstraintViolationError(
                     f'Cannot create new route with request {best_request} for carrier {carrier.id_}.')
 
             if tour_id < len(solution.tours):
@@ -166,7 +167,7 @@ class MaxCliqueTourInitialization(ABC):
 
                 # make sure that the first request is feasible alone
                 if not tour_.insertion_feasibility_check(instance, [1, 2], [i_pickup, i_delivery]):
-                    raise ut.ConstraintViolationError(
+                    raise utility_module.errors.ConstraintViolationError(
                         message=f'[{instance.id_}] Request {i_request} cannot feasibly be served by carrier {carrier}!')
                 tour_.insert_and_update(instance, [1, 2], [i_pickup, i_delivery])
                 tour_.requests.add(i_request)
