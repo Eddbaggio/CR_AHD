@@ -174,7 +174,7 @@ class PDPParallelInsertionConstruction(ABC):
                 f' Max. number of vehicles is {instance.carriers_max_num_tours}!'
                 f' ({instance.id_})')
         tour_id = solution.get_free_tour_id()
-        assert tour_id < instance.num_carriers * instance.carriers_max_num_tours
+        assert tour_id < instance.num_carriers * instance.carriers_max_num_tours, f'{instance.id_}: tour_id={tour_id}'
         tour = tr.Tour(tour_id, depot_index=carrier.id_)
 
         if tour.insertion_feasibility_check(instance, [1, 2], instance.pickup_delivery_pair(request)):

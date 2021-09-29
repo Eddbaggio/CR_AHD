@@ -23,10 +23,10 @@ if __name__ == '__main__':
             list(utility_module.io.input_dir.iterdir()),
             key=ut.natural_sort_key
         )
-        run, rad, n = 11, 0, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
+        run, rad, n = 41, 2, 0  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
         i = run * 6 + rad * 2 + n
-        i = random.choice(range(len(paths)))
-        paths = paths[:6]
+        # i = random.choice(range(len(paths)))
+        paths = paths[i:i+1]
 
         # solving
         if len(paths) < 6:

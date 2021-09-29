@@ -317,39 +317,5 @@ ALL_TW = [TimeWindow(e, min(e + TW_LENGTH, END_TIME)) for e in
 TIME_HORIZON = TimeWindow(START_TIME, END_TIME)
 SPEED_KMH = 60  # vehicle speed (set to 60 to treat distance = time)
 
-solver_config = [
-    'solution_algorithm',
-    'tour_improvement',
-    'neighborhoods',
-    'tour_construction',
-    'tour_improvement_time_limit_per_carrier',
-    'time_window_offering',
-    'time_window_selection',
-
-    'num_int_auctions',
-    'int_auction_tour_construction',
-    'int_auction_tour_improvement',
-    'int_auction_neighborhoods',
-    'int_auction_num_submitted_requests',
-    'int_auction_request_selection',
-    'int_auction_bundle_generation',
-    'int_auction_bundling_valuation',
-    'int_auction_num_auction_bundles',
-    'int_auction_bidding',
-    'int_auction_winner_determination',
-    'int_auction_num_auction_rounds',
-
-    'fin_auction_tour_construction',
-    'fin_auction_tour_improvement',
-    'fin_auction_neighborhoods',
-    'fin_auction_num_submitted_requests',
-    'fin_auction_request_selection',
-    'fin_auction_bundle_generation',
-    'fin_auction_bundling_valuation',
-    'fin_auction_num_auction_bundles',
-    'fin_auction_bidding',
-    'fin_auction_winner_determination',
-    'fin_auction_num_auction_rounds'
-]
 
 

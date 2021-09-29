@@ -85,7 +85,7 @@ class Auction:
         timer = pr.Timer()
         auction_request_pool, original_bundling_labels = self.request_selection.execute(instance, solution)
         original_bundles = ut.indices_to_nested_lists(original_bundling_labels, auction_request_pool)
-        # timer.write_duration_to_solution(solution, 'runtime_request_selection') fixme
+        # timer.write_duration_to_solution(solution, 'runtime_request_selection') fixme need to distinguish between intermediate and final
 
         if auction_request_pool:
             profit_after_rs = [carrier.sum_profit() for carrier in solution.carriers]

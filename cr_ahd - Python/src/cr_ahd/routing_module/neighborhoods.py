@@ -248,6 +248,7 @@ class PDPRelocate(InterTourNeighborhood):
                 old_delivery_pos = old_tour.vertex_pos[delivery]
 
                 # check all new tours for re-insertion
+                # TODO also check re-insertion into a NEW tour (if feasible)
                 for new_tour in carrier.tours:
 
                     # skip the current tour, there is PDPMove for that option
@@ -290,9 +291,8 @@ class PDPRelocate(InterTourNeighborhood):
                      f'Tour {old_tour.id_} {old_pickup_pos, old_delivery_pos} to '
                      f'Tour {new_tour.id_} {new_pickup_pos, new_delivery_pos}')
 
-        # if it is now empty (i.e. depot -> depot), drop the old tour
-        if len(old_tour) <= 2:
-            carrier.tours.remove(old_tour)
+        # the old_tour might be empty (depot-depot) now
+        carrier.drop_empty_tours()
 
         new_tour.insert_and_update(instance, [new_pickup_pos, new_delivery_pos], [pickup, delivery])
         new_tour.requests.add(request)

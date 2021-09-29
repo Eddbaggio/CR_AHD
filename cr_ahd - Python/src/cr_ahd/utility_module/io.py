@@ -6,7 +6,6 @@ from typing import List
 import numpy as np
 import pandas as pd
 
-from utility_module.utils import solver_config
 
 working_dir = Path().cwd()
 data_dir = working_dir.absolute().joinpath('data')

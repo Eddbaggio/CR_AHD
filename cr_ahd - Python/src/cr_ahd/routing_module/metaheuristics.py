@@ -4,12 +4,11 @@ import time
 from abc import abstractmethod, ABC
 from copy import deepcopy
 from math import exp, log
-from typing import Sequence, List, Union
+from typing import Sequence, List
 
-import utility_module.errors
+import utility_module.errors as err
 from core_module import instance as it, solution as slt, tour as tr
 from routing_module import neighborhoods as nh, shakes as sh, tour_construction as cns
-from utility_module import utils as ut, profiling as pr
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +25,15 @@ class PDPTWMetaHeuristic(ABC):
 
         self.name = f'{self.__class__.__name__}'
 
-    @abstractmethod
     def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
                 carrier_ids: List[int] = None) -> slt.CAHDSolution:
+        new_solution = self.improve_solution(instance, solution, carrier_ids)
+        new_solution.drop_empty_tours_and_adjust_ids()
+        return new_solution
+
+    @abstractmethod
+    def improve_solution(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+                         carrier_ids: List[int] = None) -> slt.CAHDSolution:
         pass
 
     # @abstractmethod
@@ -57,8 +62,8 @@ class NoMetaheuristic(PDPTWMetaHeuristic):
     def acceptance_criterion(self, instance: it.MDPDPTWInstance, move: tuple):
         pass
 
-    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
-                carrier_ids: List[int] = None) -> slt.CAHDSolution:
+    def improve_solution(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+                         carrier_ids: List[int] = None) -> slt.CAHDSolution:
         return solution
 
     def execute_on_carrier(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution):
@@ -85,8 +90,8 @@ class LocalSearchFirst(PDPTWMetaHeuristic):
     local search heuristic using the first improvement strategy
     """
 
-    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
-                carrier_ids: List[int] = None) -> slt.CAHDSolution:
+    def improve_solution(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+                         carrier_ids: List[int] = None) -> slt.CAHDSolution:
         assert len(self.neighborhoods) == 1, 'Local Search can use a single neighborhood only!'
         best_solution = deepcopy(solution)
         if carrier_ids is None:
@@ -128,8 +133,8 @@ class LocalSearchFirst(PDPTWMetaHeuristic):
 class LocalSearchBest(PDPTWMetaHeuristic):
     """implements a the local search heuristic using the best improvement strategy, i.e. steepest descent"""
 
-    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
-                carrier_ids: List[int] = None) -> slt.CAHDSolution:
+    def improve_solution(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+                         carrier_ids: List[int] = None) -> slt.CAHDSolution:
         assert len(self.neighborhoods) == 1, 'Local Search must have a single neighborhood only!'
         best_solution = deepcopy(solution)
         if carrier_ids is None:
@@ -170,8 +175,8 @@ class PDPTWSequentialLocalSearch(PDPTWMetaHeuristic):
     used.
     """
 
-    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
-                carrier_ids: List[int] = None) -> slt.CAHDSolution:
+    def improve_solution(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+                         carrier_ids: List[int] = None) -> slt.CAHDSolution:
         best_solution = deepcopy(solution)
         if carrier_ids is None:
             carrier_ids = [x.id_ for x in best_solution.carriers]
@@ -220,8 +225,8 @@ class PDPTWVariableNeighborhoodDescent(PDPTWMetaHeuristic):
     neighborhood
     """
 
-    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
-                carrier_ids: List[int] = None) -> slt.CAHDSolution:
+    def improve_solution(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+                         carrier_ids: List[int] = None) -> slt.CAHDSolution:
         best_solution = deepcopy(solution)
         if carrier_ids is None:
             carrier_ids = [x.id_ for x in best_solution.carriers]
@@ -296,8 +301,8 @@ class PDPTWReducedVariableNeighborhoodSearch(PDPTWVariableNeighborhoodDescent):
     solution
     """
 
-    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
-                carrier_ids: List[int] = None) -> slt.CAHDSolution:
+    def improve_solution(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+                         carrier_ids: List[int] = None) -> slt.CAHDSolution:
         solution = deepcopy(solution)
         best_solution = deepcopy(solution)
         if carrier_ids is None:
@@ -336,8 +341,8 @@ class PDPTWVariableNeighborhoodSearch(PDPTWVariableNeighborhoodDescent):
 
     """
 
-    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
-                carrier_ids: List[int] = None) -> slt.CAHDSolution:
+    def improve_solution(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+                         carrier_ids: List[int] = None) -> slt.CAHDSolution:
         solution = deepcopy(solution)
         best_solution = deepcopy(solution)
         if carrier_ids is None:
@@ -385,7 +390,9 @@ class PDPTWVariableNeighborhoodSearch(PDPTWVariableNeighborhoodDescent):
         """
         # TODO neighborhood should be a parameter instead of an arbitrary choice
         arbitrary_neighborhood = self.neighborhoods[0]
-        solution = LocalSearchFirst([arbitrary_neighborhood], self.time_limit_per_carrier/10).execute(instance, solution, carrier_ids)
+        solution = LocalSearchFirst([arbitrary_neighborhood], self.time_limit_per_carrier / 10).execute(instance,
+                                                                                                        solution,
+                                                                                                        carrier_ids)
         return solution
 
 
@@ -396,8 +403,8 @@ class PDPTWSimulatedAnnealing(PDPTWMetaHeuristic):
         self.parameters['temperature'] = 0
         self.parameters['cooling_factor'] = 0.85
 
-    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
-                carrier_ids: List[int] = None) -> slt.CAHDSolution:
+    def improve_solution(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+                         carrier_ids: List[int] = None) -> slt.CAHDSolution:
         solution = deepcopy(solution)
         best_solution = deepcopy(solution)
         if carrier_ids is None:
@@ -478,8 +485,8 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
     Uses a perturbation function to explore different regions of the solution space
     """
 
-    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
-                carrier_ids: List[int] = None) -> slt.CAHDSolution:
+    def improve_solution(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+                         carrier_ids: List[int] = None) -> slt.CAHDSolution:
         solution = deepcopy(solution)
         best_best_solution = solution
 
@@ -544,7 +551,7 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
 
             return solution_copy
 
-        except utility_module.errors.ConstraintViolationError:
+        except err.ConstraintViolationError:
             # sometimes the shaking cannot be repaired with the given method and will raise a ConstraintViolationError
             # in that case, simply returning the original solution
             return solution
@@ -555,7 +562,8 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
         """
         # TODO neighborhood should be a parameter instead of an arbitrary choice
         arbitrary_neighborhood = self.neighborhoods[0]
-        improved_solution = LocalSearchFirst([arbitrary_neighborhood], self.time_limit_per_carrier/10).execute(instance, solution, carrier_ids)
+        improved_solution = LocalSearchFirst([arbitrary_neighborhood], self.time_limit_per_carrier / 10).execute(
+            instance, solution, carrier_ids)
         return improved_solution
 
     def stopping_criterion(self):

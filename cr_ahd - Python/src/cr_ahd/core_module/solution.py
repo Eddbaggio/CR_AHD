@@ -4,9 +4,8 @@ from typing import List, Sequence, Dict
 
 import numpy as np
 
-import utility_module.io
+import utility_module.io as io
 from core_module import instance as it, tour as tr
-from utility_module import utils as ut
 
 
 class CAHDSolution:
@@ -118,9 +117,21 @@ class CAHDSolution:
             carrier = self.carriers[carrier_id]
             carrier.unrouted_requests = carrier.accepted_requests[:]
             carrier.routed_requests.clear()
-            for tour_id in [tour.id_ for tour in carrier.tours]:
-                self.tours[tour_id] = None
+            self.tours = [tour for tour in self.tours if tour not in carrier.tours]
+            for index, tour in enumerate(self.tours):
+                tour.id_ = index
             carrier.tours.clear()
+
+    def drop_empty_tours_and_adjust_ids(self):
+        """
+        drops all tours that only contain a depot and do not visit any customer location. removes them from
+        self as well as all carriers in self.carriers
+        """
+        self.tours = [tour for tour in self.tours if tour.requests]
+        for index, tour in enumerate(self.tours):
+            tour.id_ = index
+        for carrier in self.carriers:
+            carrier.drop_empty_tours()
 
     def get_free_tour_id(self):
         if None in self.tours:
@@ -154,12 +165,12 @@ class CAHDSolution:
         return summary
 
     def write_to_json(self):
-        path = utility_module.io.output_dir.joinpath(f'{self.num_carriers()}carriers',
-                                                     self.id_ + '_' + self.solver_config['solution_algorithm'])
-        path = utility_module.io.unique_path(path.parent, path.stem + '_#{:03d}' + '.json')
+        path = io.output_dir.joinpath(f'{self.num_carriers()}carriers',
+                                      self.id_ + '_' + self.solver_config['solution_algorithm'])
+        path = io.unique_path(path.parent, path.stem + '_#{:03d}' + '.json')
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, mode='w') as f:
-            json.dump({'summary': self.summary(), 'solution': self.as_dict()}, f, indent=4, cls=utility_module.io.MyJSONEncoder)
+            json.dump({'summary': self.summary(), 'solution': self.as_dict()}, f, indent=4, cls=io.MyJSONEncoder)
         pass
 
     def tour_of_request(self, request: int) -> tr.Tour:
@@ -241,3 +252,11 @@ class AHDSolution:
             'acceptance_rate': self.acceptance_rate,
             'tour_summaries': {t.id_: t.summary() for t in self.tours}
         }
+
+    def drop_empty_tours(self):
+        """
+        drops all tours that only contain a depot and do not visit any customer location. removes them from
+        self
+        """
+        self.tours = [tour for tour in self.tours if tour.requests]
+        pass

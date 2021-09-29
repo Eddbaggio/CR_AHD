@@ -32,7 +32,7 @@ class BiddingBehavior(ABC):
         """
 
         bundle_bids = []
-        for b in tqdm.trange(len(bundles), desc='Bidding', disable=True):
+        for b in tqdm.trange(len(bundles), desc='Bidding', disable=not ut.debugger_is_active()):
             carrier_bundle_bids = []
             for carrier in solution.carriers:
                 logger.debug(f'Carrier {carrier.id_} generating bids for bundle {b}')
