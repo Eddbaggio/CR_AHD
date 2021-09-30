@@ -169,11 +169,20 @@ def read_gansterer_hartl_mv(path: Path, num_carriers=3) -> MDPDPTWInstance:
     requests['pickup_service_time'] = dt.timedelta(0)
     requests['delivery_service_time'] = dt.timedelta(0)
 
-    return MDPDPTWInstance(id_=path.stem, max_num_tours_per_carrier=vrp_params['V'].tolist(),
+    requests['disclosure_time'] = None
+    for carrier_id in range(requests['carrier_index'].max() + 1):
+        assert carrier_id < 24
+        requests.loc[requests.carrier_index == carrier_id, 'disclosure_time'] = list(ut.datetime_range(
+            start=ut.ACCEPTANCE_START_TIME + dt.timedelta(minutes=carrier_id),
+            stop=ut.EXECUTION_START_TIME,
+            num=len(requests[requests.carrier_index == carrier_id]), endpoint=False))
+
+    return MDPDPTWInstance(id_=path.stem,
+                           max_num_tours_per_carrier=vrp_params['V'].tolist(),
                            max_vehicle_load=(vrp_params['L'] * ut.LOAD_CAPACITY_SCALING).tolist(),
                            max_tour_length=vrp_params['T'].tolist(), requests=requests.index.tolist(),
                            requests_initial_carrier_assignment=requests['carrier_index'].tolist(),
-                           requests_disclosure_time=None,
+                           requests_disclosure_time=requests['disclosure_time'].tolist(),
                            requests_pickup_x=(requests['pickup_x'] * ut.DISTANCE_SCALING).tolist(),
                            requests_pickup_y=(requests['pickup_y'] * ut.DISTANCE_SCALING).tolist(),
                            requests_delivery_x=(requests['delivery_x'] * ut.DISTANCE_SCALING).tolist(),

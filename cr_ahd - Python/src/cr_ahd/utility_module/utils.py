@@ -208,13 +208,22 @@ def n_points_on_a_circle(n: int, radius, origin_x=0, origin_y=0):
     return points
 
 
-def datetime_range(start: dt.datetime, end: dt.datetime, freq: dt.timedelta, include_end=True):
+def datetime_range(start: dt.datetime, stop: dt.datetime, freq: dt.timedelta = None, num: int = None, endpoint=True):
     """
-    returns a generator object that yields datetime objects in the range from start to end in steps of freq.
-    :param include_end: determines whether the specified end is included in the range
+    returns a generator object that yields datetime objects in the range from start to end (a) in steps of freq or (b)
+    in num equally spaced steps.
+
+    :param endpoint: determines whether the specified end is included in the range
     :return:
     """
-    return (start + x * freq for x in range(((end - start) // freq) + include_end))
+    assert bool(freq) != bool(num), f'only one of freq or num must be given'
+    delta = stop - start
+    if bool(freq):
+        return (start + x * freq for x in range((delta // freq) + endpoint))
+    else:
+        div = (num - 1) if endpoint else num
+        freq = delta/div
+        return (start + x * freq for x in range(div))
 
 
 def natural_sort_key(s, _nsre=re.compile('([0-9]+)')):
@@ -228,7 +237,7 @@ def indices_to_nested_lists(indices: Sequence[int], elements: Sequence):
         nested_list[y].append(x)
     return nested_list
 
-
+# TODO can this not be a method of the solution itself? (circular dependencies solution - instance?)
 def validate_solution(instance, solution):
     assert solution.num_carriers() > 0
 
@@ -253,7 +262,7 @@ def validate_solution(instance, solution):
             #     assert solution.request_to_tour_assignment[
             #                request] == tour.id_, f'{instance.id_}, tour {tour.id_}, vertex {vertex} at index {i}'
 
-
+# TODO can this not be a method of the solution itself? (circular dependencies tour - instance?)
 def validate_tour(instance, tour):
     # iterate over the tour
     for i in trange(1, len(tour.routing_sequence), desc=f'Tour {tour.id_}', disable=True):
@@ -313,7 +322,7 @@ END_TIME: dt.datetime = EXECUTION_START_TIME + dt.timedelta(minutes=3360)
 # END_TIME = dt.datetime.min + dt.timedelta(days=1)
 TW_LENGTH: dt.timedelta = dt.timedelta(hours=2)
 ALL_TW = [TimeWindow(e, min(e + TW_LENGTH, END_TIME)) for e in
-          datetime_range(EXECUTION_START_TIME, END_TIME, freq=TW_LENGTH, include_end=False)]
+          datetime_range(EXECUTION_START_TIME, END_TIME, freq=TW_LENGTH, endpoint=False)]
 EXECUTION_TIME_HORIZON = TimeWindow(EXECUTION_START_TIME, END_TIME)
 SPEED_KMH = 60  # vehicle speed (set to 60 to treat distance = time)
 

@@ -47,8 +47,8 @@ class BiddingBehavior(ABC):
         return bundle_bids
 
     @staticmethod
-    def _add_bundle_to_carrier(bundle: Sequence[int], carrier_post_rs: slt.AHDSolution,
-                               carrier_pre_rs: slt.AHDSolution):
+    def _add_bundle_to_carrier(bundle: Sequence[int], post_rs_carrier: slt.AHDSolution,
+                               pre_rs_carrier: slt.AHDSolution):
         """
         add the bundle to the carriers assigned, accepted and unrouted requests.
         correct sorting is required to ensure that dynamic insertion order is the same as in the acceptance phase. in
@@ -60,18 +60,27 @@ class BiddingBehavior(ABC):
         without sorting, dynamic insertion for computing the bid would happen in the order [0, 1, 4, 5, 2, 3] which
         may make it impossible to reach the original ask price
         """
+        post_rs_carrier.assigned_requests.extend(bundle)
+        post_rs_carrier.assigned_requests.sort()
 
-        carrier_post_rs.assigned_requests = [r for r in carrier_pre_rs.assigned_requests if
-                                             r in carrier_post_rs.assigned_requests + bundle]
-        carrier_post_rs.assigned_requests += [r for r in bundle if r not in carrier_pre_rs.assigned_requests]
+        post_rs_carrier.accepted_requests.extend(bundle)
+        post_rs_carrier.accepted_requests.sort()
 
-        carrier_post_rs.accepted_requests = [r for r in carrier_pre_rs.accepted_requests if
-                                             r in carrier_post_rs.accepted_requests + bundle]
-        carrier_post_rs.accepted_requests += [r for r in bundle if r not in carrier_pre_rs.accepted_requests]
+        post_rs_carrier.unrouted_requests.extend(bundle)
+        post_rs_carrier.unrouted_requests.sort()
 
-        carrier_post_rs.unrouted_requests = [r for r in carrier_pre_rs.unrouted_requests if
-                                             r in carrier_post_rs.unrouted_requests + bundle]
-        carrier_post_rs.unrouted_requests += [r for r in bundle if r not in carrier_pre_rs.unrouted_requests]
+        # THE BELOW APPROACH CAUSES INCONSISTENT BIDDING RESULTS THAT ARE BELOW THE PRE-REQUEST-SELECTION SOLUTION!
+        # carrier_post_rs.assigned_requests = [r for r in carrier_pre_rs.assigned_requests if
+        #                                      r in carrier_post_rs.assigned_requests + bundle]
+        # carrier_post_rs.assigned_requests += [r for r in bundle if r not in carrier_pre_rs.assigned_requests]
+        #
+        # carrier_post_rs.accepted_requests = [r for r in carrier_pre_rs.accepted_requests if
+        #                                      r in carrier_post_rs.accepted_requests + bundle]
+        # carrier_post_rs.accepted_requests += [r for r in bundle if r not in carrier_pre_rs.accepted_requests]
+        #
+        # carrier_post_rs.unrouted_requests = [r for r in carrier_pre_rs.unrouted_requests if
+        #                                      r in carrier_post_rs.unrouted_requests + bundle]
+        # carrier_post_rs.unrouted_requests += [r for r in bundle if r not in carrier_pre_rs.unrouted_requests]
 
         pass
 

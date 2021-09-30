@@ -72,7 +72,8 @@ class Auction:
                 (b) the metaheuristic used for improvements does not work correctly and returns worse results. This
                 messes up the bidding because the bid on a given carrier's original bundle may be incorrect
                 """
-                raise ValueError(f'{instance.id_}: Post-auction objective is lower than pre-auction objective!,'
+                raise ValueError(f'{instance.id_}:\n {solution.objective()} < {pre_auction_objective}\n'
+                                 f' Post-auction objective is lower than pre-auction objective!,'
                                  f' Recovering the pre-auction solution')
                 solution = solution_backup
                 assert pre_auction_objective == solution.objective()
