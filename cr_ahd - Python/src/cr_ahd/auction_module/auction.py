@@ -81,11 +81,13 @@ class Auction:
     def reallocate_requests(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution) -> slt.CAHDSolution:
         logger.debug(f'running auction {self.__class__.__name__}')
 
+        pre_rs_solution = deepcopy(solution)
+
         # ===== [1] Request Selection =====
         timer = pr.Timer()
         auction_request_pool, original_bundling_labels = self.request_selection.execute(instance, solution)
         original_bundles = ut.indices_to_nested_lists(original_bundling_labels, auction_request_pool)
-        # timer.write_duration_to_solution(solution, 'runtime_request_selection') fixme need to distinguish between intermediate and final
+        # timer.write_duration_to_solution(solution, 'runtime_request_selection') fixme need to distinguish between intermediate and final: auction_counter in Solver class?
 
         if auction_request_pool:
             profit_after_rs = [carrier.sum_profit() for carrier in solution.carriers]
@@ -101,7 +103,7 @@ class Auction:
             # ===== [3] Bidding =====
             logger.debug(f'Generating bids_matrix')
             timer = pr.Timer()
-            bids_matrix = self.bidding.execute_bidding(instance, solution, auction_bundle_pool)
+            bids_matrix = self.bidding.execute_bidding(instance, pre_rs_solution, solution, auction_bundle_pool)
             # timer.write_duration_to_solution(solution, 'runtime_bidding') fixme
             logger.debug(f'Bids {bids_matrix} have been created for bundles {auction_bundle_pool}')
 

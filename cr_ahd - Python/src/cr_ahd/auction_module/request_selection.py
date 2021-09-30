@@ -22,6 +22,8 @@ def _abs_num_requests(carrier_: slt.AHDSolution, num_submitted_requests) -> int:
     if isinstance(num_submitted_requests, int):
         return num_submitted_requests
     elif isinstance(num_submitted_requests, float):
+        if num_submitted_requests % 1 == 0:
+            return int(num_submitted_requests)
         assert num_submitted_requests <= 1, 'If providing a float, must be <=1 to be converted to percentage'
         return round(len(carrier_.assigned_requests) * num_submitted_requests)
 

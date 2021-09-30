@@ -5,7 +5,7 @@ from typing import List
 
 import numpy as np
 import pandas as pd
-
+from core_module import solution as slt
 
 working_dir = Path().cwd()
 data_dir = working_dir.absolute().joinpath('data')
@@ -32,7 +32,7 @@ class MyJSONEncoder(json.JSONEncoder):
             return super().default(obj)
 
 
-def write_solution_summary_to_multiindex_df(solutions_per_instance: List[List], agg_level='tour'):
+def write_solution_summary_to_multiindex_df(solutions_per_instance: List[List[slt.CAHDSolution]], agg_level='tour'):
     """
     :param solutions_per_instance: A List of Lists of solutions. First Axis: instance, Second Axis: solver
     :param agg_level: defines up to which level the solution will be summarized. E.g. if agg_level='carrier' the
@@ -50,33 +50,32 @@ def write_solution_summary_to_multiindex_df(solutions_per_instance: List[List], 
                 df.append(record)
 
             elif agg_level == 'carrier':
-                for carrier in range(solution.num_carriers()):
+                for carrier in solution.carriers:
                     record = solution.meta.copy()  # rad, n, run, dist
                     record.update(solution.solver_config)
-                    record.update(solution.carriers[carrier].summary())
-                    record['carrier_id_'] = carrier
+                    record.update(carrier.summary())
+                    record['carrier_id_'] = carrier.id_
                     record.pop('tour_summaries')
                     df.append(record)
 
             elif agg_level == 'tour':
-                for carrier in range(solution.num_carriers()):
-                    ahd_solution = solution.carriers[carrier]
-                    for tour in range(len(ahd_solution.tours)):
+                for carrier in solution.carriers:
+                    for tour in carrier.tours:
                         record = solution.meta.copy()  # rad, n, run, dist
                         record.update(solution.solver_config)
-                        record.update(solution.carriers[carrier].tours[tour].summary())
-                        record['carrier_id_'] = carrier
-                        record['tour_id_'] = tour
+                        record.update(tour.summary())
+                        record['carrier_id_'] = carrier.id_
+                        record['tour_id_'] = tour.id_
                         df.append(record)
 
             else:
-                raise ValueError
+                raise ValueError('agg_level must be one of solution, carrier or tour')
 
     df = pd.DataFrame.from_records(df)
     df.drop(columns=['dist'], inplace=True)  # since the distance between depots is always 200 for the GH instances
 
     # set the multiindex
-    index = ['rad', 'n', 'run'] + solver_config
+    index = ['rad', 'n', 'run'] + list(solution.solver_config.keys())
     if agg_level == 'carrier':
         index += ['carrier_id_']
     if agg_level == 'tour':
@@ -115,7 +114,7 @@ def unique_path(directory, name_pattern) -> Path:
 
 def ask_for_overwrite_permission(path: Path):
     if path.exists():
-        permission = input(f'Should files and directories that exist at {path} be overwritten?\n[y/n]: ')
+        permission = input(f'Should files and directories that exist at {path} be overwritten?\t[y/n]: ')
         if permission == 'y':
             return True
         else:

@@ -28,8 +28,8 @@ class MDPDPTWInstance:
                  requests_delivery_x: List[float],
                  requests_delivery_y: List[float],
                  requests_revenue: List[float],
-                 requests_pickup_service_time: List[dt.timedelta],
-                 requests_delivery_service_time: List[dt.timedelta],
+                 requests_pickup_service_duration: List[dt.timedelta],
+                 requests_delivery_service_duration: List[dt.timedelta],
                  requests_pickup_load: List[float],
                  requests_delivery_load: List[float],
                  request_pickup_time_window_open: List[dt.datetime],
@@ -60,11 +60,12 @@ class MDPDPTWInstance:
         self.x_coords = [*carrier_depots_x, *requests_pickup_x, *requests_delivery_x]
         self.y_coords = [*carrier_depots_y, *requests_pickup_y, *requests_delivery_y]
         self.request_to_carrier_assignment: List[int] = requests_initial_carrier_assignment
+        # TODO self.request_disclosure_time: List[dt.datetime]
         self.vertex_revenue = [*[0] * (self.num_carriers + len(requests)), *requests_revenue]
         self.vertex_load = [*[0] * self.num_carriers, *requests_pickup_load, *requests_delivery_load]
         self.vertex_service_duration = (*[dt.timedelta(0)] * self.num_carriers,
-                                        *requests_pickup_service_time,
-                                        *requests_delivery_service_time)
+                                        *requests_pickup_service_duration,
+                                        *requests_delivery_service_duration)
         self.tw_open = [*carrier_depots_tw_open, *request_pickup_time_window_open, *request_delivery_time_window_open]
         self.tw_close = [*carrier_depots_tw_close, *request_pickup_time_window_close,
                          *request_delivery_time_window_close]
@@ -195,9 +196,9 @@ def read_gansterer_hartl_mv(path: Path, num_carriers=3) -> MDPDPTWInstance:
                            requests_delivery_x=(requests['delivery_x'] * ut.DISTANCE_SCALING).tolist(),
                            requests_delivery_y=(requests['delivery_y'] * ut.DISTANCE_SCALING).tolist(),
                            requests_revenue=(requests['revenue'] * ut.REVENUE_SCALING).tolist(),
-                           requests_pickup_service_time=[x.to_pytimedelta() for x in requests['pickup_service_time']],
-                           requests_delivery_service_time=[x.to_pytimedelta() for x in
-                                                           requests['delivery_service_time']],
+                           requests_pickup_service_duration=[x.to_pytimedelta() for x in requests['pickup_service_time']],
+                           requests_delivery_service_duration=[x.to_pytimedelta() for x in
+                                                               requests['delivery_service_time']],
                            requests_pickup_load=requests['load'].tolist(),
                            requests_delivery_load=(-requests['load']).tolist(),
                            request_pickup_time_window_open=[ut.START_TIME for _ in range(len(requests) * 2)],
