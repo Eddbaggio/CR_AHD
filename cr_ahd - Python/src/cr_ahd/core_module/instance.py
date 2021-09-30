@@ -172,10 +172,10 @@ def read_gansterer_hartl_mv(path: Path, num_carriers=3) -> MDPDPTWInstance:
     requests['disclosure_time'] = None
     for carrier_id in range(requests['carrier_index'].max() + 1):
         assert carrier_id < 24
-        requests.loc[requests.carrier_index == carrier_id, 'disclosure_time'] = list(ut.datetime_range(
-            start=ut.ACCEPTANCE_START_TIME + dt.timedelta(minutes=carrier_id),
-            stop=ut.EXECUTION_START_TIME,
-            num=len(requests[requests.carrier_index == carrier_id]), endpoint=False))
+        requests.loc[requests.carrier_index == carrier_id, 'disclosure_time'] = list(
+            ut.datetime_range(start=ut.ACCEPTANCE_START_TIME + dt.timedelta(minutes=carrier_id),
+                              stop=ut.EXECUTION_START_TIME, num=len(requests[requests.carrier_index == carrier_id]),
+                              endpoint=False))
 
     return MDPDPTWInstance(id_=path.stem,
                            max_num_tours_per_carrier=vrp_params['V'].tolist(),

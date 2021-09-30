@@ -208,22 +208,37 @@ def n_points_on_a_circle(n: int, radius, origin_x=0, origin_y=0):
     return points
 
 
-def datetime_range(start: dt.datetime, stop: dt.datetime, freq: dt.timedelta = None, num: int = None, endpoint=True):
-    """
-    returns a generator object that yields datetime objects in the range from start to end (a) in steps of freq or (b)
-    in num equally spaced steps.
+def datetime_range(start: dt.datetime, stop: dt.datetime, step: dt.timedelta = None, num: int = None, startpoint=True,
+                   endpoint=True):
+    assert None in (step, num), f'only one of step or num must be given'
+    if step is not None:
+        assert step.total_seconds() > 0, f"Step shouldn't be 0"
+    if num is not None:
+        assert num > 0, f"Num shouldn't be 0"
 
-    :param endpoint: determines whether the specified end is included in the range
-    :return:
-    """
-    assert bool(freq) != bool(num), f'only one of freq or num must be given'
     delta = stop - start
-    if bool(freq):
-        return (start + x * freq for x in range((delta // freq) + endpoint))
+
+    if num:
+        if endpoint and startpoint:
+            div = num - 1
+        elif endpoint or startpoint:
+            div = num
+        else:
+            div = num + 1
+        step = delta / div
     else:
-        div = (num - 1) if endpoint else num
-        freq = delta/div
-        return (start + x * freq for x in range(div))
+        num = delta // step
+        if endpoint and startpoint:
+            num += 1
+        elif endpoint or startpoint:
+            pass
+        else:
+            num -= 1
+
+    if not startpoint:
+        start += step
+
+    return (start + (x * step) for x in range(num))
 
 
 def natural_sort_key(s, _nsre=re.compile('([0-9]+)')):
@@ -236,6 +251,7 @@ def indices_to_nested_lists(indices: Sequence[int], elements: Sequence):
     for x, y in zip(elements, indices):
         nested_list[y].append(x)
     return nested_list
+
 
 # TODO can this not be a method of the solution itself? (circular dependencies solution - instance?)
 def validate_solution(instance, solution):
@@ -261,6 +277,7 @@ def validate_solution(instance, solution):
             #     request = instance.request_from_vertex(vertex)
             #     assert solution.request_to_tour_assignment[
             #                request] == tour.id_, f'{instance.id_}, tour {tour.id_}, vertex {vertex} at index {i}'
+
 
 # TODO can this not be a method of the solution itself? (circular dependencies tour - instance?)
 def validate_tour(instance, tour):
@@ -322,9 +339,6 @@ END_TIME: dt.datetime = EXECUTION_START_TIME + dt.timedelta(minutes=3360)
 # END_TIME = dt.datetime.min + dt.timedelta(days=1)
 TW_LENGTH: dt.timedelta = dt.timedelta(hours=2)
 ALL_TW = [TimeWindow(e, min(e + TW_LENGTH, END_TIME)) for e in
-          datetime_range(EXECUTION_START_TIME, END_TIME, freq=TW_LENGTH, endpoint=False)]
+          datetime_range(EXECUTION_START_TIME, END_TIME, step=TW_LENGTH, endpoint=False)]
 EXECUTION_TIME_HORIZON = TimeWindow(EXECUTION_START_TIME, END_TIME)
 SPEED_KMH = 60  # vehicle speed (set to 60 to treat distance = time)
-
-
-
