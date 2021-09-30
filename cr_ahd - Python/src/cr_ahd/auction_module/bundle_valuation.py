@@ -331,7 +331,7 @@ def ropke_pisinger_request_similarity(instance: it.MDPDPTWInstance,
                               delivery_pos_1])
                           ).total_seconds()
     # normalize time [0, 1]
-    start_time_delta = (ut.START_TIME - dt.datetime.min).total_seconds()
+    start_time_delta = (ut.EXECUTION_START_TIME - dt.datetime.min).total_seconds()
     end_time_delta = (ut.END_TIME - dt.datetime.min).total_seconds()
     # ((x - old_min) / (old_max - old_min)) * (new_max - new_min) + new_min
     arrival_time_delta = (arrival_time_delta - start_time_delta) / (end_time_delta - start_time_delta * (1 - 0)) + 0

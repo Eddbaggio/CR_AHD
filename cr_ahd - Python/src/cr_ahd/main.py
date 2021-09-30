@@ -15,7 +15,7 @@ if __name__ == '__main__':
     def cr_ahd():
         # setup
         logger.info(f'START {datetime.now()}')
-        random.seed()
+        random.seed(0)
 
         # select the files to be solved
         paths = sorted(list(io.input_dir.iterdir()), key=ut.natural_sort_key)

@@ -304,17 +304,17 @@ def debugger_is_active() -> bool:
     return gettrace() is not None
 
 
-random.seed(0)
 DISTANCE_SCALING = 1
 REVENUE_SCALING = DISTANCE_SCALING
 LOAD_CAPACITY_SCALING = 10
-START_TIME: dt.datetime = dt.datetime.min
-END_TIME: dt.datetime = dt.datetime.min + dt.timedelta(minutes=3360)
+ACCEPTANCE_START_TIME: dt.datetime = dt.datetime.min
+EXECUTION_START_TIME: dt.datetime = ACCEPTANCE_START_TIME + dt.timedelta(days=1)
+END_TIME: dt.datetime = EXECUTION_START_TIME + dt.timedelta(minutes=3360)
 # END_TIME = dt.datetime.min + dt.timedelta(days=1)
 TW_LENGTH: dt.timedelta = dt.timedelta(hours=2)
 ALL_TW = [TimeWindow(e, min(e + TW_LENGTH, END_TIME)) for e in
-          datetime_range(START_TIME, END_TIME, freq=TW_LENGTH, include_end=False)]
-TIME_HORIZON = TimeWindow(START_TIME, END_TIME)
+          datetime_range(EXECUTION_START_TIME, END_TIME, freq=TW_LENGTH, include_end=False)]
+EXECUTION_TIME_HORIZON = TimeWindow(EXECUTION_START_TIME, END_TIME)
 SPEED_KMH = 60  # vehicle speed (set to 60 to treat distance = time)
 
 

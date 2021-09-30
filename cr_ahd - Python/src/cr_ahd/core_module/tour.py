@@ -39,10 +39,10 @@ class Tour:
         # initialize depot to depot tour
         for _ in range(2):
             self.routing_sequence.insert(1, depot_index)
-            self.arrival_time_sequence.insert(1, dt.datetime(1, 1, 1, 0))
-            self.service_time_sequence.insert(1, dt.datetime(1, 1, 1, 0))
+            self.arrival_time_sequence.insert(1, ut.EXECUTION_START_TIME)
+            self.service_time_sequence.insert(1, ut.EXECUTION_START_TIME)
             self.wait_duration_sequence.insert(1, dt.timedelta(0))
-            self.max_shift_sequence.insert(1, ut.END_TIME - ut.START_TIME)
+            self.max_shift_sequence.insert(1, ut.END_TIME - ut.EXECUTION_START_TIME)
 
     def __str__(self):
         return f'Tour ID:\t{self.id_};\tRequests:\t{self.requests}\n' \

@@ -1,7 +1,7 @@
 import abc
 import datetime as dt
 
-import tw_management_module.tw
+from tw_management_module import tw
 from core_module import instance as it, solution as slt, tour as tr
 from utility_module import utils as ut
 
@@ -13,7 +13,7 @@ class TWOfferingBehavior(abc.ABC):
     def execute(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, request: int):
         pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
         # make sure that the request has not been given a tw yet
-        assert instance.tw_open[delivery_vertex] in (ut.START_TIME, None)
+        assert instance.tw_open[delivery_vertex] in (ut.EXECUTION_START_TIME, None)
         assert instance.tw_close[delivery_vertex] in (ut.END_TIME, None)
 
         tw_valuations = []
@@ -25,13 +25,13 @@ class TWOfferingBehavior(abc.ABC):
 
     @abc.abstractmethod
     def _evaluate_time_window(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, request: int,
-                              tw: tw_management_module.tw.TimeWindow):
+                              tw: tw.TimeWindow):
         pass
 
 
 class FeasibleTW(TWOfferingBehavior):
     def _evaluate_time_window(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, request: int,
-                              tw: tw_management_module.tw.TimeWindow):
+                              tw: tw.TimeWindow):
         """
         :return: 1 if TW is feasible, -1 else
         """
@@ -47,7 +47,7 @@ class FeasibleTW(TWOfferingBehavior):
             tmp_tour = tr.Tour('tmp', carrier.id_)
             if tmp_tour.insertion_feasibility_check(instance, [1, 2], [pickup_vertex, delivery_vertex]):
                 # undo the setting of the time window and return
-                instance.tw_open[delivery_vertex] = ut.START_TIME
+                instance.tw_open[delivery_vertex] = ut.EXECUTION_START_TIME
                 instance.tw_close[delivery_vertex] = ut.END_TIME
                 return 1
 
@@ -60,20 +60,20 @@ class FeasibleTW(TWOfferingBehavior):
                             [pickup_pos, delivery_pos],
                             [pickup_vertex, delivery_vertex]):
                         # undo the setting of the time window and return
-                        instance.tw_open[delivery_vertex] = ut.START_TIME
+                        instance.tw_open[delivery_vertex] = ut.EXECUTION_START_TIME
                         instance.tw_close[delivery_vertex] = ut.END_TIME
                         return 1
 
         # undo the setting of the time window and return
-        instance.tw_open[delivery_vertex] = ut.START_TIME
+        instance.tw_open[delivery_vertex] = ut.EXECUTION_START_TIME
         instance.tw_close[delivery_vertex] = ut.END_TIME
         return -1
 
 
 class NoTw(TWOfferingBehavior):
     def execute(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, request: int):
-        return [ut.TIME_HORIZON]
+        return [ut.EXECUTION_TIME_HORIZON]
 
     def _evaluate_time_window(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, request: int,
-                              tw: tw_management_module.tw.TimeWindow):
+                              tw: tw.TimeWindow):
         pass

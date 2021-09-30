@@ -148,7 +148,7 @@ class Solver:
                     timer.write_duration_to_solution(solution, 'runtime_time_window_management', True)
 
                     pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
-                    instance.assign_time_window(pickup_vertex, ut.TIME_HORIZON)
+                    instance.assign_time_window(pickup_vertex, ut.EXECUTION_TIME_HORIZON)
 
                     if selected_tw:
                         instance.assign_time_window(delivery_vertex, selected_tw)
@@ -162,7 +162,7 @@ class Solver:
                     else:  # in case (a) the offer set was empty or (b) the customer did not select any time window
                         logger.error(f'[{instance.id_}] No feasible TW can be offered '
                                      f'from Carrier {carrier.id_} to request {request}')
-                        instance.assign_time_window(delivery_vertex, ut.TIME_HORIZON)
+                        instance.assign_time_window(delivery_vertex, ut.EXECUTION_TIME_HORIZON)
                         carrier.rejected_requests.append(request)
                         carrier.unrouted_requests.pop(0)
                         carrier.acceptance_rate = len(carrier.accepted_requests) / len(carrier.assigned_requests)

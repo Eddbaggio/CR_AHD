@@ -4,7 +4,7 @@ import logging
 import random
 from typing import List
 
-from utility_module.utils import END_TIME, START_TIME, TIME_HORIZON
+from utility_module.utils import EXECUTION_START_TIME, END_TIME, EXECUTION_TIME_HORIZON
 from tw_management_module.tw import TimeWindow
 
 logger = logging.getLogger(__name__)
@@ -30,8 +30,8 @@ class TWSelectionBehavior(abc.ABC):
 
 class NoTW(TWSelectionBehavior):
     def execute(self, tw_offer_set: List[TimeWindow], request: int):
-        assert tw_offer_set == [TIME_HORIZON]
-        return TIME_HORIZON
+        assert tw_offer_set == [EXECUTION_TIME_HORIZON]
+        return EXECUTION_TIME_HORIZON
 
     def select_tw(self, tw_offer_set: List[TimeWindow], request: int) -> TimeWindow:
         pass
@@ -59,11 +59,11 @@ class UnequalPreference(TWSelectionBehavior):
         # early preference
         if pref <= 0.1:
             attractive_tws = [tw for tw in tw_offer_set if
-                              tw.close <= START_TIME + (END_TIME - START_TIME) / 2]
+                              tw.close <= EXECUTION_START_TIME + (END_TIME - EXECUTION_START_TIME) / 2]
         # late preference
         else:
             attractive_tws = [tw for tw in tw_offer_set if
-                              tw.open >= START_TIME + (END_TIME - START_TIME) / 2]
+                              tw.open >= EXECUTION_START_TIME + (END_TIME - EXECUTION_START_TIME) / 2]
         if attractive_tws:
             return random.choice(attractive_tws)
         else:

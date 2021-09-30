@@ -587,7 +587,7 @@ class SpatioTemporalBundle(RequestSelectionBehaviorBundle):
                                                                                                 bundle)
         # normalize to range [0, 1]
         min_temporal_range = ut.TW_LENGTH.total_seconds()
-        max_temporal_range = (ut.TIME_HORIZON.close - ut.TIME_HORIZON.open).total_seconds()
+        max_temporal_range = (ut.EXECUTION_TIME_HORIZON.close - ut.EXECUTION_TIME_HORIZON.open).total_seconds()
 
         temporal_evaluation = -(temporal_evaluation - len(bundle) * (-min_temporal_range)) / (
                 len(bundle) * (-max_temporal_range) - len(bundle) * (-min_temporal_range))
