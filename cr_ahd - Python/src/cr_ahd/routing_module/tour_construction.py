@@ -151,6 +151,7 @@ class PDPParallelInsertionConstruction(ABC):
         carrier = solution.carriers[carrier_id]
         tour = solution.tours[tour_id]
         pickup, delivery = instance.pickup_delivery_pair(request)
+        logger.debug(f'Carrier {carrier_id}, Tour {tour_id}, request {request}{pickup, delivery} insertion')
         tour.insert_and_update(instance, [pickup_pos, delivery_pos], [pickup, delivery])
         tour.requests.add(request)
         carrier.unrouted_requests.remove(request)
@@ -175,6 +176,7 @@ class PDPParallelInsertionConstruction(ABC):
                 f' ({instance.id_})')
         tour_id = solution.get_free_tour_id()
         assert tour_id < instance.num_carriers * instance.carriers_max_num_tours, f'{instance.id_}: tour_id={tour_id}'
+        logger.debug(f'Carrier {carrier_id}, *Tour {tour_id}')
         tour = tr.Tour(tour_id, depot_index=carrier.id_)
 
         if tour.insertion_feasibility_check(instance, [1, 2], instance.pickup_delivery_pair(request)):

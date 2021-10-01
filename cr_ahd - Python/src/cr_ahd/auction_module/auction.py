@@ -49,34 +49,44 @@ class Auction:
         for auction_round in range(self.num_auction_rounds):
 
             # auction
-            pre_auction_objective = solution.objective()
-            # print([(carrier.routed_requests, carrier.unrouted_requests) for carrier in solution.carriers])  # RemoveMe
-            solution_backup = deepcopy(solution)
+            pre_auction_solution = deepcopy(solution)
             solution = self.reallocate_requests(instance, solution)
-            # print([(carrier.routed_requests, carrier.unrouted_requests) for carrier in solution.carriers])  # RemoveMe
 
             # clears the solution and re-optimize
-            solution = self.post_auction_routing_ClearAndReinsertAll(instance, solution)
+            solution = self.post_auction_routing(instance, solution)
 
-            if not pre_auction_objective <= solution.objective():
+            # consistency check. cannot compare carriers' profit individually before and after the auction because I
+            # do not implement profit sharing! Thus, an individual carrier may be worse off, while the global solution
+            # is better!
+            if not pre_auction_solution.objective() <= solution.objective():
                 """
                 Unfortunately, there are several circumstances that can lead to the post-auction result being worse
                 than the pre-auction solution. In that case, throw a warning and recover the pre-auction solution!
                 Causes:
+                
                 (a) If intermediate auctions are used, any auction other than the first may run into the following 
                 problem: The sorting of assigned requests for a given carrier can be in no order due to request 
                 reassignments in a previous auction. Now, if the current auction's bidding takes place and the carrier
                 bids on his original bundle, this bundle will be in a different order, meaning that dynamic insertion
                 obtains a different - potentially worse - result! SOLUTION: make sure that the dynamic insertion
                 (of the bidding phase) follows the same order as the carrier.assigned_requests list.
+                -> FIXED by adding request_disclosure_time to the instance
+                
                 (b) the metaheuristic used for improvements does not work correctly and returns worse results. This
                 messes up the bidding because the bid on a given carrier's original bundle may be incorrect
+                
+                (c) the bidding process inserts all requests from scratch and runs a single improvement at the end.
+                with intermediate auctions, there is an improvement phase after each intermediate auction and only
+                afterwards will newly arriving requests be inserted. Thus, the bidding is not the same as the 
+                dynamic insertion because the latter has additional intermediate improvements.
+                -> is not the (only) problem at the moment since using NoMetaheuristic did not resolve the issue
                 """
-                raise ValueError(f'{instance.id_}:\n {solution.objective()} < {pre_auction_objective}\n'
+                raise ValueError(f'{instance.id_},:\n'
+                                 f' {solution.objective()} < {pre_auction_solution.objective()}\n'
                                  f' Post-auction objective is lower than pre-auction objective!,'
                                  f' Recovering the pre-auction solution')
-                solution = solution_backup
-                assert pre_auction_objective == solution.objective()
+                solution = pre_auction_solution
+                assert pre_auction_solution.objective() == solution.objective()
         return solution
 
     def reallocate_requests(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution) -> slt.CAHDSolution:
@@ -104,7 +114,7 @@ class Auction:
             # ===== [3] Bidding =====
             logger.debug(f'Generating bids_matrix')
             timer = pr.Timer()
-            bids_matrix = self.bidding.execute_bidding(instance, pre_rs_solution, solution, auction_bundle_pool)
+            bids_matrix = self.bidding.execute_bidding(instance, solution, auction_bundle_pool)
             # timer.write_duration_to_solution(solution, 'runtime_bidding') fixme
             logger.debug(f'Bids {bids_matrix} have been created for bundles {auction_bundle_pool}')
 
@@ -117,14 +127,14 @@ class Auction:
             # todo: store whether the auction did achieve a reallocation or not
 
             # ===== [4.2] Bundle Reallocation =====
-            self.assign_bundles_to_winners(solution, winner_bundles, bundle_winners)
+            self.assign_bundles_to_winners(instance, solution, winner_bundles, bundle_winners)
 
         else:
             logger.warning(f'No requests have been submitted!')
 
         return solution
 
-    def post_auction_routing_ClearAndReinsertAll(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution):
+    def post_auction_routing(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution):
         """
         After requests have been reallocated, this function builds the new tours based on the new requests. It is
         important that this routing follows the same steps as the routing approach in the bidding phase to reliably
@@ -137,7 +147,7 @@ class Auction:
         solution.clear_carrier_routes(None)  # clear everything that was left after Request Selection
         timer = pr.Timer()
         for carrier in solution.carriers:
-            while carrier.unrouted_requests:
+            while len(carrier.unrouted_requests) > 0:
                 request = carrier.unrouted_requests[0]
                 self.tour_construction.insert_single_request(instance, solution, carrier.id_, request)
         # timer.write_duration_to_solution(solution, 'runtime_final_dynamic_insertion') FixMe
@@ -146,32 +156,17 @@ class Auction:
         # timer.write_duration_to_solution(solution, 'runtime_final_improvement') fixme
         return solution
 
-    def post_auction_routing_InsertBundle(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution):
-        """
-        Does NOT clear the routes before inserting yet unrouted requests
-        :param instance:
-        :param solution:
-        :return:
-        """
-        raise NotImplementedError(f'This has never been used before, check before removing the Error raise')
-        for carrier in solution.carriers:
-            while carrier.unrouted_requests:
-                request = carrier.unrouted_requests[0]
-                self.tour_construction.insert_single_request(instance, solution, carrier.id_, request)
-        solution = self.tour_improvement.execute(instance, solution)
-        return solution
-
     @staticmethod
-    def assign_bundles_to_winners(solution, winner_bundles, bundle_winners):
+    def assign_bundles_to_winners(instance, solution, winner_bundles, bundle_winners):
         # assign the bundles to the corresponding winner
         for bundle, winner in zip(winner_bundles, bundle_winners):
             solution.assign_requests_to_carriers(bundle, [winner] * len(bundle))
             solution.carriers[winner].accepted_requests.extend(bundle)
         # must be sorted to obtain the acceptance phase's solutions also in the final routing
-        for carrier_ in solution.carriers:
-            carrier_.assigned_requests.sort()
-            carrier_.accepted_requests.sort()
-            carrier_.unrouted_requests.sort()
+        for carrier in solution.carriers:
+            carrier.assigned_requests.sort(key=lambda x: (instance.request_disclosure_time[x], instance.request_to_carrier_assignment[x]))
+            carrier.accepted_requests.sort(key=lambda x: (instance.request_disclosure_time[x], instance.request_to_carrier_assignment[x]))
+            carrier.unrouted_requests.sort(key=lambda x: (instance.request_disclosure_time[x], instance.request_to_carrier_assignment[x]))
 
 
 # ======================================================================================================================

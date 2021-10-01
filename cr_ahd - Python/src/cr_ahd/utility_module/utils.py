@@ -210,6 +210,10 @@ def n_points_on_a_circle(n: int, radius, origin_x=0, origin_y=0):
 
 def datetime_range(start: dt.datetime, stop: dt.datetime, step: dt.timedelta = None, num: int = None, startpoint=True,
                    endpoint=True):
+    """
+    returns a generator of equally-spaced datetime objects. Exactly one of step or num must be supplied.
+    """
+
     assert None in (step, num), f'only one of step or num must be given'
     if step is not None:
         assert step.total_seconds() > 0, f"Step shouldn't be 0"

@@ -46,9 +46,16 @@ class MDPDPTWInstance:
 
         :param id_: unique identifier
         """
+        # sanity checks:
+        assert len(carrier_depots_x) == len(carrier_depots_y)
+        assert len(requests_pickup_x) == len(requests_pickup_y) == len(requests_delivery_x) == len(requests_delivery_y)
+        assert all(ut.ACCEPTANCE_START_TIME <= t <= ut.EXECUTION_START_TIME for t in requests_disclosure_time)
+        assert all(x <= max_vehicle_load for x in requests_pickup_load)
+        assert all(ut.EXECUTION_START_TIME <= t <= ut.END_TIME for t in request_pickup_time_window_open)
+        assert all(ut.EXECUTION_START_TIME <= t <= ut.END_TIME for t in request_pickup_time_window_close)
+
         self._id_ = id_
         self.meta = dict((k.strip(), int(v.strip())) for k, v in (item.split('=') for item in id_.split('+')))
-        self.num_carriers = len(carrier_depots_x)
         self.num_carriers = len(carrier_depots_x)
         self.vehicles_max_load = max_vehicle_load
         self.vehicles_max_travel_distance = max_tour_length
@@ -59,6 +66,7 @@ class MDPDPTWInstance:
         self.num_requests_per_carrier = self.num_requests // self.num_carriers
         self.x_coords = [*carrier_depots_x, *requests_pickup_x, *requests_delivery_x]
         self.y_coords = [*carrier_depots_y, *requests_pickup_y, *requests_delivery_y]
+        assert all(x in range(self.num_carriers) for x in requests_initial_carrier_assignment)
         self.request_to_carrier_assignment: List[int] = requests_initial_carrier_assignment
         self.request_disclosure_time: List[dt.datetime] = requests_disclosure_time
         self.vertex_revenue = [*[0] * (self.num_carriers + len(requests)), *requests_revenue]
@@ -173,8 +181,9 @@ def read_gansterer_hartl_mv(path: Path, num_carriers=3) -> MDPDPTWInstance:
     for carrier_id in range(requests['carrier_index'].max() + 1):
         assert carrier_id < 24
         requests.loc[requests.carrier_index == carrier_id, 'disclosure_time'] = list(
-            ut.datetime_range(start=ut.ACCEPTANCE_START_TIME + dt.timedelta(minutes=carrier_id),
-                              stop=ut.EXECUTION_START_TIME, num=len(requests[requests.carrier_index == carrier_id]),
+            ut.datetime_range(start=ut.ACCEPTANCE_START_TIME,
+                              stop=ut.EXECUTION_START_TIME,
+                              num=len(requests[requests.carrier_index == carrier_id]),
                               endpoint=False))
 
     return MDPDPTWInstance(id_=path.stem,

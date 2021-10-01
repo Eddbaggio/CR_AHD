@@ -152,7 +152,7 @@ class BestOfAllBundlings(LimitedBundlePoolGenerationBehavior):
             all_bundlings.extend(list(algorithm_u(auction_request_pool, k)))
 
         bundling_valuations = []
-        for bundling in tqdm.tqdm(all_bundlings, desc='Bundle Generation', disable=False):
+        for bundling in tqdm.tqdm(all_bundlings, desc='Bundle Generation', disable=not ut.debugger_is_active()):
             bundling_valuations.append(self.bundling_valuation.evaluate_bundling(instance, solution, bundling))
 
         sorted_bundlings = (bundling for _, bundling in sorted(zip(bundling_valuations, all_bundlings), reverse=True))
@@ -227,7 +227,7 @@ class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
         for generation_counter in tqdm.trange(1,
                                               self.parameters['num_generations'],
                                               desc='Bundle Generation',
-                                              disable=True):
+                                              disable=not ut.debugger_is_active()):
             fitness, population = self.generate_new_population(instance, solution, population, fitness,
                                                                auction_request_pool)
 
