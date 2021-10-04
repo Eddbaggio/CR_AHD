@@ -33,11 +33,11 @@ def parameter_generator():
     tour_improvements: List[mh.PDPTWMetaHeuristic.__class__] = [
         # mh.PDPTWSequentialLocalSearch,
         # mh.PDPTWIteratedLocalSearch,
-        mh.PDPTWVariableNeighborhoodDescent,
+        # mh.PDPTWVariableNeighborhoodDescent,
         # mh.PDPTWReducedVariableNeighborhoodSearch,
         # mh.PDPTWVariableNeighborhoodSearch,
         # mh.PDPTWSimulatedAnnealing,
-        # mh.NoMetaheuristic,
+        mh.NoMetaheuristic,
     ]
 
     neighborhood_collections: List[List[nh.Neighborhood]] = [

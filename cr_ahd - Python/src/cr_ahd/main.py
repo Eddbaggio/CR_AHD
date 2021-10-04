@@ -19,10 +19,10 @@ if __name__ == '__main__':
 
         # select the files to be solved
         paths = sorted(list(io.input_dir.iterdir()), key=ut.natural_sort_key)
-        run, rad, n = 18, 0, 0  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
-        # i = run * 6 + rad * 2 + n
-        i = random.choice(range(len(paths)))
-        paths = paths[i:i + 1]
+        run, rad, n = 1, 1, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
+        i = run * 6 + rad * 2 + n
+        # i = random.choice(range(len(paths)))
+        paths = paths[:24]
 
         # solving
         if len(paths) < 6:
@@ -34,7 +34,7 @@ if __name__ == '__main__':
         # plotting and evaluation
         ev.bar_chart(df,
                      title=str(csv_path.name),
-                     values='sum_travel_distance',
+                     values='sum_profit',
                      color=['solution_algorithm', 'num_int_auctions'],
                      category='run',
                      facet_col='rad',

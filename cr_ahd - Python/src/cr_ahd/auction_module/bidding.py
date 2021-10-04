@@ -31,12 +31,13 @@ class BiddingBehavior(ABC):
 
         bundle_bids = []
         for b in tqdm.trange(len(bundles), desc='Bidding', disable=not ut.debugger_is_active()):
+            bundle = bundles[b]
             carrier_bundle_bids = []
             for carrier in solution.carriers:
-                logger.debug(f'Carrier {carrier.id_} generating bids for bundle {b}={bundles[b]}')
+                logger.debug(f'Carrier {carrier.id_} generating bids for bundle {b}={bundle}')
 
                 value_without_bundle = carrier.objective()
-                value_with_bundle = self._value_with_bundle(instance, solution, bundles[b], carrier.id_)
+                value_with_bundle = self._value_with_bundle(instance, solution, bundle, carrier.id_)
                 bid = value_with_bundle - value_without_bundle
 
                 carrier_bundle_bids.append(bid)

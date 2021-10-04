@@ -2,6 +2,9 @@ import logging
 import warnings
 from abc import ABC
 from copy import deepcopy
+from typing import List
+
+import pandas as pd
 
 from auction_module import request_selection as rs, bundle_generation as bg, bidding as bd, \
     winner_determination as wd
@@ -50,10 +53,10 @@ class Auction:
 
             # auction
             pre_auction_solution = deepcopy(solution)
-            solution = self.reallocate_requests(instance, solution)
+            solution, winners = self.reallocate_requests(instance, solution)
 
             # clears the solution and re-optimize
-            solution = self.post_auction_routing(instance, solution)
+            solution = self.post_auction_routing(instance, solution, winners)
 
             # consistency check. cannot compare carriers' profit individually before and after the auction because I
             # do not implement profit sharing! Thus, an individual carrier may be worse off, while the global solution
@@ -80,6 +83,11 @@ class Auction:
                 afterwards will newly arriving requests be inserted. Thus, the bidding is not the same as the 
                 dynamic insertion because the latter has additional intermediate improvements.
                 -> is not the (only) problem at the moment since using NoMetaheuristic did not resolve the issue
+                
+                (d) after submitting requests to the auction pool, the solution is not re-optimized from scratch but
+                left as is. On the other hand, post_auction_routing re-optimizes from scratch. The re-optimization
+                may yield results that are worse than simply removing requests!
+                 
                 """
                 raise ValueError(f'{instance.id_},:\n'
                                  f' {solution.objective()} < {pre_auction_solution.objective()}\n'
@@ -89,7 +97,9 @@ class Auction:
                 assert pre_auction_solution.objective() == solution.objective()
         return solution
 
-    def reallocate_requests(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution) -> slt.CAHDSolution:
+    def reallocate_requests(self,
+                            instance: it.MDPDPTWInstance,
+                            solution: slt.CAHDSolution) -> (slt.CAHDSolution, List[int]):
         logger.debug(f'running auction {self.__class__.__name__}')
 
         pre_rs_solution = deepcopy(solution)
@@ -115,6 +125,15 @@ class Auction:
             logger.debug(f'Generating bids_matrix')
             timer = pr.Timer()
             bids_matrix = self.bidding.execute_bidding(instance, solution, auction_bundle_pool)
+
+            # REMOVEME only for debugging
+            bids_dict = {tuple(bundle): bids for bundle, bids in zip(auction_bundle_pool, bids_matrix)}
+            bids_on_original_bundles = []
+            for bundle, carrier in zip(original_bundles, solution.carriers):
+                bids_on_original_bundles.append(bids_dict[tuple(bundle)][carrier.id_])
+
+            # =====
+
             # timer.write_duration_to_solution(solution, 'runtime_bidding') fixme
             logger.debug(f'Bids {bids_matrix} have been created for bundles {auction_bundle_pool}')
 
@@ -124,6 +143,13 @@ class Auction:
                                                                                auction_request_pool,
                                                                                auction_bundle_pool, bids_matrix)
             # timer.write_duration_to_solution(solution, 'runtime_winner_determination') fixme
+
+            # REMOVEME only for debugging
+            winning_bids = []
+            for winner, bundle in zip(bundle_winners, winner_bundles):
+                winning_bids.append(bids_dict[tuple(bundle)][winner])
+            # =====
+
             # todo: store whether the auction did achieve a reallocation or not
 
             # ===== [4.2] Bundle Reallocation =====
@@ -132,9 +158,9 @@ class Auction:
         else:
             logger.warning(f'No requests have been submitted!')
 
-        return solution
+        return solution, bundle_winners
 
-    def post_auction_routing(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution):
+    def post_auction_routing(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, winners: List[int]):
         """
         After requests have been reallocated, this function builds the new tours based on the new requests. It is
         important that this routing follows the same steps as the routing approach in the bidding phase to reliably
@@ -144,7 +170,7 @@ class Auction:
         :param solution:
         :return:
         """
-        solution.clear_carrier_routes(None)  # clear everything that was left after Request Selection
+        solution.clear_carrier_routes(winners)  # for all winners, clear what was left after Request Selection
         timer = pr.Timer()
         for carrier in solution.carriers:
             while len(carrier.unrouted_requests) > 0:
@@ -157,16 +183,21 @@ class Auction:
         return solution
 
     @staticmethod
-    def assign_bundles_to_winners(instance, solution, winner_bundles, bundle_winners):
+    def assign_bundles_to_winners(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+                                  winner_bundles: List[List[int]],
+                                  bundle_winners: List[int]):
         # assign the bundles to the corresponding winner
         for bundle, winner in zip(winner_bundles, bundle_winners):
             solution.assign_requests_to_carriers(bundle, [winner] * len(bundle))
             solution.carriers[winner].accepted_requests.extend(bundle)
         # must be sorted to obtain the acceptance phase's solutions also in the final routing
         for carrier in solution.carriers:
-            carrier.assigned_requests.sort(key=lambda x: (instance.request_disclosure_time[x], instance.request_to_carrier_assignment[x]))
-            carrier.accepted_requests.sort(key=lambda x: (instance.request_disclosure_time[x], instance.request_to_carrier_assignment[x]))
-            carrier.unrouted_requests.sort(key=lambda x: (instance.request_disclosure_time[x], instance.request_to_carrier_assignment[x]))
+            carrier.assigned_requests.sort(
+                key=lambda x: (instance.request_disclosure_time[x], instance.request_to_carrier_assignment[x]))
+            carrier.accepted_requests.sort(
+                key=lambda x: (instance.request_disclosure_time[x], instance.request_to_carrier_assignment[x]))
+            carrier.unrouted_requests.sort(
+                key=lambda x: (instance.request_disclosure_time[x], instance.request_to_carrier_assignment[x]))
 
 
 # ======================================================================================================================
