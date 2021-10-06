@@ -56,7 +56,7 @@ class Auction:
             solution, winners = self.reallocate_requests(instance, solution)
 
             # clears the solution and re-optimize
-            solution = self.post_auction_routing(instance, solution, winners)
+            solution = self.re_optimize(instance, solution, winners)
 
             # consistency check. cannot compare carriers' profit individually before and after the auction because I
             # do not implement profit sharing! Thus, an individual carrier may be worse off, while the global solution
@@ -87,8 +87,18 @@ class Auction:
                 (d) after submitting requests to the auction pool, the solution is not re-optimized from scratch but
                 left as is. On the other hand, post_auction_routing re-optimizes from scratch. The re-optimization
                 may yield results that are worse than simply removing requests!
-                 
+                -> FIXED by only re-optimizing the winners' route plan and leaving carriers untouched that did not win
+                a bundle. However, this does not fix issue (e)! 
+                
+                (e) similarly to (d) the following procedure causes problems, too: A carrier submits something in the 
+                first auction but does not win anything in this auction. thus, his route plan will not be 
+                re-optimized after request selection. He is left with the solution [A] obtained by simply removing 
+                the submitted requests from their tour. In a second auction, the same carrier may win *his own* 
+                submitted requests. Thus, his route plan will be re-optimized but the requests are the same as before 
+                that second auction. The re-optimization may yield results that are worse than solution [A]! 
+                -> TODO Fix this by doing a re-optimization after RS for all carriers?? 
                 """
+
                 raise ValueError(f'{instance.id_},:\n'
                                  f' {solution.objective()} < {pre_auction_solution.objective()}\n'
                                  f' Post-auction objective is lower than pre-auction objective!,'
@@ -107,6 +117,8 @@ class Auction:
         # ===== [1] Request Selection =====
         timer = pr.Timer()
         auction_request_pool, original_bundling_labels = self.request_selection.execute(instance, solution)
+        # post_rs_solution must be re-optimized to avoid inconsistencies when intermediate auctions are used
+        solution = self.re_optimize(instance, solution)
         original_bundles = ut.indices_to_nested_lists(original_bundling_labels, auction_request_pool)
         # timer.write_duration_to_solution(solution, 'runtime_request_selection') fixme need to distinguish between intermediate and final: auction_counter in Solver class?
 
@@ -160,7 +172,7 @@ class Auction:
 
         return solution, bundle_winners
 
-    def post_auction_routing(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, winners: List[int]):
+    def re_optimize(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_ids: List[int] = None):
         """
         After requests have been reallocated, this function builds the new tours based on the new requests. It is
         important that this routing follows the same steps as the routing approach in the bidding phase to reliably
@@ -170,9 +182,13 @@ class Auction:
         :param solution:
         :return:
         """
-        solution.clear_carrier_routes(winners)  # for all winners, clear what was left after Request Selection
+        if carrier_ids is None:
+            carrier_ids = [carrier.id_ for carrier in solution.carriers]
+
+        solution.clear_carrier_routes(carrier_ids)  # for all winners, clear what was left after Request Selection
         timer = pr.Timer()
-        for carrier in solution.carriers:
+        for carrier_id in carrier_ids:
+            carrier = solution.carriers[carrier_id]
             while len(carrier.unrouted_requests) > 0:
                 request = carrier.unrouted_requests[0]
                 self.tour_construction.insert_single_request(instance, solution, carrier.id_, request)

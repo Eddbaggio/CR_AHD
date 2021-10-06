@@ -19,10 +19,10 @@ if __name__ == '__main__':
 
         # select the files to be solved
         paths = sorted(list(io.input_dir.iterdir()), key=ut.natural_sort_key)
-        run, rad, n = 1, 1, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
+        run, rad, n = 8, 1, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
         i = run * 6 + rad * 2 + n
         # i = random.choice(range(len(paths)))
-        paths = paths[:24]
+        paths = paths[i:i+1]
 
         # solving
         if len(paths) < 6:
