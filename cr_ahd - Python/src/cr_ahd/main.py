@@ -21,7 +21,7 @@ if __name__ == '__main__':
         paths = sorted(list(io.input_dir.iterdir()), key=ut.natural_sort_key)
         run, rad, n = 8, 1, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
         i = run * 6 + rad * 2 + n
-        # i = random.choice(range(len(paths)))
+        i = random.choice(range(len(paths)))
         paths = paths[i:i+1]
 
         # solving
@@ -29,18 +29,32 @@ if __name__ == '__main__':
             solutions = wf.solve_instances(paths)
         else:
             solutions = wf.solve_instances_multiprocessing(paths)
-        df, csv_path = io.write_solution_summary_to_multiindex_df(solutions, 'solution')
+
+        agg_level = 'solution'
+        df = io.solutions_to_df(solutions, agg_level)
+
+        # write df
+        io.output_dir.mkdir(exist_ok=True, parents=True)
+        df.to_csv(path_or_buf=(io.unique_path(io.output_dir, 'evaluation_agg_' + agg_level + '_#{:03d}' + '.csv')))
 
         # plotting and evaluation
-        ev.bar_chart(df,
-                     title=str(csv_path.name),
-                     values='sum_profit',
-                     color=['solution_algorithm', 'num_int_auctions'],
-                     category='run',
-                     facet_col='rad',
-                     facet_row='n',
-                     show=True,
-                     html_path=io.unique_path(io.output_dir, 'CAHD_#{:03d}.html').as_posix())
+        ev.plot(df,
+                values='sum_profit',
+                color=('solution_algorithm', 'num_int_auctions'),
+                category=('run',),
+                facet_col=('rad',),
+                facet_row=('n',),
+                )
+
+        # ev.bar_chart(df,
+        #              title=str(io.unique_path(io.output_dir, 'evaluation_agg_' + agg_level + '_#{:03d}' + '.csv').name),
+        #              values='sum_profit',
+        #              color=['solution_algorithm', 'num_int_auctions'],
+        #              category='run',
+        #              facet_col='rad',
+        #              facet_row='n',
+        #              show=True,
+        #              html_path=io.unique_path(io.output_dir, 'CAHD_#{:03d}.html').as_posix())
         secondary_parameter = 'neighborhoods'
         ev.print_top_level_stats(df, [secondary_parameter])
 

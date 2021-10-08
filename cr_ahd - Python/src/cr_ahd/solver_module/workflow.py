@@ -81,9 +81,7 @@ def solve_multiple_instances(instance_paths):
 
 def _solve_instance_with_parameters(instance: it.MDPDPTWInstance, parameter_generator=pg.parameter_generator):
     """
-    :param parameter_generator:
-    :param instance:
-    :return: evaluation metrics (Instance.evaluation_metrics) of all the solutions obtained
+
     """
     solutions = []
     isolated_planning_starting_solution = None
@@ -126,10 +124,11 @@ def solve_instances_multiprocessing(instance_paths):
     solves multiple instances in parallel threads using the multiprocessing library
     """
     with multiprocessing.Pool(6) as pool:
-        solutions = list(
-            tqdm(pool.imap(solve_instance, instance_paths), total=len(instance_paths), desc="Parallel Solving",
-                 disable=False))
-    return solutions
+        instance_solutions = list(tqdm(pool.imap(solve_instance, instance_paths),
+                                       total=len(instance_paths),
+                                       desc="Parallel Solving",
+                                       disable=False))
+    return [solution for instance_solutions in instance_solutions for solution in instance_solutions]
 
 
 def solve_instances(instance_paths):
@@ -139,5 +138,5 @@ def solve_instances(instance_paths):
     solutions = []
     for path in tqdm(instance_paths, disable=True):
         solver_solutions = solve_instance(path)
-        solutions.append(solver_solutions)
+        solutions.extend(solver_solutions)
     return solutions

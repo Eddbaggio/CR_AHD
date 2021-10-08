@@ -91,12 +91,16 @@ class Auction:
                 a bundle. However, this does not fix issue (e)! 
                 
                 (e) similarly to (d) the following procedure causes problems, too: A carrier submits something in the 
-                first auction but does not win anything in this auction. thus, his route plan will not be 
+                first auction but does not win anything in this auction. thus, his route plan will never be 
                 re-optimized after request selection. He is left with the solution [A] obtained by simply removing 
-                the submitted requests from their tour. In a second auction, the same carrier may win *his own* 
-                submitted requests. Thus, his route plan will be re-optimized but the requests are the same as before 
-                that second auction. The re-optimization may yield results that are worse than solution [A]! 
+                the submitted requests from their tour. Dynamic insertion of any request that arrives after the first 
+                auction is now based on [A]. In a second auction, the same carrier may win *his own* submitted 
+                requests. Since he is technically a winner, his route plan will be re-optimized *from scratch*, 
+                potentially making different insertion decisions as were made when insertion was based on [A]. The 
+                re-optimization may yield results that are worse than solution [A] (or even infeasible)! 
                 -> TODO Fix this by doing a re-optimization after RS for all carriers?? 
+                    -> No, because this may be infeasible, too
+                
                 """
 
                 raise ValueError(f'{instance.id_},:\n'

@@ -145,14 +145,14 @@ class CAHDSolution:
         return {carrier.id_: carrier.as_dict() for carrier in self.carriers}
 
     def summary(self):
-        summary = {
-            'id_': self.id_,
-            'num_carriers': self.num_carriers(),
+        summary = {**self.meta,}
+        summary.update(self.solver_config)
+        summary.update({
+            # 'num_carriers': self.num_carriers(),
             'objective': self.objective(),
             'sum_profit': self.sum_profit(),
             'sum_travel_distance': self.sum_travel_distance(),
             'sum_travel_duration': self.sum_travel_duration(),
-            # 'sum_wait_duration': self.sum_wait_duration(),
             'sum_load': self.sum_load(),
             'sum_revenue': self.sum_revenue(),
             'num_tours': self.num_tours(),
@@ -160,8 +160,8 @@ class CAHDSolution:
             'acceptance_rate': self.avg_acceptance_rate(),
             **self.timings,
             'carrier_summaries': {c.id_: c.summary() for c in self.carriers}
-        }
-        summary.update(self.solver_config)
+        })
+
         return summary
 
     def write_to_json(self):
@@ -240,13 +240,12 @@ class AHDSolution:
 
     def summary(self) -> dict:
         return {
-            # 'id_': self.id_,
+            'carrier_id': self.id_,
             'num_tours': len(self.tours),
             'num_routing_stops': self.num_routing_stops(),
             'sum_profit': self.objective(),
             'sum_travel_distance': self.sum_travel_distance(),
             'sum_travel_duration': self.sum_travel_duration(),
-            # 'sum_wait_duration': self.sum_wait_duration(),
             'sum_load': self.sum_load(),
             'sum_revenue': self.sum_revenue(),
             'acceptance_rate': self.acceptance_rate,

@@ -120,7 +120,7 @@ class Tour:
 
     def summary(self):
         return {
-            # 'id_': self.id_,
+            'tour_id': self.id_,
             'sum_profit': self.sum_profit,
             'num_routing_stops': self.num_routing_stops,
             'sum_travel_distance': self.sum_travel_distance,

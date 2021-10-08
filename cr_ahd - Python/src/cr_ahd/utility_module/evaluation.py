@@ -38,6 +38,26 @@ config = dict({'scrollZoom': True})
 # =================================================================================================
 # PLOTLY
 # =================================================================================================
+def plot(df: pd.DataFrame,
+         values,
+         category,
+         color,
+         facet_row,
+         facet_col,
+         title: str = '',
+         width: float = None,
+         height: float = None,
+         show: bool = True,
+         html_path=None
+         ):
+    if category == 'run' or df['run'].nunique() == 1:
+        bar_chart(df, values, category, color, facet_row, facet_col, title=title, width=width, height=height, show=show,
+                  html_path=html_path)
+    else:
+        bar_chart(df, values, category, color, facet_row, facet_col, title=title, width=width, height=height, show=show,
+                  html_path=html_path)
+
+
 def bar_chart(df: pd.DataFrame,
               values,
               category,
@@ -51,123 +71,27 @@ def bar_chart(df: pd.DataFrame,
               show: bool = True,
               html_path=None,
               ):
-    """
-    MultiIndex Hierarchy is:
-    rad, n, run, solution_algorithm, carrier_id_
+    assert 'carrier_id' not in df.index.names
+    assert 'tour_id' not in df.index.names
 
-    :param df: multi-index dataframe
-    :return:
-    """
-
-    splitters = dict(category=category,
-                     color=color,
-                     facet_row=facet_row,
-                     facet_col=facet_col, )
-
-    # create annotation
-    annotation, _ = single_and_zero_value_indices(df.index, list(splitters.values()))
-    annotation = [f"{i}={df.index.unique(i).dropna().difference([np.NaN, float('nan'), None, 'None'])[0]}"
-                  for i in annotation]
-    annotation = '<br>'.join(annotation)
-    # annotation = '<br>'.join(('; '.join(x) for x in zip_longest(annotation[::2], annotation[1::2], fillvalue='')))
-
-    # drop indices with single values or only None values
-    svi, zvi = single_and_zero_value_indices(df.index, ut.flatten([category, color, facet_row, facet_col]))
-    df.droplevel([*svi, *zvi], axis=0)
-
-    # aggregate carriers if necessary to obtain a df containing data per solution rather than per carrier
-    if 'carrier_id_' in df.index.names:
-        # aggregate the 3 carriers
-        solution_df = df.groupby(df.index.names.difference(['carrier_id_']),
-                                 dropna=False).agg({'sum_profit': sum,
-                                                    'sum_travel_distance': sum,
-                                                    'sum_travel_duration': sum,
-                                                    'sum_load': sum,
-                                                    'sum_revenue': sum,
-                                                    'num_tours': sum,
-                                                    'acceptance_rate': 'mean',
-                                                    })
-    else:
-        solution_df = df
-
-    # if any of facet_col, facet_row, color, category is a sequence, merge the levels into one
-    already_joined = []
-    for k, v in splitters.items():
-        if isinstance(v, (List, Tuple)):
-            if len(v) > 1:
-                splitters[k] = '-'.join(v)
-                if v not in already_joined:
-                    solution_df = merge_index_levels(solution_df, v)
-                    already_joined.append(v)
-            else:
-                splitters[k] = v[0]
+    annotation, df, splitters_dict = plotly_prepare_df(df, category, color, facet_col, facet_row)
 
     # group by facets, colors and categories
-    px_ready = solution_df.groupby([x for x in set(splitters.values()) if x], dropna=False).agg('mean')
+    px_ready = df.groupby([x for x in set(splitters_dict.values()) if x], dropna=False).agg('mean')
 
     # prepare for use in plotly express
     px_ready: pd.DataFrame = px_ready.reset_index()
     px_ready = px_ready.round(2)
 
-    '''
-    # bar plot
-    fig = make_subplots(rows=df[facet_row].nunique(),
-                        cols=df[facet_col].nunique(),
-                        specs=[[{"secondary_y": True}] * df[facet_col].nunique()] * df[facet_row].nunique(),
-                        column_titles=[f'{facet_col}={val}' for val in df[facet_col].unique()],
-                        row_titles=[f'{facet_row}={val}' for val in df[facet_row].unique()],
-                        shared_xaxes='all',
-                        shared_yaxes='all',
-                        vertical_spacing=0.1,
-                        horizontal_spacing=0.1,
-                        # subplot_titles=("Plot 1", "Plot 2", ...)
-                        )
-    colormap = ut.map_to_univie_colors(df[color].unique())
-
-    for col_idx, col in enumerate(df[facet_col].unique(), start=1):
-        for row_idx, row in enumerate(df[facet_row].unique(), start=1):
-            for legend_idx, legend_group in enumerate(df[color].unique()):
-                data = df.loc[(df[facet_col] == col) & (df[facet_row] == row) & (df[color] == legend_group)]
-                fig.add_bar(
-                    x=data[category],
-                    y=data[values],
-                    marker=dict(color=colormap[legend_group], opacity=0.6),
-                    text=data[values],
-                    row=row_idx,
-                    col=col_idx,
-                    name=legend_group,
-                    legendgroup=legend_group,
-                )
-
-                fig.add_scatter(
-                    x=data[category] - 0.2 + legend_idx * 0.5,
-                    y=data['num_tours'],
-                    mode='markers',
-                    marker=dict(color=colormap[legend_group],
-                                size=10,
-                                opacity=1),
-                    row=row_idx,
-                    col=col_idx,
-                    name=legend_group,
-                    legendgroup=legend_group,
-                    showlegend=False,
-                    secondary_y=True,
-
-                )
-
-    # fig.update_yaxes(range=[0, 10], secondary_y=True)
-    fig.update_layout(title_text=f'{values}', template='plotly_white')
-    '''
-
     # bar plot
     fig = px.bar(px_ready,
-                 x=splitters['category'],
+                 x=splitters_dict['category'],
                  y=values,
                  title=title,
-                 color=splitters['color'],
+                 color=splitters_dict['color'],
                  color_discrete_sequence=ut.univie_colors_100 + ut.univie_colors_60,
-                 facet_row=splitters['facet_row'],
-                 facet_col=splitters['facet_col'],
+                 facet_row=splitters_dict['facet_row'],
+                 facet_col=splitters_dict['facet_col'],
                  text=values,
                  template='plotly_white',
                  hover_data=px_ready.columns.values,
@@ -204,18 +128,37 @@ def bar_chart(df: pd.DataFrame,
     if html_path:
         fig.write_html(html_path, )
 
+
+def box_plot(df: pd.DataFrame,
+             values,
+             category,
+             color,
+             facet_row,
+             facet_col,
+             title: str,
+             height: float,
+             width: float,
+             points: str = None,
+             show: bool = True,
+             html_path=None
+             ):
+    assert 'carrier_id' not in df.index.names
+    assert 'tour_id' not in df.index.names
+
+    annotation, df, splitters_dict = plotly_prepare_df(df, category, color, facet_col, facet_row)
+
     # box plot
-    fig = px.box(solution_df.reset_index(),
-                 # points='all',
-                 x=splitters['category'],
+    fig = px.box(df,
+                 points=points,
+                 x=splitters_dict['category'],
                  y=values,
                  title=title,
-                 color=splitters['color'],
+                 color=splitters_dict['color'],
                  color_discrete_sequence=ut.univie_colors_100 + ut.univie_colors_60,
-                 facet_row=splitters['facet_row'],
-                 facet_col=splitters['facet_col'],
+                 facet_row=splitters_dict['facet_row'],
+                 facet_col=splitters_dict['facet_col'],
                  template='plotly_white',
-                 hover_data=solution_df.reset_index().columns.values,
+                 hover_data=df.columns.values,
                  boxmode='group',
                  category_orders=category_orders,
                  width=width,
@@ -232,7 +175,6 @@ def bar_chart(df: pd.DataFrame,
         showarrow=False,
         align='left',
         text=annotation)
-
     # fig.update_yaxes(range=[0, 10000])
     fig.update_xaxes(type='category')
     if 7 < dt.datetime.now().hour < 20:
@@ -249,9 +191,41 @@ def bar_chart(df: pd.DataFrame,
     #     title_font_size=12,
     #     template=template
     # )
-
     if show:
         fig.show(config=config)
+
+    if html_path:
+        fig.write_html(html_path, )
+
+
+def plotly_prepare_df(df, category, color, facet_col, facet_row):
+    splitters_dict = dict(category=category,
+                          color=color,
+                          facet_row=facet_row,
+                          facet_col=facet_col, )
+    splitter_flat_list = ut.flatten([category, color, facet_row, facet_col])
+    # if any of the splitters is a sequence, merge these levels into one
+    already_joined = []
+    for k, v in splitters_dict.items():
+        if isinstance(v, (List, Tuple)):
+            if len(v) > 1:
+                splitters_dict[k] = '-'.join(v)
+                if v not in already_joined:
+                    df = merge_index_levels(df, v)
+                    already_joined.append(v)
+            else:
+                splitters_dict[k] = v[0]
+    # create annotation
+    # svi, _ = single_and_zero_value_indices(multiindex=df.index, ignore=list(splitters_dict.values()))
+    # drop indices with single values or only None values
+    svi, zvi = single_and_zero_value_indices(df.index, splitter_flat_list)
+    annotation = [f"{i}={df.index.unique(i).dropna().difference([np.NaN, float('nan'), None, 'None'])[0]}"
+                  for i in svi]
+    annotation = '<br>'.join(annotation)
+    # annotation = '<br>'.join(('; '.join(x) for x in zip_longest(annotation[::2], annotation[1::2], fillvalue='')))
+    df.droplevel([*svi, *zvi], axis=0)
+    df.reset_index(inplace=True)
+    return annotation, df, splitters_dict
 
 
 def single_and_zero_value_indices(multiindex: pd.MultiIndex, ignore=None):
@@ -282,9 +256,9 @@ def single_and_zero_value_indices(multiindex: pd.MultiIndex, ignore=None):
     return single_value_indices, zero_value_indices
 
 
-def merge_index_levels(df: pd.DataFrame, levels: Sequence):
+def merge_index_levels(df: pd.DataFrame, levels: Sequence, merge_str: str = '-'):
     """merges two or more levels of a pandas Multiindex Dataframe into a single level"""
-    df['-'.join(levels)] = df.reset_index(df.index.names.difference(levels)).index.to_flat_index()
+    df[merge_str.join(levels)] = df.reset_index(df.index.names.difference(levels)).index.to_flat_index()
     df.set_index('-'.join(levels), append=True, drop=True, inplace=True)
     for level in levels:
         df = df.droplevel(level)
