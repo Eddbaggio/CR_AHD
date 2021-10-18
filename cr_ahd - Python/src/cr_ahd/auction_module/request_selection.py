@@ -346,7 +346,9 @@ class PackedTW(RequestSelectionBehaviorIndividual):
 class RequestSelectionBehaviorNeighbor(RequestSelectionBehavior, ABC):
     """
     Select (for each carrier) a bundle by finding an initial request and then adding num_submitted_requests-1 more
-    requests based on some neighborhood criterion
+    requests based on some neighborhood criterion, idea from
+    Gansterer, Margaretha, and Richard F. Hartl. 2016. “Request Evaluation Strategies for Carriers in Auction-Based
+    Collaborations.” OR Spectrum 38 (1): 3–23. https://doi.org/10.1007/s00291-015-0411-1.
     """
 
     def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution):
@@ -437,7 +439,7 @@ class MarginalProfitProxyNeighbor(RequestSelectionBehaviorNeighbor):
 
 class RequestSelectionBehaviorBundle(RequestSelectionBehavior, ABC):
     """
-    Select (for each carrier) a set of requests based on their combined evaluation of a given measure (e.g. spatial
+    Select (for each carrier) a set of requests based on their *combined* evaluation of a given measure (e.g. spatial
     proximity of the cluster). This idea of bundled evaluation is also from Gansterer & Hartl (2016)
     """
 

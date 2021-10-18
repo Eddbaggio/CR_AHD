@@ -40,17 +40,19 @@ config = dict({'scrollZoom': True})
 # =================================================================================================
 def plot(df: pd.DataFrame,
          values,
-         category,
-         color,
-         facet_row,
-         facet_col,
+         category: Tuple,
+         color: Tuple,
+         facet_row: Tuple,
+         facet_col: Tuple,
          title: str = '',
          width: float = None,
          height: float = None,
          show: bool = True,
          html_path=None
          ):
-    if category == 'run' or df['run'].nunique() == 1:
+    for x in category, color, facet_row, facet_col:
+        assert isinstance(x, Tuple), 'splitters must be given as tuples'
+    if category == ('run',) or df['run'].nunique() == 1:
         bar_chart(df, values, category, color, facet_row, facet_col, title=title, width=width, height=height, show=show,
                   html_path=html_path)
     else:
@@ -120,7 +122,9 @@ def bar_chart(df: pd.DataFrame,
         template = 'plotly_dark'
     fig.update_layout(
         title_font_size=12,
-        template=template)
+        template=template,
+        margin=dict(r=250)
+    )
 
     if show:
         fig.show(config=config)
@@ -181,16 +185,17 @@ def box_plot(df: pd.DataFrame,
         template = 'plotly_white'
     else:
         template = 'plotly_dark'
-    # fig.update_layout(
-    #     legend=dict(
-    #         orientation="h",
-    #         yanchor="top",
-    #         y=-0.1,
-    #         xanchor="center",
-    #         x=0.5)
-    #     title_font_size=12,
-    #     template=template
-    # )
+    fig.update_layout(
+        legend=dict(
+            orientation="h",
+            yanchor="top",
+            y=-0.1,
+            xanchor="center",
+            x=0.5),
+        title_font_size=12,
+        template=template,
+        margin=dict(r=250)
+    )
     if show:
         fig.show(config=config)
 
@@ -203,7 +208,8 @@ def plotly_prepare_df(df, category, color, facet_col, facet_row):
                           color=color,
                           facet_row=facet_row,
                           facet_col=facet_col, )
-    splitter_flat_list = ut.flatten([category, color, facet_row, facet_col])
+    splitter_flat_list = ut.flatten([list(x) for x in splitters_dict.values()])
+
     # if any of the splitters is a sequence, merge these levels into one
     already_joined = []
     for k, v in splitters_dict.items():
@@ -216,65 +222,67 @@ def plotly_prepare_df(df, category, color, facet_col, facet_row):
             else:
                 splitters_dict[k] = v[0]
     # create annotation
-    # svi, _ = single_and_zero_value_indices(multiindex=df.index, ignore=list(splitters_dict.values()))
-    # drop indices with single values or only None values
-    svi, zvi = single_and_zero_value_indices(df.index, splitter_flat_list)
-    annotation = [f"{i}={df.index.unique(i).dropna().difference([np.NaN, float('nan'), None, 'None'])[0]}"
-                  for i in svi]
+
+    single_val_col, zero_val_col = single_and_zero_value_columns(df, splitter_flat_list)
+    annotation = [f"{col}={df[col].dropna().unique()[0]}" for col in single_val_col]
     annotation = '<br>'.join(annotation)
     # annotation = '<br>'.join(('; '.join(x) for x in zip_longest(annotation[::2], annotation[1::2], fillvalue='')))
-    df.droplevel([*svi, *zvi], axis=0)
-    df.reset_index(inplace=True)
+
     return annotation, df, splitters_dict
 
 
-def single_and_zero_value_indices(multiindex: pd.MultiIndex, ignore=None):
+def single_and_zero_value_columns(df: pd.DataFrame, ignore=None):
     """
-    identify the indices that contain a single value (not counting None, NaN, etc.)
-    or no value (not counting None, NaN, etc.). Zero-value-indices can only happen if all values of that index are
-    None, NaN, etc.
+    identify the columns that contain a *single* value (not counting None, NaN, etc.)
+    or *no* value at all (not counting None, NaN, etc.).
+    Zero-value-indices can only happen if all values of that column are None, NaN, etc.
 
-    :param ignore: indices to ignore even if they only have a single value or no value
+    :param ignore: columns to ignore even if they only have a single value or no value
     :return: two lists of levels from the DataFrame's MultiIndex that contain (1) only a single value and (2) no values
     """
     if ignore is None:
         ignore = []
 
-    if len(multiindex) == 1:
+    if len(df) == 1:
         warnings.warn('Dataframe has only a single row, thus all indices will only have a single value!')
 
     single_value_indices = []
     zero_value_indices = []
-    for index in multiindex.names:
-        if index in ignore:
+    for column in df.columns:
+        if column in ignore:
             continue
-        index_length = len(multiindex.unique(index).difference([np.NaN, float('nan'), None, 'None']))
-        if index_length == 1:
-            single_value_indices.append(index)
-        elif index_length == 0:
-            zero_value_indices.append(index)
+        num_unique_values = df[column].nunique(dropna=True)
+
+        # df[column].difference([np.NaN, float('nan'), None, 'None']))
+        if num_unique_values == 1:
+            single_value_indices.append(column)
+        elif num_unique_values == 0:
+            zero_value_indices.append(column)
     return single_value_indices, zero_value_indices
 
 
 def merge_index_levels(df: pd.DataFrame, levels: Sequence, merge_str: str = '-'):
     """merges two or more levels of a pandas Multiindex Dataframe into a single level"""
-    df[merge_str.join(levels)] = df.reset_index(df.index.names.difference(levels)).index.to_flat_index()
-    df.set_index('-'.join(levels), append=True, drop=True, inplace=True)
-    for level in levels:
-        df = df.droplevel(level)
-    return df
+    df_idx = df.set_index(list(levels))
+    df_idx.index = df_idx.index.to_flat_index()
+    df_idx.index.name = merge_str.join(levels)
+    df_idx = df_idx.reset_index()
+    return df_idx
 
 
 def print_top_level_stats(df: pd.DataFrame, secondary_parameters: List[str]):
+    df = df.set_index(keys=df.columns[:33].tolist())
+
     if len(df) > 1:
-        drop_indices = single_and_zero_value_indices(
-            df.index, ['rad', 'n', 'run', 'carrier_id_', 'solution_algorithm', *secondary_parameters])
-        df.droplevel([*drop_indices[0], *drop_indices[1]], axis=0)
+        single_val_col, zero_val_col = single_and_zero_value_columns(
+            df.reset_index(), ['rad', 'n', 'run', 'carrier_id_', 'solution_algorithm', *secondary_parameters])
+        drop_idx = [idx for idx in (single_val_col + zero_val_col) if idx in df.index.names]
+        df = df.droplevel(drop_idx, axis=0)
 
     with pd.option_context('display.max_rows', None, 'display.max_columns', None, 'display.width', 0):
         if 'carrier_id_' in df.index.names:
             # aggregate the 3 carriers
-            solution_df = df.groupby(df.index.names.difference(['carrier_id_']),
+            solution_df = df.groupby(df.columns.difference(['carrier_id_']),
                                      dropna=False).agg({'sum_profit': sum,
                                                         'sum_travel_distance': sum,
                                                         'sum_travel_duration': sum,
