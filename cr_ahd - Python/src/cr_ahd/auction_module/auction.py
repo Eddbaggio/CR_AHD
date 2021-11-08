@@ -121,8 +121,13 @@ class Auction:
         # ===== [1] Request Selection =====
         timer = pr.Timer()
         auction_request_pool, original_bundling_labels = self.request_selection.execute(instance, solution)
+
+        # /// Part of the sequential-auctions problem
         # post_rs_solution must be re-optimized to avoid inconsistencies when intermediate auctions are used
-        solution = self.re_optimize(instance, solution)
+        # however, a re-optimization is not guaranteed to be feasible unless exact approach is used
+        # solution = self.re_optimize(instance, solution)
+        # ///
+
         original_bundles = ut.indices_to_nested_lists(original_bundling_labels, auction_request_pool)
         # timer.write_duration_to_solution(solution, 'runtime_request_selection') fixme need to distinguish between intermediate and final: auction_counter in Solver class?
 
@@ -142,13 +147,12 @@ class Auction:
             timer = pr.Timer()
             bids_matrix = self.bidding.execute_bidding(instance, solution, auction_bundle_pool)
 
-            # REMOVEME only for debugging
+            # /// REMOVEME only for debugging
             bids_dict = {tuple(bundle): bids for bundle, bids in zip(auction_bundle_pool, bids_matrix)}
             bids_on_original_bundles = []
             for bundle, carrier in zip(original_bundles, solution.carriers):
                 bids_on_original_bundles.append(bids_dict[tuple(bundle)][carrier.id_])
-
-            # =====
+            # ///
 
             # timer.write_duration_to_solution(solution, 'runtime_bidding') fixme
             logger.debug(f'Bids {bids_matrix} have been created for bundles {auction_bundle_pool}')
@@ -160,11 +164,11 @@ class Auction:
                                                                                auction_bundle_pool, bids_matrix)
             # timer.write_duration_to_solution(solution, 'runtime_winner_determination') fixme
 
-            # REMOVEME only for debugging
+            # /// REMOVEME only for debugging
             winning_bids = []
             for winner, bundle in zip(bundle_winners, winner_bundles):
                 winning_bids.append(bids_dict[tuple(bundle)][winner])
-            # =====
+            # ///
 
             # todo: store whether the auction did achieve a reallocation or not
 

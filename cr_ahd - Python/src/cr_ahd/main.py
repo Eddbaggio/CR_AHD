@@ -21,8 +21,8 @@ if __name__ == '__main__':
         paths = sorted(list(io.input_dir.iterdir()), key=ut.natural_sort_key)
         run, rad, n = 8, 1, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
         i = run * 6 + rad * 2 + n
-        i = random.choice(range(len(paths)))
-        paths = paths[i:i+1]
+        # i = random.choice(range(len(paths)))
+        paths = paths[:]
 
         # solving
         if len(paths) < 6:
@@ -35,15 +35,18 @@ if __name__ == '__main__':
 
         # write df
         io.output_dir.mkdir(exist_ok=True, parents=True)
-        df.to_csv(path_or_buf=(io.unique_path(io.output_dir, 'evaluation_agg_' + agg_level + '_#{:03d}' + '.csv')))
+        csv_path = io.unique_path(io.output_dir, 'evaluation_agg_' + agg_level + '_#{:03d}' + '.csv')
+        df.to_csv(path_or_buf=csv_path, index=False)
 
         # plotting and evaluation
         ev.plot(df,
                 values='sum_profit',
-                color=('solution_algorithm', 'num_int_auctions'),
+                color=('solution_algorithm', 'num_int_auctions', 'fin_auction_num_auction_rounds'),
                 category=('run',),
                 facet_col=('rad',),
                 facet_row=('n',),
+                title=str(csv_path.name),
+                html_path=io.unique_path(io.output_dir, 'CAHD_#{:03d}.html').as_posix(),
                 )
 
         # ev.bar_chart(df,

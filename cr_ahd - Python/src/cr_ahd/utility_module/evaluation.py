@@ -34,6 +34,24 @@ category_orders = {'solution_algorithm': ['IsolatedPlanning',
 
 config = dict({'scrollZoom': True})
 
+ppt_layout = dict(
+    # width=31.6,  # cm
+    width=4106,  # pixels
+    # height=10.1,  # cm
+    height=1313,  # pixels
+    font_size=12,
+    title_font_size=18.6,
+)
+
+ppt_half_width_layout = dict(
+    # width=15.4,  # cm
+    width=2001,  # pixels
+    # height=10.1,  # cm
+    height=1313,  # pixels
+    font_size=12,
+    title_font_size=18.6,
+)
+
 
 # =================================================================================================
 # PLOTLY
@@ -56,8 +74,8 @@ def plot(df: pd.DataFrame,
         bar_chart(df, values, category, color, facet_row, facet_col, title=title, width=width, height=height, show=show,
                   html_path=html_path)
     else:
-        bar_chart(df, values, category, color, facet_row, facet_col, title=title, width=width, height=height, show=show,
-                  html_path=html_path)
+        box_plot(df, values, category, color, facet_row, facet_col, title=title, width=width, height=height, show=show,
+                 html_path=html_path)
 
 
 def bar_chart(df: pd.DataFrame,
@@ -121,9 +139,9 @@ def bar_chart(df: pd.DataFrame,
     else:
         template = 'plotly_dark'
     fig.update_layout(
-        title_font_size=12,
+        # **ppt_half_width_layout,
         template=template,
-        margin=dict(r=250)
+        margin=dict(r=500)
     )
 
     if show:
@@ -186,15 +204,15 @@ def box_plot(df: pd.DataFrame,
     else:
         template = 'plotly_dark'
     fig.update_layout(
-        legend=dict(
-            orientation="h",
-            yanchor="top",
-            y=-0.1,
-            xanchor="center",
-            x=0.5),
-        title_font_size=12,
+        # legend=dict(
+        #     orientation="h",
+        #     yanchor="top",
+        #     y=-0.1,
+        #     xanchor="center",
+        #     x=0.5),
+        # **ppt_half_width_layout,
         template=template,
-        margin=dict(r=250)
+        margin=dict(r=500)
     )
     if show:
         fig.show(config=config)
@@ -311,7 +329,7 @@ def print_top_level_stats(df: pd.DataFrame, secondary_parameters: List[str]):
             print('=============/ collaboration gains /=============')
             columns = ['sum_profit', 'sum_travel_distance', 'num_tours', 'runtime_total']
             records = []
-            grouped = solution_df.groupby('solution_algorithm')
+            grouped = solution_df.groupby('solution_algorithm', dropna=False)
             isolated = grouped.get_group('IsolatedPlanning')
             collaborative = grouped.get_group('CollaborativePlanning')
             # average overall
@@ -327,7 +345,8 @@ def print_top_level_stats(df: pd.DataFrame, secondary_parameters: List[str]):
                 ['rad', *secondary_parameters],
                 ['rad', 'n'],
                 ['rad', 'n', *secondary_parameters]]:
-                for iso, coll in zip(isolated.groupby(grouper), collaborative.groupby(grouper)):
+                for iso, coll in zip(isolated.groupby(grouper, dropna=False),
+                                     collaborative.groupby(grouper, dropna=False)):
                     iso_name, iso_group = iso
                     coll_name, coll_group = coll
                     assert coll_name == iso_name
@@ -348,40 +367,44 @@ def print_top_level_stats(df: pd.DataFrame, secondary_parameters: List[str]):
 
         if 'CollaborativePlanning' in solution_df.index.get_level_values('solution_algorithm'):
             print('=============/ consistency check: collaborative better than isolated? /=============')
+            inconsistent = []
             secondary_parameters_categorical = [param for param in secondary_parameters if 'runtime' not in param]
             print(['run', 'rad', 'n', *secondary_parameters_categorical])
-            for name, group in solution_df.groupby(['run', 'rad', 'n', *secondary_parameters_categorical]):
-                grouped = group.groupby('solution_algorithm')
+            for name, group in solution_df.groupby(['run', 'rad', 'n', *secondary_parameters_categorical],
+                                                   dropna=False):
+                grouped = group.groupby('solution_algorithm', dropna=False)
                 if all([x in grouped.groups for x in ['CollaborativePlanning', 'IsolatedPlanning']]):
                     isolated = grouped.get_group('IsolatedPlanning')
-                    for _, collaborative in grouped.get_group('CollaborativePlanning').groupby(secondary_parameters):
-                        if not isolated.squeeze()['sum_profit'] <= collaborative.squeeze()['sum_profit']:
+                    for idx, collaborative in grouped.get_group(
+                            'CollaborativePlanning').iterrows():  # .groupby(secondary_parameters, dropna=False):
+                        if not all([isolated.squeeze()['sum_profit'] <= collaborative.squeeze()['sum_profit']]):
+                            print(f'{name}: consistency check failed!')
                             warnings.warn(f'{name}: Collaborative is worse than Isolated!')
+                            inconsistent.append(idx)
                         else:
                             print(f'{name}: consistency check successful')
                 else:
                     print(f'{name}: Cannot compare Isolated and Collaborative, '
                           f'since in this group only {grouped.groups.keys()} exist')
+            print(f'\n\n{len(inconsistent)} inconsistent solutions:')
+            for x in inconsistent:
+                print(x)
 
 
 if __name__ == '__main__':
-    path = "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home " \
-           "Deliveries/01_Code/data/Output/evaluation_agg_solution_#012.csv"
-    df = pd.read_csv(path, index_col=list(range(33)))
-    df.fillna(value={col: 0 for col in df.columns if 'runtime' in col}, inplace=True)
-    df.fillna(value='None', inplace=True)
+    path = "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home Deliveries/01_Code/data/Output/evaluation_agg_solution_#050.csv"
+    df = pd.read_csv(path)
 
-    secondary_parameter = 'num_int_auctions'
-    # print_top_level_stats(df, [secondary_parameter])
+    print_top_level_stats(df, [])
     bar_chart(df,
-              title=str(Path(path).name),
-              values='sum_profit',
-              color=['solution_algorithm', secondary_parameter],
-              category='rad',
-              facet_col=None,
-              facet_row='n',
-              show=True,
-              # width=1000 * 0.85,
-              # height=450 * 0.85 * 1.8,
-              # html_path=ut.unique_path(Path("C:/Users/Elting/Desktop"), 'CAHD_#{:03d}.html').as_posix()
-              )
+         title=str(Path(path).name),
+         values='sum_profit',
+         color=('solution_algorithm', 'num_int_auctions', 'fin_auction_num_auction_rounds'),
+         category=('rad',),
+         facet_col=(None,),
+         facet_row=('n',),
+         show=True,
+         # width=1000 * 0.85,
+         # height=450 * 0.85 * 1.8,
+         # html_path=ut.unique_path(Path("C:/Users/Elting/Desktop"), 'CAHD_#{:03d}.html').as_posix()
+         )

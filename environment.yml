@@ -1,4 +1,4 @@
-name: AMO
+name: CR_AHD
 channels:
   - https://conda.anaconda.org/gurobi
   - r

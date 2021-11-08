@@ -4,6 +4,7 @@ from typing import List, Tuple, Sequence
 
 import numpy as np
 import gurobipy as gp
+import pandas as pd
 from gurobipy import GRB
 
 import utility_module.io
@@ -126,7 +127,7 @@ class MaxBidGurobiCAP1(WinnerDeterminationBehavior):
 
 class MaxBidGurobiCAP2(WinnerDeterminationBehavior):
     """
-    Set Packing Formulation for the Combinatorial Auction Problem / Winner Determination Problem
+    Set Partitioning Formulation for the Combinatorial Auction Problem / Winner Determination Problem
     Following Vries,S.de, & Vohra,R.V. (2003). Combinatorial Auctions: A Survey.
     https://doi.org/10.1287/ijoc.15.3.284.16077
     CAP2
@@ -152,11 +153,13 @@ class MaxBidGurobiCAP2(WinnerDeterminationBehavior):
         # objective: max the sum of bids
         m.modelSense = GRB.MAXIMIZE
 
-        # constraints: each request is assigned to exactly one carrier
+        # constraints: each request is assigned to exactly (!) one carrier --> partitioning
+        # with at most one carrier --> set packing
+        # with at least one --> set covering
         for request in auction_pool:
             m.addConstr(sum(x[i] for i in range(len(bundles)) if request in bundles[i]) == 1, "single assignment")
 
-        # constraints: each carrier can win at most one bundle
+        # constraints: each carrier can win at most one bundle  # TODO check why this is not implemented!
         # for carrier in range(instance.num_carriers):
 
         # solve
@@ -174,3 +177,4 @@ class MaxBidGurobiCAP2(WinnerDeterminationBehavior):
                     f'Bundle {b_idx}: {bundle} assigned to {max_bidders[b_idx]} for a bid of {max_bids[b_idx]}')
 
         return winner_bundles, bundle_winners
+

@@ -36,7 +36,7 @@ def solve_with_parameters(instance: it.MDPDPTWInstance, parameter_generator=pg.p
         except Exception as e:
             logger.error(
                 f'{e}\nFailed on instance {instance} with solver {solver.config} at {datetime.now()}')
-            raise e
+            # raise e
             solution = slt.CAHDSolution(instance)  # create an empty solution for failed instances
             solution.solver_config.update(solver.config)
             solution.write_to_json()
@@ -98,7 +98,7 @@ def _solve_instance_with_parameters(instance: it.MDPDPTWInstance, parameter_gene
         except Exception as e:
             logger.error(
                 f'{e}\nFailed on instance {instance} with solver {solver.__class__.__name__} at {datetime.now()}')
-            raise e
+            # raise e
             solution = slt.CAHDSolution(instance)  # create an empty solution for failed instances
             solution.solver_config.update(solver.config)
             solution.write_to_json()
