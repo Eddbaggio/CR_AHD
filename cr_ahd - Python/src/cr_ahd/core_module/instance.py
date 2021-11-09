@@ -15,6 +15,9 @@ import utility_module.utils as ut
 logger = logging.getLogger(__name__)
 
 
+# class MDVRPTWInstance:
+#     pass
+
 class MDPDPTWInstance:
     def __init__(self,
                  id_: str,

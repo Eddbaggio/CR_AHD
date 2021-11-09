@@ -8,6 +8,7 @@ import pandas as pd
 from core_module import solution as slt
 
 working_dir = Path().cwd()
+print(working_dir.as_posix())
 data_dir = working_dir.absolute().joinpath('data')
 input_dir = data_dir.joinpath('Input')
 assert input_dir.exists(), f'Input directory does not exist! Make sure the working directory (place from where ' \
