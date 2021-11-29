@@ -9,11 +9,13 @@ import plotly.express as px
 
 import utility_module.utils as ut
 
-labels = {'num_carriers': 'Number of Carriers',
-          'travel_distance': 'Travel Distance',
-          'travel_duration': 'Travel Duration',
-          'rad': 'Radius of Service Area',
+labels = {'num_carriers': 'Number of carriers',
+          'travel_distance': 'Travel distance',
+          'travel_duration': 'Travel duration',
+          'rad': 'Radius of Service area',
           'n': 'Number of requests per carrier',
+          'num_acc_inf_requests': 'Number of accepted but infeasible requests\n(served by pendulum tour)',
+          'sum_profit': 'Sum of profit'
           }
 
 category_orders = {'solution_algorithm': ['IsolatedPlanning',
@@ -239,8 +241,11 @@ def plotly_prepare_df(df, category, color, facet_col, facet_row):
                     already_joined.append(v)
             else:
                 splitters_dict[k] = v[0]
-    # create annotation
 
+    # force the color column to be treated as a categorical column
+    df[splitters_dict['color']] = df[splitters_dict['color']].astype('category')
+
+    # create annotation
     single_val_col, zero_val_col = single_and_zero_value_columns(df, splitter_flat_list)
     annotation = [f"{col}={df[col].dropna().unique()[0]}" for col in single_val_col]
     annotation = '<br>'.join(annotation)
@@ -392,14 +397,14 @@ def print_top_level_stats(df: pd.DataFrame, secondary_parameters: List[str]):
 
 
 if __name__ == '__main__':
-    path = "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home Deliveries/01_Code/data/Output/evaluation_agg_solution_#050.csv"
+    path = "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home Deliveries/01_Code/data/Output/evaluation_agg_solution_#083.csv"
     df = pd.read_csv(path)
 
     print_top_level_stats(df, [])
-    bar_chart(df,
+    plot(df,
          title=str(Path(path).name),
          values='sum_profit',
-         color=('solution_algorithm', 'num_int_auctions', 'fin_auction_num_auction_rounds'),
+         color=('num_acc_inf_requests',),
          category=('rad',),
          facet_col=(None,),
          facet_row=('n',),

@@ -5,7 +5,7 @@ from typing import Tuple
 import datetime as dt
 
 from auction_module import auction as au
-from core_module import instance as it, solution as slt
+from core_module import instance as it, solution as slt, tour as tr
 from routing_module import metaheuristics as mh
 from routing_module import tour_construction as cns
 from tw_management_module import tw_offering as two, tw_selection as tws
@@ -20,6 +20,7 @@ class Solver:
                  time_window_selection: tws.TWSelectionBehavior,
                  tour_construction: cns.PDPParallelInsertionConstruction,
                  tour_improvement: mh.PDPTWMetaHeuristic,
+                 num_acc_inf_requests: int,
                  num_intermediate_auctions: int = 0,
                  intermediate_auction: au.Auction = False,
                  final_auction: au.Auction = False,
@@ -41,6 +42,7 @@ class Solver:
             'tour_improvement_time_limit_per_carrier': tour_improvement.time_limit_per_carrier,
             'time_window_offering': time_window_offering.name,
             'time_window_selection': time_window_selection.name,
+            'num_acc_inf_requests': num_acc_inf_requests,
             'num_int_auctions': num_intermediate_auctions,
 
             'int_auction_tour_construction': None,
@@ -157,12 +159,11 @@ class Solver:
                 timer.write_duration_to_solution(solution, 'runtime_time_window_management', True)
 
                 pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
-                instance.assign_time_window(pickup_vertex, ut.EXECUTION_TIME_HORIZON)
+                instance.assign_time_window(pickup_vertex, ut.EXECUTION_TIME_HORIZON)  # pickup at any time
 
                 if selected_tw:
                     instance.assign_time_window(delivery_vertex, selected_tw)
                     carrier.accepted_requests.append(request)
-                    carrier.acceptance_rate = len(carrier.accepted_requests) / len(carrier.assigned_requests)
 
                     # ===== [3] Dynamic Routing/Insertion =====
                     timer = pr.Timer()
@@ -172,10 +173,28 @@ class Solver:
                 else:  # in case (a) the offer set was empty or (b) the customer did not select any time window
                     logger.error(f'[{instance.id_}] No feasible TW can be offered '
                                  f'from Carrier {carrier.id_} to request {request}')
-                    instance.assign_time_window(delivery_vertex, ut.EXECUTION_TIME_HORIZON)
-                    carrier.rejected_requests.append(request)
-                    carrier.unrouted_requests.pop(0)
-                    carrier.acceptance_rate = len(carrier.accepted_requests) / len(carrier.assigned_requests)
+
+                    # accepting infeasible requests
+                    # TODO: parameterize the number of accepted infeasible requests
+                    if len(carrier.accepted_infeasible_requests) < self.config['num_acc_inf_requests']:
+                        carrier.accepted_infeasible_requests.append(request)
+                        tw = random.sample(ut.ALL_TW, 1)[0]
+                        instance.assign_time_window(delivery_vertex, tw)
+                        pendulum_tour = tr.Tour(f'pendulum_{len(carrier.accepted_infeasible_requests)}', carrier.id_)
+                        pendulum_tour.insert_and_update(instance, [1, 2], [pickup_vertex, delivery_vertex])
+                        pendulum_tour.requests.add(request)
+                        carrier.unrouted_requests.remove(request)
+                        carrier.routed_requests.append(request)
+                        carrier.tours_pendulum.append(pendulum_tour)
+
+                    else:
+                        instance.assign_time_window(delivery_vertex, ut.EXECUTION_TIME_HORIZON)
+                        carrier.rejected_requests.append(request)
+                        carrier.unrouted_requests.pop(0)
+
+                carrier.acceptance_rate = len(
+                    carrier.accepted_requests + carrier.accepted_infeasible_requests) / len(
+                    carrier.assigned_requests)
 
         # ===== [5] Final Improvement =====
         before_improvement = solution.objective()

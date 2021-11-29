@@ -6,6 +6,7 @@ import numpy as np
 
 import utility_module.io as io
 from core_module import instance as it, tour as tr
+from utility_module import utils as ut
 
 
 class CAHDSolution:
@@ -145,7 +146,7 @@ class CAHDSolution:
         return {carrier.id_: carrier.as_dict() for carrier in self.carriers}
 
     def summary(self):
-        summary = {**self.meta,}
+        summary = {**self.meta, }
         summary.update(self.solver_config)
         summary.update({
             # 'num_carriers': self.num_carriers(),
@@ -186,11 +187,13 @@ class AHDSolution:
         # self.depots = [carrier_index]  # maybe it's better to store the depots in this class rather than in CAHD?!
         self.assigned_requests: List = []
         self.accepted_requests: List = []
+        self.accepted_infeasible_requests: List = []
         self.rejected_requests: List = []
         self.unrouted_requests: List = []
         self.routed_requests: List = []
         self.acceptance_rate: float = 0
         self.tours: List[tr.Tour] = []
+        self.tours_pendulum: List[tr.Tour] = []  # 1 for each accepted infeasible request
 
     def __str__(self):
         s = f'---// Carrier ID: {self.id_} //---' \
@@ -198,6 +201,7 @@ class AHDSolution:
             f'Acceptance Rate={round(self.acceptance_rate, 2)}, ' \
             f'Assigned={self.assigned_requests}, ' \
             f'Accepted={self.accepted_requests}, ' \
+            f'Accepted_Infeasible={self.accepted_infeasible_requests}' \
             f'Unrouted={self.unrouted_requests}, ' \
             f'Routed={self.routed_requests}'
         s += '\n'
@@ -210,22 +214,34 @@ class AHDSolution:
         return f'Carrier (AHDSolution) {self.id_}'
 
     def num_routing_stops(self):
-        return sum(t.num_routing_stops for t in self.tours)
+        regular = sum(t.num_routing_stops for t in self.tours)
+        pendulum = sum(t.num_routing_stops for t in self.tours_pendulum)
+        return regular + pendulum
 
     def sum_travel_distance(self):
-        return sum(t.sum_travel_distance for t in self.tours)
+        regular = sum(t.sum_travel_distance for t in self.tours)
+        pendulum = sum(t.sum_travel_distance for t in self.tours_pendulum)
+        return regular + pendulum
 
     def sum_travel_duration(self):
-        return sum((t.sum_travel_duration for t in self.tours), dt.timedelta(0))
+        regular = sum((t.sum_travel_duration for t in self.tours), dt.timedelta(0))
+        pendulum = sum((t.sum_travel_duration for t in self.tours_pendulum), dt.timedelta(0))
+        return regular + pendulum
 
     def sum_load(self):
-        return sum(t.sum_load for t in self.tours)
+        regular = sum(t.sum_load for t in self.tours)
+        pendulum = sum(t.sum_load for t in self.tours_pendulum)
+        return regular + pendulum
 
     def sum_revenue(self):
-        return sum(t.sum_revenue for t in self.tours)
+        regular = sum(t.sum_revenue for t in self.tours)
+        pendulum = sum(t.sum_revenue for t in self.tours_pendulum)
+        return regular + pendulum
 
     def sum_profit(self):
-        return sum(t.sum_profit for t in self.tours)
+        regular = sum(t.sum_profit for t in self.tours)
+        pendulum = sum(t.sum_revenue - t.sum_travel_distance * ut.PENDULUM_PENALTY_DISTANCE_SCALING for t in self.tours_pendulum)
+        return regular + pendulum
 
     def objective(self):
         return self.sum_profit()

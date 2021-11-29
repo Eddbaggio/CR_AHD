@@ -263,11 +263,11 @@ def validate_solution(instance, solution):
 
     for carrier_id in trange(len(solution.carriers), desc=f'Solution validation', disable=True):
         carrier = solution.carriers[carrier_id]
-        assert len(carrier.unrouted_requests) == 0
+        assert len(carrier.unrouted_requests) == 0, f'Carrier {carrier} has unrouted requests: {carrier.unrouted_requests}'
         for tour in carrier.tours:
             assert tour is solution.tours[tour.id_]
-            assert tour.routing_sequence[0] == carrier.id_
-            assert tour.routing_sequence[-1] == carrier.id_
+            assert tour.routing_sequence[0] == carrier.id_, f'the start of tour {tour} from carrier {carrier} is not a depot'
+            assert tour.routing_sequence[-1] == carrier.id_, f'the end of tour {tour} from carrier {carrier} is not a depot'
 
             assert tour.sum_load == 0, instance.id_
             assert tour.sum_travel_distance <= instance.vehicles_max_travel_distance, instance.id_
@@ -340,9 +340,19 @@ LOAD_CAPACITY_SCALING = 10
 ACCEPTANCE_START_TIME: dt.datetime = dt.datetime.min
 EXECUTION_START_TIME: dt.datetime = ACCEPTANCE_START_TIME + dt.timedelta(days=1)
 END_TIME: dt.datetime = EXECUTION_START_TIME + dt.timedelta(minutes=3360)
-# END_TIME = dt.datetime.min + dt.timedelta(days=1)
 TW_LENGTH: dt.timedelta = dt.timedelta(hours=2)
 ALL_TW = [TimeWindow(e, min(e + TW_LENGTH, END_TIME)) for e in
           datetime_range(EXECUTION_START_TIME, END_TIME, step=TW_LENGTH, endpoint=False)]
 EXECUTION_TIME_HORIZON = TimeWindow(EXECUTION_START_TIME, END_TIME)
 SPEED_KMH = 60  # vehicle speed (set to 60 to treat distance = time)
+
+# override to artificially lower the acceptance rate:
+END_TIME: dt.datetime = EXECUTION_START_TIME + dt.timedelta(days=1)
+TW_LENGTH: dt.timedelta = dt.timedelta(hours=2)
+ALL_TW = [TimeWindow(e, min(e + TW_LENGTH, END_TIME)) for e in
+          datetime_range(EXECUTION_START_TIME, END_TIME, step=TW_LENGTH, endpoint=False)]
+EXECUTION_TIME_HORIZON = TimeWindow(EXECUTION_START_TIME, END_TIME)
+SPEED_KMH = 30  # vehicle speed (set to 60 to treat distance = time)
+
+
+PENDULUM_PENALTY_DISTANCE_SCALING = 1.25
