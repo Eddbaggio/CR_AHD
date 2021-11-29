@@ -76,13 +76,14 @@ class Auction:
                 -> FIXED by adding request_disclosure_time to the instance
                 
                 (b) the metaheuristic used for improvements does not work correctly and returns worse results. This
-                messes up the bidding because the bid on a given carrier's original bundle may be incorrect
+                messes up the bidding because the bid on a given carrier's original bundle may be incorrect.
+                -> possible, but let's first assume this is not the real issue
                 
-                (c) the bidding process inserts all requests from scratch and runs a single improvement at the end.
-                with intermediate auctions, there is an improvement phase after each intermediate auction and only
-                afterwards will newly arriving requests be inserted. Thus, the bidding is not the same as the 
-                dynamic insertion because the latter has additional intermediate improvements.
-                -> is not the (only) problem at the moment since using NoMetaheuristic did not resolve the issue
+                (c) the bidding process inserts all requests from scratch and runs a single improvement at the end. 
+                with intermediate auctions, there is an improvement phase after each intermediate auction and only 
+                afterwards will newly arriving requests be inserted. Thus, the bidding (on one's own requests) is not 
+                the same as the dynamic insertion because the latter has additional intermediate improvements. 
+                -> is not the (only) problem at the moment since using NoMetaheuristic did not resolve the issue 
                 
                 (d) after submitting requests to the auction pool, the solution is not re-optimized from scratch but
                 left as is. On the other hand, post_auction_routing re-optimizes from scratch. The re-optimization

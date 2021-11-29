@@ -1,16 +1,55 @@
 import re
+import sys
 from pathlib import Path
+from time import sleep
 
 import geopandas as gp
 import pandas as pd
+import requests
 from shapely.geometry import Point
 from utility_module import io
+import tqdm
+import matplotlib.pyplot as plt
+import itertools
+
+vienna_pop_per_district = {
+    1010: 16047,
+    1020: 105848,
+    1030: 91680,
+    1040: 33212,
+    1050: 55123,
+    1060: 31651,
+    1070: 31961,
+    1080: 25021,
+    1090: 41884,
+    1100: 207193,
+    1110: 104434,
+    1120: 97078,
+    1130: 54040,
+    1140: 93634,
+    1150: 76813,
+    1160: 103117,
+    1170: 57027,
+    1180: 51497,
+    1190: 73901,
+    1200: 86368,
+    1210: 167968,
+    1220: 195230,
+    1230: 110464,
+}
 
 
 def read_vienna_addresses(url=io.input_dir.joinpath('vienna_addresses.csv'),
-                          EPSG=4326,):
+                          EPSG=4326,
+                          **kwargs
+                          ):
+    """
+
+    """
+
     df = pd.read_csv(
         url,
+        index_col='FID',
         dtype={'FID': 'string',
                'ABSCHNITT_ZUGANG_STR': 'int64',
                'ACD': 'int64',
@@ -86,6 +125,7 @@ def read_vienna_addresses(url=io.input_dir.joinpath('vienna_addresses.csv'),
                'ZUG_X': 'float64',
                'ZUG_Y': 'float64',
                'ABLAUFDATUM': 'string'},
+        **kwargs
     )
 
     for date_col in df.columns:
@@ -122,9 +162,10 @@ def _query_vienna_addresses_online(write_path: Path = io.input_dir.joinpath('vie
             outputFormat='csv',
             cql_filter=f"GEB_BEZIRK='{district:02d}'",
         )
-        url = f"https://data.wien.gv.at/daten/geo?{'&'.join([f'{k}={v}' for k,v in d.items()])}"
+        url = f"https://data.wien.gv.at/daten/geo?{'&'.join([f'{k}={v}' for k, v in d.items()])}"
         district_df = pd.read_csv(
             url,
+            index_col='FID',
             dtype={'FID': 'string',
                    'ABSCHNITT_ZUGANG_STR': 'int64',
                    'ACD': 'int64',
@@ -214,8 +255,9 @@ def _query_vienna_addresses_online(write_path: Path = io.input_dir.joinpath('vie
         district_df.rename(columns={'SHAPE': 'geometry'}, inplace=True)
 
         # transform access points to proper shapely Point objects
-        district_df['geometry'] = district_df['geometry'].apply(lambda x: Point(float(s) for s in re.findall(r'-?\d+\.?\d*', x)))
-
+        district_df['geometry'] = district_df['geometry'].apply(
+            lambda x: Point(float(s) for s in re.findall(r'-?\d+\.?\d*', x)))
+        district_df['geometry'] = district_df['geometry'].apply(lambda p: Point(p.y, p.x))
         # turn into geodataframe and append
         district_gdf = gp.GeoDataFrame(district_df, crs=f'EPSG:{EPSG}')
         vienna_addresses = vienna_addresses.append(district_gdf)
@@ -230,9 +272,58 @@ def _query_vienna_addresses_online(write_path: Path = io.input_dir.joinpath('vie
     return vienna_addresses
 
 
+def _query_osrm_car_durations(gs: gp.GeoSeries):
+    api_limit = 100
+    half_api_limit = api_limit // 2
+    durations = dict()
+    m = 0 if len(gs) % half_api_limit == 0 else 1
+
+    for i in tqdm.tqdm(range((len(gs) // half_api_limit) + m), desc='OSRM API QUERY'):
+        chunk1 = gs.iloc[half_api_limit * i: half_api_limit * (i + 1)]
+        sources = [list(p.coords)[0] for p in chunk1]
+        sources = [",".join([str(p[1]), str(p[0])]) for p in sources]
+        sources = ";".join(sources)
+
+        for j in tqdm.tqdm(range((len(gs) // half_api_limit) + m)):
+            chunk2 = gs.iloc[half_api_limit * j: half_api_limit * (j + 1)]
+            destinations = [list(p.coords)[0] for p in chunk2]
+            destinations = [",".join([str(p[1]), str(p[0])]) for p in destinations]
+            destinations = ";".join(destinations)
+
+            # make the API request
+            locations = ";".join([sources, destinations])
+            sources_ids = ";".join(str(x) for x in (range(len(chunk1))))
+            destinations_ids = ";".join(str(x) for x in (range(len(chunk1), len(chunk1) + len(chunk2))))
+            req = f"http://router.project-osrm.org/table/v1/car/{locations}?sources={sources_ids}&destinations={destinations_ids}"
+            r = requests.get(req)
+            assert r.status_code == 200, f'Status code: {r.status_code} is invalid. Check your request.\n{r.content}'
+
+            # transform the result to a pandas DataFrame
+            duration_matrix = pd.DataFrame(r.json()['durations'], index=chunk1.index, columns=chunk2.index, )
+
+            for k in range(len(chunk1)):
+                key = chunk1.index[k]
+                if key in durations:
+                    durations[key] = durations[key] + r.json()['durations'][k]
+                else:
+                    durations[key] = r.json()['durations'][k]
+
+            # write it to the existing skeleton
+            # duration_matrix.to_csv(path, )
+    duration_matrix = pd.DataFrame(durations, columns=gs.index, index=gs.index)
+
+    return duration_matrix
+
+
 if __name__ == '__main__':
     # re-query the data
-    _query_vienna_addresses_online()
+    # _query_vienna_addresses_online()
 
     # read from disk
-    # gdf = read_vienna_addresses()
+    gdf = read_vienna_addresses().sample(n=1000, replace=False, random_state=42)
+
+    # query OSRM durations
+    gdf.set_index('NAME', inplace=True)
+    duration_matrix = _query_osrm_car_durations(gdf.geometry)
+    duration_matrix.to_csv(io.input_dir.joinpath('vienna_durations_1000.csv'), encoding='utf-8-sig', index=True,
+                           header=True)

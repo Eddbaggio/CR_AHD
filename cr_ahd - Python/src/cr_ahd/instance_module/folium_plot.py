@@ -1,7 +1,7 @@
 import folium
 from shapely.geometry import Point
 
-from address_retrieval import read_vienna_addresses
+from vienna_data_handling import read_vienna_addresses
 import geopandas as gp
 import webbrowser
 from utility_module import io
