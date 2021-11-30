@@ -8,26 +8,25 @@ from auction_module import auction as au
 from core_module import instance as it, solution as slt, tour as tr
 from routing_module import metaheuristics as mh
 from routing_module import tour_construction as cns
-from tw_management_module import tw_offering as two, tw_selection as tws
+from tw_management_module import tw_offering as two, tw_selection as tws, request_acceptance as ra
 from utility_module import utils as ut, profiling as pr
+from utility_module.errors import ConstraintViolationError
 
 logger = logging.getLogger(__name__)
 
 
 class Solver:
     def __init__(self,
-                 time_window_offering: two.TWOfferingBehavior,
-                 time_window_selection: tws.TWSelectionBehavior,
+                 request_acceptance: ra.RequestAcceptanceBehavior,
                  tour_construction: cns.PDPParallelInsertionConstruction,
                  tour_improvement: mh.PDPTWMetaHeuristic,
-                 num_acc_inf_requests: int,
                  num_intermediate_auctions: int = 0,
                  intermediate_auction: au.Auction = False,
                  final_auction: au.Auction = False,
                  ):
         assert not (bool(num_intermediate_auctions) ^ bool(intermediate_auction))  # not XOR
-        self.time_window_offering: two.TWOfferingBehavior = time_window_offering
-        self.time_window_selection: tws.TWSelectionBehavior = time_window_selection
+
+        self.request_acceptance: ra.RequestAcceptanceBehavior = request_acceptance
         self.tour_construction: cns.PDPParallelInsertionConstruction = tour_construction
         self.tour_improvement: mh.PDPTWMetaHeuristic = tour_improvement
         self.num_intermediate_auctions: int = num_intermediate_auctions
@@ -40,9 +39,10 @@ class Solver:
             'neighborhoods': '+'.join([nbh.name for nbh in tour_improvement.neighborhoods]),
             'tour_construction': tour_construction.name,
             'tour_improvement_time_limit_per_carrier': tour_improvement.time_limit_per_carrier,
-            'time_window_offering': time_window_offering.name,
-            'time_window_selection': time_window_selection.name,
-            'num_acc_inf_requests': num_acc_inf_requests,
+            'max_num_accepted_infeasible': request_acceptance.max_num_accepted_infeasible,
+            'request_acceptance_attractiveness': request_acceptance.request_acceptance_attractiveness.name,
+            'time_window_offering': request_acceptance.time_window_offering.name,
+            'time_window_selection': request_acceptance.time_window_selection.name,
             'num_int_auctions': num_intermediate_auctions,
 
             'int_auction_tour_construction': None,
@@ -129,18 +129,13 @@ class Solver:
         random.seed(0)
         logger.info(f'{instance.id_}: Solving {solution.solver_config}')
 
-        # ===== [1] Dynamic Acceptance Phase =====
+        # ===== Dynamic Request Arrival Phase =====
         for request in sorted(instance.requests, key=lambda x: instance.request_disclosure_time[x]):
 
-            # ===== [4] Intermediate Auctions =====
+            # ===== Intermediate Auctions =====
             if self.intermediate_auction:
                 if instance.request_disclosure_time[request] >= intermediate_auction_threshold:
-                    timer = pr.Timer()
-                    # solution = self.tour_improvement.execute(instance, solution)
-                    timer.write_duration_to_solution(solution, 'runtime_intermediate_improvements', True)
-                    timer = pr.Timer()
-                    solution = self.intermediate_auction.execute(instance, solution)
-                    timer.write_duration_to_solution(solution, 'runtime_intermediate_auctions', True)
+                    solution = self.run_intermediate_auction(instance, solution)
                     try:
                         intermediate_auction_threshold = next(intermediate_auction_times)
                     except StopIteration:
@@ -151,55 +146,10 @@ class Solver:
             carrier = solution.carriers[carrier_id]
             solution.assign_requests_to_carriers([request], [carrier_id])
 
-            # ===== [2] Time Window Management =====
-            if self.time_window_offering and self.time_window_selection:
-                timer = pr.Timer()
-                offer_set = self.time_window_offering.execute(instance, carrier, request)  # which TWs to offer?
-                selected_tw = self.time_window_selection.execute(offer_set, request)  # which TW is selected?
-                timer.write_duration_to_solution(solution, 'runtime_time_window_management', True)
+            # ===== Request Acceptance and Time Window Management =====
+            self.request_acceptance_and_time_window(instance, solution, carrier, request)
 
-                pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
-                instance.assign_time_window(pickup_vertex, ut.EXECUTION_TIME_HORIZON)  # pickup at any time
-
-                if selected_tw:
-                    instance.assign_time_window(delivery_vertex, selected_tw)
-                    carrier.accepted_requests.append(request)
-
-                    # ===== [3] Dynamic Routing/Insertion =====
-                    timer = pr.Timer()
-                    self.tour_construction.insert_single_request(instance, solution, carrier.id_, request)
-                    timer.write_duration_to_solution(solution, 'runtime_dynamic_insertion', True)
-
-                else:  # in case (a) the offer set was empty or (b) the customer did not select any time window
-                    logger.error(f'[{instance.id_}] No feasible TW can be offered '
-                                 f'from Carrier {carrier.id_} to request {request}:'
-                                 f'{"Emtpy offer set" if not offer_set else "Customer preference mismatch"} ')
-
-                    # accepting infeasible requests
-                    # TODO: parameterize the number of accepted infeasible requests
-                    if len(carrier.accepted_infeasible_requests) < self.config['num_acc_inf_requests']:
-                        carrier.accepted_infeasible_requests.append(request)
-                        tw = random.sample(ut.ALL_TW, 1)[0]
-                        instance.assign_time_window(delivery_vertex, tw)
-                        pendulum_tour = tr.Tour(f'pendulum_{len(carrier.accepted_infeasible_requests)}', carrier.id_)
-                        pendulum_tour.insert_and_update(instance, [1, 2], [pickup_vertex, delivery_vertex])
-                        pendulum_tour.requests.add(request)
-
-                        solution.tours_pendulum.append(pendulum_tour)
-                        carrier.unrouted_requests.remove(request)
-                        carrier.routed_requests.append(request)
-                        carrier.tours_pendulum.append(pendulum_tour)
-
-                    else:
-                        instance.assign_time_window(delivery_vertex, ut.EXECUTION_TIME_HORIZON)
-                        carrier.rejected_requests.append(request)
-                        carrier.unrouted_requests.pop(0)
-
-                carrier.acceptance_rate = len(
-                    carrier.accepted_requests + carrier.accepted_infeasible_requests) / len(
-                    carrier.assigned_requests)
-
-        # ===== [5] Final Improvement =====
+        # ===== Final Improvement =====
         before_improvement = solution.objective()
         timer = pr.Timer()
         solution = self.tour_improvement.execute(instance, solution)
@@ -207,7 +157,7 @@ class Solver:
         assert int(before_improvement) <= int(solution.objective()), instance.id_
         ut.validate_solution(instance, solution)  # safety check to make sure everything's functional
 
-        # ===== [6] Final Auction =====
+        # ===== Final Auction =====
         if self.final_auction:
             timer = pr.Timer()
             solution = self.final_auction.execute(instance, solution)
@@ -217,3 +167,41 @@ class Solver:
         logger.info(f'{instance.id_}: Success {solution.solver_config}')
 
         return instance, solution
+
+    def request_acceptance_and_time_window(self, instance, solution, carrier, request):
+        pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
+        instance.assign_time_window(pickup_vertex, ut.EXECUTION_TIME_HORIZON)  # pickup at any time
+        acceptance_type, selected_tw = self.request_acceptance.execute(instance, carrier, request)
+
+        if acceptance_type == 'accept_feasible':
+            carrier.accepted_requests.append(request)
+            instance.assign_time_window(delivery_vertex, selected_tw)
+            self.tour_construction.insert_single_request(instance, solution, carrier.id_, request)
+
+        elif acceptance_type == 'accept_infeasible':
+            logger.error(f'[{instance.id_}] No feasible TW can be offered from Carrier {carrier.id_} '
+                         f'to request {request}: {acceptance_type}')
+            carrier.accepted_infeasible_requests.append(request)
+            instance.assign_time_window(delivery_vertex, selected_tw)
+            self.tour_construction.create_pendulum_tour_for_infeasible_request(instance, solution, carrier.id_, request)
+
+        else:
+            logger.error(f'[{instance.id_}] No feasible TW can be offered from Carrier {carrier.id_} '
+                         f'to request {request}: {acceptance_type}')
+            instance.assign_time_window(delivery_vertex, ut.EXECUTION_TIME_HORIZON)
+            carrier.rejected_requests.append(request)
+            carrier.unrouted_requests.remove(request)
+
+        # update acceptance rate
+        carrier.acceptance_rate = len(
+            carrier.accepted_requests + carrier.accepted_infeasible_requests) / len(
+            carrier.assigned_requests)
+
+    def run_intermediate_auction(self, instance, solution):
+        timer = pr.Timer()
+        # solution = self.tour_improvement.execute(instance, solution)
+        timer.write_duration_to_solution(solution, 'runtime_intermediate_improvements', True)
+        timer = pr.Timer()
+        solution = self.intermediate_auction.execute(instance, solution)
+        timer.write_duration_to_solution(solution, 'runtime_intermediate_auctions', True)
+        return solution

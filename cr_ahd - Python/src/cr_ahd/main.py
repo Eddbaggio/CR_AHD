@@ -19,10 +19,10 @@ if __name__ == '__main__':
 
         # select the files to be solved
         paths = sorted(list(io.input_dir.glob('*.dat')), key=ut.natural_sort_key)
-        run, rad, n = 8, 1, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
-        # i = run * 6 + rad * 2 + n
-        i = random.choice(range(len(paths)))
-        paths = paths[:60]
+        run, rad, n = 2, 1, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
+        i = run * 6 + rad * 2 + n
+        # i = random.choice(range(len(paths)))
+        paths = paths[:24]
 
         # solving
         if len(paths) < 6:
@@ -41,7 +41,7 @@ if __name__ == '__main__':
         # plotting and evaluation
         ev.plot(df,
                 values='sum_profit',
-                color=('solution_algorithm', 'num_acc_inf_requests', ),
+                color=('solution_algorithm', 'max_num_accepted_infeasible', ),
                 category=('run',),
                 facet_col=('rad',),
                 facet_row=('n',),

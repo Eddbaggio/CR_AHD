@@ -22,7 +22,8 @@ class CAHDSolution:
         self.request_to_carrier_assignment: List[int] = [None for _ in range(instance.num_requests)]
 
         self.tours: List[tr.Tour] = []
-        self.tours_pendulum: List[tr.Tour] = []  # TODO urgently need to check whether these are treated correctly in all methods
+        self.tours_pendulum: List[
+            tr.Tour] = []  # TODO urgently need to check whether this is treated correctly in all methods
         self.carriers: List[AHDSolution] = [AHDSolution(c) for c in range(instance.num_carriers)]
 
         # solver configuration and other meta data
@@ -139,6 +140,13 @@ class CAHDSolution:
         for carrier in self.carriers:
             carrier.drop_empty_tours()
 
+    def get_free_pendulum_tour_id(self):
+        if None in self.tours_pendulum:
+            tour_id = self.tours_pendulum.index(None)
+        else:
+            tour_id = len(self.tours_pendulum)
+        return f'p{tour_id}'
+
     def get_free_tour_id(self):
         if None in self.tours:
             tour_id = self.tours.index(None)
@@ -245,7 +253,8 @@ class AHDSolution:
 
     def sum_profit(self):
         regular = sum(t.sum_profit for t in self.tours)
-        pendulum = sum(t.sum_revenue - t.sum_travel_distance * ut.PENDULUM_PENALTY_DISTANCE_SCALING for t in self.tours_pendulum)
+        pendulum = sum(
+            t.sum_revenue - t.sum_travel_distance * ut.PENDULUM_PENALTY_DISTANCE_SCALING for t in self.tours_pendulum)
         return regular + pendulum
 
     def objective(self):
@@ -270,7 +279,8 @@ class AHDSolution:
             'sum_load': self.sum_load(),
             'sum_revenue': self.sum_revenue(),
             'acceptance_rate': self.acceptance_rate,
-            'tour_summaries': {t.id_: t.summary() for t in self.tours}
+            'tour_summaries': {t.id_: t.summary() for t in self.tours},
+            'tours_pendulum_summaries': {t.id_: t.summary() for t in self.tours_pendulum}
         }
 
     def drop_empty_tours(self):

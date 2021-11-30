@@ -646,6 +646,9 @@ class Tour:
                 copy._single_insert_and_update(instance, insertion_index, insertion_vertex)
             return total_max_shift_delta
 
+# class PendulumTour(Tour):
+#     pass
+
 
 # =====================================================================================================================
 # stand-alone functions that are independent from the instance and solution classes but accept the raw data instead

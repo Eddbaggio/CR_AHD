@@ -404,7 +404,7 @@ if __name__ == '__main__':
     plot(df,
          title=str(Path(path).name),
          values='sum_profit',
-         color=('solution_algorithm', 'num_acc_inf_requests',),
+         color=('solution_algorithm', 'max_num_accepted_infeasible',),
          category=('rad',),
          facet_col=(None,),
          facet_row=('n',),

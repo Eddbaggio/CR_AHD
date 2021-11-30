@@ -166,7 +166,38 @@ class PDPParallelInsertionConstruction(ABC):
         tour.insert_and_update(instance, [pickup_pos, delivery_pos], [pickup, delivery])
         tour.requests.add(request)
 
-    def create_new_tour_with_request(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int,
+    def create_pendulum_tour_for_infeasible_request(self,
+                                                    instance: it.MDPDPTWInstance,
+                                                    solution: slt.CAHDSolution,
+                                                    carrier_id: int,
+                                                    request: int
+                                                    ):
+        carrier = solution.carriers[carrier_id]
+        pendulum_tour_id = solution.get_free_pendulum_tour_id()
+        logger.debug(f'Carrier {carrier_id}, *Pendulum Tour {pendulum_tour_id}')
+        pendulum_tour = tr.Tour(pendulum_tour_id, depot_index=carrier.id_)
+
+        if pendulum_tour.insertion_feasibility_check(instance, [1, 2], instance.pickup_delivery_pair(request)):
+            pendulum_tour.insert_and_update(instance, [1, 2], instance.pickup_delivery_pair(request))
+            pendulum_tour.requests.add(request)
+
+        else:
+            raise utility_module.errors.ConstraintViolationError(
+                f'Cannot create new route with request {request} for carrier {carrier.id_}.')
+
+        if int(pendulum_tour_id[1]) < len(solution.tours_pendulum):
+            solution.tours_pendulum[int(pendulum_tour_id[1])] = pendulum_tour
+        else:
+            solution.tours_pendulum.append(pendulum_tour)
+        carrier.tours_pendulum.append(pendulum_tour)
+        carrier.unrouted_requests.remove(request)
+        carrier.routed_requests.append(request)
+        return
+
+    def create_new_tour_with_request(self,
+                                     instance: it.MDPDPTWInstance,
+                                     solution: slt.CAHDSolution,
+                                     carrier_id: int,
                                      request: int):
         carrier = solution.carriers[carrier_id]
         if len(carrier.tours) >= instance.carriers_max_num_tours:
