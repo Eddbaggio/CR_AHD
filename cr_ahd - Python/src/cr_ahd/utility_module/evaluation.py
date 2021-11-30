@@ -162,7 +162,7 @@ def box_plot(df: pd.DataFrame,
              title: str,
              height: float,
              width: float,
-             points: str = None,
+             points: str = 'all',
              show: bool = True,
              html_path=None
              ):
@@ -397,14 +397,14 @@ def print_top_level_stats(df: pd.DataFrame, secondary_parameters: List[str]):
 
 
 if __name__ == '__main__':
-    path = "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home Deliveries/01_Code/data/Output/evaluation_agg_solution_#083.csv"
+    path = "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home Deliveries/01_Code/data/Output/evaluation_agg_solution_#086.csv"
     df = pd.read_csv(path)
 
-    print_top_level_stats(df, [])
+    # print_top_level_stats(df, [])
     plot(df,
          title=str(Path(path).name),
          values='sum_profit',
-         color=('num_acc_inf_requests',),
+         color=('solution_algorithm', 'num_acc_inf_requests',),
          category=('rad',),
          facet_col=(None,),
          facet_row=('n',),

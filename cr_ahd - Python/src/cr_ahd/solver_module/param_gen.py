@@ -71,11 +71,12 @@ def parameter_generator():
         # rs.MarginalProfitProxy,
         # rs.MarginalProfitProxyNeighbor,
         # rs.ComboRaw,
-        rs.ComboStandardized,
+        # rs.ComboStandardized,
         # rs.LosSchulteBundle,
         # rs.TemporalRangeCluster,
         # TODO SpatioTemporalCluster is not yet good enough & sometimes even infeasible
         # rs.SpatioTemporalCluster,
+        rs.InfeasibleFirstRandomSecond,
     ]
 
     nums_auction_bundles: List[int] = [
@@ -104,7 +105,7 @@ def parameter_generator():
     ]
 
     auction_policies: List[Dict] = [
-        # {'num_intermediate_auctions': 0, 'num_intermediate_auction_rounds': 0, 'num_final_auction_rounds': 1},
+        {'num_intermediate_auctions': 0, 'num_intermediate_auction_rounds': 0, 'num_final_auction_rounds': 1},
         # {'num_intermediate_auctions': 0, 'num_intermediate_auction_rounds': 0, 'num_final_auction_rounds': 2},
         # {'num_intermediate_auctions': 1, 'num_intermediate_auction_rounds': 1, 'num_final_auction_rounds': 1},
     ]
@@ -207,6 +208,7 @@ def parameter_generator():
                                                         time_window_selection=time_window_selection,
                                                         tour_construction=tour_construction,
                                                         tour_improvement=tour_improvement,
+                                                        num_acc_inf_requests=num_acc_inf_requests,
                                                         num_intermediate_auctions=auction_policy[
                                                             'num_intermediate_auctions'],
                                                         intermediate_auction=intermediate_auction,

@@ -172,7 +172,8 @@ class Solver:
 
                 else:  # in case (a) the offer set was empty or (b) the customer did not select any time window
                     logger.error(f'[{instance.id_}] No feasible TW can be offered '
-                                 f'from Carrier {carrier.id_} to request {request}')
+                                 f'from Carrier {carrier.id_} to request {request}:'
+                                 f'{"Emtpy offer set" if not offer_set else "Customer preference mismatch"} ')
 
                     # accepting infeasible requests
                     # TODO: parameterize the number of accepted infeasible requests
@@ -183,6 +184,8 @@ class Solver:
                         pendulum_tour = tr.Tour(f'pendulum_{len(carrier.accepted_infeasible_requests)}', carrier.id_)
                         pendulum_tour.insert_and_update(instance, [1, 2], [pickup_vertex, delivery_vertex])
                         pendulum_tour.requests.add(request)
+
+                        solution.tours_pendulum.append(pendulum_tour)
                         carrier.unrouted_requests.remove(request)
                         carrier.routed_requests.append(request)
                         carrier.tours_pendulum.append(pendulum_tour)

@@ -3,6 +3,7 @@ import warnings
 from abc import ABC
 from copy import deepcopy
 from typing import List
+from gurobipy import GRB
 
 import pandas as pd
 
@@ -53,63 +54,64 @@ class Auction:
 
             # auction
             pre_auction_solution = deepcopy(solution)
-            solution, winners = self.reallocate_requests(instance, solution)
+            status, solution, winners = self.reallocate_requests(instance, solution)
 
-            # clears the solution and re-optimize
-            solution = self.re_optimize(instance, solution, winners)
+            if status == GRB.OPTIMAL:
+                # clears the solution and re-optimize
+                solution = self.re_optimize(instance, solution, winners)
 
-            # consistency check. cannot compare carriers' profit individually before and after the auction because I
-            # do not implement profit sharing! Thus, an individual carrier may be worse off, while the global solution
-            # is better!
-            if not pre_auction_solution.objective() <= solution.objective():
-                """
-                Unfortunately, there are several circumstances that can lead to the post-auction result being worse
-                than the pre-auction solution. In that case, throw a warning and recover the pre-auction solution!
-                Causes:
-                
-                (a) If intermediate auctions are used, any auction other than the first may run into the following 
-                problem: The sorting of assigned requests for a given carrier can be in no order due to request 
-                reassignments in a previous auction. Now, if the current auction's bidding takes place and the carrier
-                bids on his original bundle, this bundle will be in a different order, meaning that dynamic insertion
-                obtains a different - potentially worse - result! SOLUTION: make sure that the dynamic insertion
-                (of the bidding phase) follows the same order as the carrier.assigned_requests list.
-                -> FIXED by adding request_disclosure_time to the instance
-                
-                (b) the metaheuristic used for improvements does not work correctly and returns worse results. This
-                messes up the bidding because the bid on a given carrier's original bundle may be incorrect.
-                -> possible, but let's first assume this is not the real issue
-                
-                (c) the bidding process inserts all requests from scratch and runs a single improvement at the end. 
-                with intermediate auctions, there is an improvement phase after each intermediate auction and only 
-                afterwards will newly arriving requests be inserted. Thus, the bidding (on one's own requests) is not 
-                the same as the dynamic insertion because the latter has additional intermediate improvements. 
-                -> is not the (only) problem at the moment since using NoMetaheuristic did not resolve the issue 
-                
-                (d) after submitting requests to the auction pool, the solution is not re-optimized from scratch but
-                left as is. On the other hand, post_auction_routing re-optimizes from scratch. The re-optimization
-                may yield results that are worse than simply removing requests!
-                -> FIXED by only re-optimizing the winners' route plan and leaving carriers untouched that did not win
-                a bundle. However, this does not fix issue (e)! 
-                
-                (e) similarly to (d) the following procedure causes problems, too: A carrier submits something in the 
-                first auction but does not win anything in this auction. thus, his route plan will never be 
-                re-optimized after request selection. He is left with the solution [A] obtained by simply removing 
-                the submitted requests from their tour. Dynamic insertion of any request that arrives after the first 
-                auction is now based on [A]. In a second auction, the same carrier may win *his own* submitted 
-                requests. Since he is technically a winner, his route plan will be re-optimized *from scratch*, 
-                potentially making different insertion decisions as were made when insertion was based on [A]. The 
-                re-optimization may yield results that are worse than solution [A] (or even infeasible)! 
-                -> TODO Fix this by doing a re-optimization after RS for all carriers?? 
-                    -> No, because this may be infeasible, too
-                
-                """
+                # consistency check. cannot compare carriers' profit individually before and after the auction because I
+                # do not implement profit sharing! Thus, an individual carrier may be worse off, while the global solution
+                # is better!
+                if not pre_auction_solution.objective() <= solution.objective():
+                    """
+                    Unfortunately, there are several circumstances that can lead to the post-auction result being worse
+                    than the pre-auction solution. In that case, throw a warning and recover the pre-auction solution!
+                    Causes:
+                    
+                    (a) If intermediate auctions are used, any auction other than the first may run into the following 
+                    problem: The sorting of assigned requests for a given carrier can be in no order due to request 
+                    reassignments in a previous auction. Now, if the current auction's bidding takes place and the carrier
+                    bids on his original bundle, this bundle will be in a different order, meaning that dynamic insertion
+                    obtains a different - potentially worse - result! SOLUTION: make sure that the dynamic insertion
+                    (of the bidding phase) follows the same order as the carrier.assigned_requests list.
+                    -> FIXED by adding request_disclosure_time to the instance
+                    
+                    (b) the metaheuristic used for improvements does not work correctly and returns worse results. This
+                    messes up the bidding because the bid on a given carrier's original bundle may be incorrect.
+                    -> possible, but let's first assume this is not the real issue
+                    
+                    (c) the bidding process inserts all requests from scratch and runs a single improvement at the end. 
+                    with intermediate auctions, there is an improvement phase after each intermediate auction and only 
+                    afterwards will newly arriving requests be inserted. Thus, the bidding (on one's own requests) is not 
+                    the same as the dynamic insertion because the latter has additional intermediate improvements. 
+                    -> is not the (only) problem at the moment since using NoMetaheuristic did not resolve the issue 
+                    
+                    (d) after submitting requests to the auction pool, the solution is not re-optimized from scratch but
+                    left as is. On the other hand, post_auction_routing re-optimizes from scratch. The re-optimization
+                    may yield results that are worse than simply removing requests!
+                    -> FIXED by only re-optimizing the winners' route plan and leaving carriers untouched that did not win
+                    a bundle. However, this does not fix issue (e)! 
+                    
+                    (e) similarly to (d) the following procedure causes problems, too: A carrier submits something in the 
+                    first auction but does not win anything in this auction. thus, his route plan will never be 
+                    re-optimized after request selection. He is left with the solution [A] obtained by simply removing 
+                    the submitted requests from their tour. Dynamic insertion of any request that arrives after the first 
+                    auction is now based on [A]. In a second auction, the same carrier may win *his own* submitted 
+                    requests. Since he is technically a winner, his route plan will be re-optimized *from scratch*, 
+                    potentially making different insertion decisions as were made when insertion was based on [A]. The 
+                    re-optimization may yield results that are worse than solution [A] (or even infeasible)! 
+                    -> TODO Fix this by doing a re-optimization after RS for all carriers?? 
+                        -> No, because this may be infeasible, too
+                    
+                    """
 
-                raise ValueError(f'{instance.id_},:\n'
-                                 f' {solution.objective()} < {pre_auction_solution.objective()}\n'
-                                 f' Post-auction objective is lower than pre-auction objective!,'
-                                 f' Recovering the pre-auction solution')
-                solution = pre_auction_solution
-                assert pre_auction_solution.objective() == solution.objective()
+                    raise ValueError(f'{instance.id_},:\n'
+                                     f' {solution.objective()} < {pre_auction_solution.objective()}\n'
+                                     f' Post-auction objective is lower than pre-auction objective!,'
+                                     f' Recovering the pre-auction solution')
+                    solution = pre_auction_solution
+                    assert pre_auction_solution.objective() == solution.objective()
         return solution
 
     def reallocate_requests(self,
@@ -123,7 +125,7 @@ class Auction:
         timer = pr.Timer()
         auction_request_pool, original_bundling_labels = self.request_selection.execute(instance, solution)
 
-        # /// Part of the sequential-auctions problem
+        # /// Part of the sequential-auctions problem :auction_request_pool = {list: 12} [2, 9, 10, 14, 18, 19, 25, 26, 35, 36, 42, 43]
         # post_rs_solution must be re-optimized to avoid inconsistencies when intermediate auctions are used
         # however, a re-optimization is not guaranteed to be feasible unless exact approach is used
         # solution = self.re_optimize(instance, solution)
@@ -160,26 +162,32 @@ class Auction:
 
             # ===== [4.1] Winner Determination =====
             timer = pr.Timer()
-            winner_bundles, bundle_winners = self.winner_determination.execute(instance, solution,
-                                                                               auction_request_pool,
-                                                                               auction_bundle_pool, bids_matrix)
+            status, winner_bundles, bundle_winners = self.winner_determination.execute(instance, solution,
+                                                                                       auction_request_pool,
+                                                                                       auction_bundle_pool,
+                                                                                       bids_matrix,
+                                                                                       original_bundling_labels)
             # timer.write_duration_to_solution(solution, 'runtime_winner_determination') fixme
 
-            # /// REMOVEME only for debugging
-            winning_bids = []
-            for winner, bundle in zip(bundle_winners, winner_bundles):
-                winning_bids.append(bids_dict[tuple(bundle)][winner])
-            # ///
+            if status != GRB.OPTIMAL:  # fall back to the pre-auction solution
+                solution = pre_rs_solution
 
-            # todo: store whether the auction did achieve a reallocation or not
+            else:
+                # /// REMOVEME only for debugging
+                winning_bids = []
+                for winner, bundle in zip(bundle_winners, winner_bundles):
+                    winning_bids.append(bids_dict[tuple(bundle)][winner])
+                # ///
 
-            # ===== [4.2] Bundle Reallocation =====
-            self.assign_bundles_to_winners(instance, solution, winner_bundles, bundle_winners)
+                # todo: store whether the auction did achieve a reallocation or not?
+
+                # ===== [4.2] Bundle Reallocation =====
+                self.assign_bundles_to_winners(instance, solution, winner_bundles, bundle_winners)
 
         else:
             logger.warning(f'No requests have been submitted!')
 
-        return solution, bundle_winners
+        return status, solution, bundle_winners
 
     def re_optimize(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_ids: List[int] = None):
         """

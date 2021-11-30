@@ -22,6 +22,7 @@ class CAHDSolution:
         self.request_to_carrier_assignment: List[int] = [None for _ in range(instance.num_requests)]
 
         self.tours: List[tr.Tour] = []
+        self.tours_pendulum: List[tr.Tour] = []  # TODO urgently need to check whether these are treated correctly in all methods
         self.carriers: List[AHDSolution] = [AHDSolution(c) for c in range(instance.num_carriers)]
 
         # solver configuration and other meta data
@@ -101,7 +102,10 @@ class CAHDSolution:
 
             # retract the request from the carrier
             carrier.assigned_requests.remove(request)
-            carrier.accepted_requests.remove(request)
+            if request in carrier.accepted_requests:
+                carrier.accepted_requests.remove(request)
+            else:
+                carrier.accepted_infeasible_requests.remove(request)
             carrier.routed_requests.remove(request)
             self.request_to_carrier_assignment[request] = np.nan
             self.unassigned_requests.append(request)
@@ -116,12 +120,13 @@ class CAHDSolution:
 
         for carrier_id in carrier_ids:
             carrier = self.carriers[carrier_id]
-            carrier.unrouted_requests = carrier.accepted_requests[:]
+            carrier.unrouted_requests = carrier.accepted_requests[:] + carrier.accepted_infeasible_requests[:]
             carrier.routed_requests.clear()
-            self.tours = [tour for tour in self.tours if tour not in carrier.tours]
+            self.tours = [tour for tour in self.tours if tour not in carrier.tours + carrier.tours_pendulum]
             for index, tour in enumerate(self.tours):
                 tour.id_ = index
             carrier.tours.clear()
+            carrier.tours_pendulum.clear()
 
     def drop_empty_tours_and_adjust_ids(self):
         """
@@ -175,7 +180,7 @@ class CAHDSolution:
         pass
 
     def tour_of_request(self, request: int) -> tr.Tour:
-        for tour in self.tours:
+        for tour in self.tours + self.tours_pendulum:
             if request in tour.requests:
                 return tour
         return None
