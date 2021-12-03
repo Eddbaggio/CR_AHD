@@ -71,12 +71,49 @@ class CAHDSolution:
     def num_tours(self):
         return len(self.tours)
 
+    def num_pendulum_tours(self):
+        return len(self.tours_pendulum)
+
     def num_routing_stops(self):
         return sum(c.num_routing_stops() for c in self.carriers)
 
     def avg_acceptance_rate(self):
         # average over all carriers
         return sum([c.acceptance_rate for c in self.carriers]) / self.num_carriers()
+
+    def as_dict(self):
+        """The solution as a nested python dictionary"""
+        return {carrier.id_: carrier.as_dict() for carrier in self.carriers}
+
+    def summary(self):
+        summary = {**self.meta, }
+        summary.update(self.solver_config)
+        summary.update({
+            # 'num_carriers': self.num_carriers(),
+            'objective': self.objective(),
+            'sum_profit': self.sum_profit(),
+            'sum_travel_distance': self.sum_travel_distance(),
+            'sum_travel_duration': self.sum_travel_duration(),
+            'sum_load': self.sum_load(),
+            'sum_revenue': self.sum_revenue(),
+            'num_tours': self.num_tours(),
+            'num_pendulum_tours': self.num_pendulum_tours(),
+            'num_routing_stops': self.num_routing_stops(),
+            'acceptance_rate': self.avg_acceptance_rate(),
+            **self.timings,
+            'carrier_summaries': {c.id_: c.summary() for c in self.carriers}
+        })
+
+        return summary
+
+    def write_to_json(self):
+        path = io.output_dir.joinpath(f'{self.num_carriers()}carriers',
+                                      self.id_ + '_' + self.solver_config['solution_algorithm'])
+        path = io.unique_path(path.parent, path.stem + '_#{:03d}' + '.json')
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, mode='w') as f:
+            json.dump({'summary': self.summary(), 'solution': self.as_dict()}, f, indent=4, cls=io.MyJSONEncoder)
+        pass
 
     def assign_requests_to_carriers(self, requests: Sequence[int], carriers: Sequence[int]):
         for r, c in zip(requests, carriers):
@@ -153,39 +190,6 @@ class CAHDSolution:
         else:
             tour_id = len(self.tours)
         return tour_id
-
-    def as_dict(self):
-        """The solution as a nested python dictionary"""
-        return {carrier.id_: carrier.as_dict() for carrier in self.carriers}
-
-    def summary(self):
-        summary = {**self.meta, }
-        summary.update(self.solver_config)
-        summary.update({
-            # 'num_carriers': self.num_carriers(),
-            'objective': self.objective(),
-            'sum_profit': self.sum_profit(),
-            'sum_travel_distance': self.sum_travel_distance(),
-            'sum_travel_duration': self.sum_travel_duration(),
-            'sum_load': self.sum_load(),
-            'sum_revenue': self.sum_revenue(),
-            'num_tours': self.num_tours(),
-            'num_routing_stops': self.num_routing_stops(),
-            'acceptance_rate': self.avg_acceptance_rate(),
-            **self.timings,
-            'carrier_summaries': {c.id_: c.summary() for c in self.carriers}
-        })
-
-        return summary
-
-    def write_to_json(self):
-        path = io.output_dir.joinpath(f'{self.num_carriers()}carriers',
-                                      self.id_ + '_' + self.solver_config['solution_algorithm'])
-        path = io.unique_path(path.parent, path.stem + '_#{:03d}' + '.json')
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, mode='w') as f:
-            json.dump({'summary': self.summary(), 'solution': self.as_dict()}, f, indent=4, cls=io.MyJSONEncoder)
-        pass
 
     def tour_of_request(self, request: int) -> tr.Tour:
         for tour in self.tours + self.tours_pendulum:
@@ -266,6 +270,9 @@ class AHDSolution:
             'tours': {
                 tour.id_: tour.as_dict() for tour in self.tours
             },
+            'pendulum_tours': {
+                tour.id_: tour.as_dict() for tour in self.tours_pendulum
+            }
         }
 
     def summary(self) -> dict:
@@ -279,6 +286,7 @@ class AHDSolution:
             'sum_load': self.sum_load(),
             'sum_revenue': self.sum_revenue(),
             'acceptance_rate': self.acceptance_rate,
+            'num_pendulum_tours': len(self.tours_pendulum),
             'tour_summaries': {t.id_: t.summary() for t in self.tours},
             'tours_pendulum_summaries': {t.id_: t.summary() for t in self.tours_pendulum}
         }

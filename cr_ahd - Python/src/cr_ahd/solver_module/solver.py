@@ -179,14 +179,14 @@ class Solver:
             self.tour_construction.insert_single_request(instance, solution, carrier.id_, request)
 
         elif acceptance_type == 'accept_infeasible':
-            logger.error(f'[{instance.id_}] No feasible TW can be offered from Carrier {carrier.id_} '
+            logger.debug(f'[{instance.id_}] No feasible TW can be offered from Carrier {carrier.id_} '
                          f'to request {request}: {acceptance_type}')
             carrier.accepted_infeasible_requests.append(request)
             instance.assign_time_window(delivery_vertex, selected_tw)
             self.tour_construction.create_pendulum_tour_for_infeasible_request(instance, solution, carrier.id_, request)
 
         else:
-            logger.error(f'[{instance.id_}] No feasible TW can be offered from Carrier {carrier.id_} '
+            logger.debug(f'[{instance.id_}] No feasible TW can be offered from Carrier {carrier.id_} '
                          f'to request {request}: {acceptance_type}')
             instance.assign_time_window(delivery_vertex, ut.EXECUTION_TIME_HORIZON)
             carrier.rejected_requests.append(request)

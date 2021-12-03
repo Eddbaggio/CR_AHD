@@ -19,6 +19,33 @@ class FirstComeFirstServed(RequestAcceptanceAttractiveness):
         return True
 
 
+class Dummy(RequestAcceptanceAttractiveness):
+    def evaluate(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, request: int):
+        return False
+
+
+class CloseToCompetitors(RequestAcceptanceAttractiveness):
+    """
+    Attractiveness is based on distance to competitors. If the distance to the competitor is at least as small as
+    the distance to the own depot, a request is rated attractive.
+    """
+
+    def evaluate(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, request: int):
+        pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
+        carrier_dist_sum = instance.distance([pickup_vertex, carrier.id_, carrier.id_],
+                                             [delivery_vertex, pickup_vertex, delivery_vertex])
+        for competitor_id in range(instance.num_carriers):
+            if competitor_id == carrier.id_:
+                continue
+            competitor_dist_sum = instance.distance([pickup_vertex, competitor_id, competitor_id],
+                                                    [delivery_vertex, pickup_vertex, delivery_vertex])
+            # 0.5 -> the request is at least as close to the competitor as it si to the carrier
+            if competitor_dist_sum / (competitor_dist_sum + carrier_dist_sum) <= 0.5:
+                return True
+
+        return False
+
+
 class RequestAcceptanceBehavior:
     def __init__(self,
                  max_num_accepted_infeasible: int,
@@ -37,11 +64,9 @@ class RequestAcceptanceBehavior:
         offer_set = self.time_window_offering.execute(instance, carrier, request)
         acceptance_type = 'accept_feasible'
         if not offer_set:
-            pendulum_capacity_available = len(carrier.accepted_infeasible_requests) < self.max_num_accepted_infeasible
-            request_is_attractive = self.request_acceptance_attractiveness.evaluate(instance, carrier, request)
-            if not pendulum_capacity_available:
+            if not len(carrier.accepted_infeasible_requests) < self.max_num_accepted_infeasible:
                 return 'reject_no_pendulum_capacity', None
-            elif not request_is_attractive:
+            elif not self.request_acceptance_attractiveness.evaluate(instance, carrier, request):
                 return 'reject_not_attractive', None
             else:
                 # override the (currently empty) offer set and the default acceptance type

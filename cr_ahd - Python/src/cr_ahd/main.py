@@ -21,8 +21,8 @@ if __name__ == '__main__':
         paths = sorted(list(io.input_dir.glob('*.dat')), key=ut.natural_sort_key)
         run, rad, n = 2, 1, 1  # rad: 0->150; 1->200; 2->300 // n: 0->10; 1->15
         i = run * 6 + rad * 2 + n
-        # i = random.choice(range(len(paths)))
-        paths = paths[:24]
+        i = random.choice(range(len(paths)))
+        paths = paths[:60]
 
         # solving
         if len(paths) < 6:
@@ -41,9 +41,9 @@ if __name__ == '__main__':
         # plotting and evaluation
         ev.plot(df,
                 values='sum_profit',
-                color=('solution_algorithm', 'max_num_accepted_infeasible', ),
+                color=('solution_algorithm', 'request_acceptance_attractiveness', 'max_num_accepted_infeasible' ),
                 category=('run',),
-                facet_col=('rad',),
+                facet_col=(rad,),
                 facet_row=('n',),
                 title=str(csv_path.name),
                 html_path=io.unique_path(io.output_dir, 'CAHD_#{:03d}.html').as_posix(),
@@ -58,8 +58,8 @@ if __name__ == '__main__':
         #              facet_row='n',
         #              show=True,
         #              html_path=io.unique_path(io.output_dir, 'CAHD_#{:03d}.html').as_posix())
-        secondary_parameter = 'neighborhoods'
-        ev.print_top_level_stats(df, [secondary_parameter])
+        secondary_parameter = ['request_acceptance_attractiveness', 'max_num_accepted_infeasible']
+        ev.print_top_level_stats(df, secondary_parameter)
 
         logger.info(f'END {datetime.now()}')
 

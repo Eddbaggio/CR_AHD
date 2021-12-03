@@ -248,6 +248,7 @@ def plotly_prepare_df(df, category, color, facet_col, facet_row):
     # create annotation
     single_val_col, zero_val_col = single_and_zero_value_columns(df, splitter_flat_list)
     annotation = [f"{col}={df[col].dropna().unique()[0]}" for col in single_val_col]
+    annotation += [f"{col}=#various" for col in df.columns if col not in single_val_col + zero_val_col]
     annotation = '<br>'.join(annotation)
     # annotation = '<br>'.join(('; '.join(x) for x in zip_longest(annotation[::2], annotation[1::2], fillvalue='')))
 
@@ -397,16 +398,16 @@ def print_top_level_stats(df: pd.DataFrame, secondary_parameters: List[str]):
 
 
 if __name__ == '__main__':
-    path = "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home Deliveries/01_Code/data/Output/evaluation_agg_solution_#086.csv"
+    path = "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home Deliveries/01_Code/data/Output/evaluation_agg_solution_#098.csv"
     df = pd.read_csv(path)
 
     # print_top_level_stats(df, [])
     plot(df,
          title=str(Path(path).name),
          values='sum_profit',
-         color=('solution_algorithm', 'max_num_accepted_infeasible',),
-         category=('rad',),
-         facet_col=(None,),
+         color=('solution_algorithm', 'request_acceptance_attractiveness', 'max_num_accepted_infeasible',),
+         category=('run',),
+         facet_col=('rad',),
          facet_row=('n',),
          show=True,
          # width=1000 * 0.85,
