@@ -132,7 +132,9 @@ def bar_chart(df: pd.DataFrame,
         yref='paper',
         showarrow=False,
         align='left',
-        text=annotation)
+        text=annotation,
+        font={'size': 9}
+    )
 
     # fig.update_yaxes(range=[0, 10000])
     fig.update_xaxes(type='category')
@@ -198,7 +200,9 @@ def box_plot(df: pd.DataFrame,
         yref='paper',
         showarrow=False,
         align='left',
-        text=annotation)
+        text=annotation,
+        font={'size': 9},
+    )
     # fig.update_yaxes(range=[0, 10000])
     fig.update_xaxes(type='category')
     if 7 < dt.datetime.now().hour < 20:

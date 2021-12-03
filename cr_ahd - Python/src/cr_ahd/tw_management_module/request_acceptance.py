@@ -24,7 +24,7 @@ class Dummy(RequestAcceptanceAttractiveness):
         return False
 
 
-class CloseToCompetitors(RequestAcceptanceAttractiveness):
+class _CloseToCompetitors(RequestAcceptanceAttractiveness):
     """
     Attractiveness is based on distance to competitors. If the distance to the competitor is at least as small as
     the distance to the own depot, a request is rated attractive.
@@ -39,11 +39,28 @@ class CloseToCompetitors(RequestAcceptanceAttractiveness):
                 continue
             competitor_dist_sum = instance.distance([pickup_vertex, competitor_id, competitor_id],
                                                     [delivery_vertex, pickup_vertex, delivery_vertex])
-            # 0.5 -> the request is at least as close to the competitor as it si to the carrier
-            if competitor_dist_sum / (competitor_dist_sum + carrier_dist_sum) <= 0.5:
+            # self.closeness = 0.5 -> the request is at least as close to the competitor as it si to the carrier
+            if competitor_dist_sum / (competitor_dist_sum + carrier_dist_sum) <= self.closeness:
                 return True
-
         return False
+
+
+class CloseToCompetitors25(_CloseToCompetitors):
+    def __init__(self):
+        super().__init__()
+        self.closeness = .25
+
+
+class CloseToCompetitors50(_CloseToCompetitors):
+    def __init__(self):
+        super().__init__()
+        self.closeness = .5
+
+
+class CloseToCompetitors75(_CloseToCompetitors):
+    def __init__(self):
+        super().__init__()
+        self.closeness = .75
 
 
 class RequestAcceptanceBehavior:

@@ -49,9 +49,9 @@ def solve_single_instance(path: Path):
     """
     solves a single instance given by the path with all parameters defined in the parameter generator
     """
-    log.remove_all_file_handlers(logging.getLogger())
+    log.remove_all_handlers(logging.getLogger())
     log_file_path = utility_module.io.output_dir.joinpath(f'{path.stem}_log.log')
-    log.add_file_handler(logging.getLogger(), str(log_file_path))
+    log.add_handlers(logging.getLogger(), str(log_file_path))
 
     instance = it.read_gansterer_hartl_mv(path)
     return solve_with_parameters(instance, pg.parameter_generator)
@@ -111,9 +111,9 @@ def solve_instance(path: Path):
     """
     solves a single instance given by the path
     """
-    log.remove_all_file_handlers(logging.getLogger())
+    log.remove_all_handlers(logging.getLogger())
     log_file_path = utility_module.io.output_dir.joinpath(f'{path.stem}_log.log')
-    log.add_file_handler(logging.getLogger(), str(log_file_path))
+    log.add_handlers(logging.getLogger(), str(log_file_path))
 
     instance = it.read_gansterer_hartl_mv(path)
     return _solve_instance_with_parameters(instance)

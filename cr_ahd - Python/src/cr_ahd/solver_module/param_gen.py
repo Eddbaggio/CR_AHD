@@ -20,11 +20,15 @@ def parameter_generator():
         # cns.MinTimeShiftInsertion()
     ]
 
-    acceptance_policies: List[Dict]=[
-        {'max_num_accepted_infeasible': 0, 'request_acceptance_attractiveness': ra.Dummy()},
-        {'max_num_accepted_infeasible': 2, 'request_acceptance_attractiveness': ra.FirstComeFirstServed()},
-        {'max_num_accepted_infeasible': 2, 'request_acceptance_attractiveness': ra.CloseToCompetitors()},
-    ]
+    acceptance_policies: List[Dict] = [
+        {'max_num_accepted_infeasible': m, 'request_acceptance_attractiveness': r}
+        for m, r in [
+            (0, ra.Dummy()),
+            (1, ra.CloseToCompetitors50()),
+            (2, ra.CloseToCompetitors50()),
+            (3, ra.CloseToCompetitors50()),
+            (4, ra.CloseToCompetitors50())
+        ]]
 
     time_window_offerings = [
         two.FeasibleTW(),

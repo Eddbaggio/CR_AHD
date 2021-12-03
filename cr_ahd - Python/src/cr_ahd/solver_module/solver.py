@@ -1,4 +1,5 @@
 import logging.config
+from utility_module.cr_ahd_logging import SUCCESS
 import random
 from copy import deepcopy
 from typing import Tuple
@@ -164,7 +165,7 @@ class Solver:
             timer.write_duration_to_solution(solution, 'runtime_final_auction')
 
         ut.validate_solution(instance, solution)  # safety check to make sure everything's functional
-        logger.info(f'{instance.id_}: Success {solution.solver_config}')
+        logger.log(SUCCESS, f'{instance.id_}: Success {solution.solver_config}')
 
         return instance, solution
 
