@@ -216,7 +216,7 @@ class PDPParallelInsertionConstruction(ABC):
 
         else:
             raise utility_module.errors.ConstraintViolationError(
-                f'Cannot create new route with request {request} for carrier {carrier.id_}.')
+                f'{instance.id_} Cannot create new route with request {request} for carrier {carrier.id_}.')
 
         if tour_id < len(solution.tours):
             solution.tours[tour_id] = tour

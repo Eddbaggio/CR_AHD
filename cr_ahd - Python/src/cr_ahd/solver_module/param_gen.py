@@ -23,11 +23,11 @@ def parameter_generator():
     acceptance_policies: List[Dict] = [
         {'max_num_accepted_infeasible': m, 'request_acceptance_attractiveness': r}
         for m, r in [
-            (0, ra.Dummy()),
+            # (0, ra.Dummy()),
             (1, ra.CloseToCompetitors50()),
-            (2, ra.CloseToCompetitors50()),
-            (3, ra.CloseToCompetitors50()),
-            (4, ra.CloseToCompetitors50())
+            # (2, ra.CloseToCompetitors50()),
+            # (3, ra.CloseToCompetitors50()),
+            # (4, ra.CloseToCompetitors50())
         ]]
 
     time_window_offerings = [

@@ -20,11 +20,11 @@ if __name__ == '__main__':
 
         # select the files to be solved
         paths = sorted(list(io.input_dir.glob('*.dat')), key=ut.natural_sort_key)
-        run, rad, n = 11, 150, 15
+        run, rad, n = 12, 300, 10
         d = {'rad': {150: 0, 200: 1, 300: 2}, 'n': {10: 0, 15: 1}}
         i = run * 6 + d['rad'][rad] * 2 + d['n'][n]
         # i = random.choice(range(len(paths)))
-        paths = paths[60:84]
+        paths = paths[i:i+1]
 
         # solving
         if len(paths) < 6:

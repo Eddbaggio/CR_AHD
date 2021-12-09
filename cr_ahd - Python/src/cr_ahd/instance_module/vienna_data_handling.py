@@ -12,6 +12,9 @@ import tqdm
 import matplotlib.pyplot as plt
 import itertools
 
+district_zip_codes = [1010, 1020, 1030, 1040, 1050, 1060, 1070, 1080, 1090, 1100, 1110, 1120, 1130, 1140, 1150, 1160,
+                      1170, 1180, 1190, 1200, 1210, 1220, 1230, ]
+
 vienna_pop_per_district = {
     1010: 16047,
     1020: 105848,
@@ -242,11 +245,9 @@ def _query_vienna_addresses_online(write_path: Path = io.input_dir.joinpath('vie
                    'ZUG_Y': 'float64',
                    'ABLAUFDATUM': 'string'},
         )
-        # some cleaning
-        district_df = district_df[district_df['PLZ'].isin([
-            1010, 1020, 1030, 1040, 1050, 1060, 1070, 1080, 1090, 1100, 1110, 1120, 1130, 1140, 1150, 1160, 1170, 1180,
-            1190, 1200, 1210, 1220, 1230,
-        ])]
+        # some cleaning since there was at least one record with a transposition of digits
+
+        district_df = district_df[district_df['PLZ'].isin(district_zip_codes)]
         # convert to datetime
         for date_col in district_df.columns:
             if 'TIMESTAMP' in date_col:
