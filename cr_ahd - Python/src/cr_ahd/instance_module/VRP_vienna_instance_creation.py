@@ -1,17 +1,19 @@
 import datetime as dt
-import math
+import random
 import webbrowser
-from typing import List, Union
+from typing import List, Union, Dict
 
 import folium
 import geopandas as gp
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from matplotlib.colors import to_hex
-from shapely.geometry import Point, Polygon
+from shapely.geometry import Point
 
 import instance_module.geometry as geo
-from utility_module import io
+from core_module import instance as it
+from utility_module import io, utils as ut
 from vienna_data_handling import read_vienna_addresses
 
 
@@ -91,51 +93,127 @@ def generate_vienna_cr_ahd_instance(
     for (idx, name), centroid in districts_centroids.to_crs(epsg=3035).items():
         for jdx, depot in depots.to_crs(epsg=3035).items():
             centroid_depot_dist[idx - 1, jdx] = centroid.distance(depot)
-    assignment = centroid_depot_dist.min(axis=1).repeat(num_carriers).reshape(centroid_depot_dist.shape)
-    assignment = assignment / centroid_depot_dist
-    assignment = np.argwhere(assignment >= (1 - carrier_competition))
+    district_carrier_assignment = centroid_depot_dist.min(axis=1).repeat(num_carriers).reshape(
+        centroid_depot_dist.shape)
+    district_carrier_assignment = district_carrier_assignment / centroid_depot_dist
+    district_carrier_assignment = np.argwhere(district_carrier_assignment >= (1 - carrier_competition))
+    district_carrier_assignment = ut.indices_to_nested_lists(*district_carrier_assignment.T)
+    district_carrier_assignment = {idx: district_carrier_assignment[idx - 1] for idx, name in districts.index}
 
-    plot_service_areas(assignment, depots, districts, num_carriers, vienna_lat, vienna_long)
+    m = plot_service_areas(district_carrier_assignment, depots, districts, vienna_lat, vienna_long)
 
-    vienna_addresses = read_vienna_addresses(nrows=100)
-    # for carrier in range(num_carriers):
-    #     vienna_addresses[f'carrier_{carrier}'] = vienna_addresses['geometry'].apply(
-    #         lambda x: x.within(service_circles[carrier]))
+    # assign carriers to requests
+    durations = pd.read_csv(io.input_dir.joinpath('vienna_durations_1000_#001.csv'), index_col=0)
+    vienna_addresses = read_vienna_addresses()  # fixme
+    vienna_addresses = vienna_addresses.loc[list(durations.index)]
+    vienna_addresses.to_csv(io.input_dir.joinpath('vienna_addresses_1000_#001.csv'))  # fixme remove once saved, then read this subset only
+    vienna_addresses['carrier'] = [random.choice(district_carrier_assignment[x])
+                                   for x in vienna_addresses['GEB_BEZIRK']]
+    # plotting customers
+    layer = folium.map.FeatureGroup(f'customers').add_to(m)
+    cmap = plt.get_cmap('jet', num_carriers)
+    for idx, srs in vienna_addresses.iterrows():
+        district = srs['GEB_BEZIRK']
+        c = srs['carrier']
+        cm = folium.CircleMarker(
+            location=(srs.geometry.x, srs.geometry.y),
+            radius=3,
+            color=to_hex(cmap(c / num_carriers)),
+        )
+        cm.add_to(layer)
+
+    # write and display
+    folium.LayerControl(collapsed=False).add_to(m)  # must be added last!
+    path = io.output_dir.joinpath('folium_map.html')
+    m.save(path.as_posix())
+    webbrowser.open(path)
+
+    # sampling the customers
+    data: pd.DataFrame = vienna_addresses
+    selected = []
+    for name, group in data.groupby(['carrier']):
+        s = group.sample(num_requests, replace=False, random_state=42)
+        selected.extend(s.index)
+    data = data.loc[selected]
+
+    rng = np.random.default_rng()
+
+    # instance = it.MDVRPTWInstance(
+    #     id_=f'vienna_test',
+    #     max_num_tours_per_carrier=3,
+    #     max_vehicle_load=None,
+    #     max_tour_length=None,
+    #     requests=list(range(len(data))),
+    #     requests_initial_carrier_assignment=data['carrier'],
+    #     requests_disclosure_time=None,
+    #     requests_x=data.geometry.x,
+    #     requests_y=data.geometry.y,
+    #     requests_revenue=rng.integers(10, 40, len(data)),
+    #     requests_service_duration=dt.timedelta(minutes=4),
+    #     requests_load=1,
+    #     request_time_window_open=None,
+    #     request_time_window_close=None,
+    #     carrier_depots_x=None,
+    #     carrier_depots_y=None,
+    #     carrier_depots_tw_open=None,
+    #     carrier_depots_tw_close=None,
+    #     duration_matrix=None,
+    # )
 
     return
 
 
-def plot_service_areas(assignment, depots, districts, num_carriers, vienna_lat, vienna_long):
+def plot_service_areas(assignment: Dict[int, List], depots, districts, vienna_lat, vienna_long):
+    num_carriers = len(depots)
     # plot
     m = folium.Map((vienna_lat, vienna_long), zoom_start=12, crs='EPSG3857', tiles='Stamen Toner')
+    folium.TileLayer('openstreetmap').add_to(m)
     # plot service areas
     cmap = plt.get_cmap('jet', num_carriers)
-    for carrier in range(num_carriers):
-        layer = folium.map.FeatureGroup(f'carrier {carrier} service area')
-        layer.add_to(m)
-        for district_idx in assignment[assignment[:, 1] == carrier, 0]:
+    carrier_layers = [folium.map.FeatureGroup(f'carrier {carrier} service areas', show=True) for carrier in
+                      range(num_carriers)]
+    for district_idx, carriers in assignment.items():
+        for carrier in carriers:
+            poly, name = districts.loc[district_idx].squeeze(), districts.index[district_idx - 1]
             poly = folium.Polygon(
-                locations=districts[district_idx + 1][0].exterior.coords,
-                popup=districts[district_idx + 1],
+                locations=poly.exterior.coords,
+                popup=name,
                 color=to_hex(cmap(carrier / num_carriers)),
                 fill_color=to_hex(cmap(carrier / num_carriers)),
                 fill_opacity=0.4
             )
-            poly.add_to(layer)
+            poly.add_to(carrier_layers[carrier])
+    for cl in carrier_layers:
+        cl.add_to(m)
+
+    # for carrier in range(num_carriers):
+    #     layer = folium.map.FeatureGroup(f'carrier {carrier} service area')
+    #     layer.add_to(m)
+    #     for district_idx in assignment[assignment[:, 1] == carrier, 0]:
+    #         poly = folium.Polygon(
+    #             locations=districts[district_idx + 1][0].exterior.coords,
+    #             popup=districts[district_idx + 1]['NAMEG'],
+    #             color=to_hex(cmap(carrier / num_carriers)),
+    #             fill_color=to_hex(cmap(carrier / num_carriers)),
+    #             fill_opacity=0.4
+    #         )
+    #         poly.add_to(layer)
     # plot depots
+    depot_markers = []
     for idx, depot in depots.items():
-        folium.CircleMarker(location=(depot.x, depot.y),
-                            popup=f'Depot {idx}',
-                            radius=5,
-                            color='black',
-                            fill_color=to_hex(cmap(idx / num_carriers)),
-                            fill_opacity=1
-                            ).add_to(m)
-    folium.LayerControl(collapsed=False).add_to(m)
-    # write and display
-    path = io.output_dir.joinpath('folium_map.html')
-    m.save(path.as_posix())
-    webbrowser.open(path)
+        cm = folium.CircleMarker(location=(depot.x, depot.y),
+                                 popup=f'Depot {idx}',
+                                 radius=5,
+                                 color='black',
+                                 fill_color=to_hex(cmap(idx / num_carriers)),
+                                 fill_opacity=1,
+                                 )
+        cm.add_to(m)
+        depot_markers.append(cm)
+
+    m.keep_in_front(*depot_markers)
+
+    return m
 
 
 def read_vienna_districts_shapefile():
@@ -149,25 +227,8 @@ def read_vienna_districts_shapefile():
     return districts
 
 
-def plot_coords(objs):
-    ax: plt.Axes
-    fig, ax = plt.subplots()
-
-    for obj in objs:
-        if isinstance(obj, Point):
-            coords = list(obj.coords)
-            color = 'blue'
-        elif isinstance(obj, Polygon):
-            coords = list(obj.exterior.coords)
-            color = 'red'
-            # ax.plot(zip(coords))
-        for x, y in coords:
-            ax.scatter(x, y, c=color)
-    plt.show()
-
-
 if __name__ == '__main__':
-    generate_vienna_cr_ahd_instance(num_carriers=5, carrier_competition=0)
+    generate_vienna_cr_ahd_instance(num_carriers=3, carrier_competition=0.3)
 
     # generate a 3d plot to visualize the ratios between radius, center distance and intersection_area of two circles
     """

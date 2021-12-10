@@ -1,22 +1,109 @@
 import datetime as dt
-import json
 import logging.config
 from pathlib import Path
-from typing import Tuple, Sequence, List
+from typing import Tuple, Sequence, List, Iterable
 
 import numpy as np
 import pandas as pd
 from scipy.spatial.distance import pdist, squareform
 
 import tw_management_module.tw
-import utility_module.io
 import utility_module.utils as ut
 
 logger = logging.getLogger(__name__)
 
 
-# class MDVRPTWInstance:
-#     pass
+class MDVRPTWInstance:
+    def __init__(self,
+                 id_: str,
+                 max_num_tours_per_carrier: int,
+                 max_vehicle_load: float,
+                 max_tour_length: float,
+                 requests: List[int],
+                 requests_initial_carrier_assignment: List[int],
+                 requests_disclosure_time: List[dt.datetime],
+                 requests_x: List[float],
+                 requests_y: List[float],
+                 requests_revenue: List[float],
+                 requests_service_duration: List[dt.timedelta],
+                 requests_load: List[float],
+                 request_time_window_open: List[dt.datetime],
+                 request_time_window_close: List[dt.datetime],
+                 carrier_depots_x: List[float],
+                 carrier_depots_y: List[float],
+                 carrier_depots_tw_open: List[dt.datetime],
+                 carrier_depots_tw_close: List[dt.datetime],
+                 duration_matrix,
+                 ):
+        """
+
+        :param id_: unique identifier
+        :param max_num_tours_per_carrier:
+        :param max_vehicle_load:
+        :param max_tour_length:
+        :param requests: list of request indices
+        :param requests_initial_carrier_assignment:
+        :param requests_disclosure_time:
+        :param requests_x:
+        :param requests_y:
+        :param requests_revenue:
+        :param requests_service_duration:
+        :param requests_load:
+        :param request_time_window_open:
+        :param request_time_window_close:
+        :param carrier_depots_x:
+        :param carrier_depots_y:
+        :param carrier_depots_tw_open:
+        :param carrier_depots_tw_close:
+        :param duration_matrix:
+        """
+        # sanity checks:
+        assert requests == sorted(requests)
+        assert requests[0] == 0
+        assert requests[-1] == len(requests) - 1
+        assert len(carrier_depots_x) == len(carrier_depots_y)
+        assert len(requests_x) == len(requests_y)
+        assert all(ut.ACCEPTANCE_START_TIME <= t <= ut.EXECUTION_START_TIME for t in requests_disclosure_time)
+        assert all(x <= max_vehicle_load for x in requests_load)
+        assert all(ut.EXECUTION_START_TIME <= t <= ut.END_TIME for t in request_time_window_open)
+        assert all(ut.EXECUTION_START_TIME <= t <= ut.END_TIME for t in request_time_window_close)
+
+        self._id_ = id_
+        self.meta = dict((k.strip(), int(v.strip())) for k, v in (item.split('=') for item in id_.split('+')))
+        self.num_carriers = len(carrier_depots_x)
+        self.vehicles_max_load = max_vehicle_load
+        self.vehicles_max_travel_distance = max_tour_length
+        self.carriers_max_num_tours = max_num_tours_per_carrier
+        self.requests = requests
+        self.num_requests = len(self.requests)
+        assert self.num_requests % self.num_carriers == 0
+        self.num_requests_per_carrier = self.num_requests // self.num_carriers
+        self.x_coords = [*carrier_depots_x, *requests_x]
+        self.y_coords = [*carrier_depots_y, *requests_y]
+        assert all(x in range(self.num_carriers) for x in requests_initial_carrier_assignment)
+        self.request_to_carrier_assignment: List[int] = requests_initial_carrier_assignment
+        self.request_disclosure_time: List[dt.datetime] = requests_disclosure_time
+        self.vertex_revenue = [*[0] * (self.num_carriers + len(requests)), *requests_revenue]
+        if isinstance(requests_load, Iterable):
+            self.vertex_load = [*[0] * self.num_carriers, *requests_load]
+        elif isinstance(requests_load, (float, int)):
+            self.vertex_load = [*[0] * self.num_carriers, *[requests_load] * self.num_requests]
+        if isinstance(requests_service_duration, Iterable):
+            self.vertex_service_duration = (*[dt.timedelta(0)] * self.num_carriers, *requests_service_duration)
+        elif isinstance(requests_service_duration, dt.timedelta):
+            self.vertex_service_duration = (*[dt.timedelta(0)] * self.num_carriers,
+                                            *[requests_service_duration] * self.num_requests)
+        self.tw_open = [*carrier_depots_tw_open, *request_time_window_open]
+        self.tw_close = [*carrier_depots_tw_close, *request_time_window_close]
+
+        # compute the distance and travel time matrix
+        # need to ceil the distances due to floating point precision!
+        self._travel_time_matrix = np.ceil(duration_matrix).astype('int')
+
+        logger.debug(f'{id_}: created')
+
+    pass
+
 
 class MDPDPTWInstance:
     def __init__(self,
