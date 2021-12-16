@@ -432,17 +432,17 @@ class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
         """
         # setup
         offspring = []
-        min_x = min(instance.x_coords)
-        max_x = max(instance.x_coords)
-        min_y = min(instance.y_coords)
-        max_y = max(instance.y_coords)
+        min_x = min(instance.vertex_x_coords)
+        max_x = max(instance.vertex_x_coords)
+        min_y = min(instance.vertex_y_coords)
+        max_y = max(instance.vertex_y_coords)
 
         for i, request in enumerate(auction_request_pool):
             pickup, delivery = instance.pickup_delivery_pair(request)
 
             # center of each request = midpoint between pickup and delivery
-            request_center = ut.midpoint_(instance.x_coords[pickup], instance.y_coords[pickup],
-                                          instance.x_coords[delivery], instance.y_coords[delivery])
+            request_center = ut.midpoint_(instance.vertex_x_coords[pickup], instance.vertex_y_coords[pickup],
+                                          instance.vertex_x_coords[delivery], instance.vertex_y_coords[delivery])
 
             # two random points in the plane, a and b
             random_points_x = ut.linear_interpolation([random.random(), random.random()], min_x, max_x)

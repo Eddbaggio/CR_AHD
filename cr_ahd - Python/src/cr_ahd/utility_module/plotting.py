@@ -15,8 +15,8 @@ config = dict({'scrollZoom': True})
 
 def _make_depot_scatter(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int):
     carrier_ = solution.carriers[carrier]
-    return go.Scatter(x=[instance.x_coords[carrier]],
-                      y=[instance.y_coords[carrier]],
+    return go.Scatter(x=[instance.vertex_x_coords[carrier]],
+                      y=[instance.vertex_y_coords[carrier]],
                       mode='markers+text',
                       marker=dict(
                           symbol='square',
@@ -35,8 +35,8 @@ def _make_tour_scatter(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
 
     df = pd.DataFrame({
         'id_': tour_.routing_sequence[1:-1],
-        'x': [instance.x_coords[v] for v in tour_.routing_sequence[1:-1]],
-        'y': [instance.y_coords[v] for v in tour_.routing_sequence[1:-1]],
+        'x': [instance.vertex_x_coords[v] for v in tour_.routing_sequence[1:-1]],
+        'y': [instance.vertex_y_coords[v] for v in tour_.routing_sequence[1:-1]],
         'request': [instance.request_from_vertex(v) for v in tour_.routing_sequence[1:-1]],
         'type': [instance.vertex_type(v) for v in tour_.routing_sequence[1:-1]],
         'revenue': [instance.vertex_revenue[v] for v in tour_.routing_sequence[1:-1]],
@@ -80,8 +80,8 @@ def _make_unrouted_scatter(instance: it.MDPDPTWInstance, solution: slt.CAHDSolut
 
     df = pd.DataFrame({
         'id_': unrouted_vertices,
-        'x': [instance.x_coords[v] for v in unrouted_vertices],
-        'y': [instance.y_coords[v] for v in unrouted_vertices],
+        'x': [instance.vertex_x_coords[v] for v in unrouted_vertices],
+        'y': [instance.vertex_y_coords[v] for v in unrouted_vertices],
         'request': [instance.request_from_vertex(v) for v in unrouted_vertices],
         'type': [instance.vertex_type(v) for v in unrouted_vertices],
         'revenue': [instance.vertex_revenue[v] for v in unrouted_vertices],
@@ -121,8 +121,8 @@ def _make_unassigned_scatter(instance: it.MDPDPTWInstance, solution: slt.CAHDSol
         [[p, d] for p, d in [instance.pickup_delivery_pair(r) for r in solution.unassigned_requests]])
     df = pd.DataFrame({
         'id_': vertex_id,
-        'x': [instance.x_coords[v] for v in vertex_id],
-        'y': [instance.y_coords[v] for v in vertex_id],
+        'x': [instance.vertex_x_coords[v] for v in vertex_id],
+        'y': [instance.vertex_y_coords[v] for v in vertex_id],
         'request': [instance.request_from_vertex(v) for v in vertex_id],
         'type': [instance.vertex_type(v) for v in vertex_id],
         'revenue': [instance.vertex_revenue[v] for v in vertex_id],
@@ -162,8 +162,8 @@ def _make_tour_edges(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, c
     for i in range(len(tour_.routing_sequence) - 1):
         from_vertex = tour_.routing_sequence[i]
         to_vertex = tour_.routing_sequence[i + 1]
-        arrow_tail = (instance.x_coords[from_vertex], instance.y_coords[from_vertex])
-        arrow_head = (instance.x_coords[to_vertex], instance.y_coords[to_vertex])
+        arrow_tail = (instance.vertex_x_coords[from_vertex], instance.vertex_y_coords[from_vertex])
+        arrow_head = (instance.vertex_x_coords[to_vertex], instance.vertex_y_coords[to_vertex])
         min_rev = min(instance.vertex_revenue)
         max_rev = max(instance.vertex_revenue)
 

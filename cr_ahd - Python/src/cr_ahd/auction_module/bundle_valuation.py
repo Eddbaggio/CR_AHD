@@ -114,8 +114,8 @@ def bundle_cohesion_graph_based(instance: it.MDPDPTWInstance, bundle: Sequence[i
 
 
 def bundling_extended_distance_matrix(instance: it.MDPDPTWInstance, additional_vertex_coords: Sequence[ut.Coordinates]):
-    x = instance.x_coords.copy()
-    y = instance.y_coords.copy()
+    x = instance.vertex_x_coords.copy()
+    y = instance.vertex_y_coords.copy()
     for centroid in additional_vertex_coords:
         x.append(centroid.x)
         y.append(centroid.y)
