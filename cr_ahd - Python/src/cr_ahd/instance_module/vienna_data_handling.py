@@ -328,12 +328,15 @@ if __name__ == '__main__':
     # _query_vienna_addresses_online(write_path=io.input_dir.joinpath('vienna_addresses.csv'))
 
     # read from disk
-    n = 1000
     gdf = read_vienna_addresses(io.input_dir.joinpath('vienna_addresses.csv'))
-    gdf = gdf.sample(n=n, replace=False, random_state=42)
+    n = 1000
+    gdf = gdf.sample(n=n, replace=False, random_state=42)  # NOTE the seed!
+    # write the sample to disk for faster reading later
+    write_path = io.unique_path(io.input_dir, f'vienna_{n}_addresses' + '_#{:03d}' + '.csv')
+    gdf.to_csv(io.input_dir.joinpath(write_path), encoding='utf-8-sig', index=True, header=True)
     # query OSRM durations
     duration_matrix = _query_osrm_car_durations(gdf.geometry)
-    write_path = io.unique_path(io.input_dir, f'vienna_durations_{n}' + '_#{:03d}' + '.csv')
-    duration_matrix.to_csv(io.input_dir.joinpath(write_path), encoding='utf-8-sig', index=True, header=True)
+    write_path = write_path.as_posix().replace('addresses', 'durations')
+    duration_matrix.to_csv(write_path, encoding='utf-8-sig', index=True, header=True)
 
     pass

@@ -1,5 +1,6 @@
 import datetime as dt
 import logging.config
+import pathlib
 from pathlib import Path
 from typing import Tuple, Sequence, List, Iterable
 
@@ -69,7 +70,8 @@ class MDVRPTWInstance:
         assert all(ut.EXECUTION_START_TIME <= t <= ut.END_TIME for t in request_time_window_close)
 
         self._id_ = id_
-        self.meta = dict((k.strip(), int(v.strip())) for k, v in (item.split('=') for item in id_.split('+')))
+        self.meta = dict(
+            (k.strip(), v if k == 't' else int(v.strip())) for k, v in (item.split('=') for item in id_.split('+')))
         self.num_carriers = len(carrier_depots_x)
         self.vehicles_max_load = max_vehicle_load
         self.vehicles_max_travel_distance = max_tour_length
@@ -78,31 +80,58 @@ class MDVRPTWInstance:
         self.num_requests = len(self.requests)
         assert self.num_requests % self.num_carriers == 0
         self.num_requests_per_carrier = self.num_requests // self.num_carriers
-        self.x_coords = [*carrier_depots_x, *requests_x]
-        self.y_coords = [*carrier_depots_y, *requests_y]
+        self.vertex_x_coords = [*carrier_depots_x, *requests_x]
+        self.vertex_y_coords = [*carrier_depots_y, *requests_y]
         assert all(x in range(self.num_carriers) for x in requests_initial_carrier_assignment)
         self.request_to_carrier_assignment: List[int] = requests_initial_carrier_assignment
         self.request_disclosure_time: List[dt.datetime] = requests_disclosure_time
-        self.vertex_revenue = [*[0] * (self.num_carriers + len(requests)), *requests_revenue]
-        if isinstance(requests_load, Iterable):
-            self.vertex_load = [*[0] * self.num_carriers, *requests_load]
-        elif isinstance(requests_load, (float, int)):
-            self.vertex_load = [*[0] * self.num_carriers, *[requests_load] * self.num_requests]
-        if isinstance(requests_service_duration, Iterable):
-            self.vertex_service_duration = (*[dt.timedelta(0)] * self.num_carriers, *requests_service_duration)
-        elif isinstance(requests_service_duration, dt.timedelta):
-            self.vertex_service_duration = (*[dt.timedelta(0)] * self.num_carriers,
-                                            *[requests_service_duration] * self.num_requests)
+        self.vertex_revenue = [*[0] * self.num_carriers, *requests_revenue]
+        self.vertex_load = [*[0] * self.num_carriers, *requests_load]
+        self.vertex_service_duration = (*[dt.timedelta(0)] * self.num_carriers, *requests_service_duration)
         self.tw_open = [*carrier_depots_tw_open, *request_time_window_open]
         self.tw_close = [*carrier_depots_tw_close, *request_time_window_close]
 
         # compute the distance and travel time matrix
         # need to ceil the distances due to floating point precision!
-        self._travel_time_matrix = np.ceil(duration_matrix).astype('int')
+        self._travel_duration_matrix = np.ceil(duration_matrix).astype('int')
 
         logger.debug(f'{id_}: created')
 
     pass
+
+    @property
+    def id_(self):
+        return self._id_
+
+    def write(self, path: Path, delim=','):
+        lines = [f'# VRP parameters: V = num of vehicles, L = max_load, T = max_tour_length']
+        lines.extend([f'V{delim}{self.carriers_max_num_tours}',
+                      f'L{delim}{self.vehicles_max_load}',
+                      f'T{delim}{self.vehicles_max_travel_distance}\n'])
+        lines.extend(['# carrier depots: C x y',
+                      '# one line per carrier, number of carriers defined by number of lines'])
+        lines.extend([f'C{delim}{x}{delim}{y}'
+                      for x, y in
+                      zip(self.vertex_x_coords[:self.num_carriers], self.vertex_y_coords[:self.num_carriers])])
+        lines.extend(['\n# requests: carrier_index delivery_x delivery_y revenue',
+                      '# carrier_index = line index of carriers above'])
+        for request in self.requests:
+            lines.append(
+                f'{self.request_to_carrier_assignment[request]}{delim}'
+                f'{self.vertex_x_coords[request + self.num_carriers]}{delim}'
+                f'{self.vertex_y_coords[request + self.num_carriers]}{delim}'
+                f'{self.vertex_revenue[request + self.num_carriers]}'
+            )
+
+        lines.append(f'\n# travel duration in seconds')
+
+        for i in range(len(self._travel_duration_matrix)):
+            lines.append(delim.join([str(x) for x in self._travel_duration_matrix[i]]))
+
+        with path.open('w') as f:
+            f.writelines([l + '\n' for l in lines])
+
+        pass
 
 
 class MDPDPTWInstance:
@@ -154,8 +183,8 @@ class MDPDPTWInstance:
         self.num_requests = len(self.requests)
         assert self.num_requests % self.num_carriers == 0
         self.num_requests_per_carrier = self.num_requests // self.num_carriers
-        self.x_coords = [*carrier_depots_x, *requests_pickup_x, *requests_delivery_x]
-        self.y_coords = [*carrier_depots_y, *requests_pickup_y, *requests_delivery_y]
+        self.vertex_x_coords = [*carrier_depots_x, *requests_pickup_x, *requests_delivery_x]
+        self.vertex_y_coords = [*carrier_depots_y, *requests_pickup_y, *requests_delivery_y]
         assert all(x in range(self.num_carriers) for x in requests_initial_carrier_assignment)
         self.request_to_carrier_assignment: List[int] = requests_initial_carrier_assignment
         self.request_disclosure_time: List[dt.datetime] = requests_disclosure_time
@@ -171,17 +200,13 @@ class MDPDPTWInstance:
         # compute the distance and travel time matrix
         # need to ceil the distances due to floating point precision!
         self._distance_matrix = np.ceil(
-            squareform(pdist(np.array(list(zip(self.x_coords, self.y_coords))), 'euclidean'))).astype('int')
+            squareform(pdist(np.array(list(zip(self.vertex_x_coords, self.vertex_y_coords))), 'euclidean'))).astype('int')
         self._travel_time_matrix = [[ut.travel_time(d) for d in x] for x in self._distance_matrix]
 
         logger.debug(f'{id_}: created')
 
     def __str__(self):
         return f'Instance {self.id_} with {len(self.requests)} customers, {self.num_carriers} carriers'
-
-    # TODO implement deepcopy!
-    # def __deepcopy__(self, memodict={}):
-    #     pass
 
     @property
     def id_(self):
@@ -232,7 +257,7 @@ class MDPDPTWInstance:
 
     def coords(self, vertex: int):
         """returns a tuple of (x, y) coordinates for the vertex"""
-        return ut.Coordinates(self.x_coords[vertex], self.y_coords[vertex])
+        return ut.Coordinates(self.vertex_x_coords[vertex], self.vertex_y_coords[vertex])
 
     def vertex_type(self, vertex: int):
         if vertex < self.num_carriers:

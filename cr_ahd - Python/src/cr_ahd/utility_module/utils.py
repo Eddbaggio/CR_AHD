@@ -177,8 +177,8 @@ def argsmax(a, k: int):
 
 
 def midpoint(instance, pickup_vertex, delivery_vertex):
-    pickup_x, pickup_y = instance.x_coords[pickup_vertex], instance.y_coords[delivery_vertex]
-    delivery_x, delivery_y = instance.x_coords[pickup_vertex], instance.y_coords[delivery_vertex]
+    pickup_x, pickup_y = instance.vertex_x_coords[pickup_vertex], instance.vertex_y_coords[delivery_vertex]
+    delivery_x, delivery_y = instance.vertex_x_coords[pickup_vertex], instance.vertex_y_coords[delivery_vertex]
     return (pickup_x + delivery_x) / 2, (pickup_y + delivery_y) / 2
 
 
