@@ -1,79 +1,33 @@
 import logging.config
-import random
-import re
+import argparse
 import sys
-from pathlib import Path
-import os
 from datetime import datetime
 import cProfile
 
 import utility_module.io as io
 from solver_module import workflow as wf
-from utility_module import utils as ut, evaluation as ev, cr_ahd_logging as log
+from utility_module import evaluation as ev, cr_ahd_logging as log
+from utility_module.argparse_utils import parser
+from utility_module.io import instance_selector
 
 logging.config.dictConfig(log.LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
 logger.parent.handlers[0].setFormatter(log.CustomFormatter())
 
-
-def instance_selector(run=None, rad=None, n=None):
-    """
-
-    :param run:
-    :param rad:
-    :param n:
-    :return:
-    """
-
-    if not any([run, rad, n]):
-        paths = sorted(list(io.input_dir.glob('*.dat')), key=ut.natural_sort_key)
-        i = random.choice(range(len(paths)))
-        return paths[i:i + 1]
-
-    else:
-        if isinstance(run, int):
-            p_run = run
-        elif isinstance(run, (list, tuple, range)):
-            p_run = f"({'|'.join((str(x) for x in run))})"
-        elif run == '*':
-            p_run = '\d+'
-        else:
-            raise ValueError
-
-        if isinstance(rad, int):
-            p_rad = rad
-        elif isinstance(rad, (list, tuple, range)):
-            p_rad = f"({'|'.join((str(x) for x in rad))})"
-        elif rad == '*':
-            p_rad = '\d+'
-        else:
-            raise ValueError
-
-        if isinstance(n, int):
-            p_n = n
-        elif isinstance(n, (list, tuple, range)):
-            p_n = f"({'|'.join((str(x) for x in n))})"
-        elif n == '*':
-            p_n = '\d+'
-        else:
-            raise ValueError
-
-        pattern = re.compile(f'run={p_run}\+dist=200\+rad={p_rad}\+n={p_n}(\.dat)')
-        paths = []
-        for file in (sorted(io.input_dir.glob('*.dat'), key=ut.natural_sort_key)):
-            if pattern.match(file.name):
-                paths.append(file)
-        return paths
-
-
 if __name__ == '__main__':
     def cr_ahd():
         # setup
-        sys.argv[1]  # TODO parse command line arguments
+        if len(sys.argv) > 1:
+            args = parser.parse_args()
+            args = args.__dict__
+        else:
+            args = {'run': range(2),
+                    'rad': '*',
+                    'n': '*'
+                    }
         logger.info(f'START {datetime.now()}')
-        # random.seed(0)
 
-        paths = instance_selector(run=range(2), rad='*', n='*')
+        paths = instance_selector(run=args['run'], rad=args['rad'], n=args['n'])
         # paths = instance_selector()
 
         # solving

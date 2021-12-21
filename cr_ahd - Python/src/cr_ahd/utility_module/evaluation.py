@@ -252,7 +252,7 @@ def plotly_prepare_df(df, category, color, facet_col, facet_row):
     # create annotation
     single_val_col, zero_val_col = single_and_zero_value_columns(df, splitter_flat_list)
     annotation = [f"{col}={df[col].dropna().unique()[0]}" for col in single_val_col]
-    annotation += [f"{col}=#various" for col in df.columns if col not in single_val_col + zero_val_col]
+    annotation += [f"{col}=[...]" for col in df.columns if col not in single_val_col + zero_val_col]
     annotation = '<br>'.join(annotation)
     # annotation = '<br>'.join(('; '.join(x) for x in zip_longest(annotation[::2], annotation[1::2], fillvalue='')))
 

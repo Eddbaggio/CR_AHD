@@ -1,11 +1,14 @@
 import datetime as dt
 import json
+import random
+import re
 from pathlib import Path
 from typing import List, Dict
 
 import numpy as np
 import pandas as pd
 from core_module import solution as slt
+from utility_module import utils as ut
 
 working_dir = Path().cwd()
 print(working_dir.as_posix())
@@ -119,3 +122,54 @@ def ask_for_overwrite_permission(path: Path):
             raise FileExistsError
     else:
         return True
+
+
+def instance_selector(run=None, rad=None, n=None):
+    """
+    If no arguments are passed a single, random Gansterer&Hartl instance is being solved.
+
+    :param run:
+    :param rad:
+    :param n:
+    :return:
+    """
+
+    if not any([run, rad, n]):
+        paths = sorted(list(input_dir.glob('*.dat')), key=ut.natural_sort_key)
+        i = random.choice(range(len(paths)))
+        return paths[i:i + 1]
+
+    else:
+        if isinstance(run, int):
+            p_run = run
+        elif isinstance(run, (list, tuple, range)):
+            p_run = f"({'|'.join((str(x) for x in run))})"
+        elif run == '*':
+            p_run = '\d+'
+        else:
+            raise ValueError
+
+        if isinstance(rad, int):
+            p_rad = rad
+        elif isinstance(rad, (list, tuple, range)):
+            p_rad = f"({'|'.join((str(x) for x in rad))})"
+        elif rad == '*':
+            p_rad = '\d+'
+        else:
+            raise ValueError
+
+        if isinstance(n, int):
+            p_n = n
+        elif isinstance(n, (list, tuple, range)):
+            p_n = f"({'|'.join((str(x) for x in n))})"
+        elif n == '*':
+            p_n = '\d+'
+        else:
+            raise ValueError
+
+        pattern = re.compile(f'run={p_run}\+dist=200\+rad={p_rad}\+n={p_n}(\.dat)')
+        paths = []
+        for file in (sorted(input_dir.glob('*.dat'), key=ut.natural_sort_key)):
+            if pattern.match(file.name):
+                paths.append(file)
+        return paths
