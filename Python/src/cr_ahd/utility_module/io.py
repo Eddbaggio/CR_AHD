@@ -133,43 +133,40 @@ def instance_selector(run=None, rad=None, n=None):
     :param n:
     :return:
     """
-
-    if not any([run, rad, n]):
-        paths = sorted(list(input_dir.glob('*.dat')), key=ut.natural_sort_key)
-        i = random.choice(range(len(paths)))
-        return paths[i:i + 1]
-
+    print(f'instance selector: run={run}({type(run)}), rad={rad}({type(rad)}), n={n}({type(n)})')
+    if isinstance(run, int):
+        p_run = run
+    elif run is None:
+        p_run = '\d+'
+    elif isinstance(run, (list, tuple, range)):
+        p_run = f"({'|'.join((str(x) for x in run))})"
     else:
-        if isinstance(run, int):
-            p_run = run
-        elif isinstance(run, (list, tuple, range)):
-            p_run = f"({'|'.join((str(x) for x in run))})"
-        elif run == '*':
-            p_run = '\d+'
-        else:
-            raise ValueError
+        raise ValueError(f'run must be int or list of int. run={run} is type {type(run)}')
 
-        if isinstance(rad, int):
-            p_rad = rad
-        elif isinstance(rad, (list, tuple, range)):
-            p_rad = f"({'|'.join((str(x) for x in rad))})"
-        elif rad == '*':
-            p_rad = '\d+'
-        else:
-            raise ValueError
+    if isinstance(rad, int):
+        p_rad = rad
+    elif rad is None:
+        p_rad = '\d+'
+    elif isinstance(rad, (list, tuple, range)):
+        p_rad = f"({'|'.join((str(x) for x in rad))})"
+    else:
+        raise ValueError(f'rad must be int or list of int. rad={rad} is type {type(rad)}')
 
-        if isinstance(n, int):
-            p_n = n
-        elif isinstance(n, (list, tuple, range)):
-            p_n = f"({'|'.join((str(x) for x in n))})"
-        elif n == '*':
-            p_n = '\d+'
-        else:
-            raise ValueError
+    if isinstance(n, int):
+        p_n = n
+    elif n is None:
+        p_n = '\d+'
+    elif isinstance(n, (list, tuple, range)):
+        p_n = f"({'|'.join((str(x) for x in n))})"
+    else:
+        raise ValueError(f'n must be int or list of int. n={n} is type {type(run)}')
 
-        pattern = re.compile(f'run={p_run}\+dist=200\+rad={p_rad}\+n={p_n}(\.dat)')
-        paths = []
-        for file in (sorted(input_dir.glob('*.dat'), key=ut.natural_sort_key)):
-            if pattern.match(file.name):
-                paths.append(file)
-        return paths
+    pattern = re.compile(f'run={p_run}\+dist=200\+rad={p_rad}\+n={p_n}(\.dat)')
+    paths = []
+    for file in (sorted(input_dir.glob('*.dat'), key=ut.natural_sort_key)):
+        if pattern.match(file.name):
+            paths.append(file)
+            print(file.name)
+    if len(paths) == 0:
+        raise ValueError
+    return paths

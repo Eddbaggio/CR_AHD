@@ -17,14 +17,14 @@ logger.parent.handlers[0].setFormatter(log.CustomFormatter())
 if __name__ == '__main__':
     def cr_ahd():
         # setup
-        if len(sys.argv) > 1:
-            args = parser.parse_args()
-            args = args.__dict__
-        else:
-            args = {'run': range(2),
-                    'rad': '*',
-                    'n': '*'
-                    }
+        args = parser.parse_args().__dict__
+
+        # when called from within IDE
+        # args = {'run': range(2),
+        #         'rad': None,
+        #         'n': None
+        #         }
+
         logger.info(f'START {datetime.now()}')
 
         paths = instance_selector(run=args['run'], rad=args['rad'], n=args['n'])
