@@ -5,7 +5,7 @@ from datetime import datetime
 import cProfile
 
 import utility_module.io as io
-from solver_module import workflow as wf
+from solver_module import workflow as wf, param_gen as pg
 from utility_module import evaluation as ev, cr_ahd_logging as log
 from utility_module.argparse_utils import parser
 from utility_module.io import instance_selector
@@ -25,16 +25,14 @@ if __name__ == '__main__':
         #         'n': None
         #         }
 
-        logger.info(f'START {datetime.now()}')
+        start = datetime.now()
+        logger.info(f'START {start}')
 
         paths = instance_selector(run=args['run'], rad=args['rad'], n=args['n'])
-        # paths = instance_selector()
+        configs = pg.parameter_generator()
 
         # solving
-        if len(paths) < 6:
-            solutions = wf.solve_instances(paths)
-        else:
-            solutions = wf.solve_instances_multiprocessing(paths)
+        solutions = wf.execute_jobs(paths, configs, args['threads'], args['fail'])
 
         agg_level = 'solution'
         df = io.solutions_to_df(solutions, agg_level)
@@ -67,7 +65,9 @@ if __name__ == '__main__':
         secondary_parameter = ['request_acceptance_attractiveness', 'max_num_accepted_infeasible']
         ev.print_top_level_stats(df, secondary_parameter)
 
-        logger.info(f'END {datetime.now()}')
+        end = datetime.now()
+        logger.info(f'END {end}')
+        logger.info(f'DURATION {end - start}')
 
         # send windows to sleep
         # os.system("rundll32.exe powrprof.dll,SetSuspendState 0,1,0")

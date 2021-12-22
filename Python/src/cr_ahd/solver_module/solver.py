@@ -109,7 +109,7 @@ class Solver:
                 starting_solution: slt.CAHDSolution = None
                 ) -> Tuple[it.MDPDPTWInstance, slt.CAHDSolution]:
         """
-        apply the concrete solution algorithm
+        apply the concrete steps of the solution algorithms specified in the config
         """
 
         # ===== [0] Setup =====

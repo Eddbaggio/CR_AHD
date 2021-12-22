@@ -166,7 +166,7 @@ def instance_selector(run=None, rad=None, n=None):
     for file in (sorted(input_dir.glob('*.dat'), key=ut.natural_sort_key)):
         if pattern.match(file.name):
             paths.append(file)
-            print(file.name)
+            # print(file.name)
     if len(paths) == 0:
         raise ValueError
     return paths
