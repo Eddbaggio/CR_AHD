@@ -106,7 +106,7 @@ class Solver:
 
     def execute(self,
                 instance: it.MDPDPTWInstance,
-                starting_solution: slt.CAHDSolution = None
+                starting_solution: slt.CAHDSolution = None,
                 ) -> Tuple[it.MDPDPTWInstance, slt.CAHDSolution]:
         """
         apply the concrete steps of the solution algorithms specified in the config

@@ -133,7 +133,7 @@ def instance_selector(run=None, rad=None, n=None):
     :param n:
     :return:
     """
-    print(f'instance selector: run={run}({type(run)}), rad={rad}({type(rad)}), n={n}({type(n)})')
+    # print(f'instance selector: run={run}({type(run)}), rad={rad}({type(rad)}), n={n}({type(n)})')
     if isinstance(run, int):
         p_run = run
     elif run is None:

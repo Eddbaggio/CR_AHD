@@ -23,7 +23,7 @@ if __name__ == '__main__':
             args = {'run': 19,
                     'rad': 200,
                     'n': 10,
-                    'threads': 1,
+                    'threads': 4,
                     'fail': 1,
                     }
         else:

@@ -1,7 +1,11 @@
 import itertools
+import logging
 import logging.config
+from utility_module import istarmap
 import multiprocessing
 from datetime import datetime
+
+from tqdm import tqdm
 
 import utility_module.io
 from core_module import instance as it, solution as slt
@@ -74,16 +78,32 @@ def solve_instances(instance_paths, num_threads: int = 1):
 
 
 def execute_jobs(paths, configs, num_threads: int = 1, fail_on_error: bool = False):
-    jobs = itertools.product(paths, configs, [fail_on_error])
-    with multiprocessing.Pool(num_threads) as pool:
-        solutions = list(pool.starmap(_execute_job, jobs))
+    if num_threads > 1:
+        console_log_level = logging.ERROR
+    else:
+        console_log_level = logging.INFO
+    configs = list(configs)
+    n_jobs = len(paths) * len(configs)
+    jobs = itertools.product(paths, configs, [fail_on_error], [console_log_level])
+    if num_threads == 1:
+        solutions = [_execute_job(*j) for j in jobs]
+    else:
+        with multiprocessing.Pool(num_threads) as pool:
+            solutions = list(tqdm(pool.imap(_execute_job_star, jobs), total=n_jobs))
     return solutions
 
 
-def _execute_job(path, config, fail_on_error):
+def _execute_job_star(args):
+    """ workaround to be able to display tqdm bar"""
+    return _execute_job(*args)
+
+
+def _execute_job(path, config, fail_on_error, console_log_level):
     log.remove_all_handlers(logging.getLogger())
     log_file_path = utility_module.io.output_dir.joinpath(f'{path.stem}_log.log')
     log.add_handlers(logging.getLogger(), str(log_file_path))
+
+    logging.getLogger().handlers[0].setLevel(console_log_level)
 
     instance = it.read_gansterer_hartl_mv(path)
     solver = slv.Solver(**config)
