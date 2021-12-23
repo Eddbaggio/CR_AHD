@@ -25,7 +25,7 @@ def parameter_generator():
         for m, r in [
             (0, ra.Dummy()),
             # (1, ra.CloseToCompetitors50()),
-            # (2, ra.CloseToCompetitors50()),
+            (2, ra.CloseToCompetitors50()),
             # (2, ra.CloseToCompetitors75()),
             # (3, ra.CloseToCompetitors50()),
             # (4, ra.CloseToCompetitors50())
@@ -63,9 +63,9 @@ def parameter_generator():
     ]
 
     nums_submitted_requests: List[int] = [
-        3,
+        # 3,
         4,
-        5
+        # 5
     ]
 
     request_selections: List[rs.RequestSelectionBehavior.__class__] = [

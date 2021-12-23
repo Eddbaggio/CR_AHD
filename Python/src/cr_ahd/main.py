@@ -1,5 +1,6 @@
 import logging.config
 import argparse
+import os
 import sys
 from datetime import datetime
 import cProfile
@@ -17,13 +18,16 @@ logger.parent.handlers[0].setFormatter(log.CustomFormatter())
 if __name__ == '__main__':
     def cr_ahd():
         # setup
-        args = parser.parse_args().__dict__
-
-        # when called from within IDE
-        # args = {'run': range(2),
-        #         'rad': None,
-        #         'n': None
-        #         }
+        if "PYCHARM" in os.environ:
+            # when called from within PyCharm
+            args = {'run': 19,
+                    'rad': 200,
+                    'n': 10,
+                    'threads': 1,
+                    'fail': 1,
+                    }
+        else:
+            args = parser.parse_args().__dict__
 
         start = datetime.now()
         logger.info(f'START {start}')
