@@ -20,10 +20,10 @@ if __name__ == '__main__':
         # setup
         if "PYCHARM" in os.environ:
             # when called from within PyCharm
-            args = {'run': 19,
-                    'rad': 200,
-                    'n': 10,
-                    'threads': 4,
+            args = {'run': 17,
+                    'rad': 300,
+                    'n': 15,
+                    'threads': 1,
                     'fail': 1,
                     }
         else:

@@ -162,14 +162,10 @@ class Auction:
 
             # ===== [4.1] Winner Determination =====
             timer = pr.Timer()
-            status, winner_bundles, bundle_winners = self.winner_determination.execute(instance, solution,
-                                                                                       auction_request_pool,
-                                                                                       auction_bundle_pool,
-                                                                                       bids_matrix,
-                                                                                       original_bundling_labels)
+            status, winner_bundles, bundle_winners, winner_bids = self.winner_determination.execute(
+                instance, solution, auction_request_pool, auction_bundle_pool, bids_matrix, original_bundling_labels)
             # timer.write_duration_to_solution(solution, 'runtime_winner_determination') fixme
-
-            if status != GRB.OPTIMAL:  # fall back to the pre-auction solution
+            if status != GRB.OPTIMAL or -GRB.INFINITY in winner_bids:  # fall back to the pre-auction solution
                 solution = pre_rs_solution
 
             else:
@@ -207,7 +203,8 @@ class Auction:
         for carrier_id in carrier_ids:
             carrier = solution.carriers[carrier_id]
             for request in carrier.accepted_infeasible_requests:
-                self.tour_construction.create_pendulum_tour_for_infeasible_request(instance, solution, carrier_id, request)
+                self.tour_construction.create_pendulum_tour_for_infeasible_request(instance, solution, carrier_id,
+                                                                                   request)
             while len(carrier.unrouted_requests) > 0:
                 request = carrier.unrouted_requests[0]
                 self.tour_construction.insert_single_request(instance, solution, carrier.id_, request)

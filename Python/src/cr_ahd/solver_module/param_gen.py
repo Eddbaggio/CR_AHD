@@ -26,7 +26,7 @@ def parameter_generator():
             (0, ra.Dummy()),
             # (1, ra.CloseToCompetitors50()),
             (2, ra.CloseToCompetitors50()),
-            # (2, ra.CloseToCompetitors75()),
+            (2, ra.CloseToCompetitors75()),
             # (3, ra.CloseToCompetitors50()),
             # (4, ra.CloseToCompetitors50())
         ]]
@@ -56,8 +56,8 @@ def parameter_generator():
     ]
 
     tour_improvement_time_limits: List[float] = [
-        1,
-        # 2,
+        # 1,
+        2,
         # 5,
         # 10
     ]
@@ -81,7 +81,7 @@ def parameter_generator():
         # rs.TemporalRangeCluster,
         # TODO SpatioTemporalCluster is not yet good enough & sometimes even infeasible
         # rs.SpatioTemporalCluster,
-        # rs.InfeasibleFirstRandomSecond,
+        rs.InfeasibleFirstRandomSecond,
     ]
 
     nums_auction_bundles: List[int] = [

@@ -33,16 +33,16 @@ class WinnerDeterminationBehavior(ABC):
          contain the carrier bids on that bundle
         """
 
-        status, winner_bundles, bundle_winners = self._determine_winners(instance, solution, auction_pool, bundles,
-                                                                         bids_matrix)
+        status, winner_bundles, bundle_winners, winner_bids = self._determine_winners(instance, solution, auction_pool,
+                                                                                      bundles, bids_matrix)
 
         # fall back to the pre-auction assignment
-        if status != GRB.OPTIMAL:
+        if status != GRB.OPTIMAL or -GRB.INFINITY in winner_bids:
             winner_bundles = ut.indices_to_nested_lists(original_bundling_labels, auction_pool)
             bundle_winners = [w for i, w in enumerate(original_bundling_labels) if
                               w not in original_bundling_labels[:i]]
 
-        return status, winner_bundles, bundle_winners
+        return status, winner_bundles, bundle_winners, winner_bids
 
     @abstractmethod
     def _determine_winners(self,
@@ -120,12 +120,13 @@ class MaxBidGurobiCAP1(WinnerDeterminationBehavior):
         # solve
         m.optimize()
         if m.Status != GRB.OPTIMAL:
-            return m.Status, None, None
+            return m.Status, None, None, None
         assert m.Status == GRB.OPTIMAL, f'Winner Determination is not optimal; status: {m.Status}'
         # status 3 is 'infeasible'
 
         winner_bundles = []
         bundle_winners = []
+        winner_bids = []
         logger.debug(f'the optimal solution for the Winner Determination Problem with {len(bundles)} bundles:')
         logger.debug(f'Objective: {m.objVal}')
         for b, bundle in enumerate(bundles):
@@ -133,9 +134,10 @@ class MaxBidGurobiCAP1(WinnerDeterminationBehavior):
                 if y[b, c].x >= 0.99:
                     winner_bundles.append(bundle)
                     bundle_winners.append(c)
+                    winner_bids.append(bids_matrix[b, c])
                     logger.debug(f'Bundle {b}: {bundle} assigned to {c} for a bid of {bids_matrix[b, c]}')
 
-        return m.Status, winner_bundles, bundle_winners
+        return m.Status, winner_bundles, bundle_winners, winner_bids
 
 
 class MaxBidGurobiCAP2(WinnerDeterminationBehavior):
@@ -186,11 +188,10 @@ class MaxBidGurobiCAP2(WinnerDeterminationBehavior):
         bundle_winners = []
         logger.debug(f'the optimal solution for the Winner Determination Problem with {len(bundles)} bundles:')
         logger.debug(f'Objective: {m.objVal}')
-        for b_idx, bundle in enumerate(bundles):
-            if x[b_idx].x > 0.99:
+        for b, bundle in enumerate(bundles):
+            if x[b].x > 0.99:
                 winner_bundles.append(bundle)
-                bundle_winners.append(max_bidders[b_idx])
-                logger.debug(
-                    f'Bundle {b_idx}: {bundle} assigned to {max_bidders[b_idx]} for a bid of {max_bids[b_idx]}')
+                bundle_winners.append(max_bidders[b])
+                logger.debug(f'Bundle {b}: {bundle} assigned to {max_bidders[b]} for a bid of {max_bids[b]}')
 
         return winner_bundles, bundle_winners

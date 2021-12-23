@@ -2,7 +2,7 @@ import logging
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import List, Sequence
-
+from gurobipy import GRB
 import tqdm
 
 import utility_module.errors
@@ -119,6 +119,7 @@ class ClearAndReinsertAll(BiddingBehavior):
             with_bundle = carrier_copy_improved.objective()
 
         except utility_module.errors.ConstraintViolationError:
-            with_bundle = -float('inf')
+            # with_bundle = -float('inf')
+            with_bundle = -GRB.INFINITY
 
         return with_bundle

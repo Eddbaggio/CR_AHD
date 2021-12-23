@@ -647,10 +647,10 @@ class InfeasibleFirstRandomSecond(RequestSelectionBehavior):
                 selected += [r for _, r in sorted(zip(valuations, carrier.accepted_requests))][:k]
                 selected.sort()
 
-                for request in selected:
-                    solution.free_requests_from_carriers(instance, [request])
-                    auction_request_pool.append(request)
-                    original_bundling_labels.append(carrier.id_)
+            for request in selected:
+                solution.free_requests_from_carriers(instance, [request])
+                auction_request_pool.append(request)
+                original_bundling_labels.append(carrier.id_)
 
         return auction_request_pool, original_bundling_labels
 
