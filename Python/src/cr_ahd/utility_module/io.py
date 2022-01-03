@@ -47,7 +47,7 @@ def solutions_to_df(solutions: List[slt.CAHDSolution], agg_level: str):
     :param agg_level: defines up to which level the solution will be summarized. E.g. if agg_level='carrier' the
     returned pd.DataFrame contains infos per carrier but not per tour since tours are summarized for each carrier.
     """
-
+    assert solutions, f'No solutions available'
     df = []
     for solution in solutions:
         if agg_level == 'solution':

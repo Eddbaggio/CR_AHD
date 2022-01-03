@@ -25,8 +25,8 @@ def parameter_generator():
         for m, r in [
             (0, ra.Dummy()),
             # (1, ra.CloseToCompetitors50()),
-            (2, ra.CloseToCompetitors50()),
-            (2, ra.CloseToCompetitors75()),
+            # (2, ra.CloseToCompetitors50()),
+            # (2, ra.CloseToCompetitors75()),
             # (3, ra.CloseToCompetitors50()),
             # (4, ra.CloseToCompetitors50())
         ]]
@@ -48,7 +48,7 @@ def parameter_generator():
         # mh.PDPTWReducedVariableNeighborhoodSearch,
         # mh.PDPTWVariableNeighborhoodSearch,
         # mh.PDPTWSimulatedAnnealing,
-        # mh.NoMetaheuristic,
+        mh.NoMetaheuristic,
     ]
 
     neighborhood_collections: List[List[nh.Neighborhood]] = [
@@ -81,14 +81,14 @@ def parameter_generator():
         # rs.TemporalRangeCluster,
         # TODO SpatioTemporalCluster is not yet good enough & sometimes even infeasible
         # rs.SpatioTemporalCluster,
-        rs.InfeasibleFirstRandomSecond,
+        # rs.InfeasibleFirstRandomSecond,
     ]
 
     nums_auction_bundles: List[int] = [
         # 50,
-        # 100,
+        100,
         # 200,
-        300,
+        # 300,
         # 500
     ]
 

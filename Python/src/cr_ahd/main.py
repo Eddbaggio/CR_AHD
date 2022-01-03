@@ -20,10 +20,10 @@ if __name__ == '__main__':
         # setup
         if "PYCHARM" in os.environ:
             # when called from within PyCharm
-            args = {'run': 17,
-                    'rad': 300,
-                    'n': 15,
-                    'threads': 1,
+            args = {'run': range(3),
+                    'rad': 200,
+                    'n': 10,
+                    'threads': 6,
                     'fail': 1,
                     }
         else:
@@ -46,7 +46,6 @@ if __name__ == '__main__':
         csv_path = io.unique_path(io.output_dir, 'evaluation_agg_' + agg_level + '_#{:03d}' + '.csv')
         df.to_csv(path_or_buf=csv_path, index=False)
 
-        # plotting and evaluation
         ev.plot(df,
                 values='sum_profit',
                 color=('solution_algorithm', 'request_acceptance_attractiveness', 'max_num_accepted_infeasible',),
