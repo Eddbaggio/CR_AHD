@@ -1,6 +1,7 @@
 data/Output
 .idea
 data/Input/vienna_addresses.csv
+tmp.sh
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

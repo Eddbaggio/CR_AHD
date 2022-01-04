@@ -3,13 +3,13 @@ import json
 import logging.config
 import pathlib
 from pathlib import Path
-from typing import Tuple, Sequence, List, Iterable
+from typing import Tuple, Sequence, List, Iterable, NoReturn
 
 import numpy as np
 import pandas as pd
 from scipy.spatial.distance import pdist, squareform
 
-import tw_management_module.tw
+from tw_management_module import tw
 import utility_module.utils as ut
 
 logger = logging.getLogger(__name__)
@@ -99,9 +99,38 @@ class MDVRPTWInstance:
 
     pass
 
+    def __repr__(self):
+        return f'MDVRPTW Instance {self.id_}({len(self.requests)} customers, {self.num_carriers} carriers)'
+
     @property
     def id_(self):
         return self._id_
+
+    def distance(self, i: Sequence[int], j: Sequence[int]) -> NoReturn:
+        raise NotImplementedError(f'the (vienna) MDVRPTW instances only considers travel duration but not distance!')
+
+    def travel_duration(self, i: Sequence[int], j: Sequence[int]):
+        """
+        returns the distance between pairs of elements in i and j. Think sum(distance(i[0], j[0]), distance(i[1], j[1]),
+        ...)
+
+        """
+        d = 0
+        for ii, jj in zip(i, j):
+            d += self._travel_duration_matrix[ii, jj]
+        return d
+
+    def coords(self, vertex: int):
+        """returns a tuple of (x, y) coordinates for the vertex"""
+        return ut.Coordinates(self.vertex_x_coords[vertex], self.vertex_y_coords[vertex])
+
+    def assign_time_window(self, vertex: int, time_window: tw.TimeWindow):
+        """
+        changes the time window of a vertex
+        """
+        assert self.num_carriers <= vertex < self.num_carriers + self.num_requests
+        self.tw_open[vertex] = time_window.open
+        self.tw_close[vertex] = time_window.close
 
     def write(self, path: Path, delim=','):
         lines = [f'# VRP parameters: V = num of vehicles, L = max_load, T = max_tour_length']
@@ -206,7 +235,7 @@ class MDPDPTWInstance:
 
         logger.debug(f'{id_}: created')
 
-    def __str__(self):
+    def __repr__(self):
         return f'Instance {self.id_} with {len(self.requests)} customers, {self.num_carriers} carriers'
 
     @property
@@ -270,7 +299,7 @@ class MDPDPTWInstance:
         else:
             raise IndexError(f'Vertex index {vertex} out of range')
 
-    def assign_time_window(self, vertex: int, time_window: tw_management_module.tw.TimeWindow):
+    def assign_time_window(self, vertex: int, time_window: tw.TimeWindow):
         """
         changes the time window of a vertex
         """
@@ -366,6 +395,7 @@ def read_vienna_instance(path: Path) -> MDVRPTWInstance:
 
 if __name__ == '__main__':
     from pprint import pprint
+
     inst = read_vienna_instance(Path(
         'C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home Deliveries/01_Code/data/Input/t=vienna+d=7+c=3+n=10+o=030+r=00.json'))
     print(inst)
