@@ -1,16 +1,16 @@
 import datetime as dt
 import random
 import webbrowser
-from typing import List, Union, Dict
+from typing import List, Union
 
 import folium
 import geopandas as gp
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 from matplotlib.colors import to_hex
 from shapely.geometry import Point
+from shapely.ops import nearest_points
 from tqdm import tqdm
 
 import instance_module.geometry as geo
@@ -45,7 +45,7 @@ def generate_generic_cr_ahd_instance(
 
 
 def generate_vienna_cr_ahd_instance(
-        vienna_addresses: pd.DataFrame,
+        vienna_addresses: gp.GeoDataFrame,
         vienna_durations: pd.DataFrame,
         num_carriers: int = 3,
         dist_center_to_carrier_km=7,
@@ -78,7 +78,8 @@ def generate_vienna_cr_ahd_instance(
     if num_carriers < 2:
         raise ValueError('Must have at least 2 carriers for a CR_AHD instance')
 
-    assert all(vienna_durations.index == vienna_addresses.index), f'Duration matrix and address matrix must share the same index'
+    assert all(
+        vienna_durations.index == vienna_addresses.index), f'Duration matrix and address matrix must share the same index'
     vienna_addresses = vienna_addresses.copy()
     vienna_durations = vienna_durations.copy()
 
@@ -94,16 +95,21 @@ def generate_vienna_cr_ahd_instance(
     vienna_lat, vienna_long = 48.210033, 16.363449
 
     # generate evenly positioned depots around the city center
-    depots = geo.circle(vienna_lat, vienna_long, dist_center_to_carrier_km, resolution=num_carriers)
-    depots = gp.GeoSeries([Point(lat, long) for lat, long in list(depots.exterior.coords)[:-1]], crs="EPSG:4326")
+    vienna_depots = geo.circle(vienna_lat, vienna_long, dist_center_to_carrier_km, resolution=num_carriers)
+    vienna_depots = gp.GeoSeries([Point(lat, long) for lat, long in list(vienna_depots.exterior.coords)[:-1]],
+                                 crs="EPSG:4326")
+    # snap the depot positions to the closest true address
+    vienna_depots = vienna_depots.apply(
+        lambda x: np.where(vienna_addresses.geometry == nearest_points(x, vienna_addresses.unary_union)[1])[0][0])
+    vienna_depots = vienna_addresses.iloc[vienna_depots].geometry
 
     districts = read_vienna_districts_shapefile()
     districts_centroids = districts.geometry.to_crs(epsg=3035).centroid.to_crs(epsg=4326)
 
-    # assign service districts based on distance d(depot, district_centroid)
+    # assign service districts based on (euclidean?) distance d(depot, district_centroid)
     centroid_depot_dist = np.zeros((len(districts_centroids), num_carriers))
     for (idx, name), centroid in districts_centroids.to_crs(epsg=3035).items():
-        for jdx, depot in depots.to_crs(epsg=3035).items():
+        for jdx, (_, depot) in enumerate(vienna_depots.to_crs(epsg=3035).geometry.items()):
             centroid_depot_dist[idx - 1, jdx] = centroid.distance(depot)
     district_carrier_assignment = centroid_depot_dist.min(axis=1).repeat(num_carriers).reshape(
         centroid_depot_dist.shape)
@@ -112,23 +118,24 @@ def generate_vienna_cr_ahd_instance(
     district_carrier_assignment = ut.indices_to_nested_lists(*district_carrier_assignment.T)
     district_carrier_assignment = {idx: district_carrier_assignment[idx - 1] for idx, name in districts.index}
 
-    # assign carriers to requests
-
-    vienna_addresses['carrier'] = [random.choice(district_carrier_assignment[x])
-                                   for x in vienna_addresses['GEB_BEZIRK']]
-    # plotting
-    if plot:
-        plot_service_areas_and_requests(depots, district_carrier_assignment, districts, vienna_addresses, vienna_lat,
-                                        vienna_long)
+    # assign carriers to requests. If more than one carrier serves a district, one of them is chosen randomly
+    vienna_requests = vienna_addresses.drop(index=vienna_depots.index)
+    vienna_requests['carrier'] = [random.choice(district_carrier_assignment[x])
+                                  for x in vienna_requests['GEB_BEZIRK']]
 
     # sampling the customers
-    vienna_requests: pd.DataFrame = vienna_addresses
     selected = []
     for name, group in vienna_requests.groupby(['carrier']):
         s = group.sample(num_requests_per_carrier, replace=False)
         selected.extend(s.index)
     vienna_requests = vienna_requests.loc[selected]
-    vienna_durations = vienna_durations.loc[selected, selected]
+    loc_idx = list(vienna_depots.index) + list(vienna_requests.index)
+    vienna_durations = vienna_durations.loc[loc_idx, loc_idx]
+
+    # plotting
+    if plot:
+        plot_service_areas_and_requests(vienna_depots, district_carrier_assignment, districts,
+                                        vienna_requests, vienna_lat, vienna_long)
 
     # generate disclosure times
     vienna_requests['disclosure_time'] = None
@@ -140,6 +147,7 @@ def generate_vienna_cr_ahd_instance(
 
     run = len(list(io.input_dir.glob(f't=vienna+d={dist_center_to_carrier_km}+c={num_carriers}'
                                      f'+n={num_requests_per_carrier:02d}+o={int(carrier_competition * 100):03d}+r=*')))
+
     return it.MDVRPTWInstance(
         id_=f't=vienna+d={dist_center_to_carrier_km}+c={num_carriers}'
             f'+n={num_requests_per_carrier:02d}+o={int(carrier_competition * 100):03d}+r={run:02d}',
@@ -156,8 +164,8 @@ def generate_vienna_cr_ahd_instance(
         requests_load=requests_load,
         request_time_window_open=[ut.EXECUTION_START_TIME] * len(vienna_requests),
         request_time_window_close=[ut.END_TIME] * len(vienna_requests),
-        carrier_depots_x=depots.geometry.x,
-        carrier_depots_y=depots.geometry.y,
+        carrier_depots_x=vienna_depots.geometry.x,
+        carrier_depots_y=vienna_depots.geometry.y,
         carrier_depots_tw_open=[ut.EXECUTION_START_TIME] * len(vienna_requests),
         carrier_depots_tw_close=[ut.END_TIME] * len(vienna_requests),
         duration_matrix=np.array(vienna_durations),
@@ -174,8 +182,8 @@ def plot_service_areas_and_requests(depots, district_carrier_assignment, distric
     cmap1 = plt.get_cmap('jet', num_carriers)
     carrier_layers = [folium.map.FeatureGroup(f'carrier {carrier} service areas', show=True) for carrier in
                       range(num_carriers)]
-    for district_idx, num_carriers in district_carrier_assignment.items():
-        for carrier in num_carriers:
+    for district_idx, carriers in district_carrier_assignment.items():
+        for carrier in carriers:
             poly, name1 = districts.loc[district_idx].squeeze(), districts.index[district_idx - 1]
             poly = folium.Polygon(
                 locations=poly.exterior.coords,
@@ -188,7 +196,7 @@ def plot_service_areas_and_requests(depots, district_carrier_assignment, distric
     for cl in carrier_layers:
         cl.add_to(m)
     depot_markers = []
-    for idx1, depot1 in depots.items():
+    for idx1, (_, depot1) in enumerate(depots.items()):
         cm1 = folium.CircleMarker(location=(depot1.x, depot1.y),
                                   popup=f'Depot {idx1}',
                                   radius=5,
@@ -243,5 +251,6 @@ if __name__ == '__main__':
             num_carriers=3,
             carrier_competition=0.3,
             num_requests_per_carrier=10,
+            plot=True
         )
         instance.write(io.input_dir.joinpath(instance.id_ + '.dat'))

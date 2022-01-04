@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 from scipy.spatial.distance import pdist, squareform
 
+
 import tw_management_module.tw
 import utility_module.utils as ut
 
@@ -123,7 +124,7 @@ class MDVRPTWInstance:
                 f'{self.vertex_revenue[request + self.num_carriers]}'
             )
 
-        lines.append(f'\n# travel duration in seconds')
+        lines.append(f'\n# travel duration in seconds. initial entries correspond to depots')
 
         for i in range(len(self._travel_duration_matrix)):
             lines.append(delim.join([str(x) for x in self._travel_duration_matrix[i]]))

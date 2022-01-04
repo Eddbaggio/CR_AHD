@@ -4,10 +4,10 @@ from typing import Union
 import numpy as np
 from shapely.geometry import Point, Polygon, LineString
 
+
 # CONVENTION
 # when using coordinates, use the order LATITUDE FIRST, LONGITUDE SECOND! All inputs will be rearranged to follow this
 # this order. https://en.wikipedia.org/wiki/ISO_6709#Items
-
 
 def two_circle_overlap_area(radius=1, center_distance=1, ):
     # if the circles do NOT overlap, return the negative difference of circle diameter and center distance
