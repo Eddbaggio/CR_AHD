@@ -1,4 +1,5 @@
 import datetime as dt
+import json
 import logging.config
 import pathlib
 from pathlib import Path
@@ -7,7 +8,6 @@ from typing import Tuple, Sequence, List, Iterable
 import numpy as np
 import pandas as pd
 from scipy.spatial.distance import pdist, squareform
-
 
 import tw_management_module.tw
 import utility_module.utils as ut
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 class MDVRPTWInstance:
     def __init__(self,
                  id_: str,
-                 max_num_tours_per_carrier: int,
+                 carriers_max_num_tours: int,
                  max_vehicle_load: float,
                  max_tour_length: float,
                  requests: List[int],
@@ -40,7 +40,7 @@ class MDVRPTWInstance:
         """
 
         :param id_: unique identifier
-        :param max_num_tours_per_carrier:
+        :param carriers_max_num_tours:
         :param max_vehicle_load:
         :param max_tour_length:
         :param requests: list of request indices
@@ -76,7 +76,7 @@ class MDVRPTWInstance:
         self.num_carriers = len(carrier_depots_x)
         self.vehicles_max_load = max_vehicle_load
         self.vehicles_max_travel_distance = max_tour_length
-        self.carriers_max_num_tours = max_num_tours_per_carrier
+        self.carriers_max_num_tours = carriers_max_num_tours
         self.requests = requests
         self.num_requests = len(self.requests)
         assert self.num_requests % self.num_carriers == 0
@@ -92,9 +92,8 @@ class MDVRPTWInstance:
         self.tw_open = [*carrier_depots_tw_open, *request_time_window_open]
         self.tw_close = [*carrier_depots_tw_close, *request_time_window_close]
 
-        # compute the distance and travel time matrix
-        # need to ceil the distances due to floating point precision!
-        self._travel_duration_matrix = np.ceil(duration_matrix).astype('int')
+        # need to ceil the durations due to floating point precision!
+        self._travel_duration_matrix = duration_matrix
 
         logger.debug(f'{id_}: created')
 
@@ -127,7 +126,7 @@ class MDVRPTWInstance:
         lines.append(f'\n# travel duration in seconds. initial entries correspond to depots')
 
         for i in range(len(self._travel_duration_matrix)):
-            lines.append(delim.join([str(x) for x in self._travel_duration_matrix[i]]))
+            lines.append(delim.join([str(x.total_seconds()) for x in self._travel_duration_matrix[i]]))
 
         with path.open('w') as f:
             f.writelines([l + '\n' for l in lines])
@@ -201,7 +200,8 @@ class MDPDPTWInstance:
         # compute the distance and travel time matrix
         # need to ceil the distances due to floating point precision!
         self._distance_matrix = np.ceil(
-            squareform(pdist(np.array(list(zip(self.vertex_x_coords, self.vertex_y_coords))), 'euclidean'))).astype('int')
+            squareform(pdist(np.array(list(zip(self.vertex_x_coords, self.vertex_y_coords))), 'euclidean'))).astype(
+            'int')
         self._travel_time_matrix = [[ut.travel_time(d) for d in x] for x in self._distance_matrix]
 
         logger.debug(f'{id_}: created')
@@ -328,3 +328,46 @@ def read_gansterer_hartl_mv(path: Path, num_carriers=3) -> MDPDPTWInstance:
                            carrier_depots_y=(depots['y'] * ut.DISTANCE_SCALING).tolist(),
                            carrier_depots_tw_open=[ut.EXECUTION_START_TIME for _ in range(len(depots))],
                            carrier_depots_tw_close=[ut.END_TIME for _ in range(len(depots))])
+
+
+def read_vienna_instance(path: Path) -> MDVRPTWInstance:
+    if path.suffix == ".json":
+        with open(path, 'r') as file:
+            inst = dict(json.load(file))
+        inst['request_disclosure_time'] = [dt.datetime.fromisoformat(x) for x in inst['request_disclosure_time']]
+        inst['vertex_service_duration'] = [dt.timedelta(seconds=x) for x in inst['vertex_service_duration']]
+        inst['tw_open'] = [dt.datetime.fromisoformat(x) for x in inst['tw_open']]
+        inst['tw_close'] = [dt.datetime.fromisoformat(x) for x in inst['tw_close']]
+        inst['_travel_duration_matrix'] = [[dt.timedelta(seconds=j) for j in i] for i in
+                                           inst['_travel_duration_matrix']]
+
+        return MDVRPTWInstance(
+            id_=inst['_id_'],
+            carriers_max_num_tours=inst['carriers_max_num_tours'],
+            max_vehicle_load=inst['vehicles_max_load'],
+            max_tour_length=inst['vehicles_max_travel_distance'],
+            requests=inst['requests'],
+            requests_initial_carrier_assignment=inst['request_to_carrier_assignment'],
+            requests_disclosure_time=inst['request_disclosure_time'],
+            requests_x=inst['vertex_x_coords'][inst['num_carriers']:],
+            requests_y=inst['vertex_y_coords'][inst['num_carriers']:],
+            requests_revenue=inst['vertex_revenue'][inst['num_carriers']:],
+            requests_service_duration=inst['vertex_service_duration'][inst['num_carriers']:],
+            requests_load=inst['vertex_load'][inst['num_carriers']:],
+            request_time_window_open=inst['tw_open'][inst['num_carriers']:],
+            request_time_window_close=inst['tw_close'][inst['num_carriers']:],
+            carrier_depots_x=inst['vertex_x_coords'][:inst['num_carriers']],
+            carrier_depots_y=inst['vertex_y_coords'][:inst['num_carriers']],
+            carrier_depots_tw_open=inst['tw_open'][:inst['num_carriers']],
+            carrier_depots_tw_close=inst['tw_close'][:inst['num_carriers']],
+            duration_matrix=inst['_travel_duration_matrix'],
+        )
+
+
+if __name__ == '__main__':
+    from pprint import pprint
+    inst = read_vienna_instance(Path(
+        'C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home Deliveries/01_Code/data/Input/t=vienna+d=7+c=3+n=10+o=030+r=00.json'))
+    print(inst)
+    pprint(inst.__dict__)
+    pass
