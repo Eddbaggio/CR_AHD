@@ -146,6 +146,9 @@ def read_vienna_addresses(path=io.input_dir.joinpath('vienna_addresses.csv'),
         warnings.warn('Writing and Reading in feather has caused issues before: values are not preserved!')
         gdf = gp.read_feather(path)
         print(f'reading {path.name} took {time.time() - t} seconds')
+
+    # filter out Train Stations, Museums, public toilets, Schrebergärten, ...
+    gdf = gdf[gdf['ZUGADR_TYP'] == 0]
     return gdf
 
 
@@ -282,10 +285,17 @@ def _query_vienna_addresses_online(write_path: Path = io.input_dir.joinpath('vie
     return vienna_addresses
 
 
-def _query_osrm_car_durations(gs: gp.GeoSeries):
+def query_osrm(gs: gp.GeoSeries):
+    """
+
+    :return: car-based distances and durations of the pairwise fastest routes between points in gs. The distance
+    is not the shortest distance between points but the distance of the fastest route between points. durations are
+    in seconds, distances are in meters
+    """
     api_limit = 100
     half_api_limit = api_limit // 2
     durations = dict()
+    distances = dict()
     remainder = 0 if len(gs) % half_api_limit == 0 else 1
 
     for i in tqdm.tqdm(range((len(gs) // half_api_limit) + remainder), desc='OSRM API QUERY'):
@@ -304,12 +314,15 @@ def _query_osrm_car_durations(gs: gp.GeoSeries):
             locations = ";".join([sources, destinations])
             sources_ids = ";".join(str(x) for x in (range(len(chunk1))))
             destinations_ids = ";".join(str(x) for x in (range(len(chunk1), len(chunk1) + len(chunk2))))
-            req = f"http://router.project-osrm.org/table/v1/car/{locations}?sources={sources_ids}&destinations={destinations_ids}"
+            # annotations = 'distance,duration'
+            annotations = 'duration,distance'
+            req = f"http://router.project-osrm.org/table/v1/car/{locations}?sources={sources_ids}&destinations={destinations_ids}&annotations={annotations}"
             r = requests.get(req)
             assert r.status_code == 200, f'Status code: {r.status_code} is invalid. Check your request.\n{r.content}'
 
             # transform the result to a pandas DataFrame
-            duration_matrix = pd.DataFrame(r.json()['durations'], index=chunk1.index, columns=chunk2.index, )
+            # distance_matrix = pd.DataFrame(r.json()['distances'], index=chunk1.index, columns=chunk2.index, )
+            # duration_matrix = pd.DataFrame(r.json()['durations'], index=chunk1.index, columns=chunk2.index, )
 
             for k in range(len(chunk1)):
                 key = chunk1.index[k]
@@ -317,26 +330,39 @@ def _query_osrm_car_durations(gs: gp.GeoSeries):
                     durations[key] = durations[key] + r.json()['durations'][k]
                 else:
                     durations[key] = r.json()['durations'][k]
+                if key in distances:
+                    distances[key] = distances[key] + r.json()['distances'][k]
+                else:
+                    distances[key] = r.json()['distances'][k]
 
     duration_matrix = pd.DataFrame(durations, columns=gs.index, index=gs.index)
+    distance_matrix = pd.DataFrame(distances, columns=gs.index, index=gs.index)
 
-    return duration_matrix
+    return distance_matrix, duration_matrix
 
 
 if __name__ == '__main__':
     # re-query the data
     # _query_vienna_addresses_online(write_path=io.input_dir.joinpath('vienna_addresses.csv'))
 
-    # read from disk
-    gdf = read_vienna_addresses(io.input_dir.joinpath('vienna_addresses.csv'))
-    n = 1000
-    gdf = gdf.sample(n=n, replace=False, random_state=42)  # NOTE the seed!
-    # write the sample to disk for faster reading later
-    write_path = io.unique_path(io.input_dir, f'vienna_{n}_addresses' + '_#{:03d}' + '.csv')
-    gdf.to_csv(io.input_dir.joinpath(write_path), encoding='utf-8-sig', index=True, header=True)
-    # query OSRM durations
-    duration_matrix = _query_osrm_car_durations(gdf.geometry)
-    write_path = write_path.as_posix().replace('addresses', 'durations')
-    duration_matrix.to_csv(write_path, encoding='utf-8-sig', index=True, header=True)
+    # read addresses from disk and preprocess
+    gdf_full = read_vienna_addresses(io.input_dir.joinpath('vienna_addresses.csv'),)
+                                     # nrows=200)  for testing
+
+    # sample some points for easier and more efficient handling
+    n = 1000  # sample size
+    for i in range(3):
+        gdf = gdf_full.sample(n=n, replace=False)
+
+        # write the sample to disk for faster reading later
+        write_path = io.unique_path(io.input_dir, f'vienna_{n}_addresses' + '_#{:03d}' + '.csv')
+        gdf.to_csv(io.input_dir.joinpath(write_path), encoding='utf-8-sig', index=True, header=True)
+
+        # query OSRM durations
+        distance_matrix, duration_matrix = query_osrm(gdf.geometry)
+        dur_write_path = write_path.as_posix().replace('addresses', 'durations')
+        duration_matrix.to_csv(dur_write_path, encoding='utf-8-sig', index=True, header=True)
+        dist_write_path = write_path.as_posix().replace('addresses', 'distances')
+        distance_matrix.to_csv(dist_write_path, encoding='utf-8-sig', index=True, header=True)
 
     pass

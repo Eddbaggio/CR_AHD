@@ -21,6 +21,7 @@ class MDVRPTWInstance:
                  carriers_max_num_tours: int,
                  max_vehicle_load: float,
                  max_tour_length: float,
+                 max_tour_duration: dt.timedelta,
                  requests: List[int],
                  requests_initial_carrier_assignment: List[int],
                  requests_disclosure_time: List[dt.datetime],
@@ -36,9 +37,11 @@ class MDVRPTWInstance:
                  carrier_depots_tw_open: List[dt.datetime],
                  carrier_depots_tw_close: List[dt.datetime],
                  duration_matrix,
-                 ):
+                 distance_matrix):
         """
 
+        :param max_tour_duration:
+        :param distance_matrix:
         :param id_: unique identifier
         :param carriers_max_num_tours:
         :param max_vehicle_load:
@@ -76,6 +79,7 @@ class MDVRPTWInstance:
         self.num_carriers = len(carrier_depots_x)
         self.vehicles_max_load = max_vehicle_load
         self.vehicles_max_travel_distance = max_tour_length
+        self.max_tour_duration = max_tour_duration
         self.carriers_max_num_tours = carriers_max_num_tours
         self.requests = requests
         self.num_requests = len(self.requests)
@@ -94,6 +98,7 @@ class MDVRPTWInstance:
 
         # need to ceil the durations due to floating point precision!
         self._travel_duration_matrix = duration_matrix
+        self._distance_matrix = distance_matrix
 
         logger.debug(f'{id_}: created')
 
@@ -107,7 +112,15 @@ class MDVRPTWInstance:
         return self._id_
 
     def distance(self, i: Sequence[int], j: Sequence[int]) -> NoReturn:
-        raise NotImplementedError(f'the (vienna) MDVRPTW instances only considers travel duration but not distance!')
+        """
+        returns the distance between pairs of elements in i and j. Think sum(distance(i[0], j[0]), distance(i[1], j[1]),
+        ...)
+
+        """
+        d = 0
+        for ii, jj in zip(i, j):
+            d += self._distance_matrix[ii, jj]
+        return d
 
     def travel_duration(self, i: Sequence[int], j: Sequence[int]):
         """
@@ -367,30 +380,33 @@ def read_vienna_instance(path: Path) -> MDVRPTWInstance:
         inst['vertex_service_duration'] = [dt.timedelta(seconds=x) for x in inst['vertex_service_duration']]
         inst['tw_open'] = [dt.datetime.fromisoformat(x) for x in inst['tw_open']]
         inst['tw_close'] = [dt.datetime.fromisoformat(x) for x in inst['tw_close']]
-        inst['_travel_duration_matrix'] = [[dt.timedelta(seconds=j) for j in i] for i in
-                                           inst['_travel_duration_matrix']]
+        inst['_travel_duration_matrix'] = [[dt.timedelta(seconds=j) for j in i]
+                                           for i in inst['_travel_duration_matrix']]
+        inst['max_tour_duration'] = dt.timedelta(seconds=inst['max_tour_duration'])
 
-        return MDVRPTWInstance(
-            id_=inst['_id_'],
-            carriers_max_num_tours=inst['carriers_max_num_tours'],
-            max_vehicle_load=inst['vehicles_max_load'],
-            max_tour_length=inst['vehicles_max_travel_distance'],
-            requests=inst['requests'],
-            requests_initial_carrier_assignment=inst['request_to_carrier_assignment'],
-            requests_disclosure_time=inst['request_disclosure_time'],
-            requests_x=inst['vertex_x_coords'][inst['num_carriers']:],
-            requests_y=inst['vertex_y_coords'][inst['num_carriers']:],
-            requests_revenue=inst['vertex_revenue'][inst['num_carriers']:],
-            requests_service_duration=inst['vertex_service_duration'][inst['num_carriers']:],
-            requests_load=inst['vertex_load'][inst['num_carriers']:],
-            request_time_window_open=inst['tw_open'][inst['num_carriers']:],
-            request_time_window_close=inst['tw_close'][inst['num_carriers']:],
-            carrier_depots_x=inst['vertex_x_coords'][:inst['num_carriers']],
-            carrier_depots_y=inst['vertex_y_coords'][:inst['num_carriers']],
-            carrier_depots_tw_open=inst['tw_open'][:inst['num_carriers']],
-            carrier_depots_tw_close=inst['tw_close'][:inst['num_carriers']],
-            duration_matrix=inst['_travel_duration_matrix'],
-        )
+        return MDVRPTWInstance(id_=inst['_id_'],
+                               carriers_max_num_tours=inst['carriers_max_num_tours'],
+                               max_vehicle_load=inst['vehicles_max_load'],
+                               max_tour_length=inst['vehicles_max_travel_distance'],
+                               max_tour_duration=inst['max_tour_duration'],
+                               requests=inst['requests'],
+                               requests_initial_carrier_assignment=inst['request_to_carrier_assignment'],
+                               requests_disclosure_time=inst['request_disclosure_time'],
+                               requests_x=inst['vertex_x_coords'][inst['num_carriers']:],
+                               requests_y=inst['vertex_y_coords'][inst['num_carriers']:],
+                               requests_revenue=inst['vertex_revenue'][inst['num_carriers']:],
+                               requests_service_duration=inst['vertex_service_duration'][inst['num_carriers']:],
+                               requests_load=inst['vertex_load'][inst['num_carriers']:],
+                               request_time_window_open=inst['tw_open'][inst['num_carriers']:],
+                               request_time_window_close=inst['tw_close'][inst['num_carriers']:],
+                               carrier_depots_x=inst['vertex_x_coords'][:inst['num_carriers']],
+                               carrier_depots_y=inst['vertex_y_coords'][:inst['num_carriers']],
+                               carrier_depots_tw_open=inst['tw_open'][:inst['num_carriers']],
+                               carrier_depots_tw_close=inst['tw_close'][:inst['num_carriers']],
+                               duration_matrix=inst['_travel_duration_matrix'],
+                               distance_matrix=inst['_distance_matrix'])
+    else:
+        raise NotImplementedError(f'Reading files from {path.suffix} files is not supported yet')
 
 
 if __name__ == '__main__':

@@ -45,27 +45,31 @@ def generate_generic_cr_ahd_instance(
     pass
 
 
-def generate_vienna_cr_ahd_instance(
-        vienna_addresses: gp.GeoDataFrame,
-        vienna_durations: pd.DataFrame,
-        num_carriers: int = 3,
-        dist_center_to_carrier_km=7,
-        carrier_competition: float = 0,
-        num_requests_per_carrier: int = 10,
-        carriers_max_num_tours: int = 3,
-        max_vehicle_load: int = 10,
-        max_tour_length: int = 1000,
-        requests_service_duration: Union[dt.timedelta, List[dt.timedelta]] = dt.timedelta(minutes=4),
-        requests_revenue: Union[float, int, List[float], List[int]] = 1,
-        requests_load: Union[float, int, List[float], List[int]] = 1,
-        plot=False):
+def generate_vienna_cr_ahd_instance(vienna_addresses: gp.GeoDataFrame,
+                                    vienna_distances,
+                                    vienna_durations: pd.DataFrame,
+                                    num_carriers: int = 3,
+                                    dist_center_to_carrier_km=7,
+                                    carrier_competition: float = 0,
+                                    num_requests_per_carrier: int = 10,
+                                    carriers_max_num_tours: int = 3,
+                                    max_vehicle_load: int = 10,
+                                    max_tour_length: int = 1000,
+                                    max_tour_duration=ut.EXECUTION_TIME_HORIZON.duration,
+                                    requests_service_duration: Union[dt.timedelta, List[dt.timedelta]] = dt.timedelta(
+                                        minutes=4),
+                                    requests_revenue: Union[float, int, List[float], List[int]] = 1,
+                                    requests_load: Union[float, int, List[float], List[int]] = 1,
+                                    plot=False):
     """
 
-    :param plot:
+    :param max_tour_duration:
+    :param vienna_addresses:
+    :param vienna_distances:
+    :param vienna_durations: duration matrix in seconds *as floats*
     :param num_carriers:
     :param dist_center_to_carrier_km:
-    :param carrier_competition: value between 0 and 1 indicating the degree of service area overlap. 0 means no overlap,
-        1 means all carriers serve all districts
+    :param carrier_competition:
     :param num_requests_per_carrier:
     :param carriers_max_num_tours:
     :param max_vehicle_load:
@@ -73,16 +77,15 @@ def generate_vienna_cr_ahd_instance(
     :param requests_service_duration:
     :param requests_revenue:
     :param requests_load:
+    :param plot:
     :return:
     """
 
     if num_carriers < 2:
         raise ValueError('Must have at least 2 carriers for a CR_AHD instance')
 
-    assert all(
-        vienna_durations.index == vienna_addresses.index), f'Duration matrix and address matrix must share the same index'
-    # vienna_addresses = vienna_addresses.copy()
-    # vienna_durations = vienna_durations.copy()
+    assert all(vienna_durations.index == vienna_addresses.index) and all(vienna_distances.index == vienna_addresses.index), \
+        f'Duration, distance and address matrices must share the same index'
 
     if isinstance(requests_load, (float, int)):
         requests_load = [requests_load] * (num_carriers * num_requests_per_carrier)
@@ -130,9 +133,12 @@ def generate_vienna_cr_ahd_instance(
         s = group.sample(num_requests_per_carrier, replace=False)
         selected.extend(s.index)
     vienna_requests = vienna_requests.loc[selected]
+
+    # filter addresses, durations and distances
     loc_idx = list(vienna_depots.index) + list(vienna_requests.index)
     vienna_durations = np.array(vienna_durations.loc[loc_idx, loc_idx])
     vienna_durations = np.array([[dt.timedelta(seconds=int(j)) for j in i] for i in vienna_durations])
+    vienna_distances = np.array(vienna_distances.loc[loc_idx, loc_idx])
 
     # plotting
     if plot:
@@ -151,28 +157,28 @@ def generate_vienna_cr_ahd_instance(
                                      f'+n={num_requests_per_carrier:02d}+o={int(carrier_competition * 100):03d}'
                                      f'+r=*.dat')))
 
-    return it.MDVRPTWInstance(
-        id_=f't=vienna+d={dist_center_to_carrier_km}+c={num_carriers}'
-            f'+n={num_requests_per_carrier:02d}+o={int(carrier_competition * 100):03d}+r={run:02d}',
-        carriers_max_num_tours=carriers_max_num_tours,
-        max_vehicle_load=max_vehicle_load,
-        max_tour_length=max_tour_length,
-        requests=list(range(len(vienna_requests))),
-        requests_initial_carrier_assignment=list(vienna_requests['carrier']),
-        requests_disclosure_time=list(vienna_requests['disclosure_time']),
-        requests_x=vienna_requests.geometry.x,
-        requests_y=vienna_requests.geometry.y,
-        requests_revenue=requests_revenue,
-        requests_service_duration=requests_service_duration,
-        requests_load=requests_load,
-        request_time_window_open=[ut.EXECUTION_START_TIME] * len(vienna_requests),
-        request_time_window_close=[ut.END_TIME] * len(vienna_requests),
-        carrier_depots_x=vienna_depots.geometry.x,
-        carrier_depots_y=vienna_depots.geometry.y,
-        carrier_depots_tw_open=[ut.EXECUTION_START_TIME] * len(vienna_depots),
-        carrier_depots_tw_close=[ut.END_TIME] * len(vienna_depots),
-        duration_matrix=np.array(vienna_durations),
-    )
+    return it.MDVRPTWInstance(id_=f't=vienna+d={dist_center_to_carrier_km}+c={num_carriers}'
+                                  f'+n={num_requests_per_carrier:02d}+o={int(carrier_competition * 100):03d}+r={run:02d}',
+                              carriers_max_num_tours=carriers_max_num_tours,
+                              max_vehicle_load=max_vehicle_load,
+                              max_tour_length=max_tour_length,
+                              max_tour_duration=max_tour_duration,
+                              requests=list(range(len(vienna_requests))),
+                              requests_initial_carrier_assignment=list(vienna_requests['carrier']),
+                              requests_disclosure_time=list(vienna_requests['disclosure_time']),
+                              requests_x=vienna_requests.geometry.x,
+                              requests_y=vienna_requests.geometry.y,
+                              requests_revenue=requests_revenue,
+                              requests_service_duration=requests_service_duration,
+                              requests_load=requests_load,
+                              request_time_window_open=[ut.EXECUTION_START_TIME] * len(vienna_requests),
+                              request_time_window_close=[ut.END_TIME] * len(vienna_requests),
+                              carrier_depots_x=vienna_depots.geometry.x,
+                              carrier_depots_y=vienna_depots.geometry.y,
+                              carrier_depots_tw_open=[ut.EXECUTION_START_TIME] * len(vienna_depots),
+                              carrier_depots_tw_close=[ut.END_TIME] * len(vienna_depots),
+                              duration_matrix=np.array(vienna_durations),
+                              distance_matrix=np.array(vienna_distances))
 
 
 def plot_service_areas_and_requests(depots, district_carrier_assignment, districts, vienna_addresses, vienna_lat,
@@ -244,18 +250,17 @@ def read_vienna_districts_shapefile():
 
 if __name__ == '__main__':
     m = 1000
-    n = 2
-    durations = pd.read_csv(io.input_dir.joinpath(f'vienna_{m}_durations_#{n:03d}.csv'),
-                            index_col=0)  # seconds as floats
+    n = 1
+    # travel duration in seconds *as floats*
+    durations = pd.read_csv(io.input_dir.joinpath(f'vienna_{m}_durations_#{n:03d}.csv'), index_col=0)
+    # distance in meters
+    distances = pd.read_csv(io.input_dir.joinpath(f'vienna_{m}_distances_#{n:03d}.csv'), index_col=0)
+
     addresses = read_vienna_addresses(io.input_dir.joinpath(f'vienna_{m}_addresses_#{n:03d}.csv'))
     for _ in tqdm(range(3)):
-        instance = generate_vienna_cr_ahd_instance(
-            vienna_addresses=addresses,
-            vienna_durations=durations,
-            num_carriers=3,
-            carrier_competition=0.3,
-            num_requests_per_carrier=10,
-        )
+        instance = generate_vienna_cr_ahd_instance(vienna_addresses=addresses, vienna_distances=distances,
+                                                   vienna_durations=durations, num_carriers=3, carrier_competition=0.3,
+                                                   num_requests_per_carrier=10, plot=False)
         instance.write(io.input_dir.joinpath(instance.id_ + '.dat'))
         with open(io.input_dir.joinpath(instance.id_ + '.json'), "w") as file:
             json.dump(instance.__dict__, file, cls=io.MyJSONEncoder, indent=4)

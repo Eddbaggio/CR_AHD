@@ -1,5 +1,6 @@
 import datetime as dt
 import logging.config
+from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import List, Sequence, Set, Dict
 
@@ -8,7 +9,7 @@ import utility_module.utils as ut
 logger = logging.getLogger(__name__)
 
 
-class Tour:
+class Tour(ABC):
     def __init__(self, id_: int, depot_index: int):
         """
 
@@ -129,6 +130,7 @@ class Tour:
             'sum_revenue': self.sum_revenue,
         }
 
+    @abstractmethod
     def _single_insertion_feasibility_check(self, instance, insertion_index: int, insertion_vertex: int):
         """
         Checks whether the insertion of the insertion_vertex at insertion_pos is feasible.
@@ -144,52 +146,7 @@ class Tour:
 
         :return: True if the insertion of the insertion_vertex at insertion_position is feasible, False otherwise
         """
-
-        i = self.routing_sequence[insertion_index - 1]
-        j = insertion_vertex
-        k = self.routing_sequence[insertion_index]
-
-        # [1] check precedence (only if the counterpart vertex is already in the tour)
-        if instance.vertex_type(j) == 'delivery':
-            pickup = j - instance.num_requests
-            if pickup in self.vertex_pos and self.vertex_pos[pickup] > insertion_index:
-                return False
-        elif instance.vertex_type(j) == 'pickup':
-            delivery = j + instance.num_requests
-            if delivery in self.vertex_pos and self.vertex_pos[delivery] <= insertion_index:
-                return False
-
-        # [2] check max tour distance
-        distance_shift_j = instance.distance([i, j], [j, k]) - instance.distance([i], [k])
-        if self.sum_travel_distance + distance_shift_j > instance.vehicles_max_travel_distance:
-            return False
-
-        # [3] check time windows (NEW: in constant time!)
-        # tw condition 1: start of service of j must fit the time window of j
-        arrival_time_j = self.service_time_sequence[insertion_index - 1] + \
-                         instance.vertex_service_duration[i] + \
-                         instance.travel_duration([i], [j])
-        tw_cond1 = arrival_time_j <= instance.tw_close[j]
-
-        # tw condition 2: time_shift_j must be limited to the sum of wait_k + max_shift_k
-        wait_j = max(dt.timedelta(0), instance.tw_open[j] - arrival_time_j)
-        time_shift_j = instance.travel_duration([i], [j]) + \
-                       wait_j + \
-                       instance.vertex_service_duration[j] + \
-                       instance.travel_duration([j], [k]) - \
-                       instance.travel_duration([i], [k])
-        wait_k = self.wait_duration_sequence[insertion_index]
-        max_shift_k = self.max_shift_sequence[insertion_index]
-        tw_cond2 = time_shift_j <= wait_k + max_shift_k
-
-        if not tw_cond1 or not tw_cond2:
-            return False
-
-        # [4] check max vehicle load FIXME this is incorrect because it does not consider that load can increase and decrease during the tour!
-        if self.sum_load + instance.vertex_load[j] > instance.vehicles_max_load:
-            return False
-
-        return True
+        pass
 
     def insertion_feasibility_check(self,
                                     instance,
@@ -225,14 +182,13 @@ class Tour:
         insert a in a specified position of a routing sequence and update all related sequences, sums and schedules
 
         Following
-        [1] Vansteenwegen,P., Souffriau,W., Vanden Berghe,G., & van Oudheusden,D. (2009). Iterated local search for the team
-        orienteering problem with time windows. Computers & Operations Research, 36(12), 3281–3290.
+        [1] Vansteenwegen,P., Souffriau,W., Vanden Berghe,G., & van Oudheusden,D. (2009). Iterated local search for the
+        team orienteering problem with time windows. Computers & Operations Research, 36(12), 3281–3290.
         https://doi.org/10.1016/j.cor.2009.03.008
         [2] Lu,Q., & Dessouky,M.M. (2006). A new insertion-based construction heuristic for solving the pickup and
         delivery problem with time windows. European Journal of Operational Research, 175(2), 672–687.
         https://doi.org/10.1016/j.ejor.2005.05.012
 
-        :return: the updated input variables (sequences, sums, schedules, ...) as a dict
         """
 
         assert 0 < insertion_index < len(self)
@@ -354,11 +310,6 @@ class Tour:
         for index, vertex in zip(insertion_indices, insertion_vertices):
             self._single_insert_and_update(instance, index, vertex)
 
-    # TODO
-    # def insert_request_and_update(self, instance, request:int, pickup_pos:int, delivery_pos:int):
-    #     self.requests.add(request)
-    #     pass
-
     def _single_pop_and_update(self, instance, pop_index: int):
         """
         Following
@@ -465,14 +416,6 @@ class Tour:
             self.max_shift_sequence[index] = max_shift_i
 
         return popped
-
-    # TODO
-    # def pop_request_and_update(self, instance,  request: int):
-    #     self.requests.remove(request)
-    #     pickup, delivery = instance.pickup_and_delivery_pair(request)
-    #     self._single_pop_and_update(instance, self.vertex_pos[pickup])
-    #     self._single_pop_and_update(instance, self.vertex_pos[delivery])
-    #     pass
 
     def pop_and_update(self, instance, pop_indices: Sequence[int]):
 
@@ -646,613 +589,78 @@ class Tour:
                 copy._single_insert_and_update(instance, insertion_index, insertion_vertex)
             return total_max_shift_delta
 
-# class PendulumTour(Tour):
-#     pass
 
+class PDPTWTour(Tour):
+    @abstractmethod
+    def _single_insertion_feasibility_check(self, instance, insertion_index: int, insertion_vertex: int):
+        """
+        Checks whether the insertion of the insertion_vertex at insertion_pos is feasible.
 
-# =====================================================================================================================
-# stand-alone functions that are independent from the instance and solution classes but accept the raw data instead
-# =====================================================================================================================
+        Following
+        [1] Vansteenwegen,P., Souffriau,W., Vanden Berghe,G., & van Oudheusden,D. (2009). Iterated local
+        search for the team orienteering problem with time windows. Computers & Operations Research, 36(12),
+        3281–3290. https://doi.org/10.1016/j.cor.2009.03.008
 
+        [2] Lu,Q., & Dessouky,M.M. (2006). A new insertion-based construction heuristic for solving the pickup and
+        delivery problem with time windows. European Journal of Operational Research, 175(2), 672–687.
+        https://doi.org/10.1016/j.ejor.2005.05.012
 
-def single_insertion_feasibility_check(routing_sequence: Sequence[int],
-                                       sum_travel_distance: float,
-                                       service_schedule: Sequence[dt.datetime],
-                                       sum_load: float,
-                                       wait_sequence: Sequence[dt.timedelta],
-                                       max_shift_sequence: Sequence[dt.timedelta],
-                                       num_depots: int,
-                                       num_requests: int,
-                                       distance_matrix: Sequence[Sequence[float]],
-                                       vertex_load: Sequence[float],
-                                       service_duration: Sequence[dt.timedelta],
-                                       vehicles_max_travel_distance: float,
-                                       vehicles_max_load: float,
-                                       tw_open: Sequence[dt.datetime],
-                                       tw_close: Sequence[dt.datetime],
-                                       insertion_index: int,
-                                       insertion_vertex: int,
-                                       ):
-    """
-    Checks whether the insertion of the insertion_vertex at insertion_pos is feasible.
+        :return: True if the insertion of the insertion_vertex at insertion_position is feasible, False otherwise
+        """
 
-    Following
-    [1] Vansteenwegen,P., Souffriau,W., Vanden Berghe,G., & van Oudheusden,D. (2009). Iterated local search for the team
-    orienteering problem with time windows. Computers & Operations Research, 36(12), 3281–3290.
-    https://doi.org/10.1016/j.cor.2009.03.008
-    [2] Lu,Q., & Dessouky,M.M. (2006). A new insertion-based construction heuristic for solving the pickup and
-    delivery problem with time windows. European Journal of Operational Research, 175(2), 672–687.
-    https://doi.org/10.1016/j.ejor.2005.05.012
+        i = self.routing_sequence[insertion_index - 1]
+        j = insertion_vertex
+        k = self.routing_sequence[insertion_index]
 
-    :return: True if the insertion of the insertion_vertex at insertion_position is feasible, False otherwise
-    """
+        # [1] check precedence (only if the counterpart vertex is already in the tour)
+        if instance.vertex_type(j) == 'delivery':
+            pickup = j - instance.num_requests
+            if pickup in self.vertex_pos and self.vertex_pos[pickup] > insertion_index:
+                return False
+        elif instance.vertex_type(j) == 'pickup':
+            delivery = j + instance.num_requests
+            if delivery in self.vertex_pos and self.vertex_pos[delivery] <= insertion_index:
+                return False
 
-    i = routing_sequence[insertion_index - 1]
-    j = insertion_vertex
-    k = routing_sequence[insertion_index]
-
-    # check precedence if vertex is a delivery vertex
-    if num_depots + num_requests <= j < num_depots + 2 * num_requests:
-        precedence_vertex = j - num_requests
-        if precedence_vertex not in routing_sequence[:insertion_index]:
+        # [2] check max tour distance
+        distance_shift_j = instance.distance([i, j], [j, k]) - instance.distance([i], [k])
+        if self.sum_travel_distance + distance_shift_j > instance.vehicles_max_travel_distance:
             return False
 
-    # check max tour distance
-    distance_shift_j = distance_matrix[i][j] + distance_matrix[j][k] - distance_matrix[i][k]
-    if sum_travel_distance + distance_shift_j > vehicles_max_travel_distance:
-        return False
+        # [3] check time windows (NEW: in constant time!)
+        # tw condition 1: start of service of j must fit the time window of j
+        arrival_time_j = self.service_time_sequence[insertion_index - 1] + \
+                         instance.vertex_service_duration[i] + \
+                         instance.travel_duration([i], [j])
+        tw_cond1 = arrival_time_j <= instance.tw_close[j]
 
-    # check time windows (NEW: in constant time!)
-    travel_time_i_j = ut.travel_time(distance_matrix[i][j])
-    travel_time_j_k = ut.travel_time(distance_matrix[j][k])
-    travel_time_i_k = ut.travel_time(distance_matrix[i][k])
+        # tw condition 2: time_shift_j must be limited to the sum of wait_k + max_shift_k
+        wait_j = max(dt.timedelta(0), instance.tw_open[j] - arrival_time_j)
+        time_shift_j = instance.travel_duration([i], [j]) + \
+                       wait_j + \
+                       instance.vertex_service_duration[j] + \
+                       instance.travel_duration([j], [k]) - \
+                       instance.travel_duration([i], [k])
+        wait_k = self.wait_duration_sequence[insertion_index]
+        max_shift_k = self.max_shift_sequence[insertion_index]
+        tw_cond2 = time_shift_j <= wait_k + max_shift_k
 
-    # tw condition 1: service of j must fit the time window of j
-    arrival_time_j = service_schedule[insertion_index - 1] + service_duration[i] + travel_time_i_j
-    tw_cond1 = arrival_time_j <= tw_close[j]
-
-    # tw condition 2: time_shift_j must be limited to the sum of wait_k + max_shift_k
-    wait_j = max(dt.timedelta(0), tw_open[j] - arrival_time_j)
-    time_shift_j = travel_time_i_j + wait_j + service_duration[j] + travel_time_j_k - travel_time_i_k
-    wait_k = wait_sequence[insertion_index]
-    max_shift_k = max_shift_sequence[insertion_index]
-    tw_cond2 = time_shift_j <= wait_k + max_shift_k
-
-    if not tw_cond1 or not tw_cond2:
-        return False
-
-    # check max vehicle load
-    if sum_load + vertex_load[j] > vehicles_max_load:
-        return False
-
-    return True
-
-
-def multi_insertion_feasibility_check(routing_sequence: List[int],
-                                      sum_travel_distance: float,
-                                      sum_travel_duration: dt.timedelta,
-                                      arrival_schedule: List[dt.datetime],
-                                      service_schedule: List[dt.datetime],
-                                      sum_load: float,
-                                      sum_revenue: float,
-                                      sum_profit: float,
-                                      wait_sequence: List[dt.timedelta],
-                                      max_shift_sequence: List[dt.timedelta],
-                                      num_depots,
-                                      num_requests,
-                                      distance_matrix: Sequence[Sequence[float]],
-                                      vertex_load: Sequence[float],
-                                      revenue: Sequence[float],
-                                      service_duration: Sequence[dt.timedelta],
-                                      vehicles_max_travel_distance,
-                                      vehicles_max_load,
-                                      tw_open: Sequence[dt.datetime],
-                                      tw_close: Sequence[dt.datetime],
-                                      insertion_indices,
-                                      insertion_vertices,
-                                      ):
-    # sanity check whether insertion positions are sorted in ascending order
-    assert all(insertion_indices[i] < insertion_indices[i + 1] for i in range(len(insertion_indices) - 1))
-    input_dict = dict(
-        routing_sequence=list(routing_sequence[:]),  # copy!
-        sum_travel_distance=sum_travel_distance,
-        sum_travel_duration=sum_travel_duration,
-        arrival_schedule=list(arrival_schedule[:]),  # copy!
-        service_schedule=list(service_schedule[:]),  # copy!
-        sum_load=sum_load,
-        sum_revenue=sum_revenue,
-        sum_profit=sum_profit,
-        wait_sequence=list(wait_sequence[:]),  # copy!
-        max_shift_sequence=list(max_shift_sequence[:]),  # copy!
-        num_depots=num_depots,
-        num_requests=num_requests,
-        distance_matrix=distance_matrix,
-        vertex_load=vertex_load,
-        revenue=revenue,
-        service_duration=service_duration,
-        vehicles_max_travel_distance=vehicles_max_travel_distance,
-        vehicles_max_load=vehicles_max_load,
-        tw_open=tw_open,
-        tw_close=tw_close,
-        insertion_index=None,
-        insertion_vertex=None,
-    )
-
-    # check all insertions sequentially
-    for idx, (pos, vertex) in enumerate(zip(insertion_indices, insertion_vertices)):
-        input_dict['insertion_index'] = pos
-        input_dict['insertion_vertex'] = vertex
-
-        if single_insertion_feasibility_check(**input_dict):
-
-            # if there are more insertions to check, insert the current vertex at the current pos inside the copied
-            # route sequence & update the input dict before checking the next insertion
-            if idx < len(insertion_indices) - 1:
-                updated = single_insert_and_update(**input_dict)
-                input_dict.update(updated)
-
-        else:
+        if not tw_cond1 or not tw_cond2:
             return False
 
-    return True
+        # [4] check max vehicle load FIXME this is incorrect because it does not consider that load can increase and decrease during the tour!
+        if self.sum_load + instance.vertex_load[j] > instance.vehicles_max_load:
+            return False
 
+        return True
 
-def single_insert_and_update(routing_sequence: List[int],
-                             sum_travel_distance: float,
-                             sum_travel_duration: dt.timedelta,
-                             arrival_schedule: List[dt.datetime],
-                             service_schedule: List[dt.datetime],
-                             sum_load: float,
-                             sum_revenue: float,
-                             sum_profit: float,
-                             wait_sequence: List[dt.timedelta],
-                             max_shift_sequence: List[dt.timedelta],
-                             distance_matrix: Sequence[Sequence[float]],
-                             vertex_load: Sequence[float],
-                             revenue: Sequence[float],
-                             service_duration: Sequence[dt.timedelta],
-                             tw_open: Sequence[dt.datetime],
-                             tw_close: Sequence[dt.datetime],
-                             insertion_index: int,
-                             insertion_vertex: int,
-                             **kwargs
-                             ):
-    """
-    ASSUMES THAT THE INSERTION WAS FEASIBLE, NO MORE CHECKS ARE EXECUTED IN HERE!
 
-    insert a in a specified position of a routing sequence and update all related sequences, sums and schedules
+class VRPTWTour(Tour):
+    def _single_insertion_feasibility_check(self, instance, insertion_index: int, insertion_vertex: int):
+        i = self.routing_sequence[insertion_index -1]
+        j = insertion_vertex
+        k = self.routing_sequence[insertion_index]
 
-    Following
-    [1] Vansteenwegen,P., Souffriau,W., Vanden Berghe,G., & van Oudheusden,D. (2009). Iterated local search for the team
-    orienteering problem with time windows. Computers & Operations Research, 36(12), 3281–3290.
-    https://doi.org/10.1016/j.cor.2009.03.008
-    [2] Lu,Q., & Dessouky,M.M. (2006). A new insertion-based construction heuristic for solving the pickup and
-    delivery problem with time windows. European Journal of Operational Research, 175(2), 672–687.
-    https://doi.org/10.1016/j.ejor.2005.05.012
-
-    :return: the updated input variables (sequences, sums, schedules, ...) as a dict
-    """
-
-    # [1] INSERT
-    routing_sequence.insert(insertion_index, insertion_vertex)
-
-    pos = insertion_index
-    i = routing_sequence[pos - 1]
-    j = insertion_vertex
-    k = routing_sequence[pos + 1]
-
-    # calculate arrival, start of service and wait for j
-    arrival_schedule.insert(pos,
-                            service_schedule[pos - 1] + service_duration[i] + ut.travel_time(distance_matrix[i][j]))
-    service_schedule.insert(pos, max(tw_open[j], arrival_schedule[pos]))
-    wait_sequence.insert(pos, max(dt.timedelta(0), tw_open[j] - arrival_schedule[pos]))
-    max_shift_sequence.insert(pos, dt.timedelta(0))  # will be updated further down
-
-    # [2] UPDATE
-
-    # dist_shift: total distance consumption of inserting j in between i and k
-    dist_shift_j = distance_matrix[i][j] + distance_matrix[j][k] - distance_matrix[i][k]
-
-    # time_shift: total time consumption of inserting j in between i and k
-    time_shift_j = ut.travel_time(dist_shift_j) + wait_sequence[pos] + service_duration[j]
-
-    # update totals
-    sum_travel_distance += dist_shift_j
-    sum_travel_duration += ut.travel_time(dist_shift_j)
-    sum_load += vertex_load[j]
-    sum_revenue += revenue[j]
-    sum_profit += revenue[j] - dist_shift_j
-
-    # update arrival at k
-    arrival_schedule[pos + 1] = arrival_schedule[pos + 1] + time_shift_j
-
-    # time_shift_k: how much of j's time shift is still available after waiting at k
-    time_shift_k = max(dt.timedelta(0), time_shift_j - wait_sequence[pos + 1])
-
-    # update waiting time at k
-    wait_sequence[pos + 1] = max(dt.timedelta(0), wait_sequence[pos + 1] - time_shift_j)
-
-    # update start of service at k
-    service_schedule[pos + 1] = service_schedule[pos + 1] + time_shift_k
-
-    # update max shift of k
-    max_shift_sequence[pos + 1] = max_shift_sequence[pos + 1] - time_shift_k
-
-    pos += 1
-
-    # update arrival, service, wait, max_shift and shift for all visits after j until shift == 0 or the end is reached
-    while time_shift_k > dt.timedelta(0) and pos + 1 < len(routing_sequence):
-        time_shift_j = time_shift_k
-
-        arrival_schedule[pos + 1] = arrival_schedule[pos + 1] + time_shift_j
-        time_shift_k = max(dt.timedelta(0), time_shift_j - wait_sequence[pos + 1])
-        wait_sequence[pos + 1] = max(dt.timedelta(0), wait_sequence[pos + 1] - time_shift_j)
-        service_schedule[pos + 1] = service_schedule[pos + 1] + time_shift_k
-        max_shift_sequence[pos + 1] = max_shift_sequence[pos + 1] - time_shift_k
-        pos += 1
-
-    # update max_shift for visit j and visits PRECEDING the inserted vertex j
-    for pos in range(insertion_index, -1, -1):
-        i = routing_sequence[pos]
-        max_shift_sequence[pos] = min(tw_close[i] - service_schedule[pos],
-                                      wait_sequence[pos + 1] + max_shift_sequence[pos + 1])
-
-        # if for vertex i, the max_shift does not change the insertion has no impact on a visit before i
-        # if max_shift_sequence[pos] == old_max_shift:
-        #     break
-
-    # return the updated sums, sequences and schedules
-    return dict(
-        routing_sequence=routing_sequence,
-        sum_travel_distance=sum_travel_distance,
-        sum_travel_duration=sum_travel_duration,
-        arrival_schedule=arrival_schedule,
-        service_schedule=service_schedule,
-        sum_load=sum_load,
-        sum_revenue=sum_revenue,
-        sum_profit=sum_profit,
-        wait_sequence=wait_sequence,
-        max_shift_sequence=max_shift_sequence,
-    )
-
-
-def multi_insert_and_update(routing_sequence: List[int],
-                            sum_travel_distance: float,
-                            sum_travel_duration: dt.timedelta,
-                            arrival_schedule: List[dt.datetime],
-                            service_schedule: List[dt.datetime],
-                            sum_load: float,
-                            sum_revenue: float,
-                            sum_profit: float,
-                            wait_sequence: List[dt.timedelta],
-                            max_shift_sequence: List[dt.timedelta],
-                            distance_matrix: Sequence[Sequence[float]],
-                            vertex_load: Sequence[float],
-                            revenue: Sequence[float],
-                            service_duration: Sequence[dt.timedelta],
-                            tw_open: Sequence[dt.datetime],
-                            tw_close: Sequence[dt.datetime],
-                            insertion_indices: Sequence[int],
-                            insertion_vertices: Sequence[int]
-                            ):
-    """
-    insert multiple vertices in multiple positions. route is updated after each insertion!
-
-    """
-
-    for index, vertex in zip(insertion_indices, insertion_vertices):
-        updated_sums = single_insert_and_update(routing_sequence=routing_sequence,
-                                                sum_travel_distance=sum_travel_distance,
-                                                sum_travel_duration=sum_travel_duration,
-                                                arrival_schedule=arrival_schedule,
-                                                service_schedule=service_schedule,
-                                                sum_load=sum_load,
-                                                sum_revenue=sum_revenue,
-                                                sum_profit=sum_profit,
-                                                wait_sequence=wait_sequence,
-                                                max_shift_sequence=max_shift_sequence,
-                                                distance_matrix=distance_matrix,
-                                                vertex_load=vertex_load,
-                                                revenue=revenue,
-                                                service_duration=service_duration,
-                                                tw_open=tw_open,
-                                                tw_close=tw_close,
-                                                insertion_index=index,
-                                                insertion_vertex=vertex
-                                                )
-
-        # the sums are fundamentals/primitives and must be updated manually
-        sum_travel_distance = updated_sums['sum_travel_distance']
-        sum_travel_duration = updated_sums['sum_travel_duration']
-        sum_load = updated_sums['sum_load']
-        sum_revenue = updated_sums['sum_revenue']
-        sum_profit = updated_sums['sum_profit']
-
-    return updated_sums
-
-
-def single_pop_and_update(routing_sequence: List[int],
-                          sum_travel_distance: float,
-                          sum_travel_duration: dt.timedelta,
-                          arrival_schedule: List[dt.datetime],
-                          service_schedule: List[dt.datetime],
-                          sum_load: float,
-                          sum_revenue: float,
-                          sum_profit: float,
-                          wait_sequence: List[dt.timedelta],
-                          max_shift_sequence: List[dt.timedelta],
-                          distance_matrix: Sequence[Sequence[float]],
-                          vertex_load: Sequence[float],
-                          revenue: Sequence[float],
-                          service_duration: Sequence[dt.timedelta],
-                          tw_open: Sequence[dt.datetime],
-                          tw_close: Sequence[dt.datetime],
-                          pop_pos: int):
-    """
-    Following
-    [1] Vansteenwegen,P., Souffriau,W., Vanden Berghe,G., & van Oudheusden,D. (2009). Iterated local search for the team
-    orienteering problem with time windows. Computers & Operations Research, 36(12), 3281–3290.
-    https://doi.org/10.1016/j.cor.2009.03.008
-    [2] Lu,Q., & Dessouky,M.M. (2006). A new insertion-based construction heuristic for solving the pickup and
-    delivery problem with time windows. European Journal of Operational Research, 175(2), 672–687.
-    https://doi.org/10.1016/j.ejor.2005.05.012
-
-    :return: the popped vertex j at index pop_pos of the routing_sequence, as well as a dictionary of updated sums
-    """
-
-    # [1] POP
-    popped = routing_sequence.pop(pop_pos)
-
-    pos = pop_pos
-    i = routing_sequence[pos - 1]
-    j = popped
-    k = routing_sequence[pos]  # k has taken the place of j after j has been removed
-
-    arrival_schedule.pop(pop_pos)
-    service_schedule.pop(pop_pos)
-    wait_j = wait_sequence.pop(pop_pos)
-    max_shift_sequence.pop(pop_pos)
-
-    # [2] UPDATE
-
-    # dist_shift: total distance reduction of removing j from in between i and k
-    dist_shift_j = -distance_matrix[i][j] - distance_matrix[j][k] + distance_matrix[i][k]  # negative value!
-
-    # time_shift: total time reduction of removing j from in between i and k
-    time_shift_j = ut.travel_time(dist_shift_j) - wait_j - service_duration[j]  # negative value!
-
-    # update totals
-    sum_travel_distance += dist_shift_j  # += since dist_shift_j will be negative
-    sum_travel_duration += ut.travel_time(dist_shift_j)  # += since time_shift_j will be negative
-    sum_load -= vertex_load[j]
-    sum_revenue -= revenue[j]
-    sum_profit = sum_profit - revenue[j] - dist_shift_j
-
-    # update the arrival at k
-    arrival_schedule[pos] = arrival_schedule[pos] + time_shift_j
-
-    # update waiting time at k (more complicated than in insert) - can only increase
-    wait_sequence[pos] = max(dt.timedelta(0), tw_open[k] - arrival_schedule[pos])
-
-    # time_shift_k: how much of j's time shift is still available after waiting at k
-    # of the time gained by removal of j, how much is still available after k?
-    time_shift_k = min(dt.timedelta(0), time_shift_j + wait_sequence[pos])
-
-    # update start of service at k
-    service_schedule[pos] = max(tw_open[k], arrival_schedule[pos])
-
-    # update max shift of k
-    max_shift_sequence[pos] = max_shift_sequence[pos] - time_shift_k
-
-    pos += 1
-
-    # update arrival, service, wait, max_shift and shift for all visits after j until shift == 0
-    while time_shift_k < dt.timedelta(0) and pos < len(routing_sequence):
-        time_shift_j = time_shift_k
-        k = routing_sequence[pos]
-
-        arrival_schedule[pos] = arrival_schedule[pos] + time_shift_j
-        wait_sequence[pos] = max(dt.timedelta(0), tw_open[k] - arrival_schedule[pos])
-        time_shift_k = min(dt.timedelta(0), time_shift_j + wait_sequence[pos])
-        service_schedule[pos] = max(tw_open[k], arrival_schedule[pos])
-        max_shift_sequence[pos] = max_shift_sequence[pos] - time_shift_k
-        pos += 1
-
-    # update max_shift for visits PRECEDING the removed vertex j
-    for pos in range(pop_pos - 1, -1, -1):
-        i = routing_sequence[pos]
-        max_shift_sequence[pos] = min(tw_close[i] - service_schedule[pos],
-                                      wait_sequence[pos + 1] + max_shift_sequence[pos + 1])
-
-        # if for vertex i, the max_shift does not change the insertion has no impact on a visit before i
-        # if max_shift_sequence[pos] == old_max_shift:
-        #     break
-
-    return j, dict(
-        routing_sequence=routing_sequence,
-        sum_travel_distance=sum_travel_distance,
-        sum_travel_duration=sum_travel_duration,
-        arrival_schedule=arrival_schedule,
-        service_schedule=service_schedule,
-        sum_load=sum_load,
-        sum_revenue=sum_revenue,
-        sum_profit=sum_profit,
-        wait_sequence=wait_sequence,
-        max_shift_sequence=max_shift_sequence,
-    )
-
-
-def multi_pop_and_update(routing_sequence: List[int],
-                         sum_travel_distance: float,
-                         sum_travel_duration: dt.timedelta,
-                         arrival_schedule: List[dt.datetime],
-                         service_schedule: List[dt.datetime],
-                         sum_load: float,
-                         sum_revenue: float,
-                         sum_profit: float,
-                         wait_sequence: List[dt.timedelta],
-                         max_shift_sequence: List[dt.timedelta],
-                         distance_matrix: Sequence[Sequence[float]],
-                         vertex_load: Sequence[float],
-                         revenue: Sequence[float],
-                         service_duration: Sequence[dt.timedelta],
-                         tw_open: Sequence[dt.datetime],
-                         tw_close: Sequence[dt.datetime],
-                         pop_indices: Sequence[int]):
-    """
-
-    :return: a list of popped vertices as well as a dictionary of updated sums
-    """
-
-    # assure that indices are sorted
-    assert all(pop_indices[i] <= pop_indices[i + 1] for i in range(len(pop_indices) - 1))
-
-    popped = []
-
-    # traverse the indices backwards to ensure that the succeeding indices are still correct once preceding ones
-    # have been removed
-    for pop_index in reversed(pop_indices):
-        j, updated_sums = single_pop_and_update(routing_sequence=routing_sequence,
-                                                sum_travel_distance=sum_travel_distance,
-                                                sum_travel_duration=sum_travel_duration,
-                                                arrival_schedule=arrival_schedule,
-                                                service_schedule=service_schedule,
-                                                sum_load=sum_load,
-                                                sum_revenue=sum_revenue,
-                                                sum_profit=sum_profit,
-                                                wait_sequence=wait_sequence,
-                                                max_shift_sequence=max_shift_sequence,
-                                                distance_matrix=distance_matrix,
-                                                vertex_load=vertex_load,
-                                                revenue=revenue,
-                                                service_duration=service_duration,
-                                                tw_open=tw_open,
-                                                tw_close=tw_close,
-                                                pop_pos=pop_index)
-        popped.append(j)
-        sum_travel_distance = updated_sums['sum_travel_distance']
-        sum_travel_duration = updated_sums['sum_travel_duration']
-        sum_load = updated_sums['sum_load']
-        sum_revenue = updated_sums['sum_revenue']
-        sum_profit = updated_sums['sum_profit']
-
-    # reverse the popped array again to return things in the expected order
-    return list(reversed(popped)), updated_sums
-
-
-def single_insert_max_shift_delta(routing_sequence: List[int],
-                                  arrival_schedule: List[dt.datetime],
-                                  wait_sequence: List[dt.timedelta],
-                                  max_shift_sequence: List[dt.timedelta],
-                                  distance_matrix: Sequence[Sequence[float]],
-                                  service_duration: Sequence[dt.timedelta],
-                                  tw_open: Sequence[dt.datetime],
-                                  tw_close: Sequence[dt.datetime],
-                                  insertion_index: int,
-                                  insertion_vertex: int,
-                                  **kwargs
-                                  ):
-    """returns the change in max_shift time that would be observed if insertion_vertex was placed before
-    insertion_index """
-
-    # [1] compute wait_j and max_shift_j
-    predecessor = routing_sequence[insertion_index - 1]
-    successor = routing_sequence[insertion_index]
-    arrival_j = max(arrival_schedule[insertion_index - 1], tw_open[predecessor]) + service_duration[
-        predecessor] + ut.travel_time(distance_matrix[predecessor][insertion_vertex])
-    wait_j = max(dt.timedelta(0), tw_open[insertion_vertex] - arrival_j)
-    delta_ = ut.travel_time(distance_matrix[predecessor][insertion_vertex]) + \
-             ut.travel_time(distance_matrix[insertion_vertex][successor]) - \
-             ut.travel_time(distance_matrix[predecessor][successor]) + \
-             service_duration[insertion_vertex] + \
-             wait_j
-    max_shift_j = min(tw_close[insertion_vertex] - max(arrival_j, tw_open[insertion_vertex]),
-                      wait_sequence[insertion_index] + max_shift_sequence[insertion_index] - delta_)
-
-    # [2] algorithm 4.2 for max_shift delta of PRECEDING visits:
-    # Lu,Q., & Dessouky,M.M. (2006). A new insertion-based construction heuristic for solving
-    # the pickup and delivery problem with time windows. European Journal of Operational Research, 175(2),
-    # 672–687. https://doi.org/10.1016/j.ejor.2005.05.012
-
-    beta = wait_j + max_shift_j
-    predecessors_max_shift_delta = dt.timedelta(0)
-    k = insertion_index - 1
-
-    while True:
-        if beta >= max_shift_sequence[k] or k == 0:
-            break
-
-        if k == insertion_index - 1:
-            predecessors_max_shift_delta = max_shift_sequence[k] - beta
-
-        elif wait_sequence[k + 1] > dt.timedelta(0):
-            predecessors_max_shift_delta += min(max_shift_sequence[k] - beta, wait_sequence[k + 1])
-
-        beta += wait_sequence[k]
-        k -= 1
-
-    # [3] delta in max_shift of insertion_vertex itself
-    vertex_max_shift_delta = tw_close[insertion_vertex] - max(arrival_j, tw_open[insertion_vertex]) - max_shift_j
-
-    # [4] delta in max_shift of succeeding vertices, which is exactly the travel time delta
-    successors_max_shift_delta = ut.travel_time(distance_matrix[predecessor][insertion_vertex] +
-                                                distance_matrix[insertion_vertex][successor] -
-                                                distance_matrix[predecessor][successor])
-
-    return predecessors_max_shift_delta + vertex_max_shift_delta + successors_max_shift_delta  # c1 + c2 + c3
-
-
-def multi_insert_max_shift_delta(routing_sequence: Sequence[int],
-                                 sum_travel_distance: float,
-                                 sum_travel_duration: dt.timedelta,
-                                 arrival_schedule: Sequence[dt.datetime],
-                                 service_schedule: Sequence[dt.datetime],
-                                 sum_load: float,
-                                 sum_revenue: float,
-                                 sum_profit: float,
-                                 wait_sequence: Sequence[dt.timedelta],
-                                 max_shift_sequence: Sequence[dt.timedelta],
-                                 distance_matrix: Sequence[Sequence[float]],
-                                 vertex_load: Sequence[float],
-                                 revenue: Sequence[float],
-                                 service_duration: Sequence[dt.timedelta],
-                                 tw_open: Sequence[dt.datetime],
-                                 tw_close: Sequence[dt.datetime],
-                                 insertion_indices: Sequence[int],
-                                 insertion_vertices: Sequence[int]):
-    """returns the waiting time and max_shift time that would be assigned to insertion_vertices if they were inserted
-    before insertion_indices"""
-    input_dict = dict(
-        routing_sequence=list(routing_sequence[:]),  # copy!
-        sum_travel_distance=sum_travel_distance,
-        sum_travel_duration=sum_travel_duration,
-        arrival_schedule=list(arrival_schedule[:]),  # copy!
-        service_schedule=list(service_schedule[:]),  # copy!
-        sum_load=sum_load,
-        sum_revenue=sum_revenue,
-        sum_profit=sum_profit,
-        wait_sequence=list(wait_sequence[:]),  # copy!
-        max_shift_sequence=list(max_shift_sequence[:]),  # copy!
-        distance_matrix=distance_matrix,
-        vertex_load=vertex_load,
-        revenue=revenue,
-        service_duration=service_duration,
-        tw_open=tw_open,
-        tw_close=tw_close,
-        insertion_index=None,
-        insertion_vertex=None,
-    )
-
-    total_max_shift_delta = dt.timedelta(0)
-    for idx, (index, vertex) in enumerate(zip(insertion_indices, insertion_vertices)):
-        input_dict['insertion_index'] = index
-        input_dict['insertion_vertex'] = vertex
-        max_shift_delta = single_insert_max_shift_delta(**input_dict)
-        total_max_shift_delta += max_shift_delta
-
-        # if there are more vertices that must be considered, insert the current vertex at the current pos
-        if idx < len(insertion_indices) - 1:
-            updated = single_insert_and_update(**input_dict)
-            input_dict.update(updated)
-
-    return total_max_shift_delta
+        # [1] check max tour distance
+        # distance_shift_j = instance. FIXME
+        pass
