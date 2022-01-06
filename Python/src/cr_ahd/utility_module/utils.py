@@ -270,7 +270,7 @@ def validate_solution(instance, solution):
             assert tour.routing_sequence[-1] == carrier.id_, f'the end of tour {tour} from carrier {carrier} is not a depot'
 
             assert tour.sum_load == 0, instance.id_
-            assert tour.sum_travel_distance <= instance.vehicles_max_travel_distance, instance.id_
+            assert tour.sum_travel_distance <= instance.max_tour_distance, instance.id_
             assert round(tour.sum_profit, 4) == round(tour.sum_revenue - tour.sum_travel_distance, 4), \
                 f'{instance.id_}: {round(tour.sum_profit, 4)}!={round(tour.sum_revenue - tour.sum_travel_distance, 4)}'
 

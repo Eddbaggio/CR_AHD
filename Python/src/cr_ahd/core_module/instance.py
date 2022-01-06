@@ -1,18 +1,81 @@
 import datetime as dt
 import json
 import logging.config
-import pathlib
 from pathlib import Path
-from typing import Tuple, Sequence, List, Iterable, NoReturn
+from typing import Tuple, Sequence, List, NoReturn
 
 import numpy as np
 import pandas as pd
 from scipy.spatial.distance import pdist, squareform
 
-from tw_management_module import tw
 import utility_module.utils as ut
+from tw_management_module import tw
 
 logger = logging.getLogger(__name__)
+
+"""
+class Instance(ABC):
+    def __init__(self,
+                 id_: str,
+                 max_num_tours: int,
+                 max_vehicle_load: float,
+                 max_tour_distance: float,
+                 max_tour_duration: dt.timedelta,
+                 requests: List[int],
+                 requests_initial_carrier_assignment: List[int],
+                 requests_disclosure_time: List[dt.datetime],
+
+                 # requests_x: List[float],
+                 # requests_y: List[float],
+                 # requests_revenue: List[float],
+                 # requests_service_duration: List[dt.timedelta],
+                 # requests_load: List[float],
+                 # request_time_window_open: List[dt.datetime],
+                 # request_time_window_close: List[dt.datetime],
+
+                 carrier_depots_x: List[float],
+                 carrier_depots_y: List[float],
+                 carrier_depots_tw_open: List[dt.datetime],
+                 carrier_depots_tw_close: List[dt.datetime],
+                 duration_matrix,
+                 distance_matrix,
+                 ):
+        self._id_ = id_
+        self.meta = self._meta()
+        self.num_carriers = len(carrier_depots_x)
+        self.max_vehicle_load = max_vehicle_load
+        self.max_tour_distance = max_tour_distance
+        self.max_tour_duration = max_tour_duration
+        self.max_num_tours = max_num_tours
+        self.requests = requests
+        self.num_requests = len(self.requests)
+        assert self.num_requests % self.num_carriers == 0
+        self.num_requests_per_carrier = self.num_requests // self.num_carriers
+
+
+
+        self.sanity_check()
+
+    @abstractmethod
+    def _meta(self):
+        pass
+
+    @abstractmethod
+    def sanity_check(self):
+        pass
+
+    @abstractmethod
+    def calc_duration_matrix(self):
+        pass
+
+    @abstractmethod
+    def calc_distance_matrix(self):
+        pass
+
+    @property
+    def id_(self):
+        return self._id_
+"""
 
 
 class MDVRPTWInstance:
@@ -77,8 +140,8 @@ class MDVRPTWInstance:
         self.meta = dict(
             (k.strip(), v if k == 't' else int(v.strip())) for k, v in (item.split('=') for item in id_.split('+')))
         self.num_carriers = len(carrier_depots_x)
-        self.vehicles_max_load = max_vehicle_load
-        self.vehicles_max_travel_distance = max_tour_length
+        self.max_vehicle_load = max_vehicle_load
+        self.max_tour_distance = max_tour_length
         self.max_tour_duration = max_tour_duration
         self.carriers_max_num_tours = carriers_max_num_tours
         self.requests = requests
@@ -97,8 +160,8 @@ class MDVRPTWInstance:
         self.tw_close = [*carrier_depots_tw_close, *request_time_window_close]
 
         # need to ceil the durations due to floating point precision!
-        self._travel_duration_matrix = duration_matrix
-        self._distance_matrix = distance_matrix
+        self._travel_duration_matrix = np.array(duration_matrix)
+        self._distance_matrix = np.array(distance_matrix)
 
         logger.debug(f'{id_}: created')
 
@@ -128,10 +191,15 @@ class MDVRPTWInstance:
         ...)
 
         """
-        d = 0
+        d = dt.timedelta(0)
         for ii, jj in zip(i, j):
             d += self._travel_duration_matrix[ii, jj]
         return d
+
+    def vertex_from_request(self, request: int) -> int:
+        if request >= self.num_requests:
+            raise IndexError
+        return self.num_carriers + request
 
     def coords(self, vertex: int):
         """returns a tuple of (x, y) coordinates for the vertex"""
@@ -148,8 +216,8 @@ class MDVRPTWInstance:
     def write(self, path: Path, delim=','):
         lines = [f'# VRP parameters: V = num of vehicles, L = max_load, T = max_tour_length']
         lines.extend([f'V{delim}{self.carriers_max_num_tours}',
-                      f'L{delim}{self.vehicles_max_load}',
-                      f'T{delim}{self.vehicles_max_travel_distance}\n'])
+                      f'L{delim}{self.max_vehicle_load}',
+                      f'T{delim}{self.max_tour_distance}\n'])
         lines.extend(['# carrier depots: C x y',
                       '# one line per carrier, number of carriers defined by number of lines'])
         lines.extend([f'C{delim}{x}{delim}{y}'
@@ -182,6 +250,7 @@ class MDPDPTWInstance:
                  max_num_tours_per_carrier: int,
                  max_vehicle_load: float,
                  max_tour_length: float,
+                 max_tour_duration: dt.timedelta,
                  requests: List[int],
                  requests_initial_carrier_assignment: List[int],
                  requests_disclosure_time: List[dt.datetime],
@@ -205,6 +274,7 @@ class MDPDPTWInstance:
         """
         Create an instance for the collaborative transportation network for attended home delivery
 
+        :param max_tour_duration:
         :param id_: unique identifier
         """
         # sanity checks:
@@ -220,6 +290,7 @@ class MDPDPTWInstance:
         self.num_carriers = len(carrier_depots_x)
         self.vehicles_max_load = max_vehicle_load
         self.vehicles_max_travel_distance = max_tour_length
+        self.max_tour_duration = max_tour_duration
         self.carriers_max_num_tours = max_num_tours_per_carrier
         self.requests = requests
         self.num_requests = len(self.requests)
@@ -344,10 +415,10 @@ def read_gansterer_hartl_mv(path: Path, num_carriers=3) -> MDPDPTWInstance:
                               num=len(requests[requests.carrier_index == carrier_id]),
                               endpoint=False))
 
-    return MDPDPTWInstance(id_=path.stem,
-                           max_num_tours_per_carrier=vrp_params['V'].tolist(),
+    return MDPDPTWInstance(id_=path.stem, max_num_tours_per_carrier=vrp_params['V'].tolist(),
                            max_vehicle_load=(vrp_params['L'] * ut.LOAD_CAPACITY_SCALING).tolist(),
-                           max_tour_length=vrp_params['T'].tolist(), requests=requests.index.tolist(),
+                           max_tour_length=vrp_params['T'].tolist(), max_tour_duration=None,
+                           requests=requests.index.tolist(),
                            requests_initial_carrier_assignment=requests['carrier_index'].tolist(),
                            requests_disclosure_time=requests['disclosure_time'].tolist(),
                            requests_pickup_x=(requests['pickup_x'] * ut.DISTANCE_SCALING).tolist(),
@@ -386,8 +457,8 @@ def read_vienna_instance(path: Path) -> MDVRPTWInstance:
 
         return MDVRPTWInstance(id_=inst['_id_'],
                                carriers_max_num_tours=inst['carriers_max_num_tours'],
-                               max_vehicle_load=inst['vehicles_max_load'],
-                               max_tour_length=inst['vehicles_max_travel_distance'],
+                               max_vehicle_load=inst['max_vehicle_load'],
+                               max_tour_length=inst['max_tour_distance'],
                                max_tour_duration=inst['max_tour_duration'],
                                requests=inst['requests'],
                                requests_initial_carrier_assignment=inst['request_to_carrier_assignment'],

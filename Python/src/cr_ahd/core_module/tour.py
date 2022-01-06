@@ -1,9 +1,9 @@
 import datetime as dt
 import logging.config
+import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import List, Sequence, Set, Dict
-
 import utility_module.utils as ut
 
 logger = logging.getLogger(__name__)
@@ -13,8 +13,9 @@ class Tour(ABC):
     def __init__(self, id_: int, depot_index: int):
         """
 
-        :param id_: unique tour identifier
-        :param depot_index: may be different to the id! id's can exist twice temporarily if a carrier is copied!
+        :param id_: unique tour identifier. (id's can exist twice temporarily if a carrier is copied!)
+        :param depot_index: Is often the id of the carrier to which the tour belongs, therefore it may be different to
+         the id.
         """
         if isinstance(id_, int):
             logger.debug(f'Initializing tour {id_}')
@@ -591,7 +592,6 @@ class Tour(ABC):
 
 
 class PDPTWTour(Tour):
-    @abstractmethod
     def _single_insertion_feasibility_check(self, instance, insertion_index: int, insertion_vertex: int):
         """
         Checks whether the insertion of the insertion_vertex at insertion_pos is feasible.
@@ -624,7 +624,7 @@ class PDPTWTour(Tour):
 
         # [2] check max tour distance
         distance_shift_j = instance.distance([i, j], [j, k]) - instance.distance([i], [k])
-        if self.sum_travel_distance + distance_shift_j > instance.vehicles_max_travel_distance:
+        if self.sum_travel_distance + distance_shift_j > instance.max_tour_distance:
             return False
 
         # [3] check time windows (NEW: in constant time!)
@@ -648,19 +648,49 @@ class PDPTWTour(Tour):
         if not tw_cond1 or not tw_cond2:
             return False
 
-        # [4] check max vehicle load FIXME this is incorrect because it does not consider that load can increase and decrease during the tour!
-        if self.sum_load + instance.vertex_load[j] > instance.vehicles_max_load:
+        # [4] check max vehicle load (load can increase and decrease in PDP)
+        # TODO load sequence has not been implemented!
+        if self.load_sequence[insertion_index] + instance.vertex_load[j] > instance.max_vehicle_load:
             return False
 
         return True
 
 
 class VRPTWTour(Tour):
-    def _single_insertion_feasibility_check(self, instance, insertion_index: int, insertion_vertex: int):
-        i = self.routing_sequence[insertion_index -1]
+    def _single_insertion_feasibility_check(self, instance, insertion_index: int,
+                                            insertion_vertex: int):
+        i = self.routing_sequence[insertion_index - 1]
         j = insertion_vertex
         k = self.routing_sequence[insertion_index]
 
         # [1] check max tour distance
-        # distance_shift_j = instance. FIXME
-        pass
+        distance_shift_j = instance.distance([i, j], [j, k]) - instance.distance([i], [k])
+        if self.sum_travel_distance + distance_shift_j > instance.max_tour_distance:
+            return False
+
+        # [2] check time windows
+        # tw condition 1: start of service of j must fit the time window of j
+        arrival_time_j = self.service_time_sequence[insertion_index - 1] + \
+                         instance.vertex_service_duration[i] + \
+                         instance.travel_duration([i], [j])
+        tw_cond1 = arrival_time_j <= instance.tw_close[j]
+
+        # tw condition 2: time_shift_j must be limited to the sum of wait_k + max_shift_k
+        wait_j = max(dt.timedelta(0), instance.tw_open[j] - arrival_time_j)
+        time_shift_j = instance.travel_duration([i], [j]) + \
+                       wait_j + \
+                       instance.vertex_service_duration[j] + \
+                       instance.travel_duration([j], [k]) - \
+                       instance.travel_duration([i], [k])
+        wait_k = self.wait_duration_sequence[insertion_index]
+        max_shift_k = self.max_shift_sequence[insertion_index]
+        tw_cond2 = time_shift_j <= wait_k + max_shift_k
+
+        if not tw_cond1 or not tw_cond2:
+            return False
+
+        # [3] check max vehicle load
+        warnings.warn('check whether *vertex* load and *request* load are handled properly in the Instance class!')
+        if self.sum_load + instance.vertex_load[j] > instance.max_vehicle_load:
+            return False
+        return True

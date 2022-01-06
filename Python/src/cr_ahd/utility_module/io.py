@@ -7,7 +7,6 @@ from typing import List, Dict
 
 import numpy as np
 import pandas as pd
-from core_module import solution as slt
 from utility_module import utils as ut
 
 working_dir = Path().cwd()
@@ -41,7 +40,7 @@ class MyJSONEncoder(json.JSONEncoder):
 #         self.summaries = solutions
 
 
-def solutions_to_df(solutions: List[slt.CAHDSolution], agg_level: str):
+def solutions_to_df(solutions, agg_level: str):
     """
     :param solutions: A List of solutions.
     :param agg_level: defines up to which level the solution will be summarized. E.g. if agg_level='carrier' the

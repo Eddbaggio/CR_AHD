@@ -29,7 +29,7 @@ class CAHDSolution:
         # solver configuration and other meta data
         self.solver_config = dict()
         self.timings = dict()
-        # TODO find a better way to add available ls neighborhoods automatically
+        # TODO find a better way to add available ls neighborhoods automatically REMOVEME I have never used this
         self.local_search_move_counter = dict(PDPMove=0,
                                               PDPTwoOpt=0,
                                               PDPRelocate=0,

@@ -258,9 +258,15 @@ if __name__ == '__main__':
 
     addresses = read_vienna_addresses(io.input_dir.joinpath(f'vienna_{m}_addresses_#{n:03d}.csv'))
     for _ in tqdm(range(3)):
-        instance = generate_vienna_cr_ahd_instance(vienna_addresses=addresses, vienna_distances=distances,
-                                                   vienna_durations=durations, num_carriers=3, carrier_competition=0.3,
-                                                   num_requests_per_carrier=10, plot=False)
+        instance = generate_vienna_cr_ahd_instance(vienna_addresses=addresses,
+                                                   vienna_distances=distances,
+                                                   vienna_durations=durations,
+                                                   num_carriers=3,
+                                                   carrier_competition=0.3,
+                                                   num_requests_per_carrier=10,
+                                                   max_tour_length=1_000_000,  # in meters
+                                                   plot=False
+                                                   )
         instance.write(io.input_dir.joinpath(instance.id_ + '.dat'))
         with open(io.input_dir.joinpath(instance.id_ + '.json'), "w") as file:
             json.dump(instance.__dict__, file, cls=io.MyJSONEncoder, indent=4)
