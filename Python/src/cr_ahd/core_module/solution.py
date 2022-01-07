@@ -11,7 +11,7 @@ from utility_module import utils as ut
 
 class CAHDSolution:
     # default, empty solution
-    def __init__(self, instance: it.MDPDPTWInstance):
+    def __init__(self, instance: it.MDVRPTWInstance):
         self.id_: str = instance.id_
         self.meta: Dict[str, int] = instance.meta
 
@@ -122,7 +122,7 @@ class CAHDSolution:
             self.carriers[c].assigned_requests.append(r)
             self.carriers[c].unrouted_requests.append(r)
 
-    def free_requests_from_carriers(self, instance: it.MDPDPTWInstance, requests: Sequence[int]):
+    def free_requests_from_carriers(self, instance: it.MDVRPTWInstance, requests: Sequence[int]):
         """
         removes the given requests from their route and sets them to be unassigned and not accepted (not_accepted !=
         rejected)
@@ -135,7 +135,8 @@ class CAHDSolution:
         for request in requests:
             carrier: AHDSolution = self.carriers[self.request_to_carrier_assignment[request]]
             tour = self.tour_of_request(request)
-            tour.pop_and_update(instance, [tour.vertex_pos[v] for v in instance.pickup_delivery_pair(request)])
+            delivery_pos = tour.vertex_pos[instance.vertex_from_request(request)]
+            tour.pop_and_update(instance, [delivery_pos])
             tour.requests.remove(request)
 
             # retract the request from the carrier

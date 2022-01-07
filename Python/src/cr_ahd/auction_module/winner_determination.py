@@ -1,10 +1,9 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import List, Tuple, Sequence
+from typing import Sequence
 
-import numpy as np
 import gurobipy as gp
-import pandas as pd
+import numpy as np
 from gurobipy import GRB
 
 import utility_module.io
@@ -19,7 +18,7 @@ class WinnerDeterminationBehavior(ABC):
         self.name = self.__class__.__name__
 
     def execute(self,
-                instance: it.MDPDPTWInstance,
+                instance: it.MDVRPTWInstance,
                 solution: slt.CAHDSolution,
                 auction_pool,
                 bundles: Sequence,
@@ -46,7 +45,7 @@ class WinnerDeterminationBehavior(ABC):
 
     @abstractmethod
     def _determine_winners(self,
-                           instance: it.MDPDPTWInstance,
+                           instance: it.MDVRPTWInstance,
                            solution: slt.CAHDSolution,
                            auction_pool: Sequence[int],
                            bundles: Sequence[Sequence[int]],
@@ -74,7 +73,7 @@ class MaxBidGurobiCAP1(WinnerDeterminationBehavior):
     """
 
     def _determine_winners(self,
-                           instance: it.MDPDPTWInstance,
+                           instance: it.MDVRPTWInstance,
                            solution: slt.CAHDSolution,
                            auction_pool: Sequence[int],
                            bundles: Sequence[Sequence[int]],
@@ -149,7 +148,7 @@ class MaxBidGurobiCAP2(WinnerDeterminationBehavior):
     """
 
     def _determine_winners(self,
-                           instance: it.MDPDPTWInstance,
+                           instance: it.MDVRPTWInstance,
                            solution: slt.CAHDSolution,
                            auction_pool: Sequence[int],
                            bundles: Sequence[Sequence[int]],

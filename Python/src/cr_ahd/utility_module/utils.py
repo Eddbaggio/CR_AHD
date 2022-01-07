@@ -1,9 +1,9 @@
-import sys
 import datetime as dt
 import itertools
 import math
 import random
 import re
+import sys
 from collections import namedtuple
 from typing import List, Sequence, Tuple
 
@@ -263,16 +263,14 @@ def validate_solution(instance, solution):
 
     for carrier_id in trange(len(solution.carriers), desc=f'Solution validation', disable=True):
         carrier = solution.carriers[carrier_id]
-        assert len(carrier.unrouted_requests) == 0, f'Carrier {carrier} has unrouted requests: {carrier.unrouted_requests}'
+        assert len(
+            carrier.unrouted_requests) == 0, f'Carrier {carrier} has unrouted requests: {carrier.unrouted_requests}'
         for tour in carrier.tours:
             assert tour is solution.tours[tour.id_]
-            assert tour.routing_sequence[0] == carrier.id_, f'the start of tour {tour} from carrier {carrier} is not a depot'
-            assert tour.routing_sequence[-1] == carrier.id_, f'the end of tour {tour} from carrier {carrier} is not a depot'
-
-            assert tour.sum_load == 0, instance.id_
-            assert tour.sum_travel_distance <= instance.max_tour_distance, instance.id_
-            assert round(tour.sum_profit, 4) == round(tour.sum_revenue - tour.sum_travel_distance, 4), \
-                f'{instance.id_}: {round(tour.sum_profit, 4)}!={round(tour.sum_revenue - tour.sum_travel_distance, 4)}'
+            assert tour.routing_sequence[0] == carrier.id_, \
+                f'the start of tour {tour} from carrier {carrier} is not a depot'
+            assert tour.routing_sequence[-1] == carrier.id_, \
+                f'the end of tour {tour} from carrier {carrier} is not a depot'
 
             validate_tour(instance, tour)
 
@@ -285,6 +283,12 @@ def validate_solution(instance, solution):
 
 # TODO can this not be a method of the solution itself? (circular dependencies tour - instance?)
 def validate_tour(instance, tour):
+    assert tour.sum_load == sum([instance.vertex_revenue[v] for v in tour.routing_sequence]), instance.id_
+    assert tour.sum_travel_distance <= instance.max_tour_distance, instance.id_
+    assert tour.sum_travel_duration <= instance.max_tour_duration, instance.id_
+    assert round(tour.sum_profit, 4) == round(tour.sum_revenue - tour.sum_travel_distance, 4), \
+        f'{instance.id_}: {round(tour.sum_profit, 4)}!={round(tour.sum_revenue - tour.sum_travel_distance, 4)}'
+
     # iterate over the tour
     for i in trange(1, len(tour.routing_sequence), desc=f'Tour {tour.id_}', disable=True):
         predecessor = tour.routing_sequence[i - 1]
@@ -315,6 +319,7 @@ def validate_tour(instance, tour):
         assert instance.tw_open[vertex] <= tour.service_time_sequence[i] <= instance.tw_close[vertex], \
             msg
 
+        '''
         # precedence constraint
         if instance.vertex_type(vertex) == 'pickup':
             assert vertex + instance.num_requests in tour.routing_sequence[i:], msg
@@ -322,6 +327,7 @@ def validate_tour(instance, tour):
             assert vertex - instance.num_requests in tour.routing_sequence[:i], msg
         else:
             assert vertex in range(instance.num_carriers), msg
+        '''
 
         # meta data
         if instance.vertex_type(vertex) != 'depot':
@@ -353,6 +359,5 @@ ALL_TW = [TimeWindow(e, min(e + TW_LENGTH, END_TIME)) for e in
           datetime_range(EXECUTION_START_TIME, END_TIME, step=TW_LENGTH, endpoint=False)]
 EXECUTION_TIME_HORIZON = TimeWindow(EXECUTION_START_TIME, END_TIME)
 SPEED_KMH = 30  # vehicle speed (set to 60 to treat distance = time)
-
 
 PENDULUM_PENALTY_DISTANCE_SCALING = 1.25

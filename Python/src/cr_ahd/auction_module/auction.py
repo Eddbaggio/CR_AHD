@@ -1,11 +1,8 @@
 import logging
-import warnings
-from abc import ABC
 from copy import deepcopy
 from typing import List
-from gurobipy import GRB
 
-import pandas as pd
+from gurobipy import GRB
 
 from auction_module import request_selection as rs, bundle_generation as bg, bidding as bd, \
     winner_determination as wd
@@ -18,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 class Auction:
     def __init__(self,
-                 tour_construction: cns.PDPParallelInsertionConstruction,
+                 tour_construction: cns.VRPTWInsertionConstruction,
                  tour_improvement: mh.PDPTWMetaHeuristic,
                  request_selection: rs.RequestSelectionBehavior,
                  bundle_generation: bg.LimitedBundlePoolGenerationBehavior,
@@ -49,7 +46,7 @@ class Auction:
         assert isinstance(self.bidding.tour_construction, type(self.tour_construction))
         assert isinstance(self.bidding.tour_improvement, type(self.tour_improvement))
 
-    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution):
+    def execute(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution):
         for auction_round in range(self.num_auction_rounds):
 
             # auction
@@ -115,7 +112,7 @@ class Auction:
         return solution
 
     def reallocate_requests(self,
-                            instance: it.MDPDPTWInstance,
+                            instance: it.MDVRPTWInstance,
                             solution: slt.CAHDSolution) -> (slt.CAHDSolution, List[int]):
         logger.debug(f'running auction {self.__class__.__name__}')
 
@@ -125,7 +122,7 @@ class Auction:
         timer = pr.Timer()
         auction_request_pool, original_bundling_labels = self.request_selection.execute(instance, solution)
 
-        # /// Part of the sequential-auctions problem :auction_request_pool = {list: 12} [2, 9, 10, 14, 18, 19, 25, 26, 35, 36, 42, 43]
+        # /// Part of the sequential-auctions problem :
         # post_rs_solution must be re-optimized to avoid inconsistencies when intermediate auctions are used
         # however, a re-optimization is not guaranteed to be feasible unless exact approach is used
         # solution = self.re_optimize(instance, solution)
@@ -185,7 +182,7 @@ class Auction:
 
         return status, solution, bundle_winners
 
-    def re_optimize(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_ids: List[int] = None):
+    def re_optimize(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier_ids: List[int] = None):
         """
         After requests have been reallocated, this function builds the new tours based on the new requests. It is
         important that this routing follows the same steps as the routing approach in the bidding phase to reliably
@@ -215,7 +212,7 @@ class Auction:
         return solution
 
     @staticmethod
-    def assign_bundles_to_winners(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+    def assign_bundles_to_winners(instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
                                   winner_bundles: List[List[int]],
                                   bundle_winners: List[int]):
         # assign the bundles to the corresponding winner

@@ -46,7 +46,7 @@ class SingleBundleGenerationBehavior(ABC):
         self.name = self.__class__.__name__
 
     @abstractmethod
-    def generate_bundling(self, instance: it.MDPDPTWInstance, auction_request_pool: Sequence[int]):
+    def generate_bundling(self, instance: it.MDVRPTWInstance, auction_request_pool: Sequence[int]):
         pass
 
 
@@ -57,8 +57,8 @@ class SingleKMeansBundling(SingleBundleGenerationBehavior):
     :return bundling_labels (not normalized) of the k-means partitioning
     """
 
-    def generate_bundling(self, instance: it.MDPDPTWInstance, auction_request_pool: Sequence[int]):
-        request_midpoints = [ut.midpoint(instance, *instance.pickup_delivery_pair(r)) for r in auction_request_pool]
+    def generate_bundling(self, instance: it.MDVRPTWInstance, auction_request_pool: Sequence[int]):
+        request_midpoints = [instance.coords(r) for r in auction_request_pool]
         # k_means = KMeans(n_clusters=instance.num_carriers, random_state=0).fit(request_midpoints)
         k_means = KMeans(n_clusters=instance.num_carriers).fit(request_midpoints)
         return k_means.labels_
@@ -72,7 +72,7 @@ class UnlimitedBundlePoolGenerationBehavior(ABC):
     def __init__(self):
         self.name = self.__class__.__name__
 
-    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+    def execute(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
                 auction_request_pool: Sequence[int],
                 original_bundling_labels: Sequence[int]):
         auction_bundle_pool = self._generate_auction_bundles(instance, solution, auction_request_pool,
@@ -80,7 +80,7 @@ class UnlimitedBundlePoolGenerationBehavior(ABC):
         return auction_bundle_pool
 
     @abstractmethod
-    def _generate_auction_bundles(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+    def _generate_auction_bundles(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
                                   auction_request_pool: Sequence[int],
                                   original_bundling_labels: Sequence[int]):
         pass
@@ -92,7 +92,7 @@ class AllBundles(UnlimitedBundlePoolGenerationBehavior):
     Does not include emtpy set.
     """
 
-    def _generate_auction_bundles(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+    def _generate_auction_bundles(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
                                   auction_request_pool: Sequence[int],
                                   original_bundling_labels: Sequence[int]):
         return tuple(ut.power_set(range(len(auction_request_pool)), False))
@@ -115,7 +115,7 @@ class LimitedBundlePoolGenerationBehavior(ABC):
         self.name = self.__class__.__name__
 
     def execute(self,
-                instance: it.MDPDPTWInstance,
+                instance: it.MDVRPTWInstance,
                 solution: slt.CAHDSolution,
                 auction_request_pool: Sequence[int],
                 original_bundling_labels: Sequence[int]):
@@ -125,12 +125,12 @@ class LimitedBundlePoolGenerationBehavior(ABC):
         return auction_bundle_pool
 
     @abstractmethod
-    def _generate_auction_bundles(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+    def _generate_auction_bundles(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
                                   auction_request_pool: Sequence[int],
                                   original_bundling_labels: Sequence[int]):
         pass
 
-    def preprocessing(self, instance: it.MDPDPTWInstance, auction_request_pool: Sequence[int]):
+    def preprocessing(self, instance: it.MDVRPTWInstance, auction_request_pool: Sequence[int]):
         self.bundling_valuation.preprocessing(instance, auction_request_pool)
         pass
 
@@ -142,7 +142,7 @@ class BestOfAllBundlings(LimitedBundlePoolGenerationBehavior):
     """
 
     def _generate_auction_bundles(self,
-                                  instance: it.MDPDPTWInstance,
+                                  instance: it.MDVRPTWInstance,
                                   solution: slt.CAHDSolution,
                                   auction_request_pool: Sequence[int],
                                   original_bundling_labels: Sequence[int]):
@@ -156,9 +156,9 @@ class BestOfAllBundlings(LimitedBundlePoolGenerationBehavior):
             bundling_valuations.append(self.bundling_valuation.evaluate_bundling(instance, solution, bundling))
 
         sorted_bundlings = (bundling for _, bundling in sorted(zip(bundling_valuations, all_bundlings), reverse=True))
-        limited_bundle_pool = [*bv.bundling_labels_to_bundling(original_bundling_labels, auction_request_pool)]
+        limited_bundle_pool = [*ut.indices_to_nested_lists(original_bundling_labels, auction_request_pool)]
         # todo loop significantly faster if the limited bundle pool was a set rather than a list! but the return of
-        #  bv.bundling_labels_to_bundling is unhashable List[List[int]]
+        #  ut.indices_to_nested_list is unhashable List[List[int]]
         while len(limited_bundle_pool) < self.num_auction_bundles:
             for bundle in next(sorted_bundlings):
                 if bundle not in limited_bundle_pool:
@@ -174,7 +174,7 @@ class RandomMaxKPartition(LimitedBundlePoolGenerationBehavior):
     """
 
     def _generate_auction_bundles(self,
-                                  instance: it.MDPDPTWInstance,
+                                  instance: it.MDVRPTWInstance,
                                   solution: slt.CAHDSolution,
                                   auction_request_pool: Sequence[int],
                                   original_bundling_labels: Sequence[int]):
@@ -190,7 +190,7 @@ class RandomMaxKPartition(LimitedBundlePoolGenerationBehavior):
 
         limited_bundle_pool = []
         for bl in bundling_labels_pool:
-            bundles = bv.bundling_labels_to_bundling(bl, auction_request_pool)
+            bundles = ut.indices_to_nested_lists(bl, auction_request_pool)
             limited_bundle_pool.extend(bundles)
 
         return limited_bundle_pool
@@ -213,7 +213,7 @@ class RandomMaxKPartition(LimitedBundlePoolGenerationBehavior):
 
 class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
     def _generate_auction_bundles(self,
-                                  instance: it.MDPDPTWInstance,
+                                  instance: it.MDVRPTWInstance,
                                   solution: slt.CAHDSolution,
                                   auction_request_pool: Sequence[int],
                                   original_bundling_labels: Sequence[int]):
@@ -238,23 +238,22 @@ class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
         # add each of the original bundles if it is not contained yet - this cannot be infeasible
         # this might exceed the auction_pool_size even more than self.generate_bundle_pool
         self._normalize_individual(original_bundling_labels)
-        original_bundling_labels = [
-            np.array(auction_request_pool)[np.array(original_bundling_labels) == bundle_idx].tolist()
-            for bundle_idx in range(max(original_bundling_labels) + 1)]
-        for ob in original_bundling_labels:
+        original_bundles = ut.indices_to_nested_lists(original_bundling_labels, auction_request_pool)
+        for ob in original_bundles:
             if ob not in limited_bundle_pool:
                 limited_bundle_pool.append(ob)
 
         return limited_bundle_pool
 
-    def fitness(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, offspring, auction_request_pool):
+    def fitness(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, offspring, auction_request_pool):
         fitness = self.bundling_valuation.evaluate_bundling_labels(instance, solution, offspring, auction_request_pool)
         return fitness
 
     def generate_new_population(self, instance, solution, previous_population, previous_fitness, auction_request_pool):
         # initialize new generation with the elites from the previous generation
-        elites = ut.argsmax(previous_fitness,
-                            int(self.parameters['population_size'] * (1 - self.parameters['generation_gap'])))
+        num_elites = int(self.parameters['population_size'] * (1 - self.parameters['generation_gap']))
+        elites = ut.argsmax(previous_fitness, num_elites)
+        # new_population = sorted(previous_population, key= lambda x: previous_fitness, reverse=True)[num_elites]
         new_population: List[Sequence[int]] = [previous_population[i] for i in elites]
         new_fitness: List[float] = [previous_fitness[i] for i in elites]
         offspring_counter = 0
@@ -300,7 +299,7 @@ class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
         # select the top candidates
         population_sorted = list(bundling_labels
                                  for fit, bundling_labels in sorted(zip(fitness, population), reverse=True))
-        adjusted_pool_size = min(pool_size, 2**(len(auction_request_pool))-1)
+        adjusted_pool_size = min(pool_size, 2 ** (len(auction_request_pool)) - 1)
         while len(bundle_pool) < adjusted_pool_size and population_sorted:
             bundling_labels = population_sorted.pop(0)
             bundling_labels = np.array(bundling_labels)
@@ -322,7 +321,7 @@ class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
         :return: the NORMALIZED offspring
         """
         # crossover
-        crossover_func: Callable = random.choice([self._crossover_uniform, self._crossover_geo])
+        crossover_func: Callable = random.choice([self._crossover_uniform, self._crossover_geo, self._crossover_temporal])
         offspring: List[int] = crossover_func(instance, solution, auction_request_pool, parent1, parent2)
         # normalization IN PLACE
         self._normalize_individual(offspring)
@@ -342,7 +341,7 @@ class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
 
         return offspring
 
-    def initialize_population(self, instance: it.MDPDPTWInstance,
+    def initialize_population(self, instance: it.MDVRPTWInstance,
                               solution: slt.CAHDSolution,
                               auction_request_pool: Sequence,
                               n: int,
@@ -366,8 +365,7 @@ class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
         self._normalize_individual(k_means_individual)
         if k_means_individual not in population:
             population.append(k_means_individual)
-            fitness.append(
-                self.fitness(instance, solution, k_means_individual, auction_request_pool))
+            fitness.append(self.fitness(instance, solution, k_means_individual, auction_request_pool))
 
         # fill the rest of the population with random individuals
         i = 1
@@ -378,8 +376,8 @@ class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
                 continue
             else:
                 population.append(individual)
-                fitness.append(
-                    self.fitness(instance, solution, individual, auction_request_pool))
+                fitness.append(self.fitness(instance, solution, individual, auction_request_pool))
+
                 i += 1
 
         return fitness, population
@@ -408,7 +406,7 @@ class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
         return parents
 
     @staticmethod
-    def _crossover_uniform(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, auction_request_pool, parent1,
+    def _crossover_uniform(instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, auction_request_pool, parent1,
                            parent2):
         """
         For each request, the corresponding bundle is randomly chosen from parent A or B. This corresponds to the
@@ -420,15 +418,48 @@ class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
         return offspring
 
     @staticmethod
-    def _crossover_geo(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, auction_request_pool, parent1,
+    def _crossover_temporal(instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, auction_request_pool, parent1,
+                            parent2):
+        """
+        combine parents using their time window information
+        randomly generate two time points A and B in the execution time horizon. If the opening of a requests TW is
+        closer to A it is assigned to the bundle as seen in parent A, and to B otherwise. If the solution consists
+        of too many bundles, two randomly chosen ones are merged
+        """
+        offspring = []
+        random_a = random.uniform(ut.EXECUTION_START_TIME, ut.END_TIME)
+        random_b = random.uniform(ut.EXECUTION_START_TIME, ut.END_TIME)
+
+        for i, request in enumerate(auction_request_pool):
+            delivery_tw_open = instance.tw_open[instance.vertex_from_request(request)]
+            dist_a = abs(random_a - delivery_tw_open)
+            dist_b = abs(random_b - delivery_tw_open)
+
+            if dist_a < dist_b:
+                offspring.append(parent1[i])
+            else:
+                offspring.append(parent2[i])
+
+        # merge two bundles if there are more bundles than allowed
+        if max(offspring) >= instance.num_carriers:
+            rnd_bundle_1, rnd_bundle_2 = random.sample(range(0, max(offspring) + 1), k=2)
+            for i in range(len(offspring)):
+                if offspring[i] == rnd_bundle_1:
+                    offspring[i] = rnd_bundle_2
+            assert max(offspring) < instance.num_carriers
+        return offspring
+
+    @staticmethod
+    def _crossover_geo(instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, auction_request_pool, parent1,
                        parent2):
         """
-        In this operator, we try to keep potentially good parts of existing bundles by combining the parents using
+        "In this operator, we try to keep potentially good parts of existing bundles by combining the parents using
         geographic information. First, we calculate the center of each request, which is the midpoint between pickup
         and delivery location. Then, we randomly generate two points (A and B) in the plane. If the center of a
         request is closer to A, it is assigned to the bundle given in parent A, but if it is closer to B, it gets the
-        bundle given in parent B. If the new  solution consists of too many bundles, two randomly chosen bundles are
-        merged.
+        bundle given in parent B. If the new solution consists of too many bundles, two randomly chosen bundles are
+        merged"
+        VRP: adjusted.
         """
         # setup
         offspring = []
@@ -437,20 +468,17 @@ class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
         min_y = min(instance.vertex_y_coords)
         max_y = max(instance.vertex_y_coords)
 
+        # two random points in the plane, a and b
+        random_a = (random.uniform(min_x, max_x), random.uniform(min_y, max_y))
+        random_b = (random.uniform(min_x, max_x), random.uniform(min_y, max_y))
+
         for i, request in enumerate(auction_request_pool):
-            pickup, delivery = instance.pickup_delivery_pair(request)
+            delivery = instance.vertex_from_request(request)
 
-            # center of each request = midpoint between pickup and delivery
-            request_center = ut.midpoint_(instance.vertex_x_coords[pickup], instance.vertex_y_coords[pickup],
-                                          instance.vertex_x_coords[delivery], instance.vertex_y_coords[delivery])
+            # -> the points A and B were generated *here* before?! This seems stupid so I moved it outside the loop
 
-            # two random points in the plane, a and b
-            random_points_x = ut.linear_interpolation([random.random(), random.random()], min_x, max_x)
-            random_points_y = ut.linear_interpolation([random.random(), random.random()], min_y, max_y)
-            random_a = (random_points_x[0], random_points_y[0])
-            random_b = (random_points_x[1], random_points_y[1])
-            dist_a = ut.euclidean_distance(*request_center, *random_a)
-            dist_b = ut.euclidean_distance(*request_center, *random_b)
+            dist_a = ut.euclidean_distance(*instance.coords(delivery), *random_a)
+            dist_b = ut.euclidean_distance(*instance.coords(delivery), *random_b)
 
             # copy bundle assignment based on the proximity to the nearest point
             if dist_a < dist_b:
@@ -464,10 +492,11 @@ class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
             for i in range(len(offspring)):
                 if offspring[i] == rnd_bundle_1:
                     offspring[i] = rnd_bundle_2
+            assert max(offspring) < instance.num_carriers
         return offspring
 
     @staticmethod
-    def _mutation_move(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, offspring: List[int],
+    def _mutation_move(instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, offspring: List[int],
                        auction_request_pool: Sequence[int]):
         """
         A random number of randomly chosen positions is changed. However, the number of available bundles is not
@@ -481,7 +510,7 @@ class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
         pass
 
     @staticmethod
-    def _mutation_create(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, offspring: List[int],
+    def _mutation_create(instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, offspring: List[int],
                          auction_request_pool: Sequence[int]):
         """
         A new bundle is created. We randomly chose one request and assign it to the new bundle. If by this the
@@ -501,7 +530,7 @@ class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
         pass
 
     @staticmethod
-    def _mutation_join(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, offspring: List[int],
+    def _mutation_join(instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, offspring: List[int],
                        auction_request_pool: Sequence[int]):
         """
         Two randomly chosen bundles are merged. If the offspring has only a single bundle, nothing happens
@@ -515,7 +544,7 @@ class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
         pass
 
     @staticmethod
-    def _mutation_shift(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, offspring: List[int],
+    def _mutation_shift(instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, offspring: List[int],
                         auction_request_pool: Sequence[int]):
         """
         for each of the given bundles in the candidate solution, the centroid is calculated. Then, requests are
@@ -524,17 +553,16 @@ class GeneticAlgorithm(LimitedBundlePoolGenerationBehavior):
         bundles = ut.indices_to_nested_lists(offspring, auction_request_pool)
         centroids = []
         for bundle in bundles:
-            direct_travel_dist = bv.bundle_direct_travel_dist(instance, bundle)
-            centroid = bv.bundle_centroid(instance, bundle, direct_travel_dist)
+            centroid = bv.bundle_centroid(instance, bundle)
             centroids.append(centroid)
 
         for i, request in enumerate(auction_request_pool):
-            midpoint = ut.midpoint(instance, *instance.pickup_delivery_pair(request))
+            delivery_coords = instance.coords(instance.vertex_from_request(request))
 
             min_distance = float('inf')
             closest_centroid = None
             for c, centroid in enumerate(centroids):
-                distance = ut.euclidean_distance(*midpoint, *centroid)
+                distance = ut.euclidean_distance(*delivery_coords, *centroid)
                 if distance < min_distance:
                     min_distance = distance
                     closest_centroid = c

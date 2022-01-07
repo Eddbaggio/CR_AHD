@@ -1,12 +1,8 @@
 import itertools
 import logging
 import logging.config
-import os
-
-from utility_module import istarmap
 import multiprocessing
 from datetime import datetime
-import sys
 
 from tqdm import tqdm
 
@@ -19,7 +15,7 @@ logging.config.dictConfig(log.LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
 
 '''
-def _solve_instance_with_parameters(instance: it.MDPDPTWInstance, parameter_generator=pg.parameter_generator):
+def _solve_instance_with_parameters(instance: it.MDVRPTWInstance, parameter_generator=pg.parameter_generator):
     """
 
     """

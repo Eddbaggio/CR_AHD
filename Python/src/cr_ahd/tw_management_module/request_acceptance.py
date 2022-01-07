@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
-from tw_management_module import tw_offering as two, tw_selection as tws
 from core_module import instance as it, solution as slt, tour as tr
+from tw_management_module import tw_offering as two, tw_selection as tws
 from utility_module import utils as ut
 
 
@@ -10,54 +10,88 @@ class RequestAcceptanceAttractiveness(ABC):
         self.name = self.__class__.__name__
 
     @abstractmethod
-    def evaluate(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, request: int):
+    def evaluate(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution, request: int):
         pass
 
 
 class FirstComeFirstServed(RequestAcceptanceAttractiveness):
-    def evaluate(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, request: int):
+    def evaluate(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution, request: int):
         return True
 
 
 class Dummy(RequestAcceptanceAttractiveness):
-    def evaluate(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, request: int):
+    def evaluate(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution, request: int):
         return False
 
 
-class _CloseToCompetitors(RequestAcceptanceAttractiveness):
-    """
-    Attractiveness is based on distance to competitors. If the distance to the competitor is at least as small as
-    the distance to the own depot, a request is rated attractive.
-    """
-
-    def evaluate(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, request: int):
-        pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
-        carrier_dist_sum = instance.distance([pickup_vertex, carrier.id_, carrier.id_],
-                                             [delivery_vertex, pickup_vertex, delivery_vertex])
+class _CloseDurationToCompetitors(RequestAcceptanceAttractiveness):
+    def evaluate(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution, request: int):
+        delivery_vertex = instance.vertex_from_request(request)
+        carrier_dur_sum = instance.travel_duration([carrier.id_, delivery_vertex],
+                                                   [delivery_vertex, carrier.id_])
         for competitor_id in range(instance.num_carriers):
             if competitor_id == carrier.id_:
                 continue
-            competitor_dist_sum = instance.distance([pickup_vertex, competitor_id, competitor_id],
-                                                    [delivery_vertex, pickup_vertex, delivery_vertex])
+            competitor_dur_sum = instance.travel_duration([competitor_id, delivery_vertex],
+                                                          [delivery_vertex, competitor_id])
+            # self.closeness = 0.5 -> the request is at least as close to the competitor as it si to the carrier
+            if competitor_dur_sum / (competitor_dur_sum + carrier_dur_sum) <= self.closeness:
+                return True
+        return False
+
+
+class CloseDurationToCompetitors25(_CloseDurationToCompetitors):
+    def __init__(self):
+        super().__init__()
+        self.closeness = .25
+
+
+class CloseDurationToCompetitors50(_CloseDurationToCompetitors):
+    def __init__(self):
+        super().__init__()
+        self.closeness = .5
+
+
+class CloseDurationToCompetitors75(_CloseDurationToCompetitors):
+    def __init__(self):
+        super().__init__()
+        self.closeness = .75
+
+
+class _CloseDistToCompetitors(RequestAcceptanceAttractiveness):
+    """
+    Attractiveness is based on distance to competitors. If the distance to the competitor is small  a request is
+    rated attractive.
+    """
+
+    def evaluate(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution, request: int):
+        delivery_vertex = instance.vertex_from_request(request)
+        carrier_dist_sum = instance.distance([carrier.id_, delivery_vertex],
+                                             [delivery_vertex, carrier.id_])
+        for competitor_id in range(instance.num_carriers):
+            if competitor_id == carrier.id_:
+                continue
+            competitor_dist_sum = instance.distance([competitor_id, delivery_vertex],
+                                                    [delivery_vertex, competitor_id])
             # self.closeness = 0.5 -> the request is at least as close to the competitor as it si to the carrier
             if competitor_dist_sum / (competitor_dist_sum + carrier_dist_sum) <= self.closeness:
                 return True
         return False
 
 
-class CloseToCompetitors25(_CloseToCompetitors):
+class CloseDistToCompetitors25(_CloseDistToCompetitors):
     def __init__(self):
         super().__init__()
         self.closeness = .25
 
 
-class CloseToCompetitors50(_CloseToCompetitors):
+class CloseDistToCompetitors50(_CloseDistToCompetitors):
     def __init__(self):
         super().__init__()
         self.closeness = .5
 
 
-class CloseToCompetitors75(_CloseToCompetitors):
+class CloseDistToCompetitors75(_CloseDistToCompetitors):
     def __init__(self):
         super().__init__()
         self.closeness = .75
@@ -76,7 +110,7 @@ class RequestAcceptanceBehavior:
         self.time_window_selection = time_window_selection
         self.name = self.__class__.__name__
 
-    def execute(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, request: int):
+    def execute(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution, request: int):
 
         offer_set = self.time_window_offering.execute(instance, carrier, request)
         acceptance_type = 'accept_feasible'
@@ -138,18 +172,16 @@ class RequestAcceptanceBehavior:
         return acceptance_type, selected_tw
     """
 
-    def pendulum_feasible_set(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, request: int):
+    def pendulum_feasible_set(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution, request: int):
         """
         returns all time windows for which a pendulum tour is feasible
         """
         pendulum_feasible_set = []
-        tour = tr.Tour('temp', carrier.id_)
-        pickup, delivery = instance.pickup_delivery_pair(request)
-        instance.assign_time_window(pickup, ut.EXECUTION_TIME_HORIZON)
+        tour = tr.VRPTWTour('temp', carrier.id_)
+        delivery = instance.vertex_from_request(request)
         for tw in ut.ALL_TW:
             instance.assign_time_window(delivery, tw)
-            if tour.insertion_feasibility_check(instance, [1, 2], [pickup, delivery]):
+            if tour.insertion_feasibility_check(instance, [1], [delivery]):
                 pendulum_feasible_set.append(tw)
-        instance.assign_time_window(pickup, ut.EXECUTION_TIME_HORIZON)
         instance.assign_time_window(delivery, ut.EXECUTION_TIME_HORIZON)
         return pendulum_feasible_set

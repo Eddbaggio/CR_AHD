@@ -76,7 +76,7 @@ def parameter_generator():
         # rs.MarginalProfitProxy,
         # rs.MarginalProfitProxyNeighbor,
         # rs.ComboRaw,
-        rs.ComboStandardized,
+        rs.ComboDistStandardized,
         # rs.LosSchulteBundle,
         # rs.TemporalRangeCluster,
         # TODO SpatioTemporalCluster is not yet good enough & sometimes even infeasible

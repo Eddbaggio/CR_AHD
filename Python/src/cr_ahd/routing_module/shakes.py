@@ -1,9 +1,8 @@
+import logging
 import random
 from abc import ABC, abstractmethod
-from typing import final, List
 
 from core_module import instance as it, solution as slt, tour as tr
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +16,7 @@ class Shake(ABC):
     """
 
     @abstractmethod
-    def execute(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, num_requests: int):
+    def execute(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution, num_requests: int):
         """
         Perform the Shake step on each tour of the given carrier. Currently, no intra-tour shakes do exist!
 
@@ -29,7 +28,7 @@ class Shake(ABC):
         pass
 
     @abstractmethod
-    def execute_on_tour(self, instance: it.MDPDPTWInstance, tour: tr.Tour, num_requests: int):
+    def execute_on_tour(self, instance: it.MDVRPTWInstance, tour: tr.Tour, num_requests: int):
         """
         Perform the shaking operation on the given tour
 
@@ -46,14 +45,14 @@ class RandomRemovalShake(Shake):
     removes num_requests random requests from each given tour
     """
 
-    def execute(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, num_requests: int):
+    def execute(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution, num_requests: int):
         for tour in carrier.tours:
             removed = self.execute_on_tour(instance, tour, num_requests)
             for request in removed:
                 carrier.unrouted_requests.append(request)
                 carrier.routed_requests.remove(request)
 
-    def execute_on_tour(self, instance: it.MDPDPTWInstance, tour: tr.Tour, num_requests: int):
+    def execute_on_tour(self, instance: it.MDVRPTWInstance, tour: tr.Tour, num_requests: int):
         num_requests = min(num_requests, round(len(tour)/2)-1)
         # TODO randomize the num_request by replacing the num_request parameter by max_num_requests and randomly choose
         #  from [1, max_num_requests]

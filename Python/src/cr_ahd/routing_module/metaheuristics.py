@@ -25,23 +25,23 @@ class PDPTWMetaHeuristic(ABC):
 
         self.name = f'{self.__class__.__name__}'
 
-    def execute(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+    def execute(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
                 carrier_ids: List[int] = None) -> slt.CAHDSolution:
         new_solution = self.improve_solution(instance, solution, carrier_ids)
         new_solution.drop_empty_tours_and_adjust_ids()
         return new_solution
 
     @abstractmethod
-    def improve_solution(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+    def improve_solution(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
                          carrier_ids: List[int] = None) -> slt.CAHDSolution:
         pass
 
     # @abstractmethod
-    # def execute_on_carrier(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution):
+    # def execute_on_carrier(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution):
     #     pass
 
     @abstractmethod
-    def acceptance_criterion(self, instance: it.MDPDPTWInstance, move: tuple):
+    def acceptance_criterion(self, instance: it.MDVRPTWInstance, move: tuple):
         return True
 
     @abstractmethod
@@ -59,14 +59,14 @@ class NoMetaheuristic(PDPTWMetaHeuristic):
     def stopping_criterion(self):
         pass
 
-    def acceptance_criterion(self, instance: it.MDPDPTWInstance, move: tuple):
+    def acceptance_criterion(self, instance: it.MDVRPTWInstance, move: tuple):
         pass
 
-    def improve_solution(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+    def improve_solution(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
                          carrier_ids: List[int] = None) -> slt.CAHDSolution:
         return solution
 
-    def execute_on_carrier(self, instance: it.MDPDPTWInstance, carrier: slt.AHDSolution):
+    def execute_on_carrier(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution):
         pass
 
 
@@ -90,7 +90,7 @@ class LocalSearchFirst(PDPTWMetaHeuristic):
     local search heuristic using the first improvement strategy
     """
 
-    def improve_solution(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+    def improve_solution(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
                          carrier_ids: List[int] = None) -> slt.CAHDSolution:
         assert len(self.neighborhoods) == 1, 'Local Search can use a single neighborhood only!'
         best_solution = deepcopy(solution)
@@ -117,7 +117,7 @@ class LocalSearchFirst(PDPTWMetaHeuristic):
                     break  # exit the while loop (while-condition is false anyway)
         return best_solution
 
-    def acceptance_criterion(self, instance: it.MDPDPTWInstance, move: tuple):
+    def acceptance_criterion(self, instance: it.MDVRPTWInstance, move: tuple):
         if move[0] < 0:
             return True
         else:
@@ -133,7 +133,7 @@ class LocalSearchFirst(PDPTWMetaHeuristic):
 class LocalSearchBest(PDPTWMetaHeuristic):
     """implements a the local search heuristic using the best improvement strategy, i.e. steepest descent"""
 
-    def improve_solution(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+    def improve_solution(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
                          carrier_ids: List[int] = None) -> slt.CAHDSolution:
         assert len(self.neighborhoods) == 1, 'Local Search must have a single neighborhood only!'
         best_solution = deepcopy(solution)
@@ -156,7 +156,7 @@ class LocalSearchBest(PDPTWMetaHeuristic):
                         self.improved = True
         return best_solution
 
-    def acceptance_criterion(self, instance: it.MDPDPTWInstance, move: tuple):
+    def acceptance_criterion(self, instance: it.MDVRPTWInstance, move: tuple):
         if move[0] < 0:
             return True
         else:
@@ -175,7 +175,7 @@ class PDPTWSequentialLocalSearch(PDPTWMetaHeuristic):
     used.
     """
 
-    def improve_solution(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+    def improve_solution(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
                          carrier_ids: List[int] = None) -> slt.CAHDSolution:
         best_solution = deepcopy(solution)
         if carrier_ids is None:
@@ -203,7 +203,7 @@ class PDPTWSequentialLocalSearch(PDPTWMetaHeuristic):
                             break
         return best_solution
 
-    def acceptance_criterion(self, instance: it.MDPDPTWInstance, move: tuple):
+    def acceptance_criterion(self, instance: it.MDVRPTWInstance, move: tuple):
         if move is None:
             return False
         elif move[0] < 0:
@@ -225,7 +225,7 @@ class PDPTWVariableNeighborhoodDescent(PDPTWMetaHeuristic):
     neighborhood
     """
 
-    def improve_solution(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+    def improve_solution(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
                          carrier_ids: List[int] = None) -> slt.CAHDSolution:
         best_solution = deepcopy(solution)
         if carrier_ids is None:
@@ -252,7 +252,7 @@ class PDPTWVariableNeighborhoodDescent(PDPTWMetaHeuristic):
                     self.parameters['k'] += 1
         return best_solution
 
-    def execute_on_tour(self, instance: it.MDPDPTWInstance, tour: tr.Tour):
+    def execute_on_tour(self, instance: it.MDVRPTWInstance, tour: tr.Tour):
         """
         execute the metaheuristic for a given route (in place) using all available intra-tour neighborhoods. useful if
         a tour shall be improved that does not belong to a carrier. E.g. when estimating the tour length of a bundle
@@ -275,7 +275,7 @@ class PDPTWVariableNeighborhoodDescent(PDPTWMetaHeuristic):
             else:
                 self.parameters['k'] += 1
 
-    def acceptance_criterion(self, instance: it.MDPDPTWInstance, move: tuple):
+    def acceptance_criterion(self, instance: it.MDVRPTWInstance, move: tuple):
         if move[0] < 0:
             return True
         else:
@@ -301,7 +301,7 @@ class PDPTWReducedVariableNeighborhoodSearch(PDPTWVariableNeighborhoodDescent):
     solution
     """
 
-    def improve_solution(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+    def improve_solution(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
                          carrier_ids: List[int] = None) -> slt.CAHDSolution:
         solution = deepcopy(solution)
         best_solution = deepcopy(solution)
@@ -330,7 +330,7 @@ class PDPTWReducedVariableNeighborhoodSearch(PDPTWVariableNeighborhoodDescent):
                     self.parameters['k'] += 1
         return best_solution
 
-    def execute_on_tour(self, instance: it.MDPDPTWInstance, tour: tr.Tour):
+    def execute_on_tour(self, instance: it.MDVRPTWInstance, tour: tr.Tour):
         raise NotImplementedError()
 
 
@@ -341,7 +341,7 @@ class PDPTWVariableNeighborhoodSearch(PDPTWVariableNeighborhoodDescent):
 
     """
 
-    def improve_solution(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+    def improve_solution(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
                          carrier_ids: List[int] = None) -> slt.CAHDSolution:
         solution = deepcopy(solution)
         best_solution = deepcopy(solution)
@@ -381,10 +381,10 @@ class PDPTWVariableNeighborhoodSearch(PDPTWVariableNeighborhoodDescent):
         else:
             return False
 
-    def execute_on_tour(self, instance: it.MDPDPTWInstance, tour: tr.Tour):
+    def execute_on_tour(self, instance: it.MDVRPTWInstance, tour: tr.Tour):
         raise NotImplementedError()
 
-    def local_search(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_ids: List[int]):
+    def local_search(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier_ids: List[int]):
         """
         improves the solution in place
         """
@@ -403,7 +403,7 @@ class PDPTWSimulatedAnnealing(PDPTWMetaHeuristic):
         self.parameters['temperature'] = 0
         self.parameters['cooling_factor'] = 0.85
 
-    def improve_solution(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+    def improve_solution(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
                          carrier_ids: List[int] = None) -> slt.CAHDSolution:
         solution = deepcopy(solution)
         best_solution = deepcopy(solution)
@@ -440,7 +440,7 @@ class PDPTWSimulatedAnnealing(PDPTWMetaHeuristic):
                 i += 1
         return best_solution
 
-    def acceptance_criterion(self, instance: it.MDPDPTWInstance, move: tuple):
+    def acceptance_criterion(self, instance: it.MDVRPTWInstance, move: tuple):
         """
         always accept improving moves, accept deteriorating moves with a certain probability.
         """
@@ -485,7 +485,7 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
     Uses a perturbation function to explore different regions of the solution space
     """
 
-    def improve_solution(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+    def improve_solution(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
                          carrier_ids: List[int] = None) -> slt.CAHDSolution:
         solution = deepcopy(solution)
         best_best_solution = solution
@@ -522,7 +522,7 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
 
         return best_best_solution
 
-    def acceptance_criterion(self, instance: it.MDPDPTWInstance, move: tuple):
+    def acceptance_criterion(self, instance: it.MDVRPTWInstance, move: tuple):
         """
         accept slight degradations: Threshold acceptance
 
@@ -536,7 +536,7 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
         else:
             return False
 
-    def perturbation(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_id: int,
+    def perturbation(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier_id: int,
                      num_requests: int) -> slt.CAHDSolution:
         solution_copy = deepcopy(solution)
         carrier_copy = solution_copy.carriers[carrier_id]
@@ -556,7 +556,7 @@ class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
             # in that case, simply returning the original solution
             return solution
 
-    def local_search(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier_ids: List[int]):
+    def local_search(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier_ids: List[int]):
         """
         improves the solution in place
         """

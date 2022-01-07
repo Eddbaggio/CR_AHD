@@ -1,8 +1,7 @@
 import datetime as dt
 import random
 from abc import ABC, abstractmethod
-from math import ceil
-from typing import Sequence, Tuple, List, final
+from typing import Sequence, List, final
 
 import numpy as np
 from scipy.spatial.distance import squareform, pdist
@@ -11,49 +10,22 @@ from core_module import instance as it, solution as slt, tour as tr
 from routing_module import tour_construction as cns, metaheuristics as mh, \
     neighborhoods as nh
 from utility_module import utils as ut
-
-
 # ======================================================================================================================
 # STAND-ALONE BUNDLE EVALUATION MEASURES
 # ======================================================================================================================
+from utility_module.utils import argmin
 
 
-def bundle_direct_travel_dist(instance: it.MDPDPTWInstance, bundle: Sequence):
+def bundle_centroid(instance: it.MDVRPTWInstance, bundle: Sequence):
     """
-    direct travel distances between pickup-delivery pairs of requests in the bundle
+    centroid of the requests
     """
-    direct_travel_dist = []
-    for request in bundle:
-        pickup, delivery = instance.pickup_delivery_pair(request)
-        # NOTE: must use ceil function to ensure triangle inequality
-        distance = ceil(instance.distance([pickup], [delivery]))
-        direct_travel_dist.append(distance)
-    return direct_travel_dist
+    x = [instance.vertex_x_coords[instance.vertex_from_request(r)] for r in bundle]
+    y = [instance.vertex_y_coords[instance.vertex_from_request(r)] for r in bundle]
+    return ut.Coordinates(sum(x) / len(x), sum(y) / len(y))
 
 
-def bundle_centroid(instance: it.MDPDPTWInstance, bundle: Sequence, pd_direct_travel_dist: Sequence):
-    """
-    centroid of the request’s centers, where the center of request is the midpoint between pickup and delivery
-    location. centers are weighted with the length of their request, which is the direct travel distance between
-    pickup and delivery of request
-    """
-    centers = []
-    for request in bundle:
-        pickup, delivery = instance.pickup_delivery_pair(request)
-        centers.append(ut.midpoint_(*instance.coords(pickup), *instance.coords(delivery)))
-
-    # there is one instance (run=1+dist=200+rad=150+n=10) for which pickup and delivery of a request are at the same
-    # location, in that case, the pd_direct_travel_dist is zero, thus the following if clause is needed
-    if sum(pd_direct_travel_dist) == 0:
-        weights = None
-    else:
-        weights = pd_direct_travel_dist
-
-    centroid = ut.Coordinates(*np.average(centers, axis=0, weights=weights))
-    return centroid
-
-
-def bundle_sum_squared_errors(instance: it.MDPDPTWInstance, bundle: Sequence[int], centroid: ut.Coordinates):
+def bundle_sum_squared_errors(instance: it.MDVRPTWInstance, bundle: Sequence[int], centroid: ut.Coordinates):
     """based on cluster analysis evaluation"""
     raise NotImplementedError('Bundle evaluation inspired by external cluster evaluation measures not yet complete')
     vertex_sse_list = []
@@ -62,13 +34,12 @@ def bundle_sum_squared_errors(instance: it.MDPDPTWInstance, bundle: Sequence[int
         for vertex in instance.pickup_delivery_pair(request):
             # todo maybe better use the extended_distance_matrix that includes distances to centroids rather than
             #  computing it all individually
-            vertex_sse_list.append(
-                ut.euclidean_distance(*instance.coords(vertex), *centroid))
+            vertex_sse_list.append(ut.euclidean_distance(*instance.coords(vertex), *centroid))
     bundle_sse = sum(vertex_sse_list) / len(vertex_sse_list)
     return bundle_sse
 
 
-def bundle_cohesion_centroid_based(instance: it.MDPDPTWInstance, bundle: Sequence[int], centroid: ut.Coordinates):
+def bundle_cohesion_centroid_based(instance: it.MDVRPTWInstance, bundle: Sequence[int], centroid: ut.Coordinates):
     """values closer to 1 are better"""
     raise NotImplementedError('Bundle evaluation inspired by external cluster evaluation measures not yet complete')
     vertex_cohesion_list = []
@@ -96,7 +67,7 @@ def bundle_separation_centroid_based(centroid: ut.Coordinates, other_centroids: 
     return bundle_separation
 
 
-def bundle_cohesion_graph_based(instance: it.MDPDPTWInstance, bundle: Sequence[int]):
+def bundle_cohesion_graph_based(instance: it.MDVRPTWInstance, bundle: Sequence[int]):
     """values closer to 1 are better"""
     raise NotImplementedError('Bundle evaluation inspired by external cluster evaluation measures not yet complete')
     # since the bundle contains *request* IDs, they need to be unpacked to vertex IDs
@@ -113,7 +84,14 @@ def bundle_cohesion_graph_based(instance: it.MDPDPTWInstance, bundle: Sequence[i
     return cohesion
 
 
-def bundling_extended_distance_matrix(instance: it.MDPDPTWInstance, additional_vertex_coords: Sequence[ut.Coordinates]):
+def bundling_extended_distance_matrix(instance: it.MDVRPTWInstance, additional_vertex_coords: Sequence[ut.Coordinates]):
+    """
+    uses euclidean distance for distances to/from additional_vertex_coords
+
+    :param instance:
+    :param additional_vertex_coords:
+    :return:
+    """
     x = instance.vertex_x_coords.copy()
     y = instance.vertex_y_coords.copy()
     for centroid in additional_vertex_coords:
@@ -123,42 +101,37 @@ def bundling_extended_distance_matrix(instance: it.MDPDPTWInstance, additional_v
     return np.ceil(squareform(pdist(np.array(list(zip(x, y)))))).astype('int')
 
 
-def bundle_vertex_to_centroid_travel_dist(instance: it.MDPDPTWInstance,
+def bundle_vertex_to_centroid_travel_dist(instance: it.MDVRPTWInstance,
                                           bundle_idx: int,
                                           bundle: Sequence,
                                           extended_distance_matrix):
     """
-    distance of all points in the bundle (pickup and delivery) to the bundle’s centroid. returns these distances in
-    tuples of (pickup->centroid, delivery->centroid)
+    euclidean distances of all delivery points in the bundle to the bundle’s centroid.
 
     """
     travel_dist_to_centroid = []
     for request in bundle:
-        pickup, delivery = instance.pickup_delivery_pair(request)
+        delivery = instance.vertex_from_request(request)
         # the centroid index for the distance matrix
-        centroid_idx = instance.num_carriers + 2 * instance.num_requests + bundle_idx
-        travel_dist_to_centroid.append(
-            (extended_distance_matrix[pickup][centroid_idx], extended_distance_matrix[delivery][centroid_idx]))
+        centroid_idx = instance.num_carriers + instance.num_requests + bundle_idx
+        travel_dist_to_centroid.append(extended_distance_matrix[delivery][centroid_idx])
     return travel_dist_to_centroid
 
 
-def bundle_radius(bundle: Sequence, vertex_to_centroid_travel_dist: Sequence[Tuple[float, float]]):
-    """average distance of all points in the bundle (pickup and delivery) to the bundle’s centroid."""
-    sum_ = 0
-    for pickup_dist, delivery_dist in vertex_to_centroid_travel_dist:
-        sum_ += pickup_dist + delivery_dist
-    return sum_ / (2 * len(vertex_to_centroid_travel_dist))
+def bundle_radius(bundle: Sequence, vertex_to_centroid_travel_dist: Sequence[float]):
+    """average distance of all delivery points in the bundle to the bundle’s centroid."""
+    return sum(vertex_to_centroid_travel_dist) / len(vertex_to_centroid_travel_dist)
 
 
-def bundle_density(direct_travel_dist, vertex_to_centroid_travel_dist: Sequence[Tuple[float, float]]):
+def bundle_density(direct_travel_dist, vertex_to_centroid_travel_dist: Sequence[float]):
     """average direct travel distance of all requests in the bundle, divided by the maximum of the distances of all
     requests to the bundle’s centroid. The distance of a request to the bundle’s centroid is determined by the sum of
     the distances of its pickup point and its delivery point to the centroid.
      """
-    avg_direct_travel_dist = sum(direct_travel_dist) / len(direct_travel_dist)
-    request_to_centroid_travel_dist = [pickup_dist + delivery_dist for pickup_dist, delivery_dist in
-                                       vertex_to_centroid_travel_dist]
-    max_dist_to_centroid = max(request_to_centroid_travel_dist)
+    raise NotImplementedError()
+    avg_direct_travel_dist = sum(direct_travel_dist) / len(
+        direct_travel_dist)  # fixme there is no such thing as direct_travel_dist in VRP!
+    max_dist_to_centroid = max(vertex_to_centroid_travel_dist)
     return avg_direct_travel_dist / max_dist_to_centroid  # todo causes issues due to python rounding small numbers to zero
 
 
@@ -184,21 +157,18 @@ def bundle_isolation(bundle_centroid: ut.Coordinates,
     return min_separation
 
 
-def bundle_total_travel_distance_proxy(instance: it.MDPDPTWInstance, bundle: Sequence[int]):
+def bundle_total_travel_distance_proxy(instance: it.MDVRPTWInstance, bundle: Sequence[int]):
     """
     VERY rough estimate for the total travel distance required to visit all requests in the bundle. Ignores all
     constraints (time windows, vehicle capacity, max tour length, ...)
     """
     routing_sequence = []
     for request in bundle:
-        routing_sequence.extend(instance.pickup_delivery_pair(request))
+        routing_sequence.append(instance.vertex_from_request(request))
     return instance.distance(routing_sequence[:-1], routing_sequence[1:])
 
 
-def bundle_total_travel_distance(instance: it.MDPDPTWInstance,
-                                 solution: slt.CAHDSolution,
-                                 bundle: Sequence[int],
-                                 ):
+def bundle_total_travel_distance(instance: it.MDVRPTWInstance, bundle: Sequence[int]):
     """
     total travel distance needed to visit all requests in a bundle. Since finding the optimal solutions for
     all bundles is too time consuming, the tour length is approximated using the cheapest insertion heuristic
@@ -207,44 +177,48 @@ def bundle_total_travel_distance(instance: it.MDPDPTWInstance,
 
     """
 
-    # treat the pickup of the first-to-open delivery vertex as the depot
-    min_tw_open = dt.datetime.max
-    depot_request = None
-    for request in bundle:
-        pickup, delivery = instance.pickup_delivery_pair(request)
-        if instance.tw_open[delivery] < min_tw_open:
-            min_tw_open = instance.tw_open[delivery]
-            depot_request = request
+    # treat the first-to-open delivery vertex as the depot
+    depot_request = argmin([instance.tw_open[instance.vertex_from_request(r)] for r in bundle])
+    depot_request = bundle[depot_request]
 
     # initialize temporary tour with the earliest request
-    depot_pickup, depot_delivery = instance.pickup_delivery_pair(depot_request)
-    tmp_tour_ = tr.Tour('tmp', depot_pickup)
-    tmp_tour_.insert_and_update(instance, [1], [depot_delivery])
+    depot_vertex = instance.vertex_from_request(depot_request)
+    tmp_tour_ = tr.VRPTWTour('tmp', depot_vertex)
 
     # insert all remaining requests of the bundle
-    tour_construction = cns.MinTravelDistanceInsertion()  # TODO this should be a parameter!
+    tour_construction = cns.VRPTWMinTravelDistanceInsertion()  # TODO this should be a parameter!
     tour_improvement = mh.PDPTWVariableNeighborhoodDescent(
         [nh.PDPMove(), nh.PDPTwoOpt()])  # TODO this should be a parameter!
     for request in bundle:
         if request == depot_request:
             continue
-        pickup, delivery = instance.pickup_delivery_pair(request)
+        delivery = instance.vertex_from_request(request)
 
         # set check_feasibility to False since only the tour length is of interest here
-        insertion = tour_construction.best_insertion_for_request_in_tour(instance, tmp_tour_, request, False)
-        delta, pickup_pos, delivery_pos = insertion
+        delta, delivery_pos = tour_construction.best_insertion_for_request_in_tour(instance, tmp_tour_,
+                                                                                   request, check_feasibility=False)
 
         # if no feasible insertion exists, return inf for the travel distance
-        if pickup_pos is None and delivery_pos is None:
+        if delivery_pos is None:
             return float('inf')
 
         # insert, ignores feasibility!
-        tmp_tour_.insert_and_update(instance, [pickup_pos, delivery_pos], [pickup, delivery])
+        tmp_tour_.insert_and_update(instance, [delivery_pos], [delivery])
     tour_improvement.execute_on_tour(instance, tmp_tour_)
     return tmp_tour_.sum_travel_distance
 
 
-def los_schulte_vertex_similarity(instance: it.MDPDPTWInstance, vertex1: int, vertex2: int):
+def waiting_time_seconds(instance: it.MDVRPTWInstance, vertex1: int, vertex2: int):
+    travel_time = instance.travel_duration([vertex1], [vertex2])
+    if instance.tw_open[vertex1] + travel_time > instance.tw_close[vertex2]:
+        return float('inf')
+    else:
+        t0 = max(instance.tw_open[vertex1] + travel_time, instance.tw_open[vertex2])  # earliest start of service at v2
+        t1 = min(instance.tw_close[vertex1] + travel_time, instance.tw_close[vertex2])  # latest start of service at v2
+        return (t0 - t1).total_seconds()
+
+
+def los_schulte_vertex_similarity(instance: it.MDVRPTWInstance, vertex1: int, vertex2: int):
     """
     Following [1] Los, J., Schulte, F., Gansterer, M., Hartl, R. F., Spaan, M. T. J., & Negenborn, R. R. (2020).
     Decentralized combinatorial auctions for dynamic and large-scale collaborative vehicle routing.
@@ -252,34 +226,25 @@ def los_schulte_vertex_similarity(instance: it.MDPDPTWInstance, vertex1: int, ve
     similarity of two vertices (not requests!) based on a weighted sum of travel time and waiting time
     """
 
-    def waiting_time_seconds(vertex1: int, vertex2: int):
-        travel_time = instance.travel_duration([vertex1], [vertex2])
-        if instance.tw_open[vertex1] + travel_time > instance.tw_close[vertex2]:
-            return float('inf')
-        else:
-            t0 = max(instance.tw_open[vertex1] + travel_time, instance.tw_open[vertex2])
-            t1 = min(instance.tw_close[vertex1] + travel_time, instance.tw_close[vertex2])
-            return (t0 - t1).total_seconds()
-
-    # w_ij represents the minimal waiting time (due to time window restrictions) at one of the locations if a vehicle
+    # w_ij represents the minimal waiting time (due to time window restrictions) at one of the locations, if a vehicle
     # serves both locations immediately after each other
-    w_ij = max(0, min(waiting_time_seconds(vertex1, vertex2), waiting_time_seconds(vertex2, vertex1)))
+    w_ij = max(0, min(waiting_time_seconds(instance, vertex1, vertex2), waiting_time_seconds(instance, vertex2, vertex1)))
+    avg_travel_dur = instance.travel_duration([vertex1, vertex2], [vertex2, vertex1])/2
     gamma = 2
-    return gamma * ut.travel_time(instance.distance([vertex1], [vertex2])).total_seconds() + w_ij
+    return gamma * avg_travel_dur.total_seconds() + w_ij
 
 
-def los_schulte_request_similarity(delivery0, pickup0, delivery1, pickup1, vertex_similarity_matrix):
+def los_schulte_request_similarity(delivery0, delivery1, vertex_similarity_matrix):
     """
     Following Los, J., Schulte, F., Gansterer, M., Hartl, R. F., Spaan, M. T. J., & Negenborn, R. R. (2020).
     Decentralized combinatorial auctions for dynamic and large-scale collaborative vehicle routing.
 
     :param delivery0:
-    :param pickup0:
     :param delivery1:
-    :param pickup1:
     :param vertex_similarity_matrix:
     :return:
     """
+    raise NotImplementedError('Not yet implemented for VRP')
     return min(
         vertex_similarity_matrix[pickup0][delivery1],
         vertex_similarity_matrix[delivery0][pickup1],
@@ -287,7 +252,7 @@ def los_schulte_request_similarity(delivery0, pickup0, delivery1, pickup1, verte
     )
 
 
-def ropke_pisinger_request_similarity(instance: it.MDPDPTWInstance,
+def ropke_pisinger_request_similarity(instance: it.MDVRPTWInstance,
                                       solution: slt.CAHDSolution,
                                       request_0: int,
                                       request_1: int,
@@ -309,6 +274,7 @@ def ropke_pisinger_request_similarity(instance: it.MDPDPTWInstance,
     :param num_vehicles_weight:
     :return:
     """
+    raise NotImplementedError('Not yet implemented for VRP')
     pickup_0, delivery_0 = instance.pickup_delivery_pair(request_0)
     pickup_1, delivery_1 = instance.pickup_delivery_pair(request_1)
     distance_max = max(max(x) for x in instance._distance_matrix)
@@ -317,8 +283,6 @@ def ropke_pisinger_request_similarity(instance: it.MDPDPTWInstance,
                                   for x in instance._distance_matrix]
     distance = normalized_distance_matrix[pickup_0][pickup_1] + normalized_distance_matrix[delivery_0][delivery_1]
 
-    # TODO slow search algorithm. I intentionally avoided to have a request_to_tour assignment array in the solution
-    #  because keeping it updated meant ugly dependencies on the CAHDSolution class for many functions
     tour_0, tour_1 = [solution.tour_of_request(r) for r in (request_0, request_1)]
 
     pickup_pos_0 = tour_0.vertex_pos[pickup_0]
@@ -345,23 +309,6 @@ def ropke_pisinger_request_similarity(instance: it.MDPDPTWInstance,
     return distance_weight * distance + time_weight * arrival_time_delta + capacity_weight * capacity  # + num_vehicles_weight * num_vehicles
 
 
-def bundling_labels_to_bundling(bundling_labels: Sequence[int], auction_request_pool: Sequence[int]):
-    """
-    duplicate of ut.indices_to_nested_list. uses the indices of bundling_labels to sort the items in
-    auction_request_pool into bins.
-
-    Example:
-        bundling_labels = [0, 0, 1, 2, 2, 1]
-        auction_request_pool = [1, 2, 3, 4, 5, 6]
-        bundling = [[1, 2], [3, 6], [4, 5]]
-
-    """
-    bundling = [[] for _ in range(max(bundling_labels) + 1)]
-    for x, y in zip(auction_request_pool, bundling_labels):
-        bundling[y].append(x)
-    return bundling
-
-
 # ======================================================================================================================
 # BUNDLING EVALUATION CLASSES
 # combine the above functions in a certain way
@@ -371,23 +318,24 @@ class BundlingValuation(ABC):
     """
     Class to compute the valuation of a bundling based on some valuation measure(s)
     """
+
     def __init__(self):
         self.name = self.__class__.__name__
 
     @final
-    def evaluate_bundling_labels(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+    def evaluate_bundling_labels(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
                                  bundling_labels: Sequence[int], auction_request_pool: Sequence[int]) -> float:
         """turns bundling labels into bundling and evaluates that bundling"""
-        bundling = bundling_labels_to_bundling(bundling_labels, auction_request_pool)
+        bundling = ut.indices_to_nested_lists(bundling_labels, auction_request_pool)
         return self.evaluate_bundling(instance, solution, bundling)
 
     @abstractmethod
-    def evaluate_bundling(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+    def evaluate_bundling(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
                           bundling: List[List[int]]) -> float:
         """evaluate a bundling"""
         pass
 
-    def preprocessing(self, instance: it.MDPDPTWInstance, auction_request_pool: Sequence[int]):
+    def preprocessing(self, instance: it.MDVRPTWInstance, auction_request_pool: Sequence[int]):
         pass
 
 
@@ -400,20 +348,21 @@ class GHProxyBundlingValuation(BundlingValuation):
 
     """
 
-    def evaluate_bundling(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+    def evaluate_bundling(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
                           bundling: List[List[int]]) -> float:
         """
 
         :return: the bundle's valuation/fitness
         """
+        raise NotImplementedError()
         centroids = []
         request_direct_travel_distances = []
         num_bundles = len(bundling)
 
         for bundle in bundling:
-            pd_direct_travel_dist = bundle_direct_travel_dist(instance, bundle)
-            request_direct_travel_distances.append(pd_direct_travel_dist)
-            centroid = bundle_centroid(instance, bundle, pd_direct_travel_dist)
+            # pd_direct_travel_dist = bundle_direct_travel_dist(instance, bundle)
+            # request_direct_travel_distances.append(pd_direct_travel_dist)
+            centroid = bundle_centroid(instance, bundle)
             centroids.append(centroid)
 
         extended_distance_matrix = bundling_extended_distance_matrix(instance, centroids)
@@ -430,7 +379,7 @@ class GHProxyBundlingValuation(BundlingValuation):
             radii.append(radius)
 
             # compute bundle density
-            density = bundle_density(request_direct_travel_distances[bundle_idx], travel_dist_to_centroid)
+            density = bundle_sum_squared_errors()  # FIXME cannot compute density the way it was done before
             densities.append(density)
 
             # estimating the tour length of the bundle
@@ -461,11 +410,11 @@ class MinDistanceBundlingValuation(BundlingValuation):
     the dynamic insertion procedure.
     """
 
-    def evaluate_bundling(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+    def evaluate_bundling(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
                           bundling: List[List[int]]) -> float:
         bundle_valuations = []
         for bundle in bundling:
-            valuation = bundle_total_travel_distance(instance, solution, bundle)
+            valuation = bundle_total_travel_distance(instance, bundle)
             bundle_valuations.append(valuation)
         return 1 / min(bundle_valuations)
 
@@ -473,9 +422,10 @@ class MinDistanceBundlingValuation(BundlingValuation):
 class LosSchulteBundlingValuation(BundlingValuation):
     """
     uses the request similarity measure by Los et al. (2020) to compute a clustering evaluation measure (cohesion)
+    VRP: adjusted the formulas and algorithms to be somewhat applicable to a delivery-only setting
     """
 
-    def evaluate_bundling(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+    def evaluate_bundling(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
                           bundling: List[List[int]]) -> float:
 
         bundle_valuations = []
@@ -487,29 +437,29 @@ class LosSchulteBundlingValuation(BundlingValuation):
         # TODO try max, min or other measures instead of mean?
         bundling_valuation = sum(bundle_valuations) / len(bundle_valuations)
 
-        # return inverse, since low values are better and the caller maximizes
-        return 1 / bundling_valuation
+        # return negative, since low values are better and the caller maximizes
+        return 1000/bundling_valuation
 
-    def evaluate_bundle(self, instance: it.MDPDPTWInstance, bundle: Sequence[int]):
+    def evaluate_bundle(self, instance: it.MDVRPTWInstance, bundle: Sequence[int]):
         # multi-request bundles
         if len(bundle) > 1:
             # lower request_similarity values are better
             request_relatedness_list = []
 
             for i, request0 in enumerate(bundle[:-1]):
-                p0, d0 = instance.pickup_delivery_pair(request0)
-                # adjust vertex indices to account for depots
-                p0 -= instance.num_carriers
+                d0 = instance.vertex_from_request(request0)
+                # adjust vertex index to account for depots
                 d0 -= instance.num_carriers
 
                 for j, request1 in enumerate(bundle[i + 1:]):
-                    p1, d1 = instance.pickup_delivery_pair(request1)
-                    # adjust vertex indices to account for depots
-                    p1 -= instance.num_carriers
+                    d1 = instance.vertex_from_request(request1)
+                    # adjust vertex index to account for depots
                     d1 -= instance.num_carriers
 
                     # compute request_similarity between requests 0 and 1 acc. to the paper's formula (1)
-                    request_similarity = los_schulte_request_similarity(d0, p0, d1, p1, self.vertex_relatedness_matrix)
+                    assert self.vertex_relatedness_matrix[d0][d1] == self.vertex_relatedness_matrix[d1][d0]  # REMOVEME they acutally should not always be equal due to asymmetric travel times
+                    request_similarity = self.vertex_relatedness_matrix[d0][
+                        d1]  # + self.vertex_relatedness_matrix[d1][d0] ) *0.5
 
                     request_relatedness_list.append(request_similarity)
 
@@ -520,51 +470,26 @@ class LosSchulteBundlingValuation(BundlingValuation):
 
         # single-request bundles
         else:
-            p0, d0 = instance.pickup_delivery_pair(bundle[0])
-            # adjust vertex indices to account for depots
-            p0 -= instance.num_carriers
-            d0 -= instance.num_carriers
-            # todo: cluster weights acc. to cluster size?
-            bundle_valuation = self.vertex_relatedness_matrix[p0][d0]
+            bundle_valuation = 0  # FIXME maybe not 100% appropriate: will distort the mean calculated by the caller fct
 
         return bundle_valuation
 
-    def preprocessing(self, instance: it.MDPDPTWInstance, auction_request_pool: Sequence[int]):
+    def preprocessing(self, instance: it.MDVRPTWInstance, auction_request_pool: Sequence[int]):
         """
         pre-compute the pairwise relatedness matrix for all vertices
         """
-
-        n = instance.num_requests
-
-        self.vertex_relatedness_matrix = [[0.0] * n * 2 for _ in range(n * 2)]
-
+        self.vertex_relatedness_matrix = [[0.0] * instance.num_requests for _ in range(instance.num_requests)]
         for i, request1 in enumerate(instance.requests):
-            pickup1, delivery1 = instance.pickup_delivery_pair(request1)
+            delivery1 = instance.vertex_from_request(request1)
             for j, request2 in enumerate(instance.requests):
-                pickup2, delivery2 = instance.pickup_delivery_pair(request2)
-
-                # [1] pickup1 <> delivery1
-                self.vertex_relatedness_matrix[i][i + n] = los_schulte_vertex_similarity(instance, pickup1, delivery1)
-
-                # [2] pickup1 <> pickup2
-                self.vertex_relatedness_matrix[i][j] = los_schulte_vertex_similarity(instance, pickup1, pickup2)
-
-                # [3] pickup1 <> delivery2
-                self.vertex_relatedness_matrix[i][j + n] = los_schulte_vertex_similarity(instance, pickup1, delivery2)
-
-                # [4] delivery1 <> pickup2
-                self.vertex_relatedness_matrix[i + n][j] = los_schulte_vertex_similarity(instance, delivery1, pickup2)
-
-                # [5] delivery1 <> delivery2
-                self.vertex_relatedness_matrix[i + n][j + n] = los_schulte_vertex_similarity(instance, delivery1,
-                                                                                             delivery2)
-
-                # [6] pickup2 <> delivery2
-                self.vertex_relatedness_matrix[j][j + n] = los_schulte_vertex_similarity(instance, pickup2, delivery2)
+                if i == j:
+                    continue
+                delivery2 = instance.vertex_from_request(request2)
+                self.vertex_relatedness_matrix[i][j] = los_schulte_vertex_similarity(instance, delivery1, delivery2)
 
 
 class RandomBundlingValuation(BundlingValuation):
-    def evaluate_bundling(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+    def evaluate_bundling(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
                           bundling: List[List[int]]) -> float:
         return random.random()
 
@@ -575,7 +500,7 @@ class BundlingValuation2(ABC):
 
     """
 
-    def __init__(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution):
+    def __init__(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution):
         self._vertex_distance_matrix = instance._distance_matrix
         self._request_distance_matrix = self._compute_request_distance_matrix(instance, solution)
 
@@ -591,7 +516,7 @@ class BundlingValuation2(ABC):
     def evaluate_bundle(self, bundle: Sequence[int]):
         pass
 
-    def _compute_request_distance_matrix(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution):
+    def _compute_request_distance_matrix(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution):
         request_distance_matrix = []
         for i, request0 in enumerate(instance.requests[:-1]):
             request_distance_array = []
@@ -602,7 +527,7 @@ class BundlingValuation2(ABC):
         return request_distance_matrix
 
     @abstractmethod
-    def request_distance(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, request0: int, request1: int):
+    def request_distance(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, request0: int, request1: int):
         """
         Computes a pairwise distance matrix of requests based on the given distance function.
 

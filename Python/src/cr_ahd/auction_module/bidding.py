@@ -2,8 +2,9 @@ import logging
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import List, Sequence
-from gurobipy import GRB
+
 import tqdm
+from gurobipy import GRB
 
 import utility_module.errors
 from core_module import instance as it, solution as slt
@@ -15,13 +16,13 @@ logger = logging.getLogger(__name__)
 
 class BiddingBehavior(ABC):
     def __init__(self,
-                 tour_construction: cns.PDPParallelInsertionConstruction,
+                 tour_construction: cns.VRPTWInsertionConstruction,
                  tour_improvement: mh.PDPTWMetaHeuristic):
         self.tour_construction = tour_construction
         self.tour_improvement = tour_improvement
         self.name = self.__class__.__name__
 
-    def execute_bidding(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
+    def execute_bidding(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
                         bundles: Sequence[Sequence[int]]) -> List[List[float]]:
         """
         :return a nested list of bids. the first axis is the bundles, the second axis (inner lists) contain the carrier
@@ -47,7 +48,7 @@ class BiddingBehavior(ABC):
         return bundle_bids
 
     @staticmethod
-    def _add_bundle_to_carrier(instance: it.MDPDPTWInstance, carrier: slt.AHDSolution, bundle: Sequence[int]):
+    def _add_bundle_to_carrier(instance: it.MDVRPTWInstance, carrier: slt.AHDSolution, bundle: Sequence[int]):
         """
         add the bundle to the carriers assigned, accepted and unrouted requests.
         correct sorting is required to ensure that dynamic insertion order is the same as in the acceptance phase. in
@@ -84,7 +85,7 @@ class BiddingBehavior(ABC):
         pass
 
     @abstractmethod
-    def _value_with_bundle(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, bundle: Sequence[int],
+    def _value_with_bundle(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, bundle: Sequence[int],
                            carrier_id: int):
         pass
 
@@ -98,7 +99,7 @@ class ClearAndReinsertAll(BiddingBehavior):
     Note that this is only compatible if the same dynamic re-optimization is also applied after the reallocation, too.
     """
 
-    def _value_with_bundle(self, instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, bundle: Sequence[int],
+    def _value_with_bundle(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, bundle: Sequence[int],
                            carrier_id: int):
 
         solution_copy = deepcopy(solution)

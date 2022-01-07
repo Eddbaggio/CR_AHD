@@ -1,14 +1,10 @@
 import webbrowser
-from typing import Union, List
 
 import folium
-import pandas as pd
-import matplotlib.animation as ani
 import matplotlib.pyplot as plt
-from matplotlib.colors import to_hex
-from matplotlib.text import Annotation
-import plotly.express as px
+import pandas as pd
 import plotly.graph_objects as go
+from matplotlib.colors import to_hex
 
 import tw_management_module.tw
 from core_module import instance as it, solution as slt
@@ -17,7 +13,7 @@ from utility_module import utils as ut, io
 config = dict({'scrollZoom': True})
 
 
-def _make_depot_scatter(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int):
+def _make_depot_scatter(instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier: int):
     carrier_ = solution.carriers[carrier]
     return go.Scatter(x=[instance.vertex_x_coords[carrier]],
                       y=[instance.vertex_y_coords[carrier]],
@@ -34,7 +30,7 @@ def _make_depot_scatter(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution
                       )
 
 
-def _make_tour_scatter(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, tour: int):
+def _make_tour_scatter(instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier: int, tour: int):
     tour_ = solution.tours[tour]
 
     df = pd.DataFrame({
@@ -79,7 +75,7 @@ def _make_tour_scatter(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
     )
 
 
-def _make_unrouted_scatter(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int):
+def _make_unrouted_scatter(instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier: int):
     carrier_ = solution.carriers[carrier]
     unrouted_vertices = ut.flatten([list(instance.pickup_delivery_pair(r)) for r in carrier_.unrouted_requests])
 
@@ -122,7 +118,7 @@ def _make_unrouted_scatter(instance: it.MDPDPTWInstance, solution: slt.CAHDSolut
     )
 
 
-def _make_unassigned_scatter(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution):
+def _make_unassigned_scatter(instance: it.MDVRPTWInstance, solution: slt.CAHDSolution):
     vertex_id = ut.flatten(
         [[p, d] for p, d in [instance.pickup_delivery_pair(r) for r in solution.unassigned_requests]])
     df = pd.DataFrame({
@@ -162,7 +158,7 @@ def _make_unassigned_scatter(instance: it.MDPDPTWInstance, solution: slt.CAHDSol
     )
 
 
-def _make_tour_edges(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, carrier: int, tour: int):
+def _make_tour_edges(instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier: int, tour: int):
     tour_ = solution.tours[tour]
     # creating arrows as annotations
     directed_edges = []
@@ -215,7 +211,7 @@ def _add_carrier_solution(fig: go.Figure, instance, solution: slt.CAHDSolution, 
     return scatter_traces, edge_traces
 
 
-def plot_solution_2(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, title='', tours: bool = True,
+def plot_solution_2(instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, title='', tours: bool = True,
                     time_windows: bool = True, arrival_times: bool = True, service_times: bool = True,
                     show: bool = False):
     fig = go.Figure()
@@ -301,7 +297,9 @@ def plot_vienna_vrp_solution(instance: it.MDVRPTWInstance, solution: slt.CAHDSol
         # depots
         folium.features.RegularPolygonMarker(location=instance.coords(carrier.id_),
                                              number_of_sides=4,
-                                             popup=f'Depot {carrier.id_}',
+                                             popup=f'Depot of carrier {carrier.id_}<br>'
+                                                   f'dur={carrier.sum_travel_duration()}<br>'
+                                                   f'dist={round(carrier.sum_travel_distance())}',
                                              rotation=45,
                                              radius=10,
                                              color='black',
@@ -311,7 +309,9 @@ def plot_vienna_vrp_solution(instance: it.MDVRPTWInstance, solution: slt.CAHDSol
         # tours
         for tour in carrier.tours:
             folium.PolyLine(locations=[instance.coords(i) for i in tour.routing_sequence],
-                            popup=f'Tour {tour.id_}<br>dur={tour.sum_travel_duration}<br>dist={tour.sum_travel_distance})',
+                            popup=f'Tour {tour.id_}<br>'
+                                  f'dur={tour.sum_travel_duration}<br>'
+                                  f'dist={round(tour.sum_travel_distance)})',
                             color=color,
                             ).add_to(m)
 
@@ -319,7 +319,10 @@ def plot_vienna_vrp_solution(instance: it.MDVRPTWInstance, solution: slt.CAHDSol
         for request in carrier.routed_requests:
             delivery_vertex = instance.vertex_from_request(request)
             folium.CircleMarker(location=instance.coords(delivery_vertex),
-                                popup=f'Request {request}(xy={instance.coords(delivery_vertex)}, carrier={carrier.id_}',
+                                popup=f'Request {request}<br>'
+                                      f'x,y={instance.vertex_x_coords[delivery_vertex], instance.vertex_y_coords[delivery_vertex]}<br>'
+                                      f'carrier={carrier.id_}<br>'
+                                      f'tw={instance.time_window(delivery_vertex)}',
                                 radius=5,
                                 color=color,
                                 fill_color=color,

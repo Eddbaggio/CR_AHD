@@ -1,17 +1,16 @@
+import datetime as dt
 import logging.config
-from utility_module.cr_ahd_logging import SUCCESS
 import random
 from copy import deepcopy
 from typing import Tuple
-import datetime as dt
 
 from auction_module import auction as au
-from core_module import instance as it, solution as slt, tour as tr
+from core_module import instance as it, solution as slt
 from routing_module import metaheuristics as mh
 from routing_module import tour_construction as cns
-from tw_management_module import tw_offering as two, tw_selection as tws, request_acceptance as ra
+from tw_management_module import request_acceptance as ra
 from utility_module import utils as ut, profiling as pr
-from utility_module.errors import ConstraintViolationError
+from utility_module.cr_ahd_logging import SUCCESS
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +18,7 @@ logger = logging.getLogger(__name__)
 class Solver:
     def __init__(self,
                  request_acceptance: ra.RequestAcceptanceBehavior,
-                 tour_construction: cns.PDPParallelInsertionConstruction,
+                 tour_construction: cns.VRPTWInsertionConstruction,
                  tour_improvement: mh.PDPTWMetaHeuristic,
                  num_intermediate_auctions: int = 0,
                  intermediate_auction: au.Auction = False,
@@ -28,7 +27,7 @@ class Solver:
         assert not (bool(num_intermediate_auctions) ^ bool(intermediate_auction))  # not XOR
 
         self.request_acceptance: ra.RequestAcceptanceBehavior = request_acceptance
-        self.tour_construction: cns.PDPParallelInsertionConstruction = tour_construction
+        self.tour_construction: cns.VRPTWInsertionConstruction = tour_construction
         self.tour_improvement: mh.PDPTWMetaHeuristic = tour_improvement
         self.num_intermediate_auctions: int = num_intermediate_auctions
         self.intermediate_auction: au.Auction = intermediate_auction
@@ -105,11 +104,13 @@ class Solver:
             })
 
     def execute(self,
-                instance: it.MDPDPTWInstance,
+                instance: it.MDVRPTWInstance,
                 starting_solution: slt.CAHDSolution = None,
-                ) -> Tuple[it.MDPDPTWInstance, slt.CAHDSolution]:
+                ) -> Tuple[it.MDVRPTWInstance, slt.CAHDSolution]:
         """
         apply the concrete steps of the solution algorithms specified in the config
+
+        :return a tuple of the adjusted instance with its newly assigned time windows and the solution
         """
 
         # ===== [0] Setup =====
@@ -169,6 +170,36 @@ class Solver:
 
         return instance, solution
 
+    def request_acceptance_and_time_window(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier,
+                                           request: int):
+        delivery_vertex = instance.vertex_from_request(request)
+        acceptance_type, selected_tw = self.request_acceptance.execute(instance, carrier, request)
+
+        if acceptance_type == 'accept_feasible':
+            carrier.accepted_requests.append(request)
+            instance.assign_time_window(delivery_vertex, selected_tw)
+            self.tour_construction.insert_single_request(instance, solution, carrier.id_, request)
+
+        elif acceptance_type == 'accept_infeasible':
+            logger.debug(f'[{instance.id_}] No feasible TW can be offered from Carrier {carrier.id_} '
+                         f'to request {request}: {acceptance_type}')
+            carrier.accepted_infeasible_requests.append(request)
+            instance.assign_time_window(delivery_vertex, selected_tw)
+            self.tour_construction.create_pendulum_tour_for_infeasible_request(instance, solution, carrier.id_, request)
+
+        else:
+            logger.debug(f'[{instance.id_}] No feasible TW can be offered from Carrier {carrier.id_} '
+                         f'to request {request}: {acceptance_type}')
+            instance.assign_time_window(delivery_vertex, ut.EXECUTION_TIME_HORIZON)
+            carrier.rejected_requests.append(request)
+            carrier.unrouted_requests.remove(request)
+
+        # update acceptance rate
+        carrier.acceptance_rate = len(
+            carrier.accepted_requests + carrier.accepted_infeasible_requests) / len(
+            carrier.assigned_requests)
+
+    '''
     def request_acceptance_and_time_window(self, instance, solution, carrier, request):
         pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
         instance.assign_time_window(pickup_vertex, ut.EXECUTION_TIME_HORIZON)  # pickup at any time
@@ -197,6 +228,7 @@ class Solver:
         carrier.acceptance_rate = len(
             carrier.accepted_requests + carrier.accepted_infeasible_requests) / len(
             carrier.assigned_requests)
+    '''
 
     def run_intermediate_auction(self, instance, solution):
         timer = pr.Timer()

@@ -2,11 +2,9 @@ import datetime as dt
 import json
 import logging.config
 from pathlib import Path
-from typing import Tuple, Sequence, List, NoReturn
+from typing import Sequence, List, NoReturn
 
 import numpy as np
-import pandas as pd
-from scipy.spatial.distance import pdist, squareform
 
 import utility_module.utils as ut
 from tw_management_module import tw
@@ -214,6 +212,17 @@ class MDVRPTWInstance:
         """returns a tuple of (x, y) coordinates for the vertex"""
         return ut.Coordinates(self.vertex_x_coords[vertex], self.vertex_y_coords[vertex])
 
+    def time_window(self, vertex: int):
+        return ut.TimeWindow(self.tw_open[vertex], self.tw_close[vertex])
+
+    def vertex_type(self, vertex: int):
+        if vertex < self.num_carriers:
+            return 'depot'
+        elif vertex < self.num_carriers + self.num_requests:
+            return 'pickup'
+        else:
+            raise IndexError(f'Vertex index {vertex} out of range')
+
     def assign_time_window(self, vertex: int, time_window: tw.TimeWindow):
         """
         changes the time window of a vertex
@@ -253,7 +262,8 @@ class MDVRPTWInstance:
         pass
 
 
-class MDPDPTWInstance:
+'''
+class MDVRPTWInstance:
     def __init__(self,
                  id_: str,
                  max_num_tours_per_carrier: int,
@@ -382,6 +392,9 @@ class MDPDPTWInstance:
         """returns a tuple of (x, y) coordinates for the vertex"""
         return ut.Coordinates(self.vertex_x_coords[vertex], self.vertex_y_coords[vertex])
 
+    def time_window(self, vertex: int):
+        return ut.TimeWindow(self.tw_open[vertex], self.tw_close[vertex])
+
     def vertex_type(self, vertex: int):
         if vertex < self.num_carriers:
             return "depot"
@@ -401,7 +414,8 @@ class MDPDPTWInstance:
         self.tw_close[vertex] = time_window.close
 
 
-def read_gansterer_hartl_mv(path: Path, num_carriers=3) -> MDPDPTWInstance:
+
+def read_gansterer_hartl_mv(path: Path, num_carriers=3) -> MDVRPTWInstance:
     """read an instance file as used in (Gansterer,M., & Hartl,R.F. (2016). Request evaluation strategies
     for carriers in auction-based collaborations. https://doi.org/10.1007/s00291-015-0411-1).
     CAUTION:multiplies the max vehicle load by 10!
@@ -424,7 +438,7 @@ def read_gansterer_hartl_mv(path: Path, num_carriers=3) -> MDPDPTWInstance:
                               num=len(requests[requests.carrier_index == carrier_id]),
                               endpoint=False))
 
-    return MDPDPTWInstance(id_=path.stem, max_num_tours_per_carrier=vrp_params['V'].tolist(),
+    return MDVRPTWInstance(id_=path.stem, max_num_tours_per_carrier=vrp_params['V'].tolist(),
                            max_vehicle_load=(vrp_params['L'] * ut.LOAD_CAPACITY_SCALING).tolist(),
                            max_tour_length=vrp_params['T'].tolist(), max_tour_duration=None,
                            requests=requests.index.tolist(),
@@ -450,6 +464,7 @@ def read_gansterer_hartl_mv(path: Path, num_carriers=3) -> MDPDPTWInstance:
                            carrier_depots_y=(depots['y'] * ut.DISTANCE_SCALING).tolist(),
                            carrier_depots_tw_open=[ut.EXECUTION_START_TIME for _ in range(len(depots))],
                            carrier_depots_tw_close=[ut.END_TIME for _ in range(len(depots))])
+'''
 
 
 def read_vienna_instance(path: Path) -> MDVRPTWInstance:
