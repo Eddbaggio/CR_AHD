@@ -475,6 +475,42 @@ class Tour(ABC):
 
         return delta
 
+    def insert_duration_delta(self, instance, insertion_indices: List[int], vertices: List[int]):
+        """
+        returns the duration surplus that is obtained by inserting the insertion_vertices at the insertion_positions.
+        NOTE: Does not perform a feasibility check and does not actually insert the vertices!
+
+        """
+        delta = dt.timedelta(0)
+
+        # easy for single insertion
+        if len(insertion_indices) == 1:
+
+            j_pos = insertion_indices[0]
+            i_vertex = self.routing_sequence[j_pos - 1]
+            j_vertex = vertices[0]
+            k_vertex = self.routing_sequence[j_pos]
+
+            delta += instance.travel_duration([i_vertex, j_vertex], [j_vertex, k_vertex])
+            delta -= instance.travel_duration([i_vertex], [k_vertex])
+
+        # must ensure that no edges are counted twice. Naive implementation with a tmp_routing_sequence
+        else:
+            assert all(insertion_indices[i] < insertion_indices[i + 1] for i in range(len(insertion_indices) - 1))
+
+            tmp_routing_sequence = list(self.routing_sequence)
+
+            for j_pos, j_vertex in zip(insertion_indices, vertices):
+                tmp_routing_sequence.insert(j_pos, j_vertex)
+
+                i_vertex = tmp_routing_sequence[j_pos - 1]
+                k_vertex = tmp_routing_sequence[j_pos + 1]
+
+                delta += instance.travel_duration([i_vertex, j_vertex], [j_vertex, k_vertex])
+                delta -= instance.travel_duration([i_vertex], [k_vertex])
+
+        return delta
+
     def insert_distance_delta(self, instance, insertion_indices: List[int], vertices: List[int]):
         """
         returns the distance surplus that is obtained by inserting the insertion_vertices at the insertion_positions.

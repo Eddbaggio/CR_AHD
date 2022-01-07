@@ -201,6 +201,15 @@ class MDVRPTWInstance:
             raise IndexError
         return self.num_carriers + request
 
+    def request_from_vertex(self, vertex: int):
+        if vertex < self.num_carriers:
+            raise IndexError(f'you provided vertex {vertex} but that is a depot vertex, not a request vertex')
+        elif vertex >= self.num_carriers + self.num_requests:
+            raise IndexError(
+                f'you provided vertex {vertex} but there are only {self.num_carriers + 2 * self.num_requests} vertices')
+        else:
+            return vertex - self.num_carriers
+
     def coords(self, vertex: int):
         """returns a tuple of (x, y) coordinates for the vertex"""
         return ut.Coordinates(self.vertex_x_coords[vertex], self.vertex_y_coords[vertex])

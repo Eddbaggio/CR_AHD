@@ -1,15 +1,256 @@
 import datetime as dt
 import logging
 from abc import ABC, abstractmethod
-from typing import Tuple, Union
+from typing import Tuple, Union, Optional
 
-import utility_module.errors
+from utility_module.errors import ConstraintViolationError
 from core_module import instance as it, solution as slt, tour as tr
-from utility_module import utils as ut
 
 logger = logging.getLogger(__name__)
+'''
+# Probably not worth the effort to build a superclass. I will only use delivery anyways and using loops to iterate
+#  over single element (delivery_vertex) lists is just unnecessary overhead
+
+class InsertionConstruction(ABC):
+    def __init__(self):
+        self.name = self.__class__.__name__
+
+    def insert_single_request(self, 
+                              instance: it.MDVRPTWInstance, 
+                              solution: slt.CAHDSolution,
+                              carrier_id: int, request: int):
+        """
+        Inserts a single unrouted request and inserts its vertices in the best position according
+        to the criterion of the subclass
+        
+        :param instance: 
+        :param solution: 
+        :param carrier_id: 
+        :param request: 
+        :return: 
+        """
+        carrier = solution.carriers[carrier_id]
+        insertion_criteria, tour, insertion_positions = self.best_insertion_for_request(instance, carrier, request)
+
+        if tour is None:
+            self.create_new_tour_with_request(instance, solution, carrier_id, request)
+        else:
+            self.execute_insertion(instance, solution, carrier_id, request, tour.id_, insertion_positions)
+     '''
 
 
+class VRPTWInsertionConstruction(ABC):
+    def __init__(self):
+        self.name = self.__class__.__name__
+
+    def insert_single_request(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
+                              carrier_id: int, request: int):
+        carrier = solution.carriers[carrier_id]
+        insertion_criteria, tour, delivery_pos = self.best_insertion_for_request(instance, carrier, request)
+
+        if tour is None:
+            self.create_new_tour_with_request(instance, solution, carrier_id, request)
+        else:
+            self.execute_insertion(instance, solution, carrier_id, request, tour.id_, delivery_pos)
+
+    def best_insertion_for_carrier(self,
+                                   instance: it.MDVRPTWInstance,
+                                   carrier: slt.AHDSolution) -> Tuple[Optional[int],
+                                                                      Optional[tr.Tour],
+                                                                      Optional[int]]:
+        """
+        Scanning through all the unrouted requests of the given carrier, the best one is identified and returned as
+        a tuple of (request, tour, delivery_pos). "Best" in this case is defined by the inheriting class
+        (e.g. lowest distance increase or smallest time shift)
+
+        :param instance:
+        :param carrier:
+        :return: the best found insertion as a tuple of (request, tour, delivery_pos)
+        """
+        logger.debug(f'Cheapest insertion tour construction for carrier {carrier.id_}')
+
+        best_delta = float('inf')
+        best_request: Union[None, int] = None
+        best_tour: Union[None, tr.Tour] = None
+        best_delivery_pos: Union[None, int] = None
+
+        for request in carrier.unrouted_requests:
+
+            delta, tour, delivery_pos = self.best_insertion_for_request(instance, carrier, request)
+
+            if delta < best_delta:
+                best_delta = delta
+                best_request = request
+                best_tour = tour
+                best_delivery_pos = delivery_pos
+
+            # if no feasible insertion was found return None for tour
+            if best_delta == float('inf'):
+                return request, None, None
+
+        return best_request, best_tour, best_delivery_pos
+
+    def best_insertion_for_request(self,
+                                   instance: it.MDVRPTWInstance,
+                                   carrier: slt.AHDSolution,
+                                   request: int) -> Tuple[float, tr.Tour, int]:
+        """
+
+        :param instance:
+        :param carrier:
+        :param request:
+        :return: best insertion as a tuple of (delta, tour, delivery_pos)
+        """
+        best_delta: float = float('inf')
+        best_tour: tr.Tour = None
+        best_delivery_pos: int = None
+
+        for tour in carrier.tours:
+
+            delta, delivery_pos = self.best_insertion_for_request_in_tour(instance, tour, request)
+            if delta < best_delta:
+                best_delta = delta
+                best_tour = tour
+                best_delivery_pos = delivery_pos
+
+        return best_delta, best_tour, best_delivery_pos
+
+    @abstractmethod
+    def best_insertion_for_request_in_tour(self, instance: it.MDVRPTWInstance, tour: tr.Tour,
+                                           request: int, check_feasibility=True) -> Tuple[float, int]:
+        pass
+
+    @staticmethod
+    def execute_insertion(instance: it.MDVRPTWInstance,
+                          solution: slt.CAHDSolution,
+                          carrier_id: int,
+                          request: int,
+                          tour_id: int,
+                          delivery_pos: int):
+        carrier = solution.carriers[carrier_id]
+        tour = solution.tours[tour_id]
+        delivery = instance.vertex_from_request(request)
+        tour.insert_and_update(instance, [delivery_pos], [delivery])
+        tour.requests.add(request)
+        carrier.unrouted_requests.remove(request)
+        carrier.routed_requests.append(request)
+
+    @staticmethod
+    def execute_insertion_in_tour(instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, tour_id: int,
+                                  request: int, delivery_pos: int):
+
+        delivery = instance.vertex_from_request(request)
+        tour = solution.tours[tour_id]
+        tour.insert_and_update(instance, [delivery_pos], [delivery])
+        tour.requests.add(request)
+
+    def create_pendulum_tour_for_infeasible_request(self,
+                                                    instance: it.MDVRPTWInstance,
+                                                    solution: slt.CAHDSolution,
+                                                    carrier_id: int,
+                                                    request: int,
+                                                    ):
+        carrier = solution.carriers[carrier_id]
+        pendulum_tour_id = solution.get_free_pendulum_tour_id()
+        pendulum_tour = tr.Tour(pendulum_tour_id, depot_index=carrier.id_)
+
+        if pendulum_tour.insertion_feasibility_check(instance, [1], [instance.vertex_from_request(request)]):
+            pendulum_tour.insert_and_update(instance, [1], [instance.vertex_from_request(request)])
+            pendulum_tour.requests.add(request)
+
+        else:
+            raise ConstraintViolationError(f'Cannot create new route with request {request} for carrier {carrier.id_}')
+
+        if int(pendulum_tour_id[1]) < len(solution.tours_pendulum):
+            solution.tours_pendulum[int(pendulum_tour_id[1])] = pendulum_tour
+        else:
+            solution.tours_pendulum.append(pendulum_tour)
+        carrier.tours_pendulum.append(pendulum_tour)
+        carrier.unrouted_requests.remove(request)
+        carrier.routed_requests.append(request)
+        pass
+
+    def create_new_tour_with_request(self,
+                                     instance: it.MDVRPTWInstance,
+                                     solution: slt.CAHDSolution,
+                                     carrier_id: int,
+                                     request: int):
+        carrier = solution.carriers[carrier_id]
+        if len(carrier.tours) >= instance.carriers_max_num_tours:
+            raise ConstraintViolationError(
+                f'Cannot create new route with request {request} for carrier {carrier.id_}.'
+                f' Max. number of vehicles is {instance.carriers_max_num_tours}!'
+                f' ({instance.id_})')
+        tour_id = solution.get_free_tour_id()
+        assert tour_id < instance.num_carriers * instance.carriers_max_num_tours, f'{instance.id_}: tour_id={tour_id}'
+        logger.debug(f'Carrier {carrier_id}, *Tour {tour_id}')
+        tour = tr.VRPTWTour(tour_id, depot_index=carrier.id_)
+
+        if tour.insertion_feasibility_check(instance, [1], [instance.vertex_from_request(request)]):
+            tour.insert_and_update(instance, [1, 2], [instance.vertex_from_request(request)])
+            tour.requests.add(request)
+
+        else:
+            raise ConstraintViolationError(
+                f'{instance.id_} Cannot create new route with request {request} for carrier {carrier.id_}.')
+
+        if tour_id < len(solution.tours):
+            solution.tours[tour_id] = tour
+        else:
+            solution.tours.append(tour)
+        carrier.tours.append(tour)
+        carrier.unrouted_requests.remove(request)
+        carrier.routed_requests.append(request)
+        return
+
+
+class VRPTWMinTravelDistanceInsertion(VRPTWInsertionConstruction):
+
+    def best_insertion_for_request_in_tour(self, instance: it.MDVRPTWInstance, tour: tr.VRPTWTour,
+                                           request: int, check_feasibility=True) -> Tuple[float, int]:
+        delivery_vertex = instance.vertex_from_request(request)
+        best_delta = float('inf')
+        best_delivery_position = None
+
+        for delivery_pos in range(1, len(tour) + 1):
+            delta = tour.insert_distance_delta(instance, [delivery_pos], [delivery_vertex])
+            if delta < best_delta:
+
+                update_best = True
+                if check_feasibility:
+                    update_best = tour.insertion_feasibility_check(instance, [delivery_pos], [delivery_vertex])
+
+                if update_best:
+                    best_delta = delta
+                    best_delivery_position = delivery_pos
+
+        return best_delta, best_delivery_position
+
+
+class VRPTWMinTravelDurationInsertion(VRPTWInsertionConstruction):
+
+    def best_insertion_for_request_in_tour(self, instance: it.MDVRPTWInstance, tour: tr.VRPTWTour,
+                                           request: int, check_feasibility=True) -> Tuple[float, int]:
+        delivery_vertex = instance.vertex_from_request(request)
+        best_delta = float('inf')
+        best_delivery_position = None
+
+        for delivery_pos in range(1, len(tour)):
+            delta = tour.insert_duration_delta(instance, [delivery_pos], [delivery_vertex]).total_seconds()
+            if delta < best_delta:
+
+                update_best = True
+                if check_feasibility:
+                    update_best = tour.insertion_feasibility_check(instance, [delivery_pos], [delivery_vertex])
+
+                if update_best:
+                    best_delta = delta
+                    best_delivery_position = delivery_pos
+
+        return best_delta, best_delivery_position
+
+
+'''
 class PDPParallelInsertionConstruction(ABC):
     def __init__(self):
         self.name = self.__class__.__name__
@@ -67,10 +308,10 @@ class PDPParallelInsertionConstruction(ABC):
 
     def best_insertion_for_carrier(self,
                                    instance: it.MDPDPTWInstance,
-                                   carrier: slt.AHDSolution) -> Tuple[Union[None, int],
-                                                                      Union[None, tr.Tour],
-                                                                      Union[None, int],
-                                                                      Union[None, int]]:
+                                   carrier: slt.AHDSolution) -> Tuple[Optional[int],
+                                                                      Optional[tr.Tour],
+                                                                      Optional[int],
+                                                                      Optional[int]]:
         """
         Scanning through all the unrouted requests of the given carrier, the best one is identified and returned as
         a tuple of (request, tour, pickup_pos, delivery_pos). "Best" in this case is defined by the inheriting class
@@ -182,7 +423,7 @@ class PDPParallelInsertionConstruction(ABC):
             pendulum_tour.requests.add(request)
 
         else:
-            raise utility_module.errors.ConstraintViolationError(
+            raise ConstraintViolationError(
                 f'Cannot create new route with request {request} for carrier {carrier.id_}.')
 
         if int(pendulum_tour_id[1]) < len(solution.tours_pendulum):
@@ -201,7 +442,7 @@ class PDPParallelInsertionConstruction(ABC):
                                      request: int):
         carrier = solution.carriers[carrier_id]
         if len(carrier.tours) >= instance.carriers_max_num_tours:
-            raise utility_module.errors.ConstraintViolationError(
+            raise ConstraintViolationError(
                 f'Cannot create new route with request {request} for carrier {carrier.id_}.'
                 f' Max. number of vehicles is {instance.carriers_max_num_tours}!'
                 f' ({instance.id_})')
@@ -215,7 +456,7 @@ class PDPParallelInsertionConstruction(ABC):
             tour.requests.add(request)
 
         else:
-            raise utility_module.errors.ConstraintViolationError(
+            raise ConstraintViolationError(
                 f'{instance.id_} Cannot create new route with request {request} for carrier {carrier.id_}.')
 
         if tour_id < len(solution.tours):
@@ -355,3 +596,4 @@ class TravelDistanceRegretInsertion(PDPParallelInsertionConstruction):
                                            check_feasibility=True) -> Tuple[float, int, int]:
         return MinTravelDistanceInsertion().best_insertion_for_request_in_tour(instance, tour, request,
                                                                                check_feasibility)
+'''

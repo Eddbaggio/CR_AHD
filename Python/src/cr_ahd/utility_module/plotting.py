@@ -1,14 +1,18 @@
+import webbrowser
 from typing import Union, List
+
+import folium
 import pandas as pd
 import matplotlib.animation as ani
 import matplotlib.pyplot as plt
+from matplotlib.colors import to_hex
 from matplotlib.text import Annotation
 import plotly.express as px
 import plotly.graph_objects as go
 
 import tw_management_module.tw
 from core_module import instance as it, solution as slt
-from utility_module import utils as ut
+from utility_module import utils as ut, io
 
 config = dict({'scrollZoom': True})
 
@@ -64,7 +68,8 @@ def _make_tour_scatter(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution,
         mode='markers+text',
         marker=dict(
             symbol='circle',
-            size=ut.linear_interpolation(df['revenue'].values, 15, 30, min(instance.vertex_revenue), max(instance.vertex_revenue)),
+            size=ut.linear_interpolation(df['revenue'].values, 15, 30, min(instance.vertex_revenue),
+                                         max(instance.vertex_revenue)),
             line=dict(color=[ut.univie_colors_100[c] for c in original_carrier_assignment], width=2),
             color=ut.univie_colors_60[carrier]),
         text=df['text'],
@@ -105,7 +110,8 @@ def _make_unrouted_scatter(instance: it.MDPDPTWInstance, solution: slt.CAHDSolut
         x=df['x'], y=df['y'], mode='markers+text',
         marker=dict(
             symbol=['circle'] * len(unrouted_vertices),
-            size=ut.linear_interpolation(df['revenue'].values, 15, 30, min(instance.vertex_revenue), max(instance.vertex_revenue)),
+            size=ut.linear_interpolation(df['revenue'].values, 15, 30, min(instance.vertex_revenue),
+                                         max(instance.vertex_revenue)),
             line=dict(color=[ut.univie_colors_100[c] for c in df['original_carrier_assignment']], width=2),
             color=ut.univie_colors_60[carrier]),
         text=df['text'],
@@ -145,7 +151,8 @@ def _make_unassigned_scatter(instance: it.MDPDPTWInstance, solution: slt.CAHDSol
         x=df['x'], y=df['y'], mode='markers+text',
         marker=dict(
             symbol=['circle'] * len(df),
-            size=ut.linear_interpolation(df['revenue'].values, 15, 30, min(instance.vertex_revenue), max(instance.vertex_revenue)),
+            size=ut.linear_interpolation(df['revenue'].values, 15, 30, min(instance.vertex_revenue),
+                                         max(instance.vertex_revenue)),
             line=dict(color=[ut.univie_colors_100[c] for c in df['original_carrier_assignment']],
                       width=2),
             color='white'),
@@ -174,7 +181,8 @@ def _make_tour_edges(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, c
             showarrow=True, arrowhead=2, arrowsize=2, arrowwidth=1,
             arrowcolor=ut.univie_colors_100[carrier],
             standoff=ut.linear_interpolation([instance.vertex_revenue[to_vertex]], 15, 30, min_rev, max_rev)[0] / 2,
-            startstandoff=ut.linear_interpolation([instance.vertex_revenue[from_vertex]], 15, 30, min_rev, max_rev)[0] / 2,
+            startstandoff=ut.linear_interpolation([instance.vertex_revenue[from_vertex]], 15, 30, min_rev, max_rev)[
+                              0] / 2,
             name=f'Carrier {carrier}, Tour {tour_}')
         directed_edges.append(anno)
     return directed_edges
@@ -189,7 +197,7 @@ def _add_carrier_solution(fig: go.Figure, instance, solution: slt.CAHDSolution, 
     fig.add_trace(depot_scatter)
     scatter_traces.append(depot_scatter)
 
-    for tour_id in [tour.id_ for tour in carrier.tours] :
+    for tour_id in [tour.id_ for tour in carrier.tours]:
         tour_scatter = _make_tour_scatter(instance, solution, carrier_id, tour_id)
         fig.add_trace(tour_scatter)
         scatter_traces.append(tour_scatter)
@@ -280,3 +288,56 @@ def plot_solution_2(instance: it.MDPDPTWInstance, solution: slt.CAHDSolution, ti
         fig.show(config=config)
 
 
+def plot_vienna_vrp_solution(instance: it.MDVRPTWInstance, solution: slt.CAHDSolution):
+    num_carriers = instance.num_carriers
+    # plot
+    vienna_lat, vienna_long = 48.210033, 16.363449
+    m = folium.Map((vienna_lat, vienna_long), zoom_start=12, crs='EPSG3857', tiles='Stamen Toner')
+    # folium.TileLayer('openstreetmap').add_to(m)
+    cmap1 = plt.get_cmap('jet', num_carriers)
+
+    for carrier in solution.carriers:
+        color = to_hex(cmap1(carrier.id_ / num_carriers))
+        # depots
+        folium.features.RegularPolygonMarker(location=instance.coords(carrier.id_),
+                                             number_of_sides=4,
+                                             popup=f'Depot {carrier.id_}',
+                                             rotation=45,
+                                             radius=10,
+                                             color='black',
+                                             fill_color=color,
+                                             fill_opacity=1,
+                                             ).add_to(m)
+        # tours
+        for tour in carrier.tours:
+            folium.PolyLine(locations=[instance.coords(i) for i in tour.routing_sequence],
+                            popup=f'Tour {tour.id_}<br>dur={tour.sum_travel_duration}<br>dist={tour.sum_travel_distance})',
+                            color=color,
+                            ).add_to(m)
+
+        # routed requests
+        for request in carrier.routed_requests:
+            delivery_vertex = instance.vertex_from_request(request)
+            folium.CircleMarker(location=instance.coords(delivery_vertex),
+                                popup=f'Request {request}(xy={instance.coords(delivery_vertex)}, carrier={carrier.id_}',
+                                radius=5,
+                                color=color,
+                                fill_color=color,
+                                fill_opacity=1,
+                                ).add_to(m)
+
+        # unrouted requests
+        for request in carrier.unrouted_requests:
+            delivery_vertex = instance.vertex_from_request(request)
+            folium.CircleMarker(location=instance.coords(delivery_vertex),
+                                popup=f'Request {request}(xy={instance.coords(delivery_vertex)}, carrier={carrier.id_}',
+                                radius=5,
+                                color=color,
+                                fill_color='grey',
+                                fill_opacity=0.4
+                                ).add_to(m)
+
+    path = io.output_dir.joinpath('folium_map.html')
+    m.save(path.as_posix())
+    webbrowser.open(path)
+    return m
