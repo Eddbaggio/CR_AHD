@@ -210,8 +210,8 @@ class AHDSolution:
         self.unrouted_requests: List = []
         self.routed_requests: List = []
         self.acceptance_rate: float = 0
-        self.tours: List[tr.Tour] = []
-        self.tours_pendulum: List[tr.Tour] = []  # 1 for each accepted infeasible request
+        self.tours: List[tr.VRPTWTour] = []
+        self.tours_pendulum: List[tr.VRPTWTour] = []  # 1 for each accepted infeasible request
 
     def __str__(self):
         s = f'---// Carrier ID: {self.id_} //---' \

@@ -19,7 +19,7 @@ class Solver:
     def __init__(self,
                  request_acceptance: ra.RequestAcceptanceBehavior,
                  tour_construction: cns.VRPTWInsertionConstruction,
-                 tour_improvement: mh.PDPTWMetaHeuristic,
+                 tour_improvement: mh.VRPTWMetaHeuristic,
                  num_intermediate_auctions: int = 0,
                  intermediate_auction: au.Auction = False,
                  final_auction: au.Auction = False,
@@ -28,7 +28,7 @@ class Solver:
 
         self.request_acceptance: ra.RequestAcceptanceBehavior = request_acceptance
         self.tour_construction: cns.VRPTWInsertionConstruction = tour_construction
-        self.tour_improvement: mh.PDPTWMetaHeuristic = tour_improvement
+        self.tour_improvement: mh.VRPTWMetaHeuristic = tour_improvement
         self.num_intermediate_auctions: int = num_intermediate_auctions
         self.intermediate_auction: au.Auction = intermediate_auction
         self.final_auction: au.Auction = final_auction

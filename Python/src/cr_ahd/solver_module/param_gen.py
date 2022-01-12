@@ -15,8 +15,9 @@ def parameter_generator():
     generate dicts with all parameters are required to initialize a slv.Solver.
     """
 
-    tour_constructions: List[cns.PDPParallelInsertionConstruction] = [
-        cns.MinTravelDistanceInsertion(),
+    tour_constructions: List[cns.VRPTWInsertionConstruction] = [
+        cns.VRPTWMinTravelDistanceInsertion()
+
         # cns.MinTimeShiftInsertion()
     ]
 
@@ -41,25 +42,26 @@ def parameter_generator():
         # tws.NoTW(),
     ]
 
-    tour_improvements: List[mh.PDPTWMetaHeuristic.__class__] = [
+    tour_improvements: List[mh.VRPTWMetaHeuristic.__class__] = [
         # mh.PDPTWSequentialLocalSearch,
         # mh.PDPTWIteratedLocalSearch,
-        mh.PDPTWVariableNeighborhoodDescent,
+        # mh.PDPTWVariableNeighborhoodDescent,
         # mh.PDPTWReducedVariableNeighborhoodSearch,
         # mh.PDPTWVariableNeighborhoodSearch,
         # mh.PDPTWSimulatedAnnealing,
         mh.NoMetaheuristic,
+        mh.LocalSearchFirst,
     ]
 
     neighborhood_collections: List[List[nh.Neighborhood]] = [
-        [nh.PDPMove(), nh.PDPTwoOpt(), nh.PDPRelocate()],
+        [nh.VRPTWTwoOptDist()]
     ]
 
     tour_improvement_time_limits: List[float] = [
         # 1,
-        2,
+        # 2,
         # 5,
-        # 10
+        10.0
     ]
 
     nums_submitted_requests: List[int] = [
@@ -103,9 +105,9 @@ def parameter_generator():
     ]
 
     bundling_valuations: List[bv.BundlingValuation.__class__] = [
-        bv.GHProxyBundlingValuation,
+        # bv.GHProxyBundlingValuation,
         # bv.MinDistanceBundlingValuation,
-        # bv.LosSchulteBundlingValuation,
+        bv.LosSchulteBundlingValuation,
         # bv.RandomBundlingValuation,
     ]
 

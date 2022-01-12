@@ -1,12 +1,11 @@
 import datetime as dt
 import json
-import random
 import re
 from pathlib import Path
-from typing import List, Dict
 
 import numpy as np
 import pandas as pd
+
 from utility_module import utils as ut
 
 working_dir = Path().cwd()
@@ -121,6 +120,81 @@ def ask_for_overwrite_permission(path: Path):
             raise FileExistsError
     else:
         return True
+
+
+def vrptw_instance_selector(diameter=None, num_carriers=None, num_requests=None, service_area_overlap=None, run=None):
+    """
+
+    :param diameter: diameter of the circle around the city center on which the depots are positioned
+    :param num_carriers: number of carriers
+    :param num_requests: number of requests per carrier
+    :param service_area_overlap: degree of overlap of the service areas between 0 (no overlap) and 1 (all carriers serve the whole city)
+    :param run: run, i.e. which of the random instances with the above parameters
+    :return: a MDVRPTWInstance
+    """
+    # DIAMETER
+    if isinstance(diameter, int):
+        p_diameter = diameter
+    elif diameter is None:
+        p_diameter = '\d+'
+    elif isinstance(diameter, (list, tuple, range)):
+        p_diameter = f"({'|'.join((str(x) for x in diameter))})"
+    else:
+        raise ValueError(f'diameter must be int or list of int. diameter={diameter} is type {type(diameter)}')
+
+    # NUM_CARRIERS
+    if isinstance(num_carriers, int):
+        p_num_carriers = num_carriers
+    elif num_carriers is None:
+        p_num_carriers = '\d+'
+    elif isinstance(num_carriers, (list, tuple, range)):
+        p_num_carriers = f"({'|'.join((str(x) for x in num_carriers))})"
+    else:
+        raise ValueError(
+            f'num_carriers must be int or list of int. num_carriers={num_carriers} is type {type(num_carriers)}')
+
+    # NUM_REQUESTS
+    if isinstance(num_requests, int):
+        p_num_requests = num_requests
+    elif num_requests is None:
+        p_num_requests = '\d+'
+    elif isinstance(num_requests, (list, tuple, range)):
+        p_num_requests = f"({'|'.join((str(x) for x in num_requests))})"
+    else:
+        raise ValueError(
+            f'num_requests must be int or list of int. num_requests={num_requests} is type {type(num_requests)}')
+
+    # SERVICE_AREA_OVERLAP
+    if isinstance(service_area_overlap, float):
+        p_service_area_overlap = f'{int(service_area_overlap * 100):03d}'
+    elif service_area_overlap is None:
+        p_service_area_overlap = '\d+'
+    elif isinstance(service_area_overlap, (list, tuple, range)):
+        p_service_area_overlap = f"({'|'.join((f'{int(x * 100):03d}' for x in service_area_overlap))})"
+    else:
+        raise ValueError(
+            f'service_area_overlap must be float or list of float. service_area_overlap={service_area_overlap} is type {type(service_area_overlap)}')
+
+    # RUN
+    if isinstance(run, int):
+        p_run = f'{run:02d}'
+    elif run is None:
+        p_run = '\d+'
+    elif isinstance(run, (list, tuple, range)):
+        p_run = f"({'|'.join((f'{x:02d}' for x in run))})"
+    else:
+        raise ValueError(f'run must be int or list of int. run={run} is type {type(run)}')
+
+    pattern = re.compile(f't=vienna\+d={p_diameter}\+c={p_num_carriers}\+n={p_num_requests}\+'
+                         f'o={p_service_area_overlap}\+r={p_run}(\.json)')  # run={p_run}\+dist=200\+rad={p_rad}\+n={p_n}(\.dat)')
+    paths = []
+    for file in (sorted(input_dir.glob('*.json'), key=ut.natural_sort_key)):
+        if pattern.match(file.name):
+            paths.append(file)
+            # print(file.name)
+    if len(paths) == 0:
+        raise ValueError
+    return paths
 
 
 def instance_selector(run=None, rad=None, n=None):

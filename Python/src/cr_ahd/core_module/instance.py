@@ -159,7 +159,9 @@ class MDVRPTWInstance:
 
         # need to ceil the durations due to floating point precision!
         self._travel_duration_matrix = np.array(duration_matrix)
+        assert all(self._travel_duration_matrix.ravel() > dt.timedelta(0))
         self._distance_matrix = np.array(distance_matrix)
+        assert all(self._distance_matrix.ravel() > 0)
 
         logger.debug(f'{id_}: created')
 
@@ -478,6 +480,25 @@ def read_vienna_instance(path: Path) -> MDVRPTWInstance:
         inst['_travel_duration_matrix'] = [[dt.timedelta(seconds=j) for j in i]
                                            for i in inst['_travel_duration_matrix']]
         inst['max_tour_duration'] = dt.timedelta(seconds=inst['max_tour_duration'])
+
+        # check triangle inequality:
+        for d in (inst['_travel_duration_matrix'], inst['_distance_matrix']):
+            n = len(d)
+            violations = 0
+            for i in range(n):
+                for j in range(n):
+                    if i == j:
+                        continue
+                    for k in range(n):
+                        if i == k or j == k:
+                            continue
+
+                        d_ik = d[i][k]
+                        d_ij = d[i][j]
+                        d_jk = d[j][k]
+                        if not d_ik <= d_ij + d_jk:
+                            violations += 1
+            print(f'There are {violations} violations of the triangle inequality')
 
         return MDVRPTWInstance(id_=inst['_id_'],
                                carriers_max_num_tours=inst['carriers_max_num_tours'],

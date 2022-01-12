@@ -13,7 +13,7 @@ from routing_module import neighborhoods as nh, shakes as sh, tour_construction 
 logger = logging.getLogger(__name__)
 
 
-class PDPTWMetaHeuristic(ABC):
+class VRPTWMetaHeuristic(ABC):
     def __init__(self, neighborhoods: Sequence[nh.Neighborhood], time_limit_per_carrier: float):
         self.neighborhoods = neighborhoods
         self.improved = False
@@ -53,7 +53,7 @@ class PDPTWMetaHeuristic(ABC):
         pass
 
 
-class NoMetaheuristic(PDPTWMetaHeuristic):
+class NoMetaheuristic(VRPTWMetaHeuristic):
     """Placeholder for cases in which no improvement is wanted"""
 
     def stopping_criterion(self):
@@ -85,7 +85,7 @@ class NoMetaheuristic(PDPTWMetaHeuristic):
 #     def execute_on_tour(self, instance:it.PDPInstance, solution:slt.CAHDSolution, tour_=tr.Tour):
 #         pass
 
-class LocalSearchFirst(PDPTWMetaHeuristic):
+class LocalSearchFirst(VRPTWMetaHeuristic):
     """
     local search heuristic using the first improvement strategy
     """
@@ -130,7 +130,7 @@ class LocalSearchFirst(PDPTWMetaHeuristic):
             return True
 
 
-class LocalSearchBest(PDPTWMetaHeuristic):
+class LocalSearchBest(VRPTWMetaHeuristic):
     """implements a the local search heuristic using the best improvement strategy, i.e. steepest descent"""
 
     def improve_solution(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
@@ -169,7 +169,7 @@ class LocalSearchBest(PDPTWMetaHeuristic):
             return True
 
 
-class PDPTWSequentialLocalSearch(PDPTWMetaHeuristic):
+class PDPTWSequentialLocalSearch(VRPTWMetaHeuristic):
     """
     Sequentially exhaust each neighborhood in their given order. Only improvements are accepted. First improvement is
     used.
@@ -218,7 +218,7 @@ class PDPTWSequentialLocalSearch(PDPTWMetaHeuristic):
             return True
 
 
-class PDPTWVariableNeighborhoodDescent(PDPTWMetaHeuristic):
+class PDPTWVariableNeighborhoodDescent(VRPTWMetaHeuristic):
     """
     deterministic variant of VNS. multiple neighborhoods are ordered and searched sequentially. In each neighborhood
     that is searched, the *best* found neighbor is used. When stuck in a local optimum, switches to the next
@@ -396,7 +396,7 @@ class PDPTWVariableNeighborhoodSearch(PDPTWVariableNeighborhoodDescent):
         return solution
 
 
-class PDPTWSimulatedAnnealing(PDPTWMetaHeuristic):
+class PDPTWSimulatedAnnealing(VRPTWMetaHeuristic):
     def __init__(self, neighborhoods: Sequence[nh.Neighborhood], time_limit_per_carrier: float):
         super().__init__(neighborhoods, time_limit_per_carrier)
         self.parameters['initial_temperature'] = 0
@@ -480,7 +480,7 @@ class PDPTWSimulatedAnnealing(PDPTWMetaHeuristic):
         return temperature
 
 
-class PDPTWIteratedLocalSearch(PDPTWMetaHeuristic):
+class PDPTWIteratedLocalSearch(VRPTWMetaHeuristic):
     """
     Uses a perturbation function to explore different regions of the solution space
     """

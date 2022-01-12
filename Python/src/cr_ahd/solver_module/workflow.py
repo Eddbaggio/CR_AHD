@@ -104,7 +104,7 @@ def _execute_job(path, config, fail_on_error, console_log_level):
 
     logging.getLogger().handlers[0].setLevel(console_log_level)
 
-    instance = it.read_gansterer_hartl_mv(path)
+    instance = it.read_vienna_instance(path)
     solver = slv.Solver(**config)
     try:
         timer = pr.Timer()

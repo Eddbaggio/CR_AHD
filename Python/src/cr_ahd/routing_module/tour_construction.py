@@ -207,11 +207,12 @@ class VRPTWMinTravelDistanceInsertion(VRPTWInsertionConstruction):
 
     def best_insertion_for_request_in_tour(self, instance: it.MDVRPTWInstance, tour: tr.VRPTWTour,
                                            request: int, check_feasibility=True) -> Tuple[float, int]:
+        logger.warning('Distance of vienna instances violates triangle inequality!')
         delivery_vertex = instance.vertex_from_request(request)
         best_delta = float('inf')
         best_delivery_position = None
 
-        for delivery_pos in range(1, len(tour) + 1):
+        for delivery_pos in range(1, len(tour)):
             delta = tour.insert_distance_delta(instance, [delivery_pos], [delivery_vertex])
             if delta < best_delta:
 

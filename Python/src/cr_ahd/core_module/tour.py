@@ -4,6 +4,7 @@ import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import List, Sequence, Set, Dict
+
 import utility_module.utils as ut
 
 logger = logging.getLogger(__name__)
@@ -519,7 +520,7 @@ class Tour(ABC):
         """
         delta = 0
 
-        # easy for single insertion
+        # trivial for single insertion
         if len(insertion_indices) == 1:
 
             j_pos = insertion_indices[0]
@@ -529,6 +530,7 @@ class Tour(ABC):
 
             delta += instance.distance([i_vertex, j_vertex], [j_vertex, k_vertex])
             delta -= instance.distance([i_vertex], [k_vertex])
+            assert delta >= 0
 
         # must ensure that no edges are counted twice. Naive implementation with a tmp_routing_sequence
         else:

@@ -356,7 +356,7 @@ class GHProxyBundlingValuation(BundlingValuation):
         """
         raise NotImplementedError()
         centroids = []
-        request_direct_travel_distances = []
+        request_direct_travel_distances = []  # fixme does not exist for VRP
         num_bundles = len(bundling)
 
         for bundle in bundling:
@@ -457,7 +457,7 @@ class LosSchulteBundlingValuation(BundlingValuation):
                     d1 -= instance.num_carriers
 
                     # compute request_similarity between requests 0 and 1 acc. to the paper's formula (1)
-                    assert self.vertex_relatedness_matrix[d0][d1] == self.vertex_relatedness_matrix[d1][d0]  # REMOVEME they acutally should not always be equal due to asymmetric travel times
+                    assert self.vertex_relatedness_matrix[d0][d1] == self.vertex_relatedness_matrix[d1][d0]  # REMOVEME they acutally should not always be equal due to asymmetric travel times, remove once this has been confirmed
                     request_similarity = self.vertex_relatedness_matrix[d0][
                         d1]  # + self.vertex_relatedness_matrix[d1][d0] ) *0.5
 
@@ -494,47 +494,3 @@ class RandomBundlingValuation(BundlingValuation):
         return random.random()
 
 
-class BundlingValuation2(ABC):
-    """
-    attempt at implementing a new & improved BundlingValuation interface/architecture.
-
-    """
-
-    def __init__(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution):
-        self._vertex_distance_matrix = instance._distance_matrix
-        self._request_distance_matrix = self._compute_request_distance_matrix(instance, solution)
-
-        # todo: a _bundles_distance_matrix would make it so that the instance of this class is tied to a specific
-        #  bundling. Thus, for each bundling, the same request_distance_matrix will have to be recalculated
-        # self._bundles_distance_matrix = self._compute_bundles_distance_matrix()
-
-    @abstractmethod
-    def evaluate_bundling(self, bundling: Sequence[Sequence[int]]):
-        pass
-
-    @abstractmethod
-    def evaluate_bundle(self, bundle: Sequence[int]):
-        pass
-
-    def _compute_request_distance_matrix(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution):
-        request_distance_matrix = []
-        for i, request0 in enumerate(instance.requests[:-1]):
-            request_distance_array = []
-            for j, request1 in instance.requests[i:]:
-                distance = self.request_distance(instance, solution, request0, request1)
-                request_distance_array.append(distance)
-            request_distance_matrix.append(request_distance_array)
-        return request_distance_matrix
-
-    @abstractmethod
-    def request_distance(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, request0: int, request1: int):
-        """
-        Computes a pairwise distance matrix of requests based on the given distance function.
-
-        :param instance:
-        :param solution:
-        :param request0:
-        :param request1:
-        :return:
-        """
-        pass

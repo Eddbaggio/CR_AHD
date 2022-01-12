@@ -300,6 +300,9 @@ def plot_vienna_vrp_solution(instance: it.MDVRPTWInstance, solution: slt.CAHDSol
                                              popup=f'Depot of carrier {carrier.id_}<br>'
                                                    f'dur={carrier.sum_travel_duration()}<br>'
                                                    f'dist={round(carrier.sum_travel_distance())}',
+                                             tooltip=f'Depot of carrier {carrier.id_}<br>'
+                                                   f'dur={carrier.sum_travel_duration()}<br>'
+                                                   f'dist={round(carrier.sum_travel_distance())}',
                                              rotation=45,
                                              radius=10,
                                              color='black',
@@ -312,6 +315,9 @@ def plot_vienna_vrp_solution(instance: it.MDVRPTWInstance, solution: slt.CAHDSol
                             popup=f'Tour {tour.id_}<br>'
                                   f'dur={tour.sum_travel_duration}<br>'
                                   f'dist={round(tour.sum_travel_distance)})',
+                            tooltip=f'Tour {tour.id_}<br>'
+                                  f'dur={tour.sum_travel_duration}<br>'
+                                  f'dist={round(tour.sum_travel_distance)})',
                             color=color,
                             ).add_to(m)
 
@@ -320,6 +326,10 @@ def plot_vienna_vrp_solution(instance: it.MDVRPTWInstance, solution: slt.CAHDSol
             delivery_vertex = instance.vertex_from_request(request)
             folium.CircleMarker(location=instance.coords(delivery_vertex),
                                 popup=f'Request {request}<br>'
+                                      f'x,y={instance.vertex_x_coords[delivery_vertex], instance.vertex_y_coords[delivery_vertex]}<br>'
+                                      f'carrier={carrier.id_}<br>'
+                                      f'tw={instance.time_window(delivery_vertex)}',
+                                tooltip=f'Request {request}<br>'
                                       f'x,y={instance.vertex_x_coords[delivery_vertex], instance.vertex_y_coords[delivery_vertex]}<br>'
                                       f'carrier={carrier.id_}<br>'
                                       f'tw={instance.time_window(delivery_vertex)}',

@@ -1,4 +1,3 @@
-import cProfile
 import logging.config
 import os
 from datetime import datetime
@@ -7,7 +6,6 @@ import utility_module.io as io
 from solver_module import workflow as wf, param_gen as pg
 from utility_module import evaluation as ev, cr_ahd_logging as log
 from utility_module.argparse_utils import parser
-from utility_module.io import instance_selector
 
 logging.config.dictConfig(log.LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
@@ -15,22 +13,29 @@ logger.parent.handlers[0].setFormatter(log.CustomFormatter())
 
 if __name__ == '__main__':
     def cr_ahd():
-        # setup
+        # if called from within PyCharm
         if "PYCHARM" in os.environ:
-            # when called from within PyCharm
-            args = {'run': range(3),
-                    'rad': 200,
-                    'n': 10,
-                    'threads': 6,
+            args = {'diameter': 7,
+                    'num_carriers': 3,
+                    'num_requests': 10,
+                    'service_area_overlap': 0.3,
+                    'run': range(2),
+                    'threads': 1,
                     'fail': 1,
                     }
+        # else read from terminal parameters
         else:
             args = parser.parse_args().__dict__
 
         start = datetime.now()
         logger.info(f'START {start}')
 
-        paths = instance_selector(run=args['run'], rad=args['rad'], n=args['n'])
+        paths = io.vrptw_instance_selector(diameter=args['diameter'],
+                                           num_carriers=args['num_carriers'],
+                                           num_requests=args['num_requests'],
+                                           service_area_overlap=args['service_area_overlap'],
+                                           run=args['run'],
+                                           )
         configs = pg.parameter_generator()
 
         # solving
@@ -74,9 +79,12 @@ if __name__ == '__main__':
         # os.system("rundll32.exe powrprof.dll,SetSuspendState 0,1,0")
 
 
+    cr_ahd()
+
+    """
     # PROFILING
     cProfile.run('cr_ahd()', io.output_dir.joinpath('cr_ahd_stats'))
-    """
+
     # STATS
     p = pstats.Stats(ut.output_dir.joinpath('cr_ahd_stats').as_posix())
     # remove the extraneous path from all the module names:
