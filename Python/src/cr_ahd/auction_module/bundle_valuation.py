@@ -165,7 +165,7 @@ def bundle_total_travel_distance_proxy(instance: it.MDVRPTWInstance, bundle: Seq
     routing_sequence = []
     for request in bundle:
         routing_sequence.append(instance.vertex_from_request(request))
-    return instance.distance(routing_sequence[:-1], routing_sequence[1:])
+    return instance.travel_distance(routing_sequence[:-1], routing_sequence[1:])
 
 
 def bundle_total_travel_distance(instance: it.MDVRPTWInstance, bundle: Sequence[int]):
@@ -277,10 +277,10 @@ def ropke_pisinger_request_similarity(instance: it.MDVRPTWInstance,
     raise NotImplementedError('Not yet implemented for VRP')
     pickup_0, delivery_0 = instance.pickup_delivery_pair(request_0)
     pickup_1, delivery_1 = instance.pickup_delivery_pair(request_1)
-    distance_max = max(max(x) for x in instance._distance_matrix)
-    distance_min = min(min(x) for x in instance._distance_matrix)
+    distance_max = max(max(x) for x in instance._travel_distance_matrix)
+    distance_min = min(min(x) for x in instance._travel_distance_matrix)
     normalized_distance_matrix = [ut.linear_interpolation(x, 0, 1, distance_min, distance_max)
-                                  for x in instance._distance_matrix]
+                                  for x in instance._travel_distance_matrix]
     distance = normalized_distance_matrix[pickup_0][pickup_1] + normalized_distance_matrix[delivery_0][delivery_1]
 
     tour_0, tour_1 = [solution.tour_of_request(r) for r in (request_0, request_1)]

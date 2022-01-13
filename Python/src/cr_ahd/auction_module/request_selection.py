@@ -175,7 +175,7 @@ class MinDistanceToForeignDepotDMin(RequestSelectionBehaviorIndividual):
         dist_min = float('inf')
         delivery = instance.vertex_from_request(request)
         for depot in foreign_depots:
-            dist = min(instance.distance([depot], [delivery]), instance.distance([delivery], [depot]))
+            dist = min(instance.travel_distance([depot], [delivery]), instance.travel_distance([delivery], [depot]))
             if dist < dist_min:
                 dist_min = dist
 
@@ -220,7 +220,7 @@ class MinDistanceToForeignDepotDSum(RequestSelectionBehaviorIndividual):
         delivery = instance.vertex_from_request(request)
 
         for depot in foreign_depots:
-            dist = sum((instance.distance([depot], [delivery]), instance.distance([delivery], [depot])))
+            dist = sum((instance.travel_distance([depot], [delivery]), instance.travel_distance([delivery], [depot])))
             if dist < dist_min:
                 dist_min = dist
 
@@ -279,7 +279,7 @@ class ComboDistRaw(RequestSelectionBehaviorIndividual):
         delivery = instance.vertex_from_request(request)
         own_depot = carrier.id_
         # distance as the average of the asymmetric distances between depot and delivery vertex
-        dist_to_own_depot = instance.distance([own_depot, delivery], [delivery, own_depot]) / 2
+        dist_to_own_depot = instance.travel_distance([own_depot, delivery], [delivery, own_depot]) / 2
 
         # weighted sum of non-standardized [i], [ii], [iii]
         valuation = alpha1 * min_dist_to_foreign_depot + alpha2 * marginal_profit - alpha3 * dist_to_own_depot
@@ -362,7 +362,7 @@ class ComboDistStandardized(RequestSelectionBehaviorIndividual):
         delivery = instance.vertex_from_request(request)
         own_depot = carrier.id_
         # distance as the average of the asymmetric distances between depot and delivery vertex
-        dist_to_own_depot = instance.distance([own_depot, delivery], [delivery, own_depot]) / 2
+        dist_to_own_depot = instance.travel_distance([own_depot, delivery], [delivery, own_depot]) / 2
 
         return min_dist_to_foreign_depot, marginal_profit, dist_to_own_depot
 
@@ -434,7 +434,7 @@ class RequestSelectionBehaviorDistNeighbor(RequestSelectionBehavior, ABC):
                 neighbor_valuations.append(float('inf'))
 
             neigh_delivery = instance.vertex_from_request(neighbor)
-            valuation = instance.distance([init_delivery, neigh_delivery], [neigh_delivery, init_delivery])
+            valuation = instance.travel_distance([init_delivery, neigh_delivery], [neigh_delivery, init_delivery])
             neighbor_valuations.append(valuation)
 
         # sort by valuations
@@ -536,7 +536,7 @@ class SpatialBundleDSum(RequestSelectionBehaviorBundle):
             delivery0 = instance.vertex_from_request(r0)
             delivery1 = instance.vertex_from_request(r1)
 
-            evaluation -= instance.distance([delivery0, delivery1], [delivery1, delivery0])
+            evaluation -= instance.travel_distance([delivery0, delivery1], [delivery1, delivery0])
         return evaluation
 
 
@@ -565,7 +565,7 @@ class SpatialBundleDMax(RequestSelectionBehaviorBundle):
             # negative value: low distance between pairs means high valuation
             d0 = instance.vertex_from_request(r0)
             d1 = instance.vertex_from_request(r1)
-            evaluation -= max(instance.distance([d0], [d1]), instance.distance([d1], [d0]))
+            evaluation -= max(instance.travel_distance([d0], [d1]), instance.travel_distance([d1], [d0]))
         return evaluation
 
 
@@ -609,7 +609,7 @@ class SpatioTemporalBundle(RequestSelectionBehaviorBundle):
             for request2 in carrier.accepted_requests[i + 1:]:
                 delivery1 = instance.vertex_from_request(request1)
                 delivery2 = instance.vertex_from_request(request2)
-                d = instance.distance([delivery1, delivery2], [delivery2, delivery1])
+                d = instance.travel_distance([delivery1, delivery2], [delivery2, delivery1])
                 if d > max_pickup_delivery_dist:
                     max_pickup_delivery_dist = d
                 if d < min_pickup_delivery_dist:

@@ -224,9 +224,9 @@ class Tour(ABC):
 
         # ===== [2] UPDATE =====
         # dist_shift: total distance consumption of inserting j_vertex in between i_vertex and k_vertex
-        dist_shift_j = instance.distance([i_vertex], [j_vertex]) + \
-                       instance.distance([j_vertex], [k_vertex]) - \
-                       instance.distance([i_vertex], [k_vertex])
+        dist_shift_j = instance.travel_distance([i_vertex], [j_vertex]) + \
+                       instance.travel_distance([j_vertex], [k_vertex]) - \
+                       instance.travel_distance([i_vertex], [k_vertex])
 
         # time_shift: total time consumption of inserting j_vertex in between i_vertex and k_vertex
         travel_time_shift_j = instance.travel_duration([i_vertex], [j_vertex]) + \
@@ -345,19 +345,20 @@ class Tour(ABC):
         # ===== [2] UPDATE =====
 
         # dist_shift: total distance reduction of removing j_vertex from in between i_vertex and k_vertex
-        dist_shift_j = instance.distance([i_vertex], [k_vertex]) - \
-                       instance.distance([i_vertex], [j_vertex]) - \
-                       instance.distance([j_vertex], [k_vertex])
+        dist_shift_j = instance.travel_distance([i_vertex], [k_vertex]) - \
+                       instance.travel_distance([i_vertex], [j_vertex]) - \
+                       instance.travel_distance([j_vertex], [k_vertex])
 
         # time_shift: total time reduction of removing j_vertex from in between i_vertex and k_vertex
         travel_time_shift_j = instance.travel_duration([i_vertex], [k_vertex]) - \
                               instance.travel_duration([i_vertex], [j_vertex]) - \
                               instance.travel_duration([j_vertex], [k_vertex])
+
         time_shift_j = travel_time_shift_j - wait_j - instance.vertex_service_duration[j_vertex]
 
         # update sums
         self.sum_travel_distance += dist_shift_j  # += since dist_shift_j will be negative
-        self.sum_travel_duration += ut.travel_time(dist_shift_j)  # += since time_shift_j will be negative
+        self.sum_travel_duration += travel_time_shift_j  # += since time_shift_j will be negative
         self.sum_load -= instance.vertex_load[j_vertex]
         self.sum_revenue -= instance.vertex_revenue[j_vertex]
         self.sum_profit = self.sum_profit - instance.vertex_revenue[j_vertex] - dist_shift_j
@@ -428,7 +429,8 @@ class Tour(ABC):
 
         # assure that indices are sorted
         assert all(pop_indices[i] <= pop_indices[i + 1] for i in range(len(pop_indices) - 1))
-
+        if isinstance(self.id_, int):
+            logger.debug(f'Tour {self.id_}: Popping from {pop_indices}')
         popped = []
 
         # traverse the indices backwards to ensure that the succeeding indices are still correct once preceding ones
@@ -456,8 +458,8 @@ class Tour(ABC):
             j_vertex = self.routing_sequence[j_pos]
             k_vertex = self.routing_sequence[j_pos + 1]
 
-            delta += instance.distance([i_vertex], [k_vertex])
-            delta -= instance.distance([i_vertex, j_vertex], [j_vertex, k_vertex])
+            delta += instance.travel_distance([i_vertex], [k_vertex])
+            delta -= instance.travel_distance([i_vertex, j_vertex], [j_vertex, k_vertex])
 
         # must ensure that no edges are counted twice. Naive implementation with a tmp_routing_sequence.
         else:
@@ -471,8 +473,44 @@ class Tour(ABC):
                 j_vertex = tmp_routing_sequence.pop(j_pos)
                 k_vertex = tmp_routing_sequence[j_pos]
 
-                delta += instance.distance([i_vertex], [k_vertex])
-                delta -= instance.distance([i_vertex, j_vertex], [j_vertex, k_vertex])
+                delta += instance.travel_distance([i_vertex], [k_vertex])
+                delta -= instance.travel_distance([i_vertex, j_vertex], [j_vertex, k_vertex])
+
+        return delta
+
+    def pop_duration_delta(self, instance, pop_indices: Sequence[int]):
+        """
+        :return: the negative delta that is obtained by popping the pop_indices from the routing sequence. NOTE: does
+        not actually remove/pop the vertices
+        """
+
+        delta = 0
+
+        # easy for single insertion
+        if len(pop_indices) == 1:
+
+            j_pos = pop_indices[0]
+            i_vertex = self.routing_sequence[j_pos - 1]
+            j_vertex = self.routing_sequence[j_pos]
+            k_vertex = self.routing_sequence[j_pos + 1]
+
+            delta += instance.travel_duration([i_vertex], [k_vertex])
+            delta -= instance.travel_duration([i_vertex, j_vertex], [j_vertex, k_vertex])
+
+        # must ensure that no edges are counted twice. Naive implementation with a tmp_routing_sequence.
+        else:
+            assert all(pop_indices[i] < pop_indices[i + 1] for i in
+                       range(len(pop_indices) - 1)), f'Pop indices {pop_indices} are not in correct order'
+
+            tmp_routing_sequence = list(self.routing_sequence)
+
+            for j_pos in reversed(pop_indices):
+                i_vertex = tmp_routing_sequence[j_pos - 1]
+                j_vertex = tmp_routing_sequence.pop(j_pos)
+                k_vertex = tmp_routing_sequence[j_pos]
+
+                delta += instance.travel_duration([i_vertex], [k_vertex])
+                delta -= instance.travel_duration([i_vertex, j_vertex], [j_vertex, k_vertex])
 
         return delta
 
@@ -528,8 +566,8 @@ class Tour(ABC):
             j_vertex = vertices[0]
             k_vertex = self.routing_sequence[j_pos]
 
-            delta += instance.distance([i_vertex, j_vertex], [j_vertex, k_vertex])
-            delta -= instance.distance([i_vertex], [k_vertex])
+            delta += instance.travel_distance([i_vertex, j_vertex], [j_vertex, k_vertex])
+            delta -= instance.travel_distance([i_vertex], [k_vertex])
             assert delta >= 0
 
         # must ensure that no edges are counted twice. Naive implementation with a tmp_routing_sequence
@@ -544,8 +582,8 @@ class Tour(ABC):
                 i_vertex = tmp_routing_sequence[j_pos - 1]
                 k_vertex = tmp_routing_sequence[j_pos + 1]
 
-                delta += instance.distance([i_vertex, j_vertex], [j_vertex, k_vertex])
-                delta -= instance.distance([i_vertex], [k_vertex])
+                delta += instance.travel_distance([i_vertex, j_vertex], [j_vertex, k_vertex])
+                delta -= instance.travel_distance([i_vertex], [k_vertex])
 
         return delta
 
@@ -661,7 +699,7 @@ class PDPTWTour(Tour):
                 return False
 
         # [2] check max tour distance
-        distance_shift_j = instance.distance([i, j], [j, k]) - instance.distance([i], [k])
+        distance_shift_j = instance.travel_distance([i, j], [j, k]) - instance.travel_distance([i], [k])
         if self.sum_travel_distance + distance_shift_j > instance.max_tour_distance:
             return False
 
@@ -702,7 +740,7 @@ class VRPTWTour(Tour):
         k = self.routing_sequence[insertion_index]
 
         # [1] check max tour distance
-        distance_shift_j = instance.distance([i, j], [j, k]) - instance.distance([i], [k])
+        distance_shift_j = instance.travel_distance([i, j], [j, k]) - instance.travel_distance([i], [k])
         if self.sum_travel_distance + distance_shift_j > instance.max_tour_distance:
             return False
 

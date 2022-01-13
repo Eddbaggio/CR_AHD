@@ -16,8 +16,8 @@ def parameter_generator():
     """
 
     tour_constructions: List[cns.VRPTWInsertionConstruction] = [
-        cns.VRPTWMinTravelDistanceInsertion()
-
+        # cns.VRPTWMinTravelDistanceInsertion(),
+        cns.VRPTWMinTravelDurationInsertion()
         # cns.MinTimeShiftInsertion()
     ]
 
@@ -49,12 +49,14 @@ def parameter_generator():
         # mh.PDPTWReducedVariableNeighborhoodSearch,
         # mh.PDPTWVariableNeighborhoodSearch,
         # mh.PDPTWSimulatedAnnealing,
-        mh.NoMetaheuristic,
+        # mh.NoMetaheuristic,
         mh.LocalSearchFirst,
     ]
 
     neighborhood_collections: List[List[nh.Neighborhood]] = [
-        [nh.VRPTWTwoOptDist()]
+        # [nh.VRPTWTwoOptDist()],
+        # [nh.VRPTWTwoOptDur()],
+        [nh.VRPTWMoveDist()],
     ]
 
     tour_improvement_time_limits: List[float] = [
@@ -66,7 +68,7 @@ def parameter_generator():
 
     nums_submitted_requests: List[int] = [
         # 3,
-        4,
+        # 4,
         # 5
     ]
 

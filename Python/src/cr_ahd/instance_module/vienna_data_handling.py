@@ -4,12 +4,17 @@ import warnings;
 from pathlib import Path
 
 import geopandas as gp
+import numpy as np
 import pandas as pd
 import requests
 import tqdm
 from shapely.geometry import Point
 
 from utility_module import io
+
+# CONVENTION
+# when using coordinates, use the order LATITUDE FIRST, LONGITUDE SECOND! All inputs will be rearranged to follow this
+# this order. https://en.wikipedia.org/wiki/ISO_6709#Items
 
 warnings.filterwarnings('ignore', message='.*initial implementation of Parquet.*')
 
@@ -287,6 +292,8 @@ def _query_vienna_addresses_online(write_path: Path = io.input_dir.joinpath('vie
 
 def query_osrm(gs: gp.GeoSeries):
     """
+    OSRM uses long/lat instead of lat/lon
+    The demo server only provides the car profile
 
     :return: car-based distances and durations of the pairwise fastest routes between points in gs. The distance
     is not the shortest distance between points but the distance of the fastest route between points. durations are
@@ -299,33 +306,36 @@ def query_osrm(gs: gp.GeoSeries):
     remainder = 0 if len(gs) % half_api_limit == 0 else 1
 
     for i in tqdm.tqdm(range((len(gs) // half_api_limit) + remainder), desc='OSRM API QUERY'):
-        chunk1 = gs.iloc[half_api_limit * i: half_api_limit * (i + 1)]
-        sources = [list(p.coords)[0] for p in chunk1]
-        sources = [",".join([str(p[1]), str(p[0])]) for p in sources]
+        sources_chunk = gs.iloc[half_api_limit * i: half_api_limit * (i + 1)]
+        sources = [list(p.coords)[0] for p in sources_chunk]
+        sources = [",".join([str(p[1]), str(p[0])]) for p in sources]  # OSRM uses lon/lat instead of lat/lon
         sources = ";".join(sources)
 
         for j in tqdm.tqdm(range((len(gs) // half_api_limit) + remainder)):
-            chunk2 = gs.iloc[half_api_limit * j: half_api_limit * (j + 1)]
-            destinations = [list(p.coords)[0] for p in chunk2]
-            destinations = [",".join([str(p[1]), str(p[0])]) for p in destinations]
+            destinations_chunk = gs.iloc[half_api_limit * j: half_api_limit * (j + 1)]
+            destinations = [list(p.coords)[0] for p in destinations_chunk]
+            destinations = [",".join([str(p[1]), str(p[0])]) for p in
+                            destinations]  # OSRM uses lon/lat instead of lat/lon
             destinations = ";".join(destinations)
 
             # make the API request
             locations = ";".join([sources, destinations])
-            sources_ids = ";".join(str(x) for x in (range(len(chunk1))))
-            destinations_ids = ";".join(str(x) for x in (range(len(chunk1), len(chunk1) + len(chunk2))))
-            # annotations = 'distance,duration'
+            sources_ids = ";".join(str(x) for x in (range(len(sources_chunk))))
+            destinations_ids = ";".join(
+                str(x) for x in (range(len(sources_chunk), len(sources_chunk) + len(destinations_chunk))))
             annotations = 'duration,distance'
-            req = f"http://router.project-osrm.org/table/v1/car/{locations}?sources={sources_ids}&destinations={destinations_ids}&annotations={annotations}"
+            # querying the OSRM demo server
+            # req = f"http://router.project-osrm.org/table/v1/car/{locations}?sources={sources_ids}&destinations={destinations_ids}&annotations={annotations}"
+            # querying the docker image local server (much faster!)
+            req = f"http://127.0.0.1:5000/table/v1/car/{locations}?sources={sources_ids}&destinations={destinations_ids}&annotations={annotations}"
             r = requests.get(req)
             assert r.status_code == 200, f'Status code: {r.status_code} is invalid. Check your request.\n{r.content}'
 
-            # transform the result to a pandas DataFrame
-            # distance_matrix = pd.DataFrame(r.json()['distances'], index=chunk1.index, columns=chunk2.index, )
-            # duration_matrix = pd.DataFrame(r.json()['durations'], index=chunk1.index, columns=chunk2.index, )
+            # r.json()['durations']: array of arrays that stores the matrix in row-major order. durations[i][j] gives
+            # the travel time from the i-th source to the j-th destination
 
-            for k in range(len(chunk1)):
-                key = chunk1.index[k]
+            for k in range(len(sources_chunk)):
+                key = sources_chunk.index[k]
                 if key in durations:
                     durations[key] = durations[key] + r.json()['durations'][k]
                 else:
@@ -335,10 +345,37 @@ def query_osrm(gs: gp.GeoSeries):
                 else:
                     distances[key] = r.json()['distances'][k]
 
-    duration_matrix = pd.DataFrame(durations, columns=gs.index, index=gs.index)
-    distance_matrix = pd.DataFrame(distances, columns=gs.index, index=gs.index)
+    duration_matrix = pd.DataFrame.from_dict(durations,
+                                             columns=gs.index,
+                                             orient='index')  # index orientation since the dicts store values row-wise
+    distance_matrix = pd.DataFrame.from_dict(distances,
+                                             columns=gs.index,
+                                             orient='index')  # index orientation since the dicts store values row-wise
 
     return distance_matrix, duration_matrix
+
+
+def check_triangle_inequality(data, verbose=False):
+    data = np.array(data)
+    n = len(data)
+    num_violations = 0
+    for i in range(n):
+        for j in range(n):
+            if i == j:
+                continue
+            for k in range(n):
+                if i == k or j == k:
+                    continue
+
+                d_ik = data[i][k]
+                d_ij = data[i][j]
+                d_jk = data[j][k]
+                if not d_ik <= d_ij + d_jk:
+                    num_violations += 1
+                    if verbose:
+                        print(f'violation: {i:02d}-{k:02d} > {i:02d}-{j:02d} + {j:02d}-{k:02d} =>'
+                              f' {d_ik} > {d_ij} + {d_jk} => [{d_ik - d_ij - d_jk}]')
+    return num_violations
 
 
 if __name__ == '__main__':
@@ -346,8 +383,9 @@ if __name__ == '__main__':
     # _query_vienna_addresses_online(write_path=io.input_dir.joinpath('vienna_addresses.csv'))
 
     # read addresses from disk and preprocess
-    gdf_full = read_vienna_addresses(io.input_dir.joinpath('vienna_addresses.csv'),)
-                                     # nrows=200)  for testing
+    gdf_full = read_vienna_addresses(io.input_dir.joinpath('vienna_addresses.csv'),
+                                     # nrows=200,  # for testing
+                                     )
 
     # sample some points for easier and more efficient handling
     n = 1000  # sample size

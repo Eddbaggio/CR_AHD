@@ -108,7 +108,7 @@ class VRPTWMoveDist(IntraTourNeighborhood):
                 # restore delta before checking the next insertion position
                 delta -= insertion_distance_delta
             # repair the copy before checking the next request for repositioning
-            tour_copy.insert_distance_delta(instance, [old_pos], [vertex])
+            tour_copy.insert_and_update(instance, [old_pos], [vertex])
         pass
 
     def feasibility_check(self, instance: it.MDVRPTWInstance, move: vrptw_move_move):
@@ -123,6 +123,30 @@ class VRPTWMoveDist(IntraTourNeighborhood):
         pass
 
 
+class VRPTWMoveDur(VRPTWMoveDist):
+    def feasible_move_generator_for_tour(self, instance: it.MDVRPTWInstance, tour: tr.VRPTWTour):
+        tour_copy = deepcopy(tour)
+        for old_pos, vertex in enumerate(tour_copy.routing_sequence[1:-1], start=1):
+            delta = tour_copy.pop_duration_delta(instance, [old_pos])
+            tour_copy.pop_and_update(instance, [old_pos])
+            # check new insertion positions
+            for new_pos in range(1, len(tour_copy) - 1):
+                if new_pos == old_pos:
+                    continue
+                insertion_distance_delta = tour_copy.insert_duration_delta(instance, [new_pos], [vertex])
+                delta += insertion_distance_delta
+                move = (delta, tour_copy, old_pos, vertex, new_pos)
+                # yield the move (with the original tour, not the copy) if it's feasible
+                if self.feasibility_check(instance, move):
+                    move = (delta, tour, old_pos, vertex, new_pos)
+                    yield move
+                # restore delta before checking the next insertion position
+                delta -= insertion_distance_delta
+            # repair the copy before checking the next request for repositioning
+            tour_copy.insert_and_update(instance, [old_pos], [vertex])
+        pass
+
+
 class VRPTWTwoOptDist(IntraTourNeighborhood):
     """
     The classic 2-opt neighborhood by Croes (1958)
@@ -132,10 +156,47 @@ class VRPTWTwoOptDist(IntraTourNeighborhood):
         for i in range(0, len(tour) - 3):
             for j in range(i + 2, len(tour) - 1):
                 delta = 0.0
-                delta -= instance.distance([tour.routing_sequence[i], tour.routing_sequence[j]],
-                                           [tour.routing_sequence[i + 1], tour.routing_sequence[j + 1]])
-                delta += instance.distance([tour.routing_sequence[i], tour.routing_sequence[i + 1]],
-                                           [tour.routing_sequence[j], tour.routing_sequence[j + 1]])
+                delta -= instance.travel_distance([tour.routing_sequence[i], tour.routing_sequence[j]],
+                                                  [tour.routing_sequence[i + 1], tour.routing_sequence[j + 1]])
+                delta += instance.travel_distance([tour.routing_sequence[i], tour.routing_sequence[i + 1]],
+                                                  [tour.routing_sequence[j], tour.routing_sequence[j + 1]])
+                move: vrptw_2opt_move = (delta, tour, i, j)
+                if self.feasibility_check(instance, move):
+                    yield move
+
+    def feasibility_check(self, instance: it.MDVRPTWInstance, move: vrptw_2opt_move):
+        delta, tour, i, j = move
+
+        pop_indices = list(range(i + 1, j + 1))
+        popped = tour.pop_and_update(instance, pop_indices)
+        feasibility = tour.insertion_feasibility_check(instance, range(i + 1, j + 1), list(reversed(popped)))
+        tour.insert_and_update(instance, pop_indices, popped)
+        return feasibility
+
+    def execute_move(self, instance: it.MDVRPTWInstance, move: vrptw_2opt_move):
+        delta, tour, i, j = move
+        popped = tour.pop_and_update(instance, list(range(i + 1, j + 1)))
+        tour.insert_and_update(instance, range(i + 1, j + 1), list(reversed(popped)))
+        pass
+
+
+class VRPTWTwoOptDur(IntraTourNeighborhood):
+    """
+    The classic 2-opt neighborhood by Croes (1958)
+    """
+
+    def feasible_move_generator_for_tour(self, instance: it.MDVRPTWInstance, tour: tr.VRPTWTour):
+        for i in range(0, len(tour) - 3):
+            for j in range(i + 2, len(tour) - 1):
+                delta = 0.0
+                delta -= instance.travel_duration(
+                    [tour.routing_sequence[i], tour.routing_sequence[j]],
+                    [tour.routing_sequence[i + 1], tour.routing_sequence[j + 1]]
+                ).total_seconds()
+                delta += instance.travel_duration(
+                    [tour.routing_sequence[i], tour.routing_sequence[i + 1]],
+                    [tour.routing_sequence[j], tour.routing_sequence[j + 1]]
+                ).total_seconds()
                 move: vrptw_2opt_move = (delta, tour, i, j)
                 if self.feasibility_check(instance, move):
                     yield move

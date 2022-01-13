@@ -67,10 +67,6 @@ def euclidean_distance(x1, y1, x2, y2):
     return math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
 
 
-def travel_time(dist):
-    return dt.timedelta(hours=dist / SPEED_KMH)  # compute timedelta
-
-
 def power_set(iterable, include_empty_set=True):
     """power_set([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"""
     s = list(iterable)

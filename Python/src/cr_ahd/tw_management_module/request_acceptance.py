@@ -66,13 +66,13 @@ class _CloseDistToCompetitors(RequestAcceptanceAttractiveness):
 
     def evaluate(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution, request: int):
         delivery_vertex = instance.vertex_from_request(request)
-        carrier_dist_sum = instance.distance([carrier.id_, delivery_vertex],
-                                             [delivery_vertex, carrier.id_])
+        carrier_dist_sum = instance.travel_distance([carrier.id_, delivery_vertex],
+                                                    [delivery_vertex, carrier.id_])
         for competitor_id in range(instance.num_carriers):
             if competitor_id == carrier.id_:
                 continue
-            competitor_dist_sum = instance.distance([competitor_id, delivery_vertex],
-                                                    [delivery_vertex, competitor_id])
+            competitor_dist_sum = instance.travel_distance([competitor_id, delivery_vertex],
+                                                           [delivery_vertex, competitor_id])
             # self.closeness = 0.5 -> the request is at least as close to the competitor as it si to the carrier
             if competitor_dist_sum / (competitor_dist_sum + carrier_dist_sum) <= self.closeness:
                 return True

@@ -1,4 +1,3 @@
-import json
 import datetime as dt
 import random
 import webbrowser
@@ -137,7 +136,7 @@ def generate_vienna_cr_ahd_instance(vienna_addresses: gp.GeoDataFrame,
     # filter addresses, durations and distances
     loc_idx = list(vienna_depots.index) + list(vienna_requests.index)
     vienna_durations = np.array(vienna_durations.loc[loc_idx, loc_idx])
-    vienna_durations = np.array([[dt.timedelta(seconds=int(j)) for j in i] for i in vienna_durations])
+    vienna_durations = np.array([[dt.timedelta(seconds=j) for j in i] for i in vienna_durations])
     vienna_distances = np.array(vienna_distances.loc[loc_idx, loc_idx])
 
     # plotting
@@ -267,6 +266,5 @@ if __name__ == '__main__':
                                                    max_tour_length=1_000_000,  # in meters
                                                    plot=False
                                                    )
-        instance.write(io.input_dir.joinpath(instance.id_ + '.dat'))
-        with open(io.input_dir.joinpath(instance.id_ + '.json'), "w") as file:
-            json.dump(instance.__dict__, file, cls=io.MyJSONEncoder, indent=4)
+        instance.write_delim(io.input_dir.joinpath(instance.id_ + '.dat'))
+        instance.write_json(io.input_dir.joinpath(instance.id_ + '.json'))
