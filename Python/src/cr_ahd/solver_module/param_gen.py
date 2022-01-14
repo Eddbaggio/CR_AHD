@@ -42,33 +42,15 @@ def parameter_generator():
         # tws.NoTW(),
     ]
 
-    tour_improvements: List[mh.VRPTWMetaHeuristic.__class__] = [
-        # mh.PDPTWSequentialLocalSearch,
-        # mh.PDPTWIteratedLocalSearch,
-        # mh.PDPTWVariableNeighborhoodDescent,
-        # mh.PDPTWReducedVariableNeighborhoodSearch,
-        # mh.PDPTWVariableNeighborhoodSearch,
-        # mh.PDPTWSimulatedAnnealing,
-        # mh.NoMetaheuristic,
-        mh.LocalSearchFirst,
-    ]
-
-    neighborhood_collections: List[List[nh.Neighborhood]] = [
-        # [nh.VRPTWTwoOptDist()],
-        # [nh.VRPTWTwoOptDur()],
-        [nh.VRPTWMoveDist()],
-    ]
-
-    tour_improvement_time_limits: List[float] = [
-        # 1,
-        # 2,
-        # 5,
-        10.0
+    tour_improvements: List[mh.VRPTWMetaHeuristic] = [
+        # mh.NoMetaheuristic([nh.NoNeighborhood()], None),
+        mh.LocalSearchFirst([nh.VRPTWMoveDur()], 1),
+        mh.LocalSearchBest([nh.VRPTWMoveDur()], 1),
     ]
 
     nums_submitted_requests: List[int] = [
         # 3,
-        # 4,
+        4,
         # 5
     ]
 
@@ -121,110 +103,106 @@ def parameter_generator():
 
     # ===== Nested Parameter Loops =====
     for tour_construction in tour_constructions:
-        for tour_improvement_class in tour_improvements:
-            for neighborhoods in neighborhood_collections:
-                for tour_improvement_time_limit in tour_improvement_time_limits:
-                    tour_improvement = tour_improvement_class(neighborhoods, tour_improvement_time_limit)
-                    for time_window_offering, time_window_selection in zip(time_window_offerings,
-                                                                           time_window_selections):
-                        for acceptance_policy in acceptance_policies:
-                            # ===== Isolated Planning Parameters, no auction =====
-                            isolated_planning = dict(
-                                request_acceptance=ra.RequestAcceptanceBehavior(
-                                    acceptance_policy['max_num_accepted_infeasible'],
-                                    acceptance_policy['request_acceptance_attractiveness'],
-                                    time_window_offering, time_window_selection),
-                                tour_construction=tour_construction,
-                                tour_improvement=tour_improvement,
-                                num_intermediate_auctions=0,
-                                intermediate_auction=False,
-                                final_auction=False,
-                            )
-                            yield isolated_planning
+        for tour_improvement in tour_improvements:
+            for time_window_offering, time_window_selection in zip(time_window_offerings, time_window_selections):
+                for acceptance_policy in acceptance_policies:
+                    # ===== Isolated Planning Parameters, no auction =====
+                    isolated_planning = dict(
+                        request_acceptance=ra.RequestAcceptanceBehavior(
+                            acceptance_policy['max_num_accepted_infeasible'],
+                            acceptance_policy['request_acceptance_attractiveness'],
+                            time_window_offering, time_window_selection),
+                        tour_construction=tour_construction,
+                        tour_improvement=tour_improvement,
+                        num_intermediate_auctions=0,
+                        intermediate_auction=False,
+                        final_auction=False,
+                    )
+                    yield isolated_planning
 
-                            # auction-specific parameters
-                            for num_submitted_requests in nums_submitted_requests:
-                                for request_selection in request_selections:
-                                    for num_auction_bundles in nums_auction_bundles:
-                                        for bundle_generation, bundle_generation_kwargs in bundle_generations:
-                                            for bundling_valuation in bundling_valuations:
-                                                for auction_policy in auction_policies:
+                    # auction-specific parameters
+                    for num_submitted_requests in nums_submitted_requests:
+                        for request_selection in request_selections:
+                            for num_auction_bundles in nums_auction_bundles:
+                                for bundle_generation, bundle_generation_kwargs in bundle_generations:
+                                    for bundling_valuation in bundling_valuations:
+                                        for auction_policy in auction_policies:
 
-                                                    # ===== INTERMEDIATE AUCTIONS =====
-                                                    if auction_policy['num_intermediate_auctions'] > 0:
-                                                        assert num_submitted_requests % 2 == 0
-                                                        total_nsr_int = num_submitted_requests // 2
-                                                        total_nsr_fin = num_submitted_requests // 2
+                                            # ===== INTERMEDIATE AUCTIONS =====
+                                            if auction_policy['num_intermediate_auctions'] > 0:
+                                                assert num_submitted_requests % 2 == 0
+                                                total_nsr_int = num_submitted_requests // 2
+                                                total_nsr_fin = num_submitted_requests // 2
 
-                                                        assert total_nsr_int % auction_policy[
-                                                            'num_intermediate_auctions'] == 0
-                                                        nsr_int = total_nsr_int // auction_policy[
-                                                            'num_intermediate_auctions']
+                                                assert total_nsr_int % auction_policy[
+                                                    'num_intermediate_auctions'] == 0
+                                                nsr_int = total_nsr_int // auction_policy[
+                                                    'num_intermediate_auctions']
 
-                                                        assert nsr_int % auction_policy[
-                                                            'num_intermediate_auction_rounds'] == 0
-                                                        nsr_int_round = nsr_int // auction_policy[
-                                                            'num_intermediate_auction_rounds']
+                                                assert nsr_int % auction_policy[
+                                                    'num_intermediate_auction_rounds'] == 0
+                                                nsr_int_round = nsr_int // auction_policy[
+                                                    'num_intermediate_auction_rounds']
 
-                                                        intermediate_auction = au.Auction(
-                                                            tour_construction=tour_construction,
-                                                            tour_improvement=tour_improvement,
-                                                            request_selection=request_selection(nsr_int_round),
-                                                            bundle_generation=bundle_generation(
-                                                                # TODO is it fair to divide by num_int_auctions?
-                                                                num_auction_bundles=num_auction_bundles,
-                                                                # / auction_policy['num_intermediate_auctions'],
-                                                                bundling_valuation=bundling_valuation(),
-                                                                **bundle_generation_kwargs
-                                                            ),
-                                                            bidding=bd.ClearAndReinsertAll(tour_construction,
-                                                                                           tour_improvement
-                                                                                           ),
-                                                            winner_determination=wd.MaxBidGurobiCAP1(),
-                                                            # TODO add proper parameter
-                                                            num_auction_rounds=auction_policy[
-                                                                'num_intermediate_auction_rounds']
-                                                        )
-                                                    else:
-                                                        total_nsr_fin = num_submitted_requests
-                                                        intermediate_auction = False
+                                                intermediate_auction = au.Auction(
+                                                    tour_construction=tour_construction,
+                                                    tour_improvement=tour_improvement,
+                                                    request_selection=request_selection(nsr_int_round),
+                                                    bundle_generation=bundle_generation(
+                                                        # TODO is it fair to divide by num_int_auctions?
+                                                        num_auction_bundles=num_auction_bundles,
+                                                        # / auction_policy['num_intermediate_auctions'],
+                                                        bundling_valuation=bundling_valuation(),
+                                                        **bundle_generation_kwargs
+                                                    ),
+                                                    bidding=bd.ClearAndReinsertAll(tour_construction,
+                                                                                   tour_improvement
+                                                                                   ),
+                                                    winner_determination=wd.MaxBidGurobiCAP1(),
+                                                    # TODO add proper parameter
+                                                    num_auction_rounds=auction_policy[
+                                                        'num_intermediate_auction_rounds']
+                                                )
+                                            else:
+                                                total_nsr_fin = num_submitted_requests
+                                                intermediate_auction = False
 
-                                                    # ===== FINAL AUCTION =====
-                                                    assert total_nsr_fin % auction_policy[
-                                                        'num_final_auction_rounds'] == 0
-                                                    nsr_fin_round = total_nsr_fin // auction_policy[
-                                                        'num_final_auction_rounds']
+                                            # ===== FINAL AUCTION =====
+                                            assert total_nsr_fin % auction_policy[
+                                                'num_final_auction_rounds'] == 0
+                                            nsr_fin_round = total_nsr_fin // auction_policy[
+                                                'num_final_auction_rounds']
 
-                                                    final_auction = au.Auction(
-                                                        tour_construction=tour_construction,
-                                                        tour_improvement=tour_improvement,
-                                                        request_selection=request_selection(nsr_fin_round),
-                                                        bundle_generation=bundle_generation(
-                                                            # TODO is it fair to divide by num_int_auctions?
-                                                            num_auction_bundles=num_auction_bundles,
-                                                            # / auction_policy['num_intermediate_auctions'],
-                                                            bundling_valuation=bundling_valuation(),
-                                                            **bundle_generation_kwargs
-                                                        ),
-                                                        bidding=bd.ClearAndReinsertAll(tour_construction,
-                                                                                       tour_improvement
-                                                                                       ),
-                                                        winner_determination=wd.MaxBidGurobiCAP1(),
-                                                        num_auction_rounds=auction_policy[
-                                                            'num_final_auction_rounds']
-                                                    )
+                                            final_auction = au.Auction(
+                                                tour_construction=tour_construction,
+                                                tour_improvement=tour_improvement,
+                                                request_selection=request_selection(nsr_fin_round),
+                                                bundle_generation=bundle_generation(
+                                                    # TODO is it fair to divide by num_int_auctions?
+                                                    num_auction_bundles=num_auction_bundles,
+                                                    # / auction_policy['num_intermediate_auctions'],
+                                                    bundling_valuation=bundling_valuation(),
+                                                    **bundle_generation_kwargs
+                                                ),
+                                                bidding=bd.ClearAndReinsertAll(tour_construction,
+                                                                               tour_improvement
+                                                                               ),
+                                                winner_determination=wd.MaxBidGurobiCAP1(),
+                                                num_auction_rounds=auction_policy[
+                                                    'num_final_auction_rounds']
+                                            )
 
-                                                    collaborative_planning = dict(
-                                                        request_acceptance=ra.RequestAcceptanceBehavior(
-                                                            acceptance_policy['max_num_accepted_infeasible'],
-                                                            acceptance_policy['request_acceptance_attractiveness'],
-                                                            time_window_offering, time_window_selection),
-                                                        tour_construction=tour_construction,
-                                                        tour_improvement=tour_improvement,
-                                                        num_intermediate_auctions=auction_policy[
-                                                            'num_intermediate_auctions'],
-                                                        intermediate_auction=intermediate_auction,
-                                                        final_auction=final_auction,
-                                                    )
+                                            collaborative_planning = dict(
+                                                request_acceptance=ra.RequestAcceptanceBehavior(
+                                                    acceptance_policy['max_num_accepted_infeasible'],
+                                                    acceptance_policy['request_acceptance_attractiveness'],
+                                                    time_window_offering, time_window_selection),
+                                                tour_construction=tour_construction,
+                                                tour_improvement=tour_improvement,
+                                                num_intermediate_auctions=auction_policy[
+                                                    'num_intermediate_auctions'],
+                                                intermediate_auction=intermediate_auction,
+                                                final_auction=final_auction,
+                                            )
 
-                                                    yield collaborative_planning
+                                            yield collaborative_planning

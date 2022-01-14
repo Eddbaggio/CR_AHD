@@ -1,10 +1,11 @@
 import logging.config
+import logging.config
 import os
 from datetime import datetime
 
 import utility_module.io as io
 from solver_module import workflow as wf, param_gen as pg
-from utility_module import evaluation as ev, cr_ahd_logging as log
+from utility_module import cr_ahd_logging as log
 from utility_module.argparse_utils import parser
 
 logging.config.dictConfig(log.LOGGING_CONFIG)
@@ -19,7 +20,7 @@ if __name__ == '__main__':
                     'num_carriers': 3,
                     'num_requests': 10,
                     'service_area_overlap': 0.3,
-                    'run': range(2),
+                    'run': range(5),
                     'threads': 1,
                     'fail': 1,
                     }
@@ -45,31 +46,21 @@ if __name__ == '__main__':
         df = io.solutions_to_df(solutions, agg_level)
 
         # write df
-        io.output_dir.mkdir(exist_ok=True, parents=True)
         csv_path = io.unique_path(io.output_dir, 'evaluation_agg_' + agg_level + '_#{:03d}' + '.csv')
         df.to_csv(path_or_buf=csv_path, index=False)
 
-        ev.plot(df,
-                values='sum_profit',
-                color=('solution_algorithm', 'request_acceptance_attractiveness', 'max_num_accepted_infeasible',),
-                category=('run',),
-                facet_col=('rad',),
-                facet_row=('n',),
-                title=str(csv_path.name),
-                html_path=io.unique_path(io.output_dir, 'CAHD_#{:03d}.html').as_posix(),
-                )
-
-        # ev.bar_chart(df,
-        #              title=str(io.unique_path(io.output_dir, 'evaluation_agg_' + agg_level + '_#{:03d}' + '.csv').name),
-        #              values='sum_profit',
-        #              color=['solution_algorithm', 'num_int_auctions'],
-        #              category='run',
-        #              facet_col='rad',
-        #              facet_row='n',
-        #              show=True,
-        #              html_path=io.unique_path(io.output_dir, 'CAHD_#{:03d}.html').as_posix())
-        secondary_parameter = ['request_acceptance_attractiveness', 'max_num_accepted_infeasible']
-        ev.print_top_level_stats(df, secondary_parameter)
+        # ev.plot(df,
+        #         values='sum_profit',
+        #         color=('solution_algorithm', 'request_acceptance_attractiveness', 'max_num_accepted_infeasible',),
+        #         category=('run',),
+        #         facet_col=('rad',),
+        #         facet_row=('n',),
+        #         title=str(csv_path.name),
+        #         html_path=io.unique_path(io.output_dir, 'CAHD_#{:03d}.html').as_posix(),
+        #         )
+        #
+        # secondary_parameter = ['request_acceptance_attractiveness', 'max_num_accepted_infeasible']
+        # ev.print_top_level_stats(df, secondary_parameter)
 
         end = datetime.now()
         logger.info(f'END {end}')
@@ -80,13 +71,12 @@ if __name__ == '__main__':
 
 
     cr_ahd()
-
     """
     # PROFILING
     cProfile.run('cr_ahd()', io.output_dir.joinpath('cr_ahd_stats'))
 
     # STATS
-    p = pstats.Stats(ut.output_dir.joinpath('cr_ahd_stats').as_posix())
+    p = pstats.Stats(io.output_dir.joinpath('cr_ahd_stats').as_posix())
     # remove the extraneous path from all the module names:
     p.strip_dirs()
     # sorts the profile by cumulative time in a function, and then only prints the n most significant lines:

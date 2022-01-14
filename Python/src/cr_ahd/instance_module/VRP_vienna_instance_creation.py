@@ -1,5 +1,4 @@
 import datetime as dt
-import random
 import webbrowser
 from typing import List, Union
 
@@ -16,52 +15,24 @@ from tqdm import tqdm
 import instance_module.geometry as geo
 from core_module import instance as it
 from utility_module import io, utils as ut
-from vienna_data_handling import read_vienna_addresses
+from vienna_data_handling import read_vienna_addresses, check_triangle_inequality
 
 
 # CONVENTION
 # when using coordinates, use the order LATITUDE FIRST, LONGITUDE SECOND! All inputs will be rearranged to follow this
 # this order. https://en.wikipedia.org/wiki/ISO_6709#Items
 
-def generate_generic_cr_ahd_instance(
-        area_km: tuple = (20, 20),
-        num_carriers: int = 3,
-        dist_center_to_carrier_km=7,
-        carrier_competition: float = 0.2,
-        num_request: int = 10,
-        max_num_tours_per_carrier: int = 3,
-        max_vehicle_load: int = 10,
-        max_tour_length: int = 1000,
-        requests_service_duration: List[dt.timedelta] = (dt.timedelta(minutes=4),) * (3 * 10)
-):
-    center_x, center_y = area_km[0] / 2, area_km[1] / 2
-    # generate evenly positioned depots around the city center
-    depots = geo.circle(center_x, center_y, dist_center_to_carrier_km, resolution=num_carriers)
-    depots = gp.GeoSeries([Point(lat, long) for lat, long in list(depots.exterior.coords)[:-1]], crs="EPSG:4326")
-    service_circles = gp.GeoSeries([geo.circle(p.x, p.y, 7, 24) for p in depots], crs="EPSG:4326")
-
-    raise NotImplementedError
-    pass
-
-
-def generate_vienna_cr_ahd_instance(vienna_addresses: gp.GeoDataFrame,
-                                    vienna_distances,
-                                    vienna_durations: pd.DataFrame,
-                                    num_carriers: int = 3,
-                                    dist_center_to_carrier_km=7,
-                                    carrier_competition: float = 0,
-                                    num_requests_per_carrier: int = 10,
-                                    carriers_max_num_tours: int = 3,
-                                    max_vehicle_load: int = 10,
-                                    max_tour_length: int = 1000,
+def generate_vienna_cr_ahd_instance(vienna_addresses: gp.GeoDataFrame, vienna_distances, vienna_durations: pd.DataFrame,
+                                    num_carriers: int = 3, dist_center_to_carrier_km=7, carrier_competition: float = 0,
+                                    num_requests_per_carrier: int = 10, carriers_max_num_tours: int = 3,
+                                    max_vehicle_load: int = 10, max_tour_length: int = 1000,
                                     max_tour_duration=ut.EXECUTION_TIME_HORIZON.duration,
                                     requests_service_duration: Union[dt.timedelta, List[dt.timedelta]] = dt.timedelta(
-                                        minutes=4),
-                                    requests_revenue: Union[float, int, List[float], List[int]] = 1,
-                                    requests_load: Union[float, int, List[float], List[int]] = 1,
-                                    plot=False):
+                                        minutes=4), requests_revenue: Union[float, int, List[float], List[int]] = 1,
+                                    requests_load: Union[float, int, List[float], List[int]] = 1, plot=False, rng=None):
     """
 
+    :param rng:
     :param max_tour_duration:
     :param vienna_addresses:
     :param vienna_distances:
@@ -79,6 +50,8 @@ def generate_vienna_cr_ahd_instance(vienna_addresses: gp.GeoDataFrame,
     :param plot:
     :return:
     """
+
+    rng = np.random.default_rng(rng)
 
     if num_carriers < 2:
         raise ValueError('Must have at least 2 carriers for a CR_AHD instance')
@@ -123,13 +96,12 @@ def generate_vienna_cr_ahd_instance(vienna_addresses: gp.GeoDataFrame,
 
     # assign carriers to requests. If more than one carrier serves a district, one of them is chosen randomly
     vienna_requests = vienna_addresses.drop(index=vienna_depots.index)
-    vienna_requests['carrier'] = [random.choice(district_carrier_assignment[x])
-                                  for x in vienna_requests['GEB_BEZIRK']]
+    vienna_requests['carrier'] = [rng.choice(district_carrier_assignment[x]) for x in vienna_requests['GEB_BEZIRK']]
 
     # sampling the customers
     selected = []
     for name, group in vienna_requests.groupby(['carrier']):
-        s = group.sample(num_requests_per_carrier, replace=False)
+        s = group.sample(num_requests_per_carrier, replace=False, random_state=rng.bit_generator)
         selected.extend(s.index)
     vienna_requests = vienna_requests.loc[selected]
 
@@ -138,6 +110,8 @@ def generate_vienna_cr_ahd_instance(vienna_addresses: gp.GeoDataFrame,
     vienna_durations = np.array(vienna_durations.loc[loc_idx, loc_idx])
     vienna_durations = np.array([[dt.timedelta(seconds=j) for j in i] for i in vienna_durations])
     vienna_distances = np.array(vienna_distances.loc[loc_idx, loc_idx])
+
+    check_triangle_inequality(vienna_durations, True)
 
     # plotting
     if plot:
@@ -250,21 +224,22 @@ def read_vienna_districts_shapefile():
 if __name__ == '__main__':
     m = 1000
     n = 1
+    rng = np.random.default_rng()
     # travel duration in seconds *as floats*
     durations = pd.read_csv(io.input_dir.joinpath(f'vienna_{m}_durations_#{n:03d}.csv'), index_col=0)
     # distance in meters
     distances = pd.read_csv(io.input_dir.joinpath(f'vienna_{m}_distances_#{n:03d}.csv'), index_col=0)
 
     addresses = read_vienna_addresses(io.input_dir.joinpath(f'vienna_{m}_addresses_#{n:03d}.csv'))
-    for _ in tqdm(range(3)):
+    for _ in tqdm(range(10)):
         instance = generate_vienna_cr_ahd_instance(vienna_addresses=addresses,
                                                    vienna_distances=distances,
                                                    vienna_durations=durations,
                                                    num_carriers=3,
                                                    carrier_competition=0.3,
                                                    num_requests_per_carrier=10,
-                                                   max_tour_length=1_000_000,  # in meters
-                                                   plot=False
-                                                   )
+                                                   max_tour_length=1_000_000,
+                                                   plot=False,
+                                                   rng=rng)
         instance.write_delim(io.input_dir.joinpath(instance.id_ + '.dat'))
         instance.write_json(io.input_dir.joinpath(instance.id_ + '.json'))

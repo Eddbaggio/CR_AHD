@@ -77,15 +77,6 @@ def solutions_to_df(solutions, agg_level: str):
             raise ValueError('agg_level must be one of "solution", "carrier" or "tour"')
 
     df = pd.DataFrame.from_records(df)
-    df.drop(columns=['dist'], inplace=True)  # since the distance between depots is always 200 for the GH instances
-
-    # set the multiindex
-    # index = ['rad', 'n', 'run'] + list(solution.solver_config.keys())
-    # if agg_level == 'carrier':
-    #     index += ['carrier_id_']
-    # if agg_level == 'tour':
-    #     index += ['tour_id_']
-    # df.set_index(keys=index, inplace=True)
 
     # convert timedelta to seconds
     for column in df.select_dtypes(include=['timedelta64']):

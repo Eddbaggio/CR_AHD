@@ -50,6 +50,17 @@ class Neighborhood(ABC):
         pass
 
 
+class NoNeighborhood(Neighborhood):
+    def feasible_move_generator_for_carrier(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution):
+        pass
+
+    def execute_move(self, instance: it.MDVRPTWInstance, move: tuple):
+        pass
+
+    def feasibility_check(self, instance: it.MDVRPTWInstance, move: tuple):
+        pass
+
+
 # =====================================================================================================================
 # INTRA-TOUR NEIGHBORHOOD
 # =====================================================================================================================
@@ -120,6 +131,7 @@ class VRPTWMoveDist(IntraTourNeighborhood):
         # remove
         tour.pop_and_update(instance, [old_pos])
         tour.insert_and_update(instance, [new_pos], [vertex])
+        logger.debug(f'{self.name} neighborhood moved vertex {vertex} from {old_pos} to {new_pos} for a delta of {delta}')
         pass
 
 
@@ -127,21 +139,22 @@ class VRPTWMoveDur(VRPTWMoveDist):
     def feasible_move_generator_for_tour(self, instance: it.MDVRPTWInstance, tour: tr.VRPTWTour):
         tour_copy = deepcopy(tour)
         for old_pos, vertex in enumerate(tour_copy.routing_sequence[1:-1], start=1):
-            delta = tour_copy.pop_duration_delta(instance, [old_pos])
+            delta = tour_copy.pop_duration_delta(instance, [old_pos]).total_seconds()
             tour_copy.pop_and_update(instance, [old_pos])
             # check new insertion positions
             for new_pos in range(1, len(tour_copy) - 1):
                 if new_pos == old_pos:
                     continue
-                insertion_distance_delta = tour_copy.insert_duration_delta(instance, [new_pos], [vertex])
-                delta += insertion_distance_delta
+                insertion_duration_delta = tour_copy.insert_duration_delta(instance, [new_pos],
+                                                                           [vertex]).total_seconds()
+                delta += insertion_duration_delta
                 move = (delta, tour_copy, old_pos, vertex, new_pos)
                 # yield the move (with the original tour, not the copy) if it's feasible
                 if self.feasibility_check(instance, move):
                     move = (delta, tour, old_pos, vertex, new_pos)
                     yield move
                 # restore delta before checking the next insertion position
-                delta -= insertion_distance_delta
+                delta -= insertion_duration_delta
             # repair the copy before checking the next request for repositioning
             tour_copy.insert_and_update(instance, [old_pos], [vertex])
         pass

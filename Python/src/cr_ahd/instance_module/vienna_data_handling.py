@@ -9,6 +9,7 @@ import pandas as pd
 import requests
 import tqdm
 from shapely.geometry import Point
+from tqdm import trange
 
 from utility_module import io
 
@@ -355,11 +356,11 @@ def query_osrm(gs: gp.GeoSeries):
     return distance_matrix, duration_matrix
 
 
-def check_triangle_inequality(data, verbose=False):
+def check_triangle_inequality(data, verbose=False, disable_progress_bar=True):
     data = np.array(data)
     n = len(data)
     num_violations = 0
-    for i in range(n):
+    for i in trange(n, disable=disable_progress_bar):
         for j in range(n):
             if i == j:
                 continue
@@ -394,10 +395,10 @@ if __name__ == '__main__':
 
         # write the sample to disk for faster reading later
         write_path = io.unique_path(io.input_dir, f'vienna_{n}_addresses' + '_#{:03d}' + '.csv')
-        gdf.to_csv(io.input_dir.joinpath(write_path), encoding='utf-8-sig', index=True, header=True)
 
         # query OSRM durations
         distance_matrix, duration_matrix = query_osrm(gdf.geometry)
+        gdf.to_csv(io.input_dir.joinpath(write_path), encoding='utf-8-sig', index=True, header=True)
         dur_write_path = write_path.as_posix().replace('addresses', 'durations')
         duration_matrix.to_csv(dur_write_path, encoding='utf-8-sig', index=True, header=True)
         dist_write_path = write_path.as_posix().replace('addresses', 'distances')

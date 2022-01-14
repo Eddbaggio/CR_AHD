@@ -21,7 +21,7 @@ class VRPTWMetaHeuristic(ABC):
         self.time_limit_per_carrier = time_limit_per_carrier
         self.iter_count = None
         self.parameters = dict()
-        self.trajectory = []  # collection of all accepted & executed moves
+        # self.trajectory = []  # collection of all accepted & executed moves
 
         self.name = f'{self.__class__.__name__}'
 
@@ -48,9 +48,9 @@ class VRPTWMetaHeuristic(ABC):
     def stopping_criterion(self):
         pass
 
-    def update_trajectory(self, name: str, move: tuple, accepted: bool):
-        self.trajectory.append((name, move, accepted))
-        pass
+    # def update_trajectory(self, name: str, move: tuple, accepted: bool):
+    #     self.trajectory.append((name, move, accepted))
+    #     pass
 
 
 class NoMetaheuristic(VRPTWMetaHeuristic):
@@ -108,10 +108,10 @@ class LocalSearchFirst(VRPTWMetaHeuristic):
                 try:
                     move = next(move_gen)  # may be feasible but not improving
                     while not self.acceptance_criterion(instance, move):
-                        self.update_trajectory(neighborhood.__class__.__name__, move, False)
+                        # self.update_trajectory(neighborhood.__class__.__name__, move, False)
                         move = next(move_gen)
                     neighborhood.execute_move(instance, move)
-                    self.update_trajectory(neighborhood.__class__.__name__, move, True)
+                    # self.update_trajectory(neighborhood.__class__.__name__, move, True)
                     self.improved = True
                 except StopIteration:
                     break  # exit the while loop (while-condition is false anyway)
@@ -151,7 +151,7 @@ class LocalSearchBest(VRPTWMetaHeuristic):
                 if any(all_moves):
                     best_move = min(all_moves, key=lambda x: x[0])
                     if self.acceptance_criterion(instance, best_move):
-                        self.update_trajectory(neighborhood.__class__.__name__, best_move, True)
+                        # self.update_trajectory(neighborhood.__class__.__name__, best_move, True)
                         neighborhood.execute_move(instance, best_move)
                         self.improved = True
         return best_solution
@@ -196,7 +196,7 @@ class PDPTWSequentialLocalSearch(VRPTWMetaHeuristic):
                             if self.acceptance_criterion(instance, move):
                                 neighborhood.execute_move(instance, move)
                                 self.improved = True
-                                self.update_trajectory(neighborhood.__class__.__name__, move, True)
+                                # self.update_trajectory(neighborhood.__class__.__name__, move, True)
                                 move_generator = neighborhood.feasible_move_generator_for_carrier(instance, carrier)
                         except StopIteration:
                             # StopIteration occurs if there are no neighbors that can be returned by the move_generator
@@ -243,16 +243,16 @@ class PDPTWVariableNeighborhoodDescent(VRPTWMetaHeuristic):
                     if self.acceptance_criterion(instance, best_move):
                         neighborhood.execute_move(instance, best_move)
                         # ut.validate_solution(instance, best_solution)
-                        self.update_trajectory(self.parameters['k'], best_move, True)
+                        # self.update_trajectory(self.parameters['k'], best_move, True)
                         self.parameters['k'] = 0
                     else:
-                        self.update_trajectory(self.parameters['k'], best_move, False)
+                        # self.update_trajectory(self.parameters['k'], best_move, False)
                         self.parameters['k'] += 1
                 else:
                     self.parameters['k'] += 1
         return best_solution
 
-    def execute_on_tour(self, instance: it.MDVRPTWInstance, tour: tr.Tour):
+    def execute_on_tour(self, instance: it.MDVRPTWInstance, tour: tr.VRPTWTour):
         """
         execute the metaheuristic for a given route (in place) using all available intra-tour neighborhoods. useful if
         a tour shall be improved that does not belong to a carrier. E.g. when estimating the tour length of a bundle
@@ -267,10 +267,10 @@ class PDPTWVariableNeighborhoodDescent(VRPTWMetaHeuristic):
                 best_move = min(all_moves, key=lambda x: x[0])
                 if self.acceptance_criterion_tour(best_move):
                     neighborhood.execute_move(instance, best_move)
-                    self.update_trajectory(self.parameters['k'], best_move, True)
+                    # self.update_trajectory(self.parameters['k'], best_move, True)
                     self.parameters['k'] = 0
                 else:
-                    self.update_trajectory(self.parameters['k'], best_move, False)
+                    # self.update_trajectory(self.parameters['k'], best_move, False)
                     self.parameters['k'] += 1
             else:
                 self.parameters['k'] += 1
@@ -321,10 +321,10 @@ class PDPTWReducedVariableNeighborhoodSearch(PDPTWVariableNeighborhoodDescent):
                         neighborhood.execute_move(instance, random_move)  # in place
                         # ut.validate_solution(instance, best_solution)
                         best_solution = deepcopy(solution)
-                        self.update_trajectory(self.parameters['k'], random_move, True)
+                        # self.update_trajectory(self.parameters['k'], random_move, True)
                         self.parameters['k'] = 0
                     else:
-                        self.update_trajectory(self.parameters['k'], random_move, False)
+                        # self.update_trajectory(self.parameters['k'], random_move, False)
                         self.parameters['k'] += 1
                 else:
                     self.parameters['k'] += 1
@@ -362,12 +362,12 @@ class PDPTWVariableNeighborhoodSearch(PDPTWVariableNeighborhoodDescent):
                     if self.acceptance_criterion(instance, (solution_improved, best_solution)):
                         # ut.validate_solution(instance, best_solution)
                         solution = solution_improved
-                        self.update_trajectory(self.parameters['k'], random_move, True)
+                        # self.update_trajectory(self.parameters['k'], random_move, True)
                         self.parameters['k'] = 0
                         if solution_improved.objective() > best_solution.objective():
                             best_solution = deepcopy(solution_improved)
                     else:
-                        self.update_trajectory(self.parameters['k'], random_move, False)
+                        # self.update_trajectory(self.parameters['k'], random_move, False)
                         self.parameters['k'] += 1
                 else:
                     self.parameters['k'] += 1
@@ -431,7 +431,7 @@ class PDPTWSimulatedAnnealing(VRPTWMetaHeuristic):
 
                     if self.acceptance_criterion(instance, move):
                         neighborhood.execute_move(instance, move)
-                        self.update_trajectory(neighborhood.__class__.__name__, move, True)
+                        # self.update_trajectory(neighborhood.__class__.__name__, move, True)
                         # update the best solution
                         if solution.objective() > best_solution.objective():
                             best_solution = deepcopy(solution)
@@ -513,7 +513,7 @@ class PDPTWIteratedLocalSearch(VRPTWMetaHeuristic):
                 delta = solution_new.sum_travel_distance() - solution.sum_travel_distance()
                 move = (delta, solution, solution_new)
                 if self.acceptance_criterion(instance, move):
-                    self.update_trajectory('ILS Perturbation', move, True)
+                    # self.update_trajectory('ILS Perturbation', move, True)
                     solution = solution_new  # equivalent to execute_move
                 self.iter_count += 1
 

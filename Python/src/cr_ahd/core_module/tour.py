@@ -1,6 +1,5 @@
 import datetime as dt
 import logging.config
-import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import List, Sequence, Set, Dict
@@ -484,7 +483,7 @@ class Tour(ABC):
         not actually remove/pop the vertices
         """
 
-        delta = 0
+        delta = dt.timedelta(0)
 
         # easy for single insertion
         if len(pop_indices) == 1:
@@ -766,7 +765,7 @@ class VRPTWTour(Tour):
             return False
 
         # [3] check max vehicle load
-        warnings.warn('check whether *vertex* load and *request* load are handled properly in the Instance class!')
+        # TODO warnings.warn('check whether *vertex* load and *request* load are handled properly in the Instance class!')
         if self.sum_load + instance.vertex_load[j] > instance.max_vehicle_load:
             return False
         return True

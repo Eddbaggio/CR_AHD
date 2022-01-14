@@ -1,6 +1,7 @@
 import datetime as dt
 import json
 import logging.config
+import math
 from pathlib import Path
 from typing import Sequence, List, NoReturn
 
@@ -9,6 +10,7 @@ import numpy as np
 import utility_module.utils as ut
 from instance_module.vienna_data_handling import check_triangle_inequality
 from tw_management_module import tw
+from utility_module.datetime_rounding import ceil_timedelta
 from utility_module.io import MyJSONEncoder
 
 logger = logging.getLogger(__name__)
@@ -159,11 +161,14 @@ class MDVRPTWInstance:
         self.tw_open = [*carrier_depots_tw_open, *request_time_window_open]
         self.tw_close = [*carrier_depots_tw_close, *request_time_window_close]
 
-        # TODO need to ceil the durations due to floating point precision?!
-        #  I did that with distances in PDPTW
-        self._travel_duration_matrix = np.array(duration_matrix)
+        # TODO need to ceil the durations due to floating point precision?!, Yes!!
+        # self._travel_duration_matrix = np.array(duration_matrix)
+        self._travel_duration_matrix = np.array([[ceil_timedelta(x, 's') for x in y] for y in duration_matrix])
         assert all(self._travel_duration_matrix.ravel() >= dt.timedelta(0))
-        self._travel_distance_matrix = np.array(distance_matrix)
+        num_violations = check_triangle_inequality(self._travel_duration_matrix, True)
+        assert num_violations == 0, f'{self.id_} violates triangle inequality in {num_violations} cases'
+
+        self._travel_distance_matrix = np.array([[math.ceil(x) for x in y] for y in distance_matrix])
         assert all(self._travel_distance_matrix.ravel() >= 0)
 
         logger.debug(f'{id_}: created')
@@ -294,12 +299,6 @@ def read_vienna_instance(path: Path) -> MDVRPTWInstance:
         inst['_travel_duration_matrix'] = [[dt.timedelta(seconds=y) for y in x]
                                            for x in inst['_travel_duration_matrix']]
         inst['max_tour_duration'] = dt.timedelta(seconds=inst['max_tour_duration'])
-
-        # check triangle inequality:
-        num_violations = check_triangle_inequality(inst['_travel_duration_matrix'], True)
-        print(f'There are {num_violations} violations of the triangle inequality in the travel duration matrix')
-        num_violations = check_triangle_inequality(inst['_travel_distance_matrix'])
-        print(f'There are {num_violations} violations of the triangle inequality in the travel distance matrix')
 
         return MDVRPTWInstance(id_=inst['_id_'],
                                carriers_max_num_tours=inst['carriers_max_num_tours'],

@@ -11,7 +11,6 @@ from routing_module import tour_construction as cns
 from tw_management_module import request_acceptance as ra
 from utility_module import utils as ut, profiling as pr
 from utility_module.cr_ahd_logging import SUCCESS
-from utility_module.plotting import plot_vienna_vrp_solution
 
 logger = logging.getLogger(__name__)
 
@@ -153,7 +152,7 @@ class Solver:
             self.request_acceptance_and_time_window(instance, solution, carrier, request)
 
         # ===== Final Improvement =====
-        plot_vienna_vrp_solution(instance, solution)  # REMOVEME for debugging only
+        # plot_vienna_vrp_solution(instance, solution)  # REMOVEME for debugging only
         before_improvement = solution.objective()
         timer = pr.Timer()
         solution = self.tour_improvement.execute(instance, solution)
@@ -170,7 +169,7 @@ class Solver:
         ut.validate_solution(instance, solution)  # safety check to make sure everything's functional
         logger.log(SUCCESS, f'{instance.id_}: Success {solution.solver_config}')
 
-        plot_vienna_vrp_solution(instance, solution)  # REMOVEME for debugging only
+        # plot_vienna_vrp_solution(instance, solution)  # REMOVEME for debugging only
         return instance, solution
 
     def request_acceptance_and_time_window(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier,
