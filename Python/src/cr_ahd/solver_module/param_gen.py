@@ -43,9 +43,9 @@ def parameter_generator():
     ]
 
     tour_improvements: List[mh.VRPTWMetaHeuristic] = [
-        # mh.NoMetaheuristic([nh.NoNeighborhood()], None),
+        mh.NoMetaheuristic([nh.NoNeighborhood()], None),
         mh.LocalSearchFirst([nh.VRPTWMoveDur()], 1),
-        mh.LocalSearchBest([nh.VRPTWMoveDur()], 1),
+        # mh.LocalSearchBest([nh.VRPTWMoveDur()], 1),
     ]
 
     nums_submitted_requests: List[int] = [

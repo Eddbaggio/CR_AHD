@@ -29,12 +29,6 @@ class CAHDSolution:
         # solver configuration and other meta data
         self.solver_config = dict()
         self.timings = dict()
-        # TODO find a better way to add available ls neighborhoods automatically REMOVEME I have never used this
-        self.local_search_move_counter = dict(PDPMove=0,
-                                              PDPTwoOpt=0,
-                                              PDPRelocate=0,
-                                              PDPRelocate2=0,
-                                              PDPLargeInterTourNeighborhood=0)
 
     def __str__(self):
         s = f'Solution {self.id_}\nObjective={round(self.objective(), 2)}'
@@ -107,10 +101,8 @@ class CAHDSolution:
         return summary
 
     def write_to_json(self):
-        path = io.output_dir.joinpath(f'{self.num_carriers()}carriers',
-                                      self.id_ + '_' + self.solver_config['solution_algorithm'])
+        path = io.solution_dir.joinpath(self.id_ + '_' + self.solver_config['solution_algorithm'])
         path = io.unique_path(path.parent, path.stem + '_#{:03d}' + '.json')
-        path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, mode='w') as f:
             json.dump({'summary': self.summary(), 'solution': self.as_dict()}, f, indent=4, cls=io.MyJSONEncoder)
         pass

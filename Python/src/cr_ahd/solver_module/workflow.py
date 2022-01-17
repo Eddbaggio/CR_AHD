@@ -6,10 +6,9 @@ from datetime import datetime
 
 from tqdm import tqdm
 
-import utility_module.io
 from core_module import instance as it, solution as slt
 from solver_module import solver as slv
-from utility_module import profiling as pr, cr_ahd_logging as log
+from utility_module import profiling as pr, cr_ahd_logging as log, io
 
 logging.config.dictConfig(log.LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
@@ -38,7 +37,7 @@ def _execute_job_star(args):
 
 def _execute_job(path, config, fail_on_error, console_log_level):
     log.remove_all_handlers(logging.getLogger())
-    log_file_path = utility_module.io.output_dir.joinpath(f'{path.stem}_log.log')
+    log_file_path = io.logging_dir.joinpath(f'{path.stem}_log.log')
     log.add_handlers(logging.getLogger(), str(log_file_path))
 
     logging.getLogger().handlers[0].setLevel(console_log_level)

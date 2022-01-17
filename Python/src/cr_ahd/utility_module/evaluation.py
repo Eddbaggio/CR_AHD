@@ -1,11 +1,10 @@
 import datetime as dt
 import warnings
-from pathlib import Path
 from typing import Sequence, List, Tuple
 
-import numpy as np
 import pandas as pd
 import plotly.express as px
+from matplotlib import pyplot as plt
 
 import utility_module.utils as ut
 
@@ -348,13 +347,12 @@ def print_top_level_stats(df: pd.DataFrame, secondary_parameters: List[str]):
                 record[x] = collaborative[x].agg('mean') / isolated[x].agg('mean')
             records.append(record)
             # average by different groupings
-            for grouper in [
-                ['rad'],
-                ['n'],
-                secondary_parameters,
-                ['rad', *secondary_parameters],
-                ['rad', 'n'],
-                ['rad', 'n', *secondary_parameters]]:
+            for grouper in [['rad'],
+                            ['n'],
+                            secondary_parameters,
+                            ['rad', *secondary_parameters],
+                            ['rad', 'n'],
+                            ['rad', 'n', *secondary_parameters]]:
                 for iso, coll in zip(isolated.groupby(grouper, dropna=False),
                                      collaborative.groupby(grouper, dropna=False)):
                     iso_name, iso_group = iso
@@ -401,20 +399,108 @@ def print_top_level_stats(df: pd.DataFrame, secondary_parameters: List[str]):
                 print(x)
 
 
+def collaboration_gain(df: pd.DataFrame):
+    instance_config = [
+        't',
+        'd',
+        'c',
+        'n',
+        'o',
+        'r', ]
+    planning_config = 'solution_algorithm'
+    general_config = [
+        'tour_improvement',
+        'neighborhoods',
+        'tour_construction',
+        'tour_improvement_time_limit_per_carrier', ]
+    collaborative_config = [
+        'max_num_accepted_infeasible',
+        'request_acceptance_attractiveness',
+        'time_window_offering',
+        'time_window_selection',
+        'num_int_auctions',
+        'int_auction_tour_construction',
+        'int_auction_tour_improvement',
+        'int_auction_neighborhoods',
+        'int_auction_num_submitted_requests',
+        'int_auction_request_selection',
+        'int_auction_bundle_generation',
+        'int_auction_bundling_valuation',
+        'int_auction_num_auction_bundles',
+        'int_auction_bidding',
+        'int_auction_winner_determination',
+        'int_auction_num_auction_rounds',
+        'fin_auction_tour_construction',
+        'fin_auction_tour_improvement',
+        'fin_auction_neighborhoods',
+        'fin_auction_num_submitted_requests',
+        'fin_auction_request_selection',
+        'fin_auction_bundle_generation',
+        'fin_auction_bundling_valuation',
+        'fin_auction_num_auction_bundles',
+        'fin_auction_bidding',
+        'fin_auction_winner_determination',
+        'fin_auction_num_auction_rounds', ]
+    solution_values = [
+        'objective',
+        'sum_profit',
+        'sum_travel_distance',
+        'sum_travel_duration',
+        'sum_load',
+        'sum_revenue',
+        'num_tours',
+        'num_pendulum_tours',
+        'num_routing_stops',
+        'acceptance_rate', ]
+    solution_runtimes = [
+        'runtime_final_improvement',
+        'runtime_total',
+        'runtime_final_auction', ]
+
+    gains = []
+
+    for inst_name, inst_group in df.groupby(instance_config):
+        record = {k: v for k, v in zip(instance_config, inst_name)}
+
+        for gen_name, gen_group in inst_group.groupby(general_config):
+            record.update({k: v for k, v in zip(general_config, gen_name)})
+
+            isolated = gen_group[gen_group[planning_config] == 'IsolatedPlanning'].squeeze()
+
+            collaborative = gen_group[gen_group[planning_config] == 'CollaborativePlanning'].squeeze()
+            if isinstance(collaborative, pd.Series):
+                coll_gain = collaborative[solution_values] / isolated[solution_values]
+                record.update({k: v for k, v in zip(solution_values, coll_gain)})
+                gains.append(record)
+            else:
+                for collab_name, collab_group in collaborative.groupby(collaborative_config):
+                    coll_gain = collab_group[solution_values] / isolated[solution_values]
+                    record.update({k: v for k, v in zip(solution_values, coll_gain)})
+                    gains.append(record)
+
+    df = pd.DataFrame.from_records(gains, columns=instance_config + general_config + collaborative_config + solution_values)
+    df.set_index(instance_config + general_config + collaborative_config, inplace=True)
+    df.plot(kind='bar').legend(loc='upper center', bbox_to_anchor=(0.5, 1.1), ncol=5)
+    plt.show()
+    return df
+
+
 if __name__ == '__main__':
-    path = "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home Deliveries/01_Code/data/Output/evaluation_agg_solution_#098.csv"
+    path = "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home Deliveries/01_Code/data/Output/evaluation_agg_solution_#001.csv"
     df = pd.read_csv(path)
 
+    collaboration_gain(df)
+
     # print_top_level_stats(df, [])
-    plot(df,
-         title=str(Path(path).name),
-         values='sum_profit',
-         color=('solution_algorithm', 'request_acceptance_attractiveness', 'max_num_accepted_infeasible',),
-         category=('run',),
-         facet_col=('rad',),
-         facet_row=('n',),
-         show=True,
-         # width=1000 * 0.85,
-         # height=450 * 0.85 * 1.8,
-         # html_path=ut.unique_path(Path("C:/Users/Elting/Desktop"), 'CAHD_#{:03d}.html').as_posix()
-         )
+    # plot(df,
+    #      title=str(Path(path).name),
+    #      values='sum_profit',
+    #      color=('solution_algorithm', 'request_acceptance_attractiveness', 'max_num_accepted_infeasible',),
+    #      category=('run',),
+    #      facet_col=('rad',),
+    #      facet_row=('n',),
+    #      show=True,
+    # width=1000 * 0.85,
+    # height=450 * 0.85 * 1.8,
+    # html_path=ut.unique_path(Path("C:/Users/Elting/Desktop"), 'CAHD_#{:03d}.html').as_posix()
+    # )

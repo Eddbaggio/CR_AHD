@@ -16,6 +16,10 @@ assert input_dir.exists(), f'Input directory does not exist! Make sure the worki
                            f'execution is called) is correct '
 output_dir = data_dir.joinpath('Output')
 output_dir.mkdir(parents=True, exist_ok=True)
+logging_dir = output_dir.joinpath('logs')
+logging_dir.mkdir(parents=True, exist_ok=True)
+solution_dir = output_dir.joinpath('solutions')
+solution_dir.mkdir(parents=True, exist_ok=True)
 
 
 class MyJSONEncoder(json.JSONEncoder):

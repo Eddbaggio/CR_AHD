@@ -103,30 +103,6 @@ class MDVRPTWInstance:
                  carrier_depots_tw_close: List[dt.datetime],
                  duration_matrix,
                  distance_matrix):
-        """
-
-        :param max_tour_duration:
-        :param distance_matrix:
-        :param id_: unique identifier
-        :param carriers_max_num_tours:
-        :param max_vehicle_load:
-        :param max_tour_length:
-        :param requests: list of request indices
-        :param requests_initial_carrier_assignment:
-        :param requests_disclosure_time:
-        :param requests_x:
-        :param requests_y:
-        :param requests_revenue:
-        :param requests_service_duration:
-        :param requests_load:
-        :param request_time_window_open:
-        :param request_time_window_close:
-        :param carrier_depots_x:
-        :param carrier_depots_y:
-        :param carrier_depots_tw_open:
-        :param carrier_depots_tw_close:
-        :param duration_matrix:
-        """
         # sanity checks:
         assert requests == sorted(requests)
         assert requests[0] == 0
@@ -161,15 +137,16 @@ class MDVRPTWInstance:
         self.tw_open = [*carrier_depots_tw_open, *request_time_window_open]
         self.tw_close = [*carrier_depots_tw_close, *request_time_window_close]
 
-        # TODO need to ceil the durations due to floating point precision?!, Yes!!
-        # self._travel_duration_matrix = np.array(duration_matrix)
+        # need to ceil the durations & distances due to floating point precision errors
         self._travel_duration_matrix = np.array([[ceil_timedelta(x, 's') for x in y] for y in duration_matrix])
         assert all(self._travel_duration_matrix.ravel() >= dt.timedelta(0))
         num_violations = check_triangle_inequality(self._travel_duration_matrix, True)
-        assert num_violations == 0, f'{self.id_} violates triangle inequality in {num_violations} cases'
+        # assert num_violations == 0, f'{self.id_} violates triangle inequality for DURATIONS in {num_violations} cases'
 
         self._travel_distance_matrix = np.array([[math.ceil(x) for x in y] for y in distance_matrix])
         assert all(self._travel_distance_matrix.ravel() >= 0)
+        num_violations = check_triangle_inequality(self._travel_distance_matrix, True)
+        # assert num_violations == 0, f'{self.id_} violates triangle inequality for DISTANCES in {num_violations} cases'
 
         logger.debug(f'{id_}: created')
 

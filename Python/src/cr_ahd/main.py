@@ -3,9 +3,8 @@ import logging.config
 import os
 from datetime import datetime
 
-import utility_module.io as io
 from solver_module import workflow as wf, param_gen as pg
-from utility_module import cr_ahd_logging as log
+from utility_module import cr_ahd_logging as log, io, evaluation as ev
 from utility_module.argparse_utils import parser
 
 logging.config.dictConfig(log.LOGGING_CONFIG)
@@ -21,7 +20,7 @@ if __name__ == '__main__':
                     'num_requests': 10,
                     'service_area_overlap': 0.3,
                     'run': range(5),
-                    'threads': 1,
+                    'threads': 6,
                     'fail': 1,
                     }
         # else read from terminal parameters
@@ -37,7 +36,7 @@ if __name__ == '__main__':
                                            service_area_overlap=args['service_area_overlap'],
                                            run=args['run'],
                                            )
-        configs = pg.parameter_generator()
+        configs = list(pg.parameter_generator())
 
         # solving
         solutions = wf.execute_jobs(paths, configs, args['threads'], args['fail'])
@@ -48,6 +47,9 @@ if __name__ == '__main__':
         # write df
         csv_path = io.unique_path(io.output_dir, 'evaluation_agg_' + agg_level + '_#{:03d}' + '.csv')
         df.to_csv(path_or_buf=csv_path, index=False)
+
+        collaboration_gains = ev.collaboration_gain(df)
+        collaboration_gains.to_csv(str(csv_path).replace('agg_solution', 'coll_gain'), index=False)
 
         # ev.plot(df,
         #         values='sum_profit',

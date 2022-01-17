@@ -291,22 +291,29 @@ def _query_vienna_addresses_online(write_path: Path = io.input_dir.joinpath('vie
     return vienna_addresses
 
 
-def query_osrm(gs: gp.GeoSeries):
+def query_osrm(gs: gp.GeoSeries, mode: str, api_limit=100):
     """
     OSRM uses long/lat instead of lat/lon
-    The demo server only provides the car profile
+    The demo server only provides the car profile, and the "shortest path"  is actually a "routability" profile that
+    minimizes duration while respecting some convenience constraints.
+    Therefore, two individual docker containers must be running to support strict shortest/quickest path. The two
+    modes are 'distance' or 'durations'
 
-    :return: car-based distances and durations of the pairwise fastest routes between points in gs. The distance
-    is not the shortest distance between points but the distance of the fastest route between points. durations are
+    :return: car-based distances/durations of the pairwise shortest/fastest routes between points in gs. durations are
     in seconds, distances are in meters
     """
-    api_limit = 100
+    if mode == 'duration':
+        port = 5000
+    elif mode == 'distance':
+        port = 5001
+    else:
+        raise ValueError
+
     half_api_limit = api_limit // 2
-    durations = dict()
-    distances = dict()
+    weights = dict()
     remainder = 0 if len(gs) % half_api_limit == 0 else 1
 
-    for i in tqdm.tqdm(range((len(gs) // half_api_limit) + remainder), desc='OSRM API QUERY'):
+    for i in tqdm.tqdm(range((len(gs) // half_api_limit) + remainder), desc=f'Querying {mode}s from OSRM'):
         sources_chunk = gs.iloc[half_api_limit * i: half_api_limit * (i + 1)]
         sources = [list(p.coords)[0] for p in sources_chunk]
         sources = [",".join([str(p[1]), str(p[0])]) for p in sources]  # OSRM uses lon/lat instead of lat/lon
@@ -324,11 +331,10 @@ def query_osrm(gs: gp.GeoSeries):
             sources_ids = ";".join(str(x) for x in (range(len(sources_chunk))))
             destinations_ids = ";".join(
                 str(x) for x in (range(len(sources_chunk), len(sources_chunk) + len(destinations_chunk))))
-            annotations = 'duration,distance'
             # querying the OSRM demo server
             # req = f"http://router.project-osrm.org/table/v1/car/{locations}?sources={sources_ids}&destinations={destinations_ids}&annotations={annotations}"
             # querying the docker image local server (much faster!)
-            req = f"http://127.0.0.1:5000/table/v1/car/{locations}?sources={sources_ids}&destinations={destinations_ids}&annotations={annotations}"
+            req = f"http://127.0.0.1:{port}/table/v1/car/{locations}?sources={sources_ids}&destinations={destinations_ids}&annotations={mode}"
             r = requests.get(req)
             assert r.status_code == 200, f'Status code: {r.status_code} is invalid. Check your request.\n{r.content}'
 
@@ -337,23 +343,15 @@ def query_osrm(gs: gp.GeoSeries):
 
             for k in range(len(sources_chunk)):
                 key = sources_chunk.index[k]
-                if key in durations:
-                    durations[key] = durations[key] + r.json()['durations'][k]
+                if key in weights:
+                    weights[key] = weights[key] + r.json()[f'{mode}s'][k]
                 else:
-                    durations[key] = r.json()['durations'][k]
-                if key in distances:
-                    distances[key] = distances[key] + r.json()['distances'][k]
-                else:
-                    distances[key] = r.json()['distances'][k]
+                    weights[key] = r.json()[f'{mode}s'][k]
 
-    duration_matrix = pd.DataFrame.from_dict(durations,
-                                             columns=gs.index,
-                                             orient='index')  # index orientation since the dicts store values row-wise
-    distance_matrix = pd.DataFrame.from_dict(distances,
-                                             columns=gs.index,
-                                             orient='index')  # index orientation since the dicts store values row-wise
+    # index orientation since the dicts store values row-wise
+    weight_matrix = pd.DataFrame.from_dict(weights, columns=gs.index, orient='index')
 
-    return distance_matrix, duration_matrix
+    return weight_matrix
 
 
 def check_triangle_inequality(data, verbose=False, disable_progress_bar=True):
@@ -397,7 +395,9 @@ if __name__ == '__main__':
         write_path = io.unique_path(io.input_dir, f'vienna_{n}_addresses' + '_#{:03d}' + '.csv')
 
         # query OSRM durations
-        distance_matrix, duration_matrix = query_osrm(gdf.geometry)
+        duration_matrix = query_osrm(gdf.geometry, 'duration', 500)
+        distance_matrix = query_osrm(gdf.geometry, 'distance', 500)
+
         gdf.to_csv(io.input_dir.joinpath(write_path), encoding='utf-8-sig', index=True, header=True)
         dur_write_path = write_path.as_posix().replace('addresses', 'durations')
         duration_matrix.to_csv(dur_write_path, encoding='utf-8-sig', index=True, header=True)

@@ -1,7 +1,7 @@
 import logging
-from typing import Union
 import os
 import pathlib
+from typing import Union
 
 LOGGING_CONFIG = {
     'version': 1,
@@ -25,7 +25,7 @@ LOGGING_CONFIG = {
             'level': 'INFO',
             'formatter': 'standard',
             'class': 'logging.FileHandler',
-            'filename': './data/Output/cr_ahd_log.log',
+            'filename': './data/Output/logs/cr_ahd_log.log',
             'mode': 'w',
         },
     },

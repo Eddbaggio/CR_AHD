@@ -6,57 +6,46 @@ import folium
 import geopandas as gp
 import numpy as np
 import pandas as pd
+import tqdm
 from matplotlib import pyplot as plt
 from matplotlib.colors import to_hex
 from shapely.geometry import Point
 from shapely.ops import nearest_points
-from tqdm import tqdm
 
 import instance_module.geometry as geo
 from core_module import instance as it
 from utility_module import io, utils as ut
-from vienna_data_handling import read_vienna_addresses, check_triangle_inequality
+from vienna_data_handling import read_vienna_addresses
 
 
 # CONVENTION
 # when using coordinates, use the order LATITUDE FIRST, LONGITUDE SECOND! All inputs will be rearranged to follow this
 # this order. https://en.wikipedia.org/wiki/ISO_6709#Items
 
-def generate_vienna_cr_ahd_instance(vienna_addresses: gp.GeoDataFrame, vienna_distances, vienna_durations: pd.DataFrame,
-                                    num_carriers: int = 3, dist_center_to_carrier_km=7, carrier_competition: float = 0,
-                                    num_requests_per_carrier: int = 10, carriers_max_num_tours: int = 3,
-                                    max_vehicle_load: int = 10, max_tour_length: int = 1000,
+def generate_vienna_cr_ahd_instance(vienna_addresses: gp.GeoDataFrame,
+                                    vienna_distances, vienna_durations: pd.DataFrame,
+                                    run: int, num_carriers: int = 3,
+                                    dist_center_to_carrier_km=7,
+                                    carrier_competition: float = 0,
+                                    num_requests_per_carrier: int = 10,
+                                    carriers_max_num_tours: int = 3,
+                                    max_vehicle_load: int = 10,
+                                    max_tour_length: int = 1000,
                                     max_tour_duration=ut.EXECUTION_TIME_HORIZON.duration,
                                     requests_service_duration: Union[dt.timedelta, List[dt.timedelta]] = dt.timedelta(
-                                        minutes=4), requests_revenue: Union[float, int, List[float], List[int]] = 1,
-                                    requests_load: Union[float, int, List[float], List[int]] = 1, plot=False, rng=None):
-    """
-
-    :param rng:
-    :param max_tour_duration:
-    :param vienna_addresses:
-    :param vienna_distances:
-    :param vienna_durations: duration matrix in seconds *as floats*
-    :param num_carriers:
-    :param dist_center_to_carrier_km:
-    :param carrier_competition:
-    :param num_requests_per_carrier:
-    :param carriers_max_num_tours:
-    :param max_vehicle_load:
-    :param max_tour_length:
-    :param requests_service_duration:
-    :param requests_revenue:
-    :param requests_load:
-    :param plot:
-    :return:
-    """
+                                        minutes=4),
+                                    requests_revenue: Union[float, int, List[float], List[int]] = 1,
+                                    requests_load: Union[float, int, List[float], List[int]] = 1,
+                                    plot=False,
+                                    rng=None):
 
     rng = np.random.default_rng(rng)
 
     if num_carriers < 2:
         raise ValueError('Must have at least 2 carriers for a CR_AHD instance')
 
-    assert all(vienna_durations.index == vienna_addresses.index) and all(vienna_distances.index == vienna_addresses.index), \
+    assert all(vienna_durations.index == vienna_addresses.index) and all(
+        vienna_distances.index == vienna_addresses.index), \
         f'Duration, distance and address matrices must share the same index'
 
     if isinstance(requests_load, (float, int)):
@@ -111,7 +100,8 @@ def generate_vienna_cr_ahd_instance(vienna_addresses: gp.GeoDataFrame, vienna_di
     vienna_durations = np.array([[dt.timedelta(seconds=j) for j in i] for i in vienna_durations])
     vienna_distances = np.array(vienna_distances.loc[loc_idx, loc_idx])
 
-    check_triangle_inequality(vienna_durations, True)
+    # check_triangle_inequality(vienna_durations, True)
+    # check_triangle_inequality(vienna_distances, True)
 
     # plotting
     if plot:
@@ -125,10 +115,6 @@ def generate_vienna_cr_ahd_instance(vienna_addresses: gp.GeoDataFrame, vienna_di
                                                                                      stop=ut.EXECUTION_START_TIME,
                                                                                      num=len(group),
                                                                                      endpoint=False))
-
-    run = len(list(io.input_dir.glob(f't=vienna+d={dist_center_to_carrier_km}+c={num_carriers}'
-                                     f'+n={num_requests_per_carrier:02d}+o={int(carrier_competition * 100):03d}'
-                                     f'+r=*.dat')))
 
     return it.MDVRPTWInstance(id_=f't=vienna+d={dist_center_to_carrier_km}+c={num_carriers}'
                                   f'+n={num_requests_per_carrier:02d}+o={int(carrier_competition * 100):03d}+r={run:02d}',
@@ -224,22 +210,27 @@ def read_vienna_districts_shapefile():
 if __name__ == '__main__':
     m = 1000
     n = 1
-    rng = np.random.default_rng()
+    rng = np.random.default_rng(42)
     # travel duration in seconds *as floats*
     durations = pd.read_csv(io.input_dir.joinpath(f'vienna_{m}_durations_#{n:03d}.csv'), index_col=0)
     # distance in meters
     distances = pd.read_csv(io.input_dir.joinpath(f'vienna_{m}_distances_#{n:03d}.csv'), index_col=0)
 
     addresses = read_vienna_addresses(io.input_dir.joinpath(f'vienna_{m}_addresses_#{n:03d}.csv'))
-    for _ in tqdm(range(10)):
-        instance = generate_vienna_cr_ahd_instance(vienna_addresses=addresses,
-                                                   vienna_distances=distances,
-                                                   vienna_durations=durations,
-                                                   num_carriers=3,
-                                                   carrier_competition=0.3,
-                                                   num_requests_per_carrier=10,
-                                                   max_tour_length=1_000_000,
-                                                   plot=False,
-                                                   rng=rng)
-        instance.write_delim(io.input_dir.joinpath(instance.id_ + '.dat'))
-        instance.write_json(io.input_dir.joinpath(instance.id_ + '.json'))
+    with tqdm.tqdm(total=2 * 5 * 20) as pbar:
+        for num_requests_per_carrier in [10, 25]:
+            for carrier_competition in [0.0, 0.25, 0.5, 0.75, 1.0]:
+                for run in range(20):
+                    instance = generate_vienna_cr_ahd_instance(vienna_addresses=addresses,
+                                                               vienna_distances=distances,
+                                                               vienna_durations=durations,
+                                                               run=run,
+                                                               num_carriers=3,
+                                                               carrier_competition=carrier_competition,
+                                                               num_requests_per_carrier=num_requests_per_carrier,
+                                                               max_tour_length=1_000_000,
+                                                               plot=False,
+                                                               rng=rng)
+                    # instance.write_delim(io.input_dir.joinpath(instance.id_ + '.dat'))
+                    instance.write_json(io.input_dir.joinpath(instance.id_ + '.json'))
+                    pbar.update()

@@ -6,9 +6,8 @@ import gurobipy as gp
 import numpy as np
 from gurobipy import GRB
 
-import utility_module.io
 from core_module import instance as it, solution as slt
-from utility_module import utils as ut
+from utility_module import utils as ut, io
 
 logger = logging.getLogger(__name__)
 
@@ -110,9 +109,8 @@ class MaxBidGurobiCAP1(WinnerDeterminationBehavior):
             m.addLConstr(y.sum('*', c), GRB.LESS_EQUAL, 1, f'single bundle {c}')
 
         # write
-        path = utility_module.io.output_dir.joinpath(f'{solution.num_carriers()}carriers',
-                                                     solution.id_ + '_' + solution.solver_config['solution_algorithm'])
-        path = utility_module.io.unique_path(path.parent, path.stem + 'WDP_#{:03d}.lp')
+        path = io.solution_dir.joinpath(solution.id_ + '_' + solution.solver_config['solution_algorithm'])
+        path = io.unique_path(path.parent, path.stem + 'WDP_#{:03d}.lp')
         path.parent.mkdir(parents=True, exist_ok=True)
         m.write(str(path))
 
