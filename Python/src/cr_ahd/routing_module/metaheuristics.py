@@ -169,7 +169,7 @@ class LocalSearchBest(VRPTWMetaHeuristic):
             return True
 
 
-class PDPTWSequentialLocalSearch(VRPTWMetaHeuristic):
+class VRPTWSequentialLocalSearch(VRPTWMetaHeuristic):
     """
     Sequentially exhaust each neighborhood in their given order. Only improvements are accepted. First improvement is
     used.
@@ -218,7 +218,7 @@ class PDPTWSequentialLocalSearch(VRPTWMetaHeuristic):
             return True
 
 
-class PDPTWVariableNeighborhoodDescent(VRPTWMetaHeuristic):
+class VRPTWVariableNeighborhoodDescent(VRPTWMetaHeuristic):
     """
     deterministic variant of VNS. multiple neighborhoods are ordered and searched sequentially. In each neighborhood
     that is searched, the *best* found neighbor is used. When stuck in a local optimum, switches to the next
@@ -295,7 +295,7 @@ class PDPTWVariableNeighborhoodDescent(VRPTWMetaHeuristic):
             return True
 
 
-class PDPTWReducedVariableNeighborhoodSearch(PDPTWVariableNeighborhoodDescent):
+class VRPTWReducedVariableNeighborhoodSearch(VRPTWVariableNeighborhoodDescent):
     """
     stochastic variant of VNS. a random neighbor from the current neighborhood is drawn and executed if it improves the
     solution
@@ -334,7 +334,7 @@ class PDPTWReducedVariableNeighborhoodSearch(PDPTWVariableNeighborhoodDescent):
         raise NotImplementedError()
 
 
-class PDPTWVariableNeighborhoodSearch(PDPTWVariableNeighborhoodDescent):
+class VRPTWVariableNeighborhoodSearch(VRPTWVariableNeighborhoodDescent):
     """
     VNS. a random neighbor from the current neighborhood is drawn and local search is applied. then, the acceptance
     decision is made
@@ -396,7 +396,7 @@ class PDPTWVariableNeighborhoodSearch(PDPTWVariableNeighborhoodDescent):
         return solution
 
 
-class PDPTWSimulatedAnnealing(VRPTWMetaHeuristic):
+class VRPTWSimulatedAnnealing(VRPTWMetaHeuristic):
     def __init__(self, neighborhoods: Sequence[nh.Neighborhood], time_limit_per_carrier: float):
         super().__init__(neighborhoods, time_limit_per_carrier)
         self.parameters['initial_temperature'] = 0
@@ -480,7 +480,7 @@ class PDPTWSimulatedAnnealing(VRPTWMetaHeuristic):
         return temperature
 
 
-class PDPTWIteratedLocalSearch(VRPTWMetaHeuristic):
+class VRPTWIteratedLocalSearch(VRPTWMetaHeuristic):
     """
     Uses a perturbation function to explore different regions of the solution space
     """

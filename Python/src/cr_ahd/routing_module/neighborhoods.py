@@ -131,7 +131,8 @@ class VRPTWMoveDist(IntraTourNeighborhood):
         # remove
         tour.pop_and_update(instance, [old_pos])
         tour.insert_and_update(instance, [new_pos], [vertex])
-        logger.debug(f'{self.name} neighborhood moved vertex {vertex} from {old_pos} to {new_pos} for a delta of {delta}')
+        logger.debug(
+            f'{self.name} neighborhood moved vertex {vertex} from {old_pos} to {new_pos} for a delta of {delta}')
         pass
 
 
@@ -169,10 +170,13 @@ class VRPTWTwoOptDist(IntraTourNeighborhood):
         for i in range(0, len(tour) - 3):
             for j in range(i + 2, len(tour) - 1):
                 delta = 0.0
-                delta -= instance.travel_distance([tour.routing_sequence[i], tour.routing_sequence[j]],
-                                                  [tour.routing_sequence[i + 1], tour.routing_sequence[j + 1]])
-                delta += instance.travel_distance([tour.routing_sequence[i], tour.routing_sequence[i + 1]],
-                                                  [tour.routing_sequence[j], tour.routing_sequence[j + 1]])
+                delta -= instance.travel_distance(
+                    tour.routing_sequence[i:j + 1], tour.routing_sequence[i + 1:j + 2]
+                )
+                delta += instance.travel_distance(
+                    [tour.routing_sequence[i], *tour.routing_sequence[j:i:-1]],
+                    [tour.routing_sequence[j], *tour.routing_sequence[j - 1:i:-1], tour.routing_sequence[j + 1]]
+                )
                 move: vrptw_2opt_move = (delta, tour, i, j)
                 if self.feasibility_check(instance, move):
                     yield move
@@ -203,12 +207,11 @@ class VRPTWTwoOptDur(IntraTourNeighborhood):
             for j in range(i + 2, len(tour) - 1):
                 delta = 0.0
                 delta -= instance.travel_duration(
-                    [tour.routing_sequence[i], tour.routing_sequence[j]],
-                    [tour.routing_sequence[i + 1], tour.routing_sequence[j + 1]]
+                    tour.routing_sequence[i:j+1], tour.routing_sequence[i+1:j+2]
                 ).total_seconds()
                 delta += instance.travel_duration(
-                    [tour.routing_sequence[i], tour.routing_sequence[i + 1]],
-                    [tour.routing_sequence[j], tour.routing_sequence[j + 1]]
+                    [tour.routing_sequence[i], *tour.routing_sequence[j:i:-1]],
+                    [tour.routing_sequence[j], *tour.routing_sequence[j-1:i:-1], tour.routing_sequence[j+1]]
                 ).total_seconds()
                 move: vrptw_2opt_move = (delta, tour, i, j)
                 if self.feasibility_check(instance, move):
@@ -262,6 +265,43 @@ class VRPTWRelocateDist(InterTourNeighborhood):
                         delta = 0.0
                         delta += old_tour.pop_distance_delta(instance, [old_pos])
                         delta += new_tour.insert_distance_delta(instance, [new_pos], [vertex])
+                        move: vrptw_relocate_move = (delta, carrier, old_tour, old_pos, new_tour, new_pos)
+                        if self.feasibility_check(instance, move):
+                            yield move
+        pass
+
+    def feasibility_check(self, instance: it.MDVRPTWInstance, move: vrptw_relocate_move):
+        delta, carrier, old_tour, old_pos, new_tour, new_pos = move
+        vertex = old_tour.routing_sequence[old_pos]
+        return new_tour.insertion_feasibility_check(instance, [new_pos], [vertex])
+
+    def execute_move(self, instance: it.MDVRPTWInstance, move: vrptw_relocate_move):
+        delta, carrier, old_tour, old_pos, new_tour, new_pos = move
+        vertex = old_tour.pop_and_update(instance, [old_pos])
+        request = instance.request_from_vertex(vertex)
+        old_tour.requests.remove(request)
+
+        carrier.drop_empty_tours()
+        new_tour.insert_and_update(instance, [new_pos], [vertex])
+        new_tour.requests.add(request)
+        pass
+
+
+class VRPTWRelocateDur(InterTourNeighborhood):
+    """
+    take a delivery request and see whether inserting it intro another tour is cheaper
+    """
+
+    def feasible_move_generator_for_carrier(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution):
+        for old_tour in carrier.tours:
+            for old_pos, vertex in enumerate(old_tour.routing_sequence[1:-1], start=1):
+                for new_tour in carrier.tours:
+                    if new_tour is old_tour:
+                        continue
+                    for new_pos in range(1, len(new_tour) - 1):
+                        delta = 0.0
+                        delta += old_tour.pop_duration_delta(instance, [old_pos])
+                        delta += new_tour.insert_duration_delta(instance, [new_pos], [vertex])
                         move: vrptw_relocate_move = (delta, carrier, old_tour, old_pos, new_tour, new_pos)
                         if self.feasibility_check(instance, move):
                             yield move

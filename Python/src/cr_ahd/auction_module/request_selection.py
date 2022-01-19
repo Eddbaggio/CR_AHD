@@ -126,7 +126,7 @@ class MarginalProfit(RequestSelectionBehaviorIndividual):
                                                                                            insert_request)
             insertion.execute_insertion_in_tour(instance, solution, tmp_tour, request, pickup_pos, delivery_pos)
         # improvement TODO: tour improvement method should be a parameter
-        mh.PDPTWVariableNeighborhoodDescent([ls.PDPMove(), ls.PDPTwoOpt()]).execute_on_tour(instance, tmp_tour)
+        mh.VRPTWVariableNeighborhoodDescent([ls.PDPMove(), ls.PDPTwoOpt()]).execute_on_tour(instance, tmp_tour)
         travel_distance_without_request = tmp_tour.sum_travel_distance
 
         return travel_distance_with_request - travel_distance_without_request

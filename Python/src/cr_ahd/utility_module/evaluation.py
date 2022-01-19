@@ -455,14 +455,14 @@ def collaboration_gain(df: pd.DataFrame, plot: bool = False):
             isolated = gen_group[gen_group[planning_config] == 'IsolatedPlanning'].squeeze()
             collaborative = gen_group[gen_group[planning_config] == 'CollaborativePlanning'].squeeze()
             if isinstance(collaborative, pd.Series):
-                coll_gain = collaborative[solution_values] / isolated[solution_values]
+                coll_gain = 1 - (collaborative[solution_values] / isolated[solution_values])
                 record = {k: v for k, v in zip(instance_config + general_config, inst_name)}
                 record.update({k: v for k, v in zip(general_config, gen_name)})
                 record.update({k: v for k, v in zip(solution_values, coll_gain)})
                 gains.append(record)
             else:
                 for collab_name, collab_group in collaborative.groupby(collaborative_config, dropna=False):
-                    coll_gain = collab_group[solution_values] / isolated[solution_values]
+                    coll_gain = 1 - (collab_group[solution_values] / isolated[solution_values])
                     record = {k: v for k, v in zip(instance_config, inst_name)}
                     record.update({k: v for k, v in zip(general_config, gen_name)})
                     record.update({k: v for k, v in zip(collaborative_config, collab_name)})

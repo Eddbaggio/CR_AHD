@@ -153,14 +153,12 @@ class Solver:
 
         # ===== Final Improvement =====
         # plot_vienna_vrp_solution(instance, solution)  # REMOVEME for debugging only
-        before_improvement = solution.objective()
+        objective = solution.objective()
         timer = pr.Timer()
         solution = self.tour_improvement.execute(instance, solution)
         timer.write_duration_to_solution(solution, 'runtime_final_improvement')
-        if isinstance(before_improvement, dt.timedelta):
-            assert int(before_improvement.total_seconds()) >= int(solution.objective().total_seconds()), instance.id_
-        else:
-            assert int(before_improvement) >= int(solution.objective()), instance.id_
+        assert objective >= solution.objective(), \
+            f'{objective} < {solution.objective()} but should be >=!({instance.id_, self.config})'
         ut.validate_solution(instance, solution)  # safety check to make sure everything's functional
 
         # ===== Final Auction =====

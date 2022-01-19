@@ -1,5 +1,6 @@
 from typing import List, Tuple, Dict
 
+import utility_module.utils
 from auction_module import auction as au, \
     request_selection as rs, \
     bundle_generation as bg, \
@@ -42,16 +43,19 @@ def parameter_generator():
         # tws.NoTW(),
     ]
 
+    t = float('inf') if utility_module.utils.debugger_is_active() else 5
     tour_improvements: List[mh.VRPTWMetaHeuristic] = [
-        mh.NoMetaheuristic([nh.NoNeighborhood()], None),
-        mh.LocalSearchFirst([nh.VRPTWMoveDur()], 1),
-        mh.LocalSearchFirst([nh.VRPTWTwoOptDur()], 1),
+        # mh.NoMetaheuristic([nh.NoNeighborhood()], None),
+        # mh.LocalSearchFirst([nh.VRPTWMoveDur()], 1),
+        # mh.LocalSearchFirst([nh.VRPTWTwoOptDur()], 1),
         # mh.LocalSearchBest([nh.VRPTWMoveDur()], 1),
+        mh.VRPTWVariableNeighborhoodDescent([nh.VRPTWTwoOptDur(), nh.VRPTWMoveDur(), nh.VRPTWRelocateDur()], t),
+        mh.VRPTWSequentialLocalSearch([nh.VRPTWTwoOptDur(), nh.VRPTWMoveDur(), nh.VRPTWRelocateDur()], t)
     ]
 
     nums_submitted_requests: List[int] = [
         # 3,
-        4,
+        # 4,
         # 5
     ]
 

@@ -18,9 +18,9 @@ if __name__ == '__main__':
             args = {'distance': 7,
                     'num_carriers': 3,
                     'num_requests': 10,
-                    'service_area_overlap': [0.5],
-                    'run': range(5),
-                    'threads': 6,
+                    'service_area_overlap': [0.0],#, 0.25, 0.5, 0.75, 1.0],
+                    'run': 14,
+                    'threads': 1,
                     'fail': 1,
                     }
         # else read from terminal parameters
