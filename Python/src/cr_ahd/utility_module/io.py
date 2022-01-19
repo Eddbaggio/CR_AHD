@@ -117,25 +117,25 @@ def ask_for_overwrite_permission(path: Path):
         return True
 
 
-def vrptw_instance_selector(diameter=None, num_carriers=None, num_requests=None, service_area_overlap=None, run=None):
+def vrptw_instance_selector(distance=None, num_carriers=None, num_requests=None, service_area_overlap=None, run=None):
     """
 
-    :param diameter: diameter of the circle around the city center on which the depots are positioned
+    :param distance: distance of the depots from the city center
     :param num_carriers: number of carriers
     :param num_requests: number of requests per carrier
     :param service_area_overlap: degree of overlap of the service areas between 0 (no overlap) and 1 (all carriers serve the whole city)
     :param run: run, i.e. which of the random instances with the above parameters
     :return: a MDVRPTWInstance
     """
-    # DIAMETER
-    if isinstance(diameter, int):
-        p_diameter = diameter
-    elif diameter is None:
-        p_diameter = '\d+'
-    elif isinstance(diameter, (list, tuple, range)):
-        p_diameter = f"({'|'.join((str(x) for x in diameter))})"
+    # DISTANCE
+    if isinstance(distance, int):
+        p_distance = distance
+    elif distance is None:
+        p_distance = '\d+'
+    elif isinstance(distance, (list, tuple, range)):
+        p_distance = f"({'|'.join((str(x) for x in distance))})"
     else:
-        raise ValueError(f'diameter must be int or list of int. diameter={diameter} is type {type(diameter)}')
+        raise ValueError(f'distance must be int or list of int. distance={distance} is type {type(distance)}')
 
     # NUM_CARRIERS
     if isinstance(num_carriers, int):
@@ -180,7 +180,7 @@ def vrptw_instance_selector(diameter=None, num_carriers=None, num_requests=None,
     else:
         raise ValueError(f'run must be int or list of int. run={run} is type {type(run)}')
 
-    pattern = re.compile(f't=vienna\+d={p_diameter}\+c={p_num_carriers}\+n={p_num_requests}\+'
+    pattern = re.compile(f't=vienna\+d={p_distance}\+c={p_num_carriers}\+n={p_num_requests}\+'
                          f'o={p_service_area_overlap}\+r={p_run}(\.json)')  # run={p_run}\+dist=200\+rad={p_rad}\+n={p_n}(\.dat)')
     paths = []
     for file in (sorted(input_dir.glob('*.json'), key=ut.natural_sort_key)):

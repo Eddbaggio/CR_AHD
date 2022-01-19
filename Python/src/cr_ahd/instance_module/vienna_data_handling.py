@@ -357,6 +357,7 @@ def query_osrm(gs: gp.GeoSeries, mode: str, api_limit=100):
 def check_triangle_inequality(data, verbose=False, disable_progress_bar=True):
     data = np.array(data)
     n = len(data)
+    violations = []
     num_violations = 0
     for i in trange(n, disable=disable_progress_bar):
         for j in range(n):
@@ -371,10 +372,11 @@ def check_triangle_inequality(data, verbose=False, disable_progress_bar=True):
                 d_jk = data[j][k]
                 if not d_ik <= d_ij + d_jk:
                     num_violations += 1
+                    violations.append((i, j, k))
                     if verbose:
                         print(f'violation: {i:02d}-{k:02d} > {i:02d}-{j:02d} + {j:02d}-{k:02d} =>'
                               f' {d_ik} > {d_ij} + {d_jk} => [{d_ik - d_ij - d_jk}]')
-    return num_violations
+    return num_violations, violations
 
 
 if __name__ == '__main__':

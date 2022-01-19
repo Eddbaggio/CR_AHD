@@ -1,3 +1,4 @@
+import datetime as dt
 import logging
 from abc import ABC, abstractmethod
 from typing import Sequence
@@ -82,7 +83,14 @@ class MaxBidGurobiCAP1(WinnerDeterminationBehavior):
         bids_matrix[bids_matrix == -float('inf')] = -GRB.INFINITY
 
         # bids as a tuple dict
-        coeff = {(b, c): bids_matrix[b, c] for b in range(len(bundles)) for c in range(instance.num_carriers)}
+        coeff = dict()
+        for c in range(instance.num_carriers):
+            for b in range(len(bundles)):
+                x = bids_matrix[b, c]
+                if isinstance(x, dt.timedelta):
+                    coeff[(b, c)] = x.total_seconds()
+                else:
+                    coeff[(b, c)] = x
 
         # model
         m = gp.Model(name="Set Partitioning Problem")
@@ -91,8 +99,8 @@ class MaxBidGurobiCAP1(WinnerDeterminationBehavior):
         # variables: bundle-to-bidder assignment
         y: gp.tupledict = m.addVars(len(bundles), instance.num_carriers, vtype=GRB.BINARY, name='y')
 
-        # objective: max the sum of realized bids
-        m.setObjective(y.prod(coeff), GRB.MAXIMIZE)
+        # objective: min the sum of realized bids (min because bids are distance or duration)
+        m.setObjective(y.prod(coeff), GRB.MINIMIZE)
 
         # constraints: each request is assigned to exactly one carrier
         # (set covering: assigned to *at least* one carrier
@@ -137,7 +145,7 @@ class MaxBidGurobiCAP1(WinnerDeterminationBehavior):
         return m.Status, winner_bundles, bundle_winners, winner_bids
 
 
-class MaxBidGurobiCAP2(WinnerDeterminationBehavior):
+'''class MaxBidGurobiCAP2(WinnerDeterminationBehavior):
     """
     Set Partitioning Formulation for the Combinatorial Auction Problem / Winner Determination Problem
     Following Vries,S.de, & Vohra,R.V. (2003). Combinatorial Auctions: A Survey.
@@ -192,3 +200,4 @@ class MaxBidGurobiCAP2(WinnerDeterminationBehavior):
                 logger.debug(f'Bundle {b}: {bundle} assigned to {max_bidders[b]} for a bid of {max_bids[b]}')
 
         return winner_bundles, bundle_winners
+'''

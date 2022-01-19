@@ -157,7 +157,10 @@ class Solver:
         timer = pr.Timer()
         solution = self.tour_improvement.execute(instance, solution)
         timer.write_duration_to_solution(solution, 'runtime_final_improvement')
-        assert int(before_improvement) <= int(solution.objective()), instance.id_
+        if isinstance(before_improvement, dt.timedelta):
+            assert int(before_improvement.total_seconds()) >= int(solution.objective().total_seconds()), instance.id_
+        else:
+            assert int(before_improvement) >= int(solution.objective()), instance.id_
         ut.validate_solution(instance, solution)  # safety check to make sure everything's functional
 
         # ===== Final Auction =====

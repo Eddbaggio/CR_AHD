@@ -8,15 +8,6 @@ from matplotlib import pyplot as plt
 
 import utility_module.utils as ut
 
-labels = {'num_carriers': 'Number of carriers',
-          'travel_distance': 'Travel distance',
-          'travel_duration': 'Travel duration',
-          'rad': 'Radius of Service area',
-          'n': 'Number of requests per carrier',
-          'num_acc_inf_requests': 'Number of accepted but infeasible requests\n(served by pendulum tour)',
-          'sum_profit': 'Sum of profit'
-          }
-
 category_orders = {'solution_algorithm': ['IsolatedPlanning',
                                           'CollaborativePlanning',
                                           # 'CentralizedPlanning'
@@ -399,7 +390,7 @@ def print_top_level_stats(df: pd.DataFrame, secondary_parameters: List[str]):
                 print(x)
 
 
-def collaboration_gain(df: pd.DataFrame):
+def collaboration_gain(df: pd.DataFrame, plot: bool = False):
     instance_config = [
         't',
         'd',
@@ -443,7 +434,7 @@ def collaboration_gain(df: pd.DataFrame):
         'fin_auction_num_auction_rounds', ]
     solution_values = [
         'objective',
-        'sum_profit',
+        # 'sum_profit',
         'sum_travel_distance',
         'sum_travel_duration',
         'sum_load',
@@ -460,28 +451,30 @@ def collaboration_gain(df: pd.DataFrame):
     gains = []
 
     for inst_name, inst_group in df.groupby(instance_config):
-        record = {k: v for k, v in zip(instance_config, inst_name)}
-
-        for gen_name, gen_group in inst_group.groupby(general_config):
-            record.update({k: v for k, v in zip(general_config, gen_name)})
-
+        for gen_name, gen_group in inst_group.groupby(general_config, dropna=False):
             isolated = gen_group[gen_group[planning_config] == 'IsolatedPlanning'].squeeze()
-
             collaborative = gen_group[gen_group[planning_config] == 'CollaborativePlanning'].squeeze()
             if isinstance(collaborative, pd.Series):
                 coll_gain = collaborative[solution_values] / isolated[solution_values]
+                record = {k: v for k, v in zip(instance_config + general_config, inst_name)}
+                record.update({k: v for k, v in zip(general_config, gen_name)})
                 record.update({k: v for k, v in zip(solution_values, coll_gain)})
                 gains.append(record)
             else:
-                for collab_name, collab_group in collaborative.groupby(collaborative_config):
+                for collab_name, collab_group in collaborative.groupby(collaborative_config, dropna=False):
                     coll_gain = collab_group[solution_values] / isolated[solution_values]
+                    record = {k: v for k, v in zip(instance_config, inst_name)}
+                    record.update({k: v for k, v in zip(general_config, gen_name)})
+                    record.update({k: v for k, v in zip(collaborative_config, collab_name)})
                     record.update({k: v for k, v in zip(solution_values, coll_gain)})
                     gains.append(record)
 
-    df = pd.DataFrame.from_records(gains, columns=instance_config + general_config + collaborative_config + solution_values)
+    df = pd.DataFrame.from_records(gains,
+                                   columns=instance_config + general_config + collaborative_config + solution_values)
     df.set_index(instance_config + general_config + collaborative_config, inplace=True)
-    df.plot(kind='bar').legend(loc='upper center', bbox_to_anchor=(0.5, 1.1), ncol=5)
-    plt.show()
+    if plot:
+        df.plot(kind='bar').legend(loc='upper center', bbox_to_anchor=(0.5, 1.1), ncol=5)
+        plt.show()
     return df
 
 

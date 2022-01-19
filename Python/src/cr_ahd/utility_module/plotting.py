@@ -322,6 +322,7 @@ def plot_vienna_vrp_solution(instance: it.MDVRPTWInstance, solution: slt.CAHDSol
                                   f'dist={round(tour.sum_travel_distance)})',
                             tooltip=f'Tour {tour.id_}',
                             color=color,
+                            weight=15
                             ).add_to(tour_group)
 
             # routed requests
@@ -331,7 +332,7 @@ def plot_vienna_vrp_solution(instance: it.MDVRPTWInstance, solution: slt.CAHDSol
                     location=instance.coords(vertex),
                     popup=f'Request {request}<br>'
                           f'arrival={tour.arrival_time_sequence[index]}'
-                          # f'x,y={instance.vertex_x_coords[vertex], instance.vertex_y_coords[vertex]}<br>'
+                    # f'x,y={instance.vertex_x_coords[vertex], instance.vertex_y_coords[vertex]}<br>'
                           f'carrier={carrier.id_}<br>'
                           f'tw={instance.time_window(vertex)}',
                     tooltip=f'Stop {index}',
@@ -341,33 +342,34 @@ def plot_vienna_vrp_solution(instance: it.MDVRPTWInstance, solution: slt.CAHDSol
                     fill_opacity=1,
                 ).add_to(tour_group)
 
-        # routed requests
-        # for request in carrier.routed_requests:
-        #     delivery_vertex = instance.vertex_from_request(request)
-        #     r = folium.CircleMarker(location=instance.coords(delivery_vertex),
-        #                             popup=f'Request {request}<br>'
-        #                                   f'x,y={instance.vertex_x_coords[delivery_vertex], instance.vertex_y_coords[delivery_vertex]}<br>'
-        #                                   f'carrier={carrier.id_}<br>'
-        #                                   f'tw={instance.time_window(delivery_vertex)}',
-        #                             tooltip=f'Stop {solution.tour_of_request(request).vertex_pos[delivery_vertex]}',
-        #                             radius=5,
-        #                             color=color,
-        #                             fill_color=color,
-        #                             fill_opacity=1,
-        #                             )
-        #     r.add_to(carrier_group)
-
         # unrouted requests
         for request in carrier.unrouted_requests:
             delivery_vertex = instance.vertex_from_request(request)
             r = folium.CircleMarker(location=instance.coords(delivery_vertex),
+                                    tooltip=f'{request}',
                                     popup=f'Request {request}(xy={instance.coords(delivery_vertex)}, carrier={carrier.id_}',
                                     radius=5,
                                     color=color,
-                                    fill_color='grey',
+                                    fill_color=color,
                                     fill_opacity=0.4
                                     )
             r.add_to(carrier_group)
+
+    # unassigned requests
+    for request in solution.unassigned_requests:
+        delivery_vertex = instance.vertex_from_request(request)
+        orig_carrier = instance.request_to_carrier_assignment[request]
+        r = folium.CircleMarker(location=instance.coords(delivery_vertex),
+                                tooltip=f'{request}, unassigned',
+                                popup=f'Request {request}(xy={instance.coords(delivery_vertex)}, '
+                                      f'original carrier={orig_carrier}',
+                                radius=5,
+                                color=to_hex(cmap1(orig_carrier / num_carriers)),
+                                weight=2,
+                                fill_color='grey',
+                                fill_opacity=0.4
+                                )
+        r.add_to(m)
 
     # totals
     folium.features.RegularPolygonMarker(location=(48.261738, 16.280746),

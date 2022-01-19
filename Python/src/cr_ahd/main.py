@@ -15,10 +15,10 @@ if __name__ == '__main__':
     def cr_ahd():
         # if called from within PyCharm
         if "PYCHARM" in os.environ:
-            args = {'diameter': 7,
+            args = {'distance': 7,
                     'num_carriers': 3,
                     'num_requests': 10,
-                    'service_area_overlap': 0.3,
+                    'service_area_overlap': [0.5],
                     'run': range(5),
                     'threads': 6,
                     'fail': 1,
@@ -30,7 +30,7 @@ if __name__ == '__main__':
         start = datetime.now()
         logger.info(f'START {start}')
 
-        paths = io.vrptw_instance_selector(diameter=args['diameter'],
+        paths = io.vrptw_instance_selector(distance=args['distance'],
                                            num_carriers=args['num_carriers'],
                                            num_requests=args['num_requests'],
                                            service_area_overlap=args['service_area_overlap'],
@@ -49,7 +49,7 @@ if __name__ == '__main__':
         df.to_csv(path_or_buf=csv_path, index=False)
 
         collaboration_gains = ev.collaboration_gain(df)
-        collaboration_gains.to_csv(str(csv_path).replace('agg_solution', 'coll_gain'), index=False)
+        collaboration_gains.to_csv(str(csv_path).replace('agg_solution', 'coll_gain'), index=True)
 
         # ev.plot(df,
         #         values='sum_profit',

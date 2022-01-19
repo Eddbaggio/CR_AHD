@@ -57,10 +57,10 @@ class Auction:
                 # clears the solution and re-optimize
                 solution = self.re_optimize(instance, solution, winners)
 
-                # consistency check. cannot compare carriers' profit individually before and after the auction because I
-                # do not implement profit sharing! Thus, an individual carrier may be worse off, while the global solution
-                # is better!
-                if not pre_auction_solution.objective() <= solution.objective():
+                # consistency check. cannot compare carriers' profit individually before and after the auction
+                # because I do not implement profit sharing! Thus, an individual carrier may be worse off,
+                # while the global solution is better!
+                if solution.objective() > pre_auction_solution.objective():
                     """
                     Unfortunately, there are several circumstances that can lead to the post-auction result being worse
                     than the pre-auction solution. In that case, throw a warning and recover the pre-auction solution!
@@ -104,7 +104,7 @@ class Auction:
                     """
 
                     raise ValueError(f'{instance.id_},:\n'
-                                     f' {round(solution.objective(), 4)} < {round(pre_auction_solution.objective())}\n'
+                                     f' {solution.objective()} < {pre_auction_solution.objective()}\n'
                                      f' Post-auction objective is lower than pre-auction objective!,'
                                      f' Recovering the pre-auction solution')
                     solution = pre_auction_solution
@@ -132,7 +132,7 @@ class Auction:
         # timer.write_duration_to_solution(solution, 'runtime_request_selection') fixme need to distinguish between intermediate and final: auction_counter in Solver class?
 
         if auction_request_pool:
-            profit_after_rs = [carrier.sum_profit() for carrier in solution.carriers]
+            # profit_after_rs = [carrier.sum_profit() for carrier in solution.carriers]
             logger.debug(f'requests {auction_request_pool} have been submitted to the auction pool')
 
             # ===== [2] Bundle Generation =====

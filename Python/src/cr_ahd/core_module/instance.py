@@ -2,6 +2,7 @@ import datetime as dt
 import json
 import logging.config
 import math
+import warnings
 from pathlib import Path
 from typing import Sequence, List, NoReturn
 
@@ -140,12 +141,18 @@ class MDVRPTWInstance:
         # need to ceil the durations & distances due to floating point precision errors
         self._travel_duration_matrix = np.array([[ceil_timedelta(x, 's') for x in y] for y in duration_matrix])
         assert all(self._travel_duration_matrix.ravel() >= dt.timedelta(0))
-        num_violations = check_triangle_inequality(self._travel_duration_matrix, True)
+        num_violations, violations = check_triangle_inequality(self._travel_duration_matrix, False)
+        if num_violations > 0:
+            req = [';'.join([','.join((str(self.vertex_y_coords[v]), str(self.vertex_x_coords[v]))) for v in ijk]) for ijk in violations]  # REMOVEME (debugging)
+            warnings.warn(f'{self.id_} violates triangle inequality for DURATIONS in {num_violations} cases')
         # assert num_violations == 0, f'{self.id_} violates triangle inequality for DURATIONS in {num_violations} cases'
 
         self._travel_distance_matrix = np.array([[math.ceil(x) for x in y] for y in distance_matrix])
         assert all(self._travel_distance_matrix.ravel() >= 0)
-        num_violations = check_triangle_inequality(self._travel_distance_matrix, True)
+        num_violations, violations = check_triangle_inequality(self._travel_distance_matrix, False)
+        if num_violations > 0:
+            req = [';'.join([','.join((str(self.vertex_y_coords[v]), str(self.vertex_x_coords[v]))) for v in ijk]) for ijk in violations]  # REMOVEME (debugging)
+            warnings.warn(f'{self.id_} violates triangle inequality for DISTANCES in {num_violations} cases')
         # assert num_violations == 0, f'{self.id_} violates triangle inequality for DISTANCES in {num_violations} cases'
 
         logger.debug(f'{id_}: created')

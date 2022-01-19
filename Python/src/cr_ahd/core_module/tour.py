@@ -36,7 +36,7 @@ class Tour(ABC):
         self.sum_travel_duration: dt.timedelta = dt.timedelta(0)
         self.sum_load: float = 0.0
         self.sum_revenue: float = 0.0
-        self.sum_profit: float = 0.0
+        # self.sum_profit: float = 0.0
 
         # initialize depot to depot tour
         for _ in range(2):
@@ -57,7 +57,7 @@ class Tour(ABC):
                f'Distance:\t{round(self.sum_travel_distance, 2)}\n' \
                f'Duration:\t{self.sum_travel_duration}\n' \
                f'Revenue:\t{self.sum_revenue}\n' \
-               f'Profit:\t\t{self.sum_profit}\n'
+               # f'Profit:\t\t{self.sum_profit}\n'
 
     def __repr__(self):
         return f'Tour {self.id_} {self.requests}'
@@ -81,7 +81,7 @@ class Tour(ABC):
         setattr(result, 'sum_travel_duration', self.sum_travel_duration)
         setattr(result, 'sum_load', self.sum_load)
         setattr(result, 'sum_revenue', self.sum_revenue)
-        setattr(result, 'sum_profit', self.sum_profit)
+        # setattr(result, 'sum_profit', self.sum_profit)
 
         return result
 
@@ -123,7 +123,7 @@ class Tour(ABC):
     def summary(self):
         return {
             'tour_id': self.id_,
-            'sum_profit': self.sum_profit,
+            # 'sum_profit': self.sum_profit,
             'num_routing_stops': self.num_routing_stops,
             'sum_travel_distance': self.sum_travel_distance,
             'sum_travel_duration': self.sum_travel_duration,
@@ -240,7 +240,7 @@ class Tour(ABC):
         self.sum_travel_duration += travel_time_shift_j
         self.sum_load += instance.vertex_load[j_vertex]
         self.sum_revenue += instance.vertex_revenue[j_vertex]
-        self.sum_profit = self.sum_profit + instance.vertex_revenue[j_vertex] - dist_shift_j
+        # self.sum_profit = self.sum_profit + instance.vertex_revenue[j_vertex] - time_shift_j
 
         # update arrival at k_vertex
         arrival_k = self.arrival_time_sequence[k_index] + time_shift_j
@@ -360,7 +360,7 @@ class Tour(ABC):
         self.sum_travel_duration += travel_time_shift_j  # += since time_shift_j will be negative
         self.sum_load -= instance.vertex_load[j_vertex]
         self.sum_revenue -= instance.vertex_revenue[j_vertex]
-        self.sum_profit = self.sum_profit - instance.vertex_revenue[j_vertex] - dist_shift_j
+        # self.sum_profit = self.sum_profit - instance.vertex_revenue[j_vertex] - dist_shift_j
 
         # update the arrival at k_vertex
         arrival_k = self.arrival_time_sequence[index] + time_shift_j

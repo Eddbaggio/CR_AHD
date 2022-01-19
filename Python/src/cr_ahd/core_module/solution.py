@@ -6,14 +6,19 @@ import numpy as np
 
 import utility_module.io as io
 from core_module import instance as it, tour as tr
-from utility_module import utils as ut
 
 
 class CAHDSolution:
     # default, empty solution
-    def __init__(self, instance: it.MDVRPTWInstance):
+    def __init__(self, instance: it.MDVRPTWInstance, objective: str = 'duration'):
         self.id_: str = instance.id_
         self.meta: Dict[str, int] = instance.meta
+        if objective == 'duration':
+            self.objective = self.sum_travel_duration
+        elif objective == 'distance':
+            self.objective = self.sum_travel_distance
+        else:
+            raise ValueError('Objective must be either "distance" or "duration"!')
 
         # requests that are not assigned to any carrier
         self.unassigned_requests: List[int] = list(instance.requests)
@@ -24,7 +29,7 @@ class CAHDSolution:
         self.tours: List[tr.Tour] = []
         self.tours_pendulum: List[
             tr.Tour] = []  # TODO urgently need to check whether this is treated correctly in all methods
-        self.carriers: List[AHDSolution] = [AHDSolution(c) for c in range(instance.num_carriers)]
+        self.carriers: List[AHDSolution] = [AHDSolution(c, objective) for c in range(instance.num_carriers)]
 
         # solver configuration and other meta data
         self.solver_config = dict()
@@ -53,11 +58,11 @@ class CAHDSolution:
     def sum_revenue(self):
         return sum(c.sum_revenue() for c in self.carriers)
 
-    def objective(self):
-        return sum(c.objective() for c in self.carriers)
+    # def objective(self):
+    #     return sum(c.objective() for c in self.carriers)
 
-    def sum_profit(self):
-        return sum(c.sum_profit() for c in self.carriers)
+    # def sum_profit(self):
+    #     return sum(c.sum_profit() for c in self.carriers)
 
     def num_carriers(self):
         return len(self.carriers)
@@ -85,7 +90,7 @@ class CAHDSolution:
         summary.update({
             # 'num_carriers': self.num_carriers(),
             'objective': self.objective(),
-            'sum_profit': self.sum_profit(),
+            # 'sum_profit': self.sum_profit(),
             'sum_travel_distance': self.sum_travel_distance(),
             'sum_travel_duration': self.sum_travel_duration(),
             'sum_load': self.sum_load(),
@@ -192,9 +197,15 @@ class CAHDSolution:
 
 
 class AHDSolution:
-    def __init__(self, carrier_index):
+    def __init__(self, carrier_index: int, objective: str):
         self.id_ = carrier_index
-        # self.depots = [carrier_index]  # maybe it's better to store the depots in this class rather than in CAHD?!
+        if objective == 'duration':
+            self.objective = self.sum_travel_duration
+        elif objective == 'distance':
+            self.objective = self.sum_travel_distance
+        else:
+            raise ValueError('Objective must be either "distance" or "duration"!')
+
         self.assigned_requests: List = []
         self.accepted_requests: List = []
         self.accepted_infeasible_requests: List = []
@@ -207,7 +218,6 @@ class AHDSolution:
 
     def __str__(self):
         s = f'---// Carrier ID: {self.id_} //---' \
-            f'\tObjective={round(self.objective(), 4)}, ' \
             f'Acceptance Rate={round(self.acceptance_rate, 2)}, ' \
             f'Assigned={self.assigned_requests}, ' \
             f'Accepted={self.accepted_requests}, ' \
@@ -248,14 +258,14 @@ class AHDSolution:
         pendulum = sum(t.sum_revenue for t in self.tours_pendulum)
         return regular + pendulum
 
-    def sum_profit(self):
-        regular = sum(t.sum_profit for t in self.tours)
-        pendulum = sum(
-            t.sum_revenue - t.sum_travel_distance * ut.PENDULUM_PENALTY_DISTANCE_SCALING for t in self.tours_pendulum)
-        return regular + pendulum
+    # def sum_profit(self):
+    #     regular = sum(t.sum_profit for t in self.tours)
+    #     pendulum = sum(
+    #         t.sum_revenue - t.sum_travel_distance * ut.PENDULUM_PENALTY_DISTANCE_SCALING for t in self.tours_pendulum)
+    #     return regular + pendulum
 
-    def objective(self):
-        return self.sum_profit()
+    # def objective(self):
+    #     return self.sum_profit()
 
     def as_dict(self):
         return {
@@ -273,7 +283,7 @@ class AHDSolution:
             'carrier_id': self.id_,
             'num_tours': len(self.tours),
             'num_routing_stops': self.num_routing_stops(),
-            'sum_profit': self.objective(),
+            # 'sum_profit': self.sum_profit(),
             'sum_travel_distance': self.sum_travel_distance(),
             'sum_travel_duration': self.sum_travel_duration(),
             'sum_load': self.sum_load(),

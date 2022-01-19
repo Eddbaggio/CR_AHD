@@ -24,7 +24,8 @@ from vienna_data_handling import read_vienna_addresses
 
 def generate_vienna_cr_ahd_instance(vienna_addresses: gp.GeoDataFrame,
                                     vienna_distances, vienna_durations: pd.DataFrame,
-                                    run: int, num_carriers: int = 3,
+                                    run: int,
+                                    num_carriers: int = 3,
                                     dist_center_to_carrier_km=7,
                                     carrier_competition: float = 0,
                                     num_requests_per_carrier: int = 10,
@@ -209,18 +210,22 @@ def read_vienna_districts_shapefile():
 
 if __name__ == '__main__':
     m = 1000
-    n = 1
     rng = np.random.default_rng(42)
-    # travel duration in seconds *as floats*
-    durations = pd.read_csv(io.input_dir.joinpath(f'vienna_{m}_durations_#{n:03d}.csv'), index_col=0)
-    # distance in meters
-    distances = pd.read_csv(io.input_dir.joinpath(f'vienna_{m}_distances_#{n:03d}.csv'), index_col=0)
+    matrices = []
+    for n in [1]:
+        # travel duration in seconds *as floats*
+        durations = pd.read_csv(io.input_dir.joinpath(f'vienna_{m}_durations_#{n:03d}.csv'), index_col=0)
+        # distance in meters
+        distances = pd.read_csv(io.input_dir.joinpath(f'vienna_{m}_distances_#{n:03d}.csv'), index_col=0)
+        # addresses
+        addresses = read_vienna_addresses(io.input_dir.joinpath(f'vienna_{m}_addresses_#{n:03d}.csv'))
+        matrices.append([durations, distances, addresses])
 
-    addresses = read_vienna_addresses(io.input_dir.joinpath(f'vienna_{m}_addresses_#{n:03d}.csv'))
     with tqdm.tqdm(total=2 * 5 * 20) as pbar:
         for num_requests_per_carrier in [10, 25]:
             for carrier_competition in [0.0, 0.25, 0.5, 0.75, 1.0]:
                 for run in range(20):
+                    durations, distances, addresses = matrices[0]
                     instance = generate_vienna_cr_ahd_instance(vienna_addresses=addresses,
                                                                vienna_distances=distances,
                                                                vienna_durations=durations,
@@ -230,7 +235,8 @@ if __name__ == '__main__':
                                                                num_requests_per_carrier=num_requests_per_carrier,
                                                                max_tour_length=1_000_000,
                                                                plot=False,
-                                                               rng=rng)
+                                                               rng=int(num_requests_per_carrier+carrier_competition*100+run)
+                                                               )
                     # instance.write_delim(io.input_dir.joinpath(instance.id_ + '.dat'))
                     instance.write_json(io.input_dir.joinpath(instance.id_ + '.json'))
                     pbar.update()
