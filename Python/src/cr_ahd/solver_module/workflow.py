@@ -53,7 +53,7 @@ def _execute_job(path, config, fail_on_error, console_log_level):
 
     except Exception as e:
         logger.error(
-            f'{e}\nFailed on instance {instance} with solver {solver.config} at {datetime.now()}')
+            f'{e}\nFailed on instance {instance} with solver {solver.config} at {datetime.now()}\n{e}')
         if fail_on_error:
             raise e
         else:

@@ -1,3 +1,4 @@
+import datetime as dt
 import logging
 from abc import ABC, abstractmethod
 from copy import deepcopy
@@ -121,6 +122,8 @@ class ClearAndReinsertAll(BiddingBehavior):
 
         except utility_module.errors.ConstraintViolationError:
             # with_bundle = -float('inf')
-            with_bundle = -GRB.INFINITY
-
+            if isinstance(solution.objective(), float):
+                with_bundle = -GRB.INFINITY
+            elif isinstance(solution.objective(), dt.timedelta):
+                with_bundle = dt.timedelta.max  # TODO create a custom infinity time delta?
         return with_bundle

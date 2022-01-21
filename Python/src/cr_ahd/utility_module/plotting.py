@@ -322,7 +322,7 @@ def plot_vienna_vrp_solution(instance: it.MDVRPTWInstance, solution: slt.CAHDSol
                                   f'dist={round(tour.sum_travel_distance)})',
                             tooltip=f'Tour {tour.id_}',
                             color=color,
-                            weight=15
+                            weight=8
                             ).add_to(tour_group)
 
             # routed requests
