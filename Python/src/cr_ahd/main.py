@@ -1,5 +1,4 @@
 import logging.config
-import logging.config
 import os
 from datetime import datetime
 
@@ -17,10 +16,10 @@ if __name__ == '__main__':
         if "PYCHARM" in os.environ:
             args = {'distance': 7,
                     'num_carriers': 3,
-                    'num_requests': 10,
-                    'service_area_overlap': [0.0],#, 0.25, 0.5, 0.75, 1.0],
-                    'run': 14,
-                    'threads': 1,
+                    'num_requests': 25,
+                    'service_area_overlap': [0.5],
+                    'run': range(20),
+                    'threads': 6,
                     'fail': 1,
                     }
         # else read from terminal parameters

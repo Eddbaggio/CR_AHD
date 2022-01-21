@@ -277,7 +277,7 @@ class VRPTWRelocateDist(InterTourNeighborhood):
 
     def execute_move(self, instance: it.MDVRPTWInstance, move: vrptw_relocate_move):
         delta, carrier, old_tour, old_pos, new_tour, new_pos = move
-        vertex = old_tour.pop_and_update(instance, [old_pos])
+        vertex = old_tour.pop_and_update(instance, [old_pos])[0]
         request = instance.request_from_vertex(vertex)
         old_tour.requests.remove(request)
 
@@ -300,8 +300,8 @@ class VRPTWRelocateDur(InterTourNeighborhood):
                         continue
                     for new_pos in range(1, len(new_tour) - 1):
                         delta = 0.0
-                        delta += old_tour.pop_duration_delta(instance, [old_pos])
-                        delta += new_tour.insert_duration_delta(instance, [new_pos], [vertex])
+                        delta += old_tour.pop_duration_delta(instance, [old_pos]).total_seconds()
+                        delta += new_tour.insert_duration_delta(instance, [new_pos], [vertex]).total_seconds()
                         move: vrptw_relocate_move = (delta, carrier, old_tour, old_pos, new_tour, new_pos)
                         if self.feasibility_check(instance, move):
                             yield move
@@ -314,7 +314,7 @@ class VRPTWRelocateDur(InterTourNeighborhood):
 
     def execute_move(self, instance: it.MDVRPTWInstance, move: vrptw_relocate_move):
         delta, carrier, old_tour, old_pos, new_tour, new_pos = move
-        vertex = old_tour.pop_and_update(instance, [old_pos])
+        vertex = old_tour.pop_and_update(instance, [old_pos])[0]
         request = instance.request_from_vertex(vertex)
         old_tour.requests.remove(request)
 

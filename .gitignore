@@ -1,6 +1,11 @@
 data/Output
+# files used to query OSRM data and sample instances
+data/OSRM
+data/Input/BEZIRKSGRENZENOGD
+data/Input/BEZIRKSGRENZENOGD.zip
+data/Input/vienna*
+
 .idea
-data/Input/vienna_addresses.csv
 tmp.sh
 
 # Byte-compiled / optimized / DLL files

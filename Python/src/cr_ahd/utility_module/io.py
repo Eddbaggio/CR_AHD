@@ -9,7 +9,7 @@ import pandas as pd
 from utility_module import utils as ut
 
 working_dir = Path().cwd()
-print(working_dir.as_posix())
+# print(working_dir.as_posix())
 data_dir = working_dir.absolute().joinpath('data')
 input_dir = data_dir.joinpath('Input')
 assert input_dir.exists(), f'Input directory does not exist! Make sure the working directory (place from where ' \
