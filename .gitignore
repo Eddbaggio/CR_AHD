@@ -1,8 +1,8 @@
 data/Output
 # files used to query OSRM data and sample instances
 data/OSRM
-data/Input/BEZIRKSGRENZENOGD
-data/Input/BEZIRKSGRENZENOGD.zip
+data/Input/BEZIRKSGRENZEOGD.zip
+data/Input/BEZIRKSGRENZEOGD/
 data/Input/vienna*
 
 .idea
