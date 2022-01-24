@@ -4,8 +4,8 @@ from abc import ABC, abstractmethod
 from typing import Sequence
 
 import gurobipy as gp
-import numpy as np
 from gurobipy import GRB
+import numpy as np
 
 from core_module import instance as it, solution as slt
 from utility_module import utils as ut, io
@@ -92,57 +92,60 @@ class MaxBidGurobiCAP1(WinnerDeterminationBehavior):
                 else:
                     coeff[(b, c)] = x
 
-        # model
-        m = gp.Model(name="Set Partitioning Problem")
-        m.setParam('OutputFlag', 0)
+        with gp.Env(empty=True) as env:
+            env.setParam('OutputFlag', 0)  # to suppress any sort of console output
+            env.start()
+            with gp.Model(env=env, name="Set Partitioning Problem") as m:
+                # model
+                m.setParam('OutputFlag', 0)
 
-        # variables: bundle-to-bidder assignment
-        y: gp.tupledict = m.addVars(len(bundles), instance.num_carriers, vtype=GRB.BINARY, name='y')
+                # variables: bundle-to-bidder assignment
+                y: gp.tupledict = m.addVars(len(bundles), instance.num_carriers, vtype=GRB.BINARY, name='y')
 
-        # objective: min the sum of realized bids (min because bids are distance or duration)
-        m.setObjective(y.prod(coeff), GRB.MINIMIZE)
+                # objective: min the sum of realized bids (min because bids are distance or duration)
+                m.setObjective(y.prod(coeff), GRB.MINIMIZE)
 
-        # constraints: each request is assigned to exactly one carrier
-        # (set covering: assigned to *at least* one carrier
-        # set packing: assigned to *at most* one carrier)
-        for request in auction_pool:
-            expr = gp.LinExpr()
-            for b, bundle in enumerate(bundles):
-                if request in bundle:
-                    expr += y.sum(b, '*')
-            m.addLConstr(expr, GRB.EQUAL, 1, f'single assignment {request}')
+                # constraints: each request is assigned to exactly one carrier
+                # (set covering: assigned to *at least* one carrier
+                # set packing: assigned to *at most* one carrier)
+                for request in auction_pool:
+                    expr = gp.LinExpr()
+                    for b, bundle in enumerate(bundles):
+                        if request in bundle:
+                            expr += y.sum(b, '*')
+                    m.addLConstr(expr, GRB.EQUAL, 1, f'single assignment {request}')
 
-        # constraints: no carrier wins more than one bundle
-        for c in range(instance.num_carriers):
-            m.addLConstr(y.sum('*', c), GRB.LESS_EQUAL, 1, f'single bundle {c}')
+                # constraints: no carrier wins more than one bundle
+                for c in range(instance.num_carriers):
+                    m.addLConstr(y.sum('*', c), GRB.LESS_EQUAL, 1, f'single bundle {c}')
 
-        # write
-        path = io.solution_dir.joinpath(solution.id_ + '_' + solution.solver_config['solution_algorithm'])
-        path = io.unique_path(path.parent, path.stem + 'WDP_#{:03d}.lp')
-        path.parent.mkdir(parents=True, exist_ok=True)
-        m.write(str(path))
+                # write
+                path = io.solution_dir.joinpath(solution.id_ + '_' + solution.solver_config['solution_algorithm'])
+                path = io.unique_path(path.parent, path.stem + 'WDP_#{:03d}.lp')
+                path.parent.mkdir(parents=True, exist_ok=True)
+                m.write(str(path))
 
-        # solve
-        m.optimize()
-        if m.Status != GRB.OPTIMAL:
-            return m.Status, None, None, None
-        assert m.Status == GRB.OPTIMAL, f'Winner Determination is not optimal; status: {m.Status}'
-        # status 3 is 'infeasible'
+                # solve
+                m.optimize()
+                if m.Status != GRB.OPTIMAL:
+                    return m.Status, None, None, None
+                assert m.Status == GRB.OPTIMAL, f'Winner Determination is not optimal; status: {m.Status}'
+                # status 3 is 'infeasible'
 
-        winner_bundles = []
-        bundle_winners = []
-        winner_bids = []
-        logger.debug(f'the optimal solution for the Winner Determination Problem with {len(bundles)} bundles:')
-        logger.debug(f'Objective: {m.objVal}')
-        for b, bundle in enumerate(bundles):
-            for c in range(instance.num_carriers):
-                if y[b, c].x >= 0.99:
-                    winner_bundles.append(bundle)
-                    bundle_winners.append(c)
-                    winner_bids.append(bids_matrix[b, c])
-                    logger.debug(f'Bundle {b}: {bundle} assigned to {c} for a bid of {bids_matrix[b, c]}')
+                winner_bundles = []
+                bundle_winners = []
+                winner_bids = []
+                logger.debug(f'the optimal solution for the Winner Determination Problem with {len(bundles)} bundles:')
+                logger.debug(f'Objective: {m.objVal}')
+                for b, bundle in enumerate(bundles):
+                    for c in range(instance.num_carriers):
+                        if y[b, c].x >= 0.99:
+                            winner_bundles.append(bundle)
+                            bundle_winners.append(c)
+                            winner_bids.append(bids_matrix[b, c])
+                            logger.debug(f'Bundle {b}: {bundle} assigned to {c} for a bid of {bids_matrix[b, c]}')
 
-        return m.Status, winner_bundles, bundle_winners, winner_bids
+                return m.Status, winner_bundles, bundle_winners, winner_bids
 
 
 '''class MaxBidGurobiCAP2(WinnerDeterminationBehavior):

@@ -462,6 +462,7 @@ def collaboration_gain(df: pd.DataFrame, plot: bool = False):
                 gains.append(record)
             else:
                 for collab_name, collab_group in collaborative.groupby(collaborative_config, dropna=False):
+                    collab_group = collab_group.squeeze()
                     coll_gain = 1 - (collab_group[solution_values] / isolated[solution_values])
                     record = {k: v for k, v in zip(instance_config, inst_name)}
                     record.update({k: v for k, v in zip(general_config, gen_name)})
@@ -479,10 +480,11 @@ def collaboration_gain(df: pd.DataFrame, plot: bool = False):
 
 
 if __name__ == '__main__':
-    path = "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home Deliveries/01_Code/data/Output/evaluation_agg_solution_#001.csv"
+    path = "C:/Users/Elting/Desktop/HPC_Output/evaluation_agg_solution_#002.csv"
     df = pd.read_csv(path)
 
-    collaboration_gain(df)
+    collaboration_gain(df).to_csv(path.replace('agg_solution', 'coll_gain'))
+
 
     # print_top_level_stats(df, [])
     # plot(df,

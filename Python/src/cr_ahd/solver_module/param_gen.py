@@ -54,9 +54,9 @@ def parameter_generator():
     ]
 
     nums_submitted_requests: List[int] = [
-        # 3,
+        3,
         4,
-        # 5
+        5
     ]
 
     request_selections: List[rs.RequestSelectionBehavior.__class__] = [
