@@ -212,7 +212,7 @@ if __name__ == '__main__':
     m = 1000
     rng = np.random.default_rng(42)
     matrices = []
-    for n in [3]:
+    for n in [1]:
         # travel duration in seconds *as floats*
         durations = pd.read_csv(io.input_dir.joinpath(f'vienna_{m}_durations_#{n:03d}.csv'), index_col=0)
         # distance in meters
