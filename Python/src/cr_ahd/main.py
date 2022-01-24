@@ -2,7 +2,7 @@ import logging.config
 import os
 from datetime import datetime
 
-from solver_module import workflow as wf, param_gen as pg
+from solver_module import workflow as wf, config as pg
 from utility_module import cr_ahd_logging as log, io, evaluation as ev
 from utility_module.argparse_utils import parser
 
@@ -35,7 +35,7 @@ if __name__ == '__main__':
                                            service_area_overlap=args['service_area_overlap'],
                                            run=args['run'],
                                            )
-        configs = list(pg.parameter_generator())
+        configs = list(pg.configs())
 
         # solving
         solutions = wf.execute_jobs(paths, configs, args['threads'], args['fail'])

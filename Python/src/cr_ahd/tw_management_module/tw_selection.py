@@ -1,11 +1,10 @@
 import abc
-import datetime as dt
 import logging
 import random
 from typing import List
 
-from utility_module.utils import EXECUTION_START_TIME, END_TIME, EXECUTION_TIME_HORIZON
 from tw_management_module.tw import TimeWindow
+from utility_module.utils import EXECUTION_START_TIME, END_TIME, EXECUTION_TIME_HORIZON
 
 logger = logging.getLogger(__name__)
 
@@ -59,11 +58,11 @@ class UnequalPreference(TWSelectionBehavior):
         # early preference
         if pref <= 0.1:
             attractive_tws = [tw for tw in tw_offer_set if
-                              tw.close <= EXECUTION_START_TIME + (END_TIME - EXECUTION_START_TIME) / 2]
+                              tw.open <= EXECUTION_START_TIME + (END_TIME - EXECUTION_START_TIME) / 2]
         # late preference
         else:
             attractive_tws = [tw for tw in tw_offer_set if
-                              tw.open >= EXECUTION_START_TIME + (END_TIME - EXECUTION_START_TIME) / 2]
+                              tw.close >= EXECUTION_START_TIME + (END_TIME - EXECUTION_START_TIME) / 2]
         if attractive_tws:
             return random.choice(attractive_tws)
         else:

@@ -336,24 +336,14 @@ def debugger_is_active() -> bool:
     return gettrace() is not None
 
 
-DISTANCE_SCALING = 1
-REVENUE_SCALING = DISTANCE_SCALING
-LOAD_CAPACITY_SCALING = 10
 ACCEPTANCE_START_TIME: dt.datetime = dt.datetime.min
+
 EXECUTION_START_TIME: dt.datetime = ACCEPTANCE_START_TIME + dt.timedelta(days=1)
-END_TIME: dt.datetime = EXECUTION_START_TIME + dt.timedelta(minutes=3360)
-TW_LENGTH: dt.timedelta = dt.timedelta(hours=2)
-ALL_TW = [TimeWindow(e, min(e + TW_LENGTH, END_TIME)) for e in
-          datetime_range(EXECUTION_START_TIME, END_TIME, step=TW_LENGTH, endpoint=False)]
-EXECUTION_TIME_HORIZON = TimeWindow(EXECUTION_START_TIME, END_TIME)
-SPEED_KMH = 60  # vehicle speed (set to 60 to treat distance = time)
-
-# override to artificially lower the acceptance rate:
 END_TIME: dt.datetime = EXECUTION_START_TIME + dt.timedelta(days=1)
-TW_LENGTH: dt.timedelta = dt.timedelta(hours=2)
-ALL_TW = [TimeWindow(e, min(e + TW_LENGTH, END_TIME)) for e in
-          datetime_range(EXECUTION_START_TIME, END_TIME, step=TW_LENGTH, endpoint=False)]
 EXECUTION_TIME_HORIZON = TimeWindow(EXECUTION_START_TIME, END_TIME)
-SPEED_KMH = 30  # vehicle speed (set to 60 to treat distance = time)
 
-PENDULUM_PENALTY_DISTANCE_SCALING = 1.25
+
+def generate_time_windows(tw_length: dt.timedelta,
+                          start: dt.datetime = EXECUTION_START_TIME,
+                          end: dt.datetime = END_TIME):
+    return [TimeWindow(e, min(e + tw_length, end)) for e in datetime_range(start, end, step=tw_length, endpoint=False)]

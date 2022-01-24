@@ -42,6 +42,7 @@ class Solver:
             'max_num_accepted_infeasible': request_acceptance.max_num_accepted_infeasible,
             'request_acceptance_attractiveness': request_acceptance.request_acceptance_attractiveness.name,
             'time_window_offering': request_acceptance.time_window_offering.name,
+            'time_window_length': request_acceptance.time_window_offering.time_window_length,
             'time_window_selection': request_acceptance.time_window_selection.name,
             'num_int_auctions': num_intermediate_auctions,
 

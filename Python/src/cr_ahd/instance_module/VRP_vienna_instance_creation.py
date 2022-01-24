@@ -39,7 +39,6 @@ def generate_vienna_cr_ahd_instance(vienna_addresses: gp.GeoDataFrame,
                                     requests_load: Union[float, int, List[float], List[int]] = 1,
                                     plot=False,
                                     rng=None):
-
     rng = np.random.default_rng(rng)
 
     if num_carriers < 2:
@@ -159,20 +158,21 @@ def plot_service_areas_and_requests(depots, district_carrier_assignment, distric
                 popup=name1,
                 color=to_hex(cmap1(carrier / num_carriers)),
                 fill_color=to_hex(cmap1(carrier / num_carriers)),
-                fill_opacity=0.4
+                fill_opacity=0.2
             )
             poly.add_to(carrier_layers[carrier])
     for cl in carrier_layers:
         cl.add_to(m)
     depot_markers = []
     for idx1, (_, depot1) in enumerate(depots.items()):
-        cm1 = folium.CircleMarker(location=(depot1.x, depot1.y),
-                                  popup=f'Depot {idx1}',
-                                  radius=5,
-                                  color='black',
-                                  fill_color=to_hex(cmap1(idx1 / num_carriers)),
-                                  fill_opacity=1,
-                                  )
+        cm1 = folium.features.RegularPolygonMarker(location=(depot1.x, depot1.y),
+                                                   number_of_sides=4,
+                                                   popup=f'Depot {idx1}',
+                                                   radius=10,
+                                                   color='black',
+                                                   fill_color=to_hex(cmap1(idx1 / num_carriers)),
+                                                   fill_opacity=1,
+                                                   )
         cm1.add_to(m)
         depot_markers.append(cm1)
 
@@ -185,7 +185,7 @@ def plot_service_areas_and_requests(depots, district_carrier_assignment, distric
         c = srs['carrier']
         cm = folium.CircleMarker(
             location=(srs.geometry.x, srs.geometry.y),
-            radius=3,
+            radius=5,
             color=to_hex(cmap(c / num_carriers)),
         )
         cm.add_to(layer)
@@ -235,7 +235,8 @@ if __name__ == '__main__':
                                                                num_requests_per_carrier=num_requests_per_carrier,
                                                                max_tour_length=1_000_000,
                                                                plot=True,
-                                                               rng=int(num_requests_per_carrier+carrier_competition*100+run)
+                                                               rng=int(
+                                                                   num_requests_per_carrier + carrier_competition * 100 + run)
                                                                )
                     # instance.write_delim(io.input_dir.joinpath(instance.id_ + '.dat'))
                     instance.write_json(io.input_dir.joinpath(instance.id_ + '.json'))

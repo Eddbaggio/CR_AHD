@@ -102,7 +102,7 @@ class RequestAcceptanceBehavior:
                  max_num_accepted_infeasible: int,
                  request_acceptance_attractiveness: RequestAcceptanceAttractiveness,
                  time_window_offering: two.TWOfferingBehavior,
-                 time_window_selection: tws.TWSelectionBehavior,
+                 time_window_selection: tws.TWSelectionBehavior
                  ):
         self.max_num_accepted_infeasible = max_num_accepted_infeasible
         self.request_acceptance_attractiveness = request_acceptance_attractiveness

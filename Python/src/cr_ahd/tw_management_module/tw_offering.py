@@ -1,4 +1,5 @@
 import abc
+import datetime as dt
 
 from core_module import instance as it, solution as slt, tour as tr
 from tw_management_module import tw
@@ -6,8 +7,10 @@ from utility_module import utils as ut
 
 
 class TWOfferingBehavior(abc.ABC):
-    def __init__(self):
+    def __init__(self, time_window_length: dt.timedelta):
         self.name = self.__class__.__name__
+        self.time_window_length = time_window_length
+        self.time_windows = ut.generate_time_windows(time_window_length)
 
     def execute(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution, request: int):
         delivery_vertex = instance.vertex_from_request(request)
@@ -18,9 +21,9 @@ class TWOfferingBehavior(abc.ABC):
             f'tw_close={instance.tw_close[delivery_vertex]}'
 
         tw_valuations = []
-        for tw in ut.ALL_TW:
+        for tw in self.time_windows:
             tw_valuations.append(self._evaluate_time_window(instance, carrier, request, tw))
-        offered_time_windows = list(sorted(zip(tw_valuations, ut.ALL_TW), key=lambda x: x[0]))
+        offered_time_windows = list(sorted(zip(tw_valuations, self.time_windows), key=lambda x: x[0]))
         offered_time_windows = [tw for valuation, tw in offered_time_windows if valuation >= 0]
         return offered_time_windows
 
