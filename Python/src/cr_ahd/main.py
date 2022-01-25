@@ -18,7 +18,7 @@ if __name__ == '__main__':
                     'num_carriers': 3,
                     'num_requests': [10],
                     'service_area_overlap': [0.5],
-                    'run': 1,
+                    'run': 7,
                     'threads': 1,
                     'fail': 1,
                     }

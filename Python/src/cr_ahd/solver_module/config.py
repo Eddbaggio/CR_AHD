@@ -39,9 +39,9 @@ def configs():
     s_request_acceptance_attractiveness: Sequence[ra.RequestAcceptanceAttractiveness] = [ra.Dummy()]
 
     s_time_window_length: Sequence[dt.timedelta] = [
-        dt.timedelta(hours=24),
-        dt.timedelta(hours=8),
-        dt.timedelta(hours=4),
+        # dt.timedelta(hours=24),
+        # dt.timedelta(hours=8),
+        # dt.timedelta(hours=4),
         dt.timedelta(hours=2),
     ]
 
@@ -63,11 +63,12 @@ def configs():
         # rs.SpatialBundleDSum,  # the original 'cluster' strategy by Gansterer & Hartl (2016)
         # rs.SpatialBundleDMax,
         # rs.MinDistanceToForeignDepotDMin,
+        rs.MinDurationToForeignDepotDMin,
         # rs.MarginalProfitProxy,
         # rs.MarginalProfitProxyNeighbor,
         # rs.ComboRaw,
         rs.ComboDistStandardized,
-        # rs.LosSchulteBundle,
+        rs.LosSchulteBundle,
         # rs.TemporalRangeCluster,
         # TODO SpatioTemporalCluster is not yet good enough & sometimes even infeasible
         # rs.SpatioTemporalCluster,

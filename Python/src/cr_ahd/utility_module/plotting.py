@@ -53,13 +53,16 @@ def plot_vienna_vrp_solution(instance: it.MDVRPTWInstance, solution: slt.CAHDSol
     cmap1 = plt.get_cmap('jet', num_carriers)
 
     # carriers
+    keep_in_front_feautres = []
     for carrier in solution.carriers:
         carrier_group = folium.FeatureGroup(f'Carrier {carrier.id_}')
         m.add_child(carrier_group)
         color = to_hex(cmap1(carrier.id_ / num_carriers))
 
         # depots
-        depot_marker(instance, carrier, color).add_to(carrier_group)
+        d = depot_marker(instance, carrier, color)
+        d.add_to(carrier_group)
+        keep_in_front_feautres.append(d)
 
         # service_areas
         service_area_group = FeatureGroupSubGroup(carrier_group, f'  Service Area {carrier.id_}')
@@ -70,7 +73,6 @@ def plot_vienna_vrp_solution(instance: it.MDVRPTWInstance, solution: slt.CAHDSol
                 locations=poly.exterior.coords, popup=name, color=color, fill_color=color, fill_opacity=0.1
             )
             poly.add_to(service_area_group)
-        folium.GeoJson()
 
         # tours
         for tour in carrier.tours:
@@ -103,6 +105,7 @@ def plot_vienna_vrp_solution(instance: it.MDVRPTWInstance, solution: slt.CAHDSol
                                          fill_color='blue',
                                          ).add_to(m)
 
+    m.keep_in_front(*keep_in_front_feautres)
     path = io.output_dir.joinpath('folium_map.html')
     folium.LayerControl(collapsed=False).add_to(m)
     m.save(path.as_posix())
