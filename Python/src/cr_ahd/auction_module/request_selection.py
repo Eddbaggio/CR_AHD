@@ -197,7 +197,7 @@ class MinDurationToForeignDepotDMin(RequestSelectionBehaviorIndividual):
         dist_min = float('inf')
         delivery = instance.vertex_from_request(request)
         for depot in foreign_depots:
-            dist = min(instance.travel_duration([depot], [delivery]), instance.travel_duration([delivery], [depot]))
+            dist = min(instance.travel_duration([depot], [delivery]), instance.travel_duration([delivery], [depot])).total_seconds()
             if dist < dist_min:
                 dist_min = dist
 
