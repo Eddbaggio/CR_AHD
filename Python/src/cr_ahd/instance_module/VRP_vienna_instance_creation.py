@@ -12,7 +12,7 @@ from matplotlib.colors import to_hex
 from shapely.geometry import Point
 from shapely.ops import nearest_points
 
-import instance_module.geometry as geo
+import utility_module.geometry as geo
 from core_module import instance as it
 from utility_module import io, utils as ut
 from vienna_data_handling import read_vienna_addresses
