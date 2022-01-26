@@ -63,8 +63,8 @@ def configs():
         # rs.SpatioTemporal,
         # rs.Random,
         # rs.MinDurationToForeignDepotDMin,
+        rs.ComboDistStandardizedNEW,
         rs.ComboDistStandardized,
-        rs.ComboDistStandardizedNEW
     ]
 
     s_num_auction_bundles: Sequence[int] = [

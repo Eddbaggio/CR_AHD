@@ -240,16 +240,16 @@ class MinDurationToForeignDepotDSum(RequestSelectionBehaviorIndividual):
         foreign_depots = list(range(instance.num_carriers))
         foreign_depots.pop(carrier.id_)
 
-        dist_min = float('inf')
+        dur_min = dt.timedelta.max
         delivery = instance.vertex_from_request(request)
 
         for depot in foreign_depots:
-            dist = sum((instance.travel_duration([depot], [delivery]), instance.travel_duration([delivery], [depot])),
+            dur = sum((instance.travel_duration([depot], [delivery]), instance.travel_duration([delivery], [depot])),
                        start=dt.timedelta(0))
-            if dist < dist_min:
-                dist_min = dist
+            if dur < dur_min:
+                dur_min = dur
 
-        return dist_min
+        return dur_min
 
 
 class ComboDistRaw(RequestSelectionBehaviorIndividual):
