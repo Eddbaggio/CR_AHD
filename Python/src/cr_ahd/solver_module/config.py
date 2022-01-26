@@ -59,11 +59,12 @@ def configs():
     ]
 
     s_request_selection: Sequence[rs.RequestSelectionBehavior.__class__] = [
-        rs.SuccessorsNeighbor,
-        rs.SpatioTemporal,
-        rs.Random,
+        # rs.SuccessorsNeighbor,
+        # rs.SpatioTemporal,
+        # rs.Random,
         # rs.MinDurationToForeignDepotDMin,
         rs.ComboDistStandardized,
+        rs.ComboDistStandardizedNEW
     ]
 
     s_num_auction_bundles: Sequence[int] = [

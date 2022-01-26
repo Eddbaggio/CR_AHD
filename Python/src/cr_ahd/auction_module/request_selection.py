@@ -368,6 +368,82 @@ class ComboDistStandardized(RequestSelectionBehaviorIndividual):
         return min_dist_to_foreign_depot, marginal_profit, dist_to_own_depot
 
 
+class ComboDistStandardizedNEW(RequestSelectionBehaviorIndividual):
+    """
+
+    """
+
+    def execute(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution):
+        """
+        Overrides method in RequestSelectionBehaviorIndividual because different components of the valuation function
+        need to be normalized before summing them up
+
+        select a set of requests based on the concrete selection behavior. will retract the requests from the carrier
+        and return
+
+        :return: the auction_request_pool as a list of request indices and a default
+        bundling, i.e. a list of the carrier indices that maps the auction_request_pool to their original carrier.
+        """
+        auction_request_pool = []
+        original_bundling_labels = []
+
+        # weighting factors for the three components (min_dist_to_foreign_depot, marginal_profit, dist_to_own_depot)
+        # of the valuation function
+        alpha1 = 1
+        alpha2 = 1
+        alpha3 = 1
+
+        for carrier in solution.carriers:
+            k = _abs_num_requests(carrier, self.num_submitted_requests)
+            valuations = []
+            for request in carrier.accepted_requests:
+                valuation = self._evaluate_request(instance, solution, carrier, request)
+                valuations.append(valuation)
+
+            # normalize the valuation components
+            standardized_components = []
+            for component_series in zip(*valuations):
+                mean = sum(component_series) / len(component_series)
+                std = sqrt(sum([(x - mean) ** 2 for x in component_series]) / len(component_series))
+                standardized_components.append(((x - mean) / std for x in component_series))
+
+            # compute the weighted sum of the standardized components
+            valuations = []
+            for comp1, comp2, comp3 in zip(*standardized_components):
+                weighted_valuation = alpha1 * comp1 + alpha2 * comp2 + alpha3 * comp3
+                valuations.append(weighted_valuation)
+
+            # pick the WORST k evaluated requests (from ascending order)
+            selected = [r for _, r in sorted(zip(valuations, carrier.accepted_requests))][:k]
+            selected.sort()
+
+            for request in selected:
+                solution.free_requests_from_carriers(instance, [request])
+                auction_request_pool.append(request)
+                original_bundling_labels.append(carrier.id_)
+
+        return auction_request_pool, original_bundling_labels
+
+    def _evaluate_request(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution,
+                          request: int) -> Tuple[float, float, float]:
+
+        # [i] duration to the depot of one of the collaborating carriers
+        min_dur_to_foreign_depot = MinDurationToForeignDepotDSum(None)._evaluate_request(instance, solution,
+                                                                                         carrier, request)
+
+        # [ii] wait duration
+        tour = solution.tour_of_request(request)
+        vertex = instance.vertex_from_request(request)
+        wait_duration = tour.wait_duration_sequence[tour.vertex_pos[vertex]]
+
+        # [iii] duration to the carrier's own depot
+        own_depot = carrier.id_
+        # duration as the average of the asymmetric durations between depot and delivery vertex
+        dur_to_own_depot = instance.travel_duration([own_depot, vertex], [vertex, own_depot]) / 2
+
+        return min_dur_to_foreign_depot.total_seconds(), wait_duration.total_seconds(), dur_to_own_depot.total_seconds()
+
+
 class SpatioTemporal(RequestSelectionBehaviorIndividual):
     """
     a request is more likely to be selected (i.e., submitted to the auction) if it is far away from the depot
@@ -491,6 +567,7 @@ class SuccessorsNeighbor(RequestSelectionBehaviorNeighbor):
     are not sufficient successors, the requests that have the shortest travel duration from the initial request
     will be chosen.
     """
+
     def _find_initial_request(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution):
         max_wait = dt.timedelta(0)
         max_wait_vertex = None
@@ -507,11 +584,11 @@ class SuccessorsNeighbor(RequestSelectionBehaviorNeighbor):
                         num_neighbors: int):
         tour = solution.tour_of_request(initial_request)
         pos = tour.vertex_pos[instance.vertex_from_request(initial_request)]
-        num_successors = len(tour.routing_sequence[pos+1:-1])
+        num_successors = len(tour.routing_sequence[pos + 1:-1])
         if num_successors >= num_neighbors:
-            return [instance.request_from_vertex(v) for v in tour.routing_sequence[pos+1:pos+1+num_neighbors]]
+            return [instance.request_from_vertex(v) for v in tour.routing_sequence[pos + 1:pos + 1 + num_neighbors]]
         else:
-            neighbors = [instance.request_from_vertex(v) for v in tour.routing_sequence[pos+1:-1]]
+            neighbors = [instance.request_from_vertex(v) for v in tour.routing_sequence[pos + 1:-1]]
             carrier = solution.carriers[carrier_id]
             initial_vertex = instance.vertex_from_request(initial_request)
             nearest_neighbors = sorted(carrier.accepted_requests,
@@ -522,6 +599,7 @@ class SuccessorsNeighbor(RequestSelectionBehaviorNeighbor):
                 if candidate not in [initial_vertex] + neighbors:
                     neighbors.append(candidate)
             return neighbors
+
 
 # =====================================================================================================================
 # BUNDLE-BASED REQUEST SELECTION
