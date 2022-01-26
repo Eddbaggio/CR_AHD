@@ -378,7 +378,7 @@ class SpatioTemporal1(RequestSelectionBehaviorIndividual):
         pos = tour.vertex_pos[vertex]
         max_shift = tour.max_shift_sequence[pos]
         max_max_shift = instance.tw_close[vertex] - instance.tw_open[vertex]
-        value = dur / max_dur + max_shift / max_max_shift  # short duration is good & short max shift is good
+        value = dur / max_dur + max_shift / max_max_shift
         return value
 
 
@@ -392,8 +392,11 @@ class SpatioTemporal2(RequestSelectionBehaviorIndividual):
         pos = tour.vertex_pos[vertex]
         max_shift = tour.max_shift_sequence[pos]
         max_max_shift = instance.tw_close[vertex] - instance.tw_open[vertex]
-        value = 1 / (dur / max_dur + max_shift / max_max_shift)  # short duration is good & short max shift is good
-        return value
+        value = dur / max_dur + max_shift / max_max_shift
+        if value == 0:
+            return 1
+        else:
+            return 1/value
 
 
 class SpatioTemporal3(RequestSelectionBehaviorIndividual):
@@ -406,7 +409,7 @@ class SpatioTemporal3(RequestSelectionBehaviorIndividual):
         pos = tour.vertex_pos[vertex]
         max_shift = tour.max_shift_sequence[pos]
         max_max_shift = instance.tw_close[vertex] - instance.tw_open[vertex]
-        value = (dur / max_dur - max_shift / max_max_shift)  # short duration is good & short max shift is good
+        value = (dur / max_dur - max_shift / max_max_shift)
         return value
 
 
@@ -420,8 +423,11 @@ class SpatioTemporal4(RequestSelectionBehaviorIndividual):
         pos = tour.vertex_pos[vertex]
         max_shift = tour.max_shift_sequence[pos]
         max_max_shift = instance.tw_close[vertex] - instance.tw_open[vertex]
-        value = 1 / (dur / max_dur - max_shift / max_max_shift)  # short duration is good & short max shift is good
-        return value
+        value = dur / max_dur - max_shift / max_max_shift
+        if value == 0:
+            return 1
+        else:
+            return 1/value
 
 
 # =====================================================================================================================
