@@ -59,12 +59,10 @@ def configs():
     ]
 
     s_request_selection: Sequence[rs.RequestSelectionBehavior.__class__] = [
-        rs.SpatioTemporal1,
-        rs.SpatioTemporal2,
-        rs.SpatioTemporal3,
-        rs.SpatioTemporal4,
+        rs.SuccessorsNeighbor,
+        rs.SpatioTemporal,
         rs.Random,
-        rs.MinDurationToForeignDepotDMin,
+        # rs.MinDurationToForeignDepotDMin,
         rs.ComboDistStandardized,
     ]
 

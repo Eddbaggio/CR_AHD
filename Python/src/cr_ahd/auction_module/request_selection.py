@@ -368,21 +368,12 @@ class ComboDistStandardized(RequestSelectionBehaviorIndividual):
         return min_dist_to_foreign_depot, marginal_profit, dist_to_own_depot
 
 
-class SpatioTemporal1(RequestSelectionBehaviorIndividual):
-    def _evaluate_request(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution,
-                          request: int):
-        vertex = instance.vertex_from_request(request)
-        max_dur = max(instance._travel_duration_matrix[carrier.id_])
-        dur = instance.travel_duration([carrier.id_], [vertex])
-        tour = solution.tour_of_request(request)
-        pos = tour.vertex_pos[vertex]
-        max_shift = tour.max_shift_sequence[pos]
-        max_max_shift = instance.tw_close[vertex] - instance.tw_open[vertex]
-        value = dur / max_dur + max_shift / max_max_shift
-        return value
+class SpatioTemporal(RequestSelectionBehaviorIndividual):
+    """
+    a request is more likely to be selected (i.e., submitted to the auction) if it is far away from the depot
+    and if its current max_shift value is large
+    """
 
-
-class SpatioTemporal2(RequestSelectionBehaviorIndividual):
     def _evaluate_request(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution,
                           request: int):
         vertex = instance.vertex_from_request(request)
@@ -394,47 +385,16 @@ class SpatioTemporal2(RequestSelectionBehaviorIndividual):
         max_max_shift = instance.tw_close[vertex] - instance.tw_open[vertex]
         value = dur / max_dur + max_shift / max_max_shift
         if value == 0:
-            return 1
+            return float('inf')
         else:
-            return 1/value
-
-
-class SpatioTemporal3(RequestSelectionBehaviorIndividual):
-    def _evaluate_request(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution,
-                          request: int):
-        vertex = instance.vertex_from_request(request)
-        max_dur = max(instance._travel_duration_matrix[carrier.id_])
-        dur = instance.travel_duration([carrier.id_], [vertex])
-        tour = solution.tour_of_request(request)
-        pos = tour.vertex_pos[vertex]
-        max_shift = tour.max_shift_sequence[pos]
-        max_max_shift = instance.tw_close[vertex] - instance.tw_open[vertex]
-        value = (dur / max_dur - max_shift / max_max_shift)
-        return value
-
-
-class SpatioTemporal4(RequestSelectionBehaviorIndividual):
-    def _evaluate_request(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution,
-                          request: int):
-        vertex = instance.vertex_from_request(request)
-        max_dur = max(instance._travel_duration_matrix[carrier.id_])
-        dur = instance.travel_duration([carrier.id_], [vertex])
-        tour = solution.tour_of_request(request)
-        pos = tour.vertex_pos[vertex]
-        max_shift = tour.max_shift_sequence[pos]
-        max_max_shift = instance.tw_close[vertex] - instance.tw_open[vertex]
-        value = dur / max_dur - max_shift / max_max_shift
-        if value == 0:
-            return 1
-        else:
-            return 1/value
+            return 1 / value
 
 
 # =====================================================================================================================
 # NEIGHBOR-BASED REQUEST SELECTION
 # =====================================================================================================================
 
-class RequestSelectionBehaviorDistNeighbor(RequestSelectionBehavior, ABC):
+class RequestSelectionBehaviorNeighbor(RequestSelectionBehavior, ABC):
     """
     Select (for each carrier) a bundle by finding an initial request and then adding num_submitted_requests-1 more
     requests based on some neighborhood criterion, idea from
@@ -453,7 +413,7 @@ class RequestSelectionBehaviorDistNeighbor(RequestSelectionBehavior, ABC):
             initial_request = self._find_initial_request(instance, solution, carrier)
 
             # find the best k-1 neighboring ones
-            neighbors = self._find_neighbors(instance, carrier, initial_request, k - 1)
+            neighbors = self._find_neighbors(instance, solution, carrier, initial_request, k - 1)
 
             best_bundle = [initial_request] + neighbors
             best_bundle.sort()
@@ -464,7 +424,7 @@ class RequestSelectionBehaviorDistNeighbor(RequestSelectionBehavior, ABC):
 
                 # update auction pool and original bundling candidate
                 auction_request_pool.append(request)
-                original_bundling_labels.append(carrier)
+                original_bundling_labels.append(carrier.id_)
 
         return auction_request_pool, original_bundling_labels
 
@@ -472,10 +432,9 @@ class RequestSelectionBehaviorDistNeighbor(RequestSelectionBehavior, ABC):
     def _find_initial_request(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution):
         pass
 
-    @staticmethod
-    def _find_neighbors(instance: it.MDVRPTWInstance,
-                        carrier: slt.AHDSolution,
-                        initial_request: int,
+    def _find_neighbors(self,
+                        instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
+                        carrier_id: int, initial_request: int,
                         num_neighbors: int):
         """
         "Any further request s ∈ Ra is selected based on its closeness to r. Closeness is determined by the sum of
@@ -483,12 +442,14 @@ class RequestSelectionBehaviorDistNeighbor(RequestSelectionBehavior, ABC):
 
         In VRP closeness is determined as the sum of the distances: dist(r, s) + dist(s,r)
 
+        :param solution:
         :param instance:
-        :param carrier:
+        :param carrier_id:
         :param initial_request: r
         :param num_neighbors:
         :return:
         """
+        carrier = solution.carriers[carrier_id]
         init_delivery = instance.vertex_from_request(initial_request)
 
         neighbor_valuations = []
@@ -506,7 +467,7 @@ class RequestSelectionBehaviorDistNeighbor(RequestSelectionBehavior, ABC):
         return best_neigh[:num_neighbors]
 
 
-class MarginalProfitProxyDistNeighbor(RequestSelectionBehaviorDistNeighbor):
+class MarginalProfitProxyNeighbor(RequestSelectionBehaviorNeighbor):
     """
     The first request r ∈ Ra is selected using MarginalProfitProxy. Any further request s ∈ Ra is selected based on
     its closeness to r.
@@ -523,6 +484,44 @@ class MarginalProfitProxyDistNeighbor(RequestSelectionBehaviorDistNeighbor):
 
         return initial_request
 
+
+class SuccessorsNeighbor(RequestSelectionBehaviorNeighbor):
+    """
+    the initial request is the one with the longest waiting time. neighbors are any succeeding requests. If there
+    are not sufficient successors, the requests that have the shortest travel duration from the initial request
+    will be chosen.
+    """
+    def _find_initial_request(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution):
+        max_wait = dt.timedelta(0)
+        max_wait_vertex = None
+        for tour in carrier.tours:
+            wait, vertex = max(zip(tour.wait_duration_sequence, tour.routing_sequence))
+            if wait > max_wait:
+                max_wait = wait
+                max_wait_vertex = vertex
+        return instance.request_from_vertex(max_wait_vertex)
+
+    def _find_neighbors(self,
+                        instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
+                        carrier_id: int, initial_request: int,
+                        num_neighbors: int):
+        tour = solution.tour_of_request(initial_request)
+        pos = tour.vertex_pos[instance.vertex_from_request(initial_request)]
+        num_successors = len(tour.routing_sequence[pos+1:-1])
+        if num_successors >= num_neighbors:
+            return [instance.request_from_vertex(v) for v in tour.routing_sequence[pos+1:pos+1+num_neighbors]]
+        else:
+            neighbors = [instance.request_from_vertex(v) for v in tour.routing_sequence[pos+1:-1]]
+            carrier = solution.carriers[carrier_id]
+            initial_vertex = instance.vertex_from_request(initial_request)
+            nearest_neighbors = sorted(carrier.accepted_requests,
+                                       key=lambda x: instance.travel_duration(
+                                           [initial_vertex], [instance.vertex_from_request(x)]))
+            while len(neighbors) < num_neighbors:
+                candidate = next(nearest_neighbors)
+                if candidate not in [initial_vertex] + neighbors:
+                    neighbors.append(candidate)
+            return neighbors
 
 # =====================================================================================================================
 # BUNDLE-BASED REQUEST SELECTION

@@ -25,6 +25,7 @@ def read_vienna_districts_shapefile():
     districts = districts.apply(geo.flip_coords)
     return districts
 
+
 def plot_vienna_vrp_solution(instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, service_areas=True):
     num_carriers = instance.num_carriers
     # prepare districts
@@ -159,10 +160,13 @@ def routed_request_marker(instance, carrier, color, index, tour, vertex):
 
 
 def tour_polyline(instance, tour, color):
+    total_dur = tour.arrival_time_sequence[-1] - tour.arrival_time_sequence[1] - instance.travel_duration(
+        [tour.routing_sequence[0]], [tour.routing_sequence[1]])
     return folium.PolyLine(locations=[instance.coords(i) for i in tour.routing_sequence],
                            popup=f'Tour {tour.id_}<br>'
-                                 f'dur={tour.sum_travel_duration}<br>'
-                                 f'dist={round(tour.sum_travel_distance)})',
+                                 f'travel_dur={tour.sum_travel_duration}<br>'
+                                 f'total_dur={total_dur}<br>'
+                                 f'travel_dist={round(tour.sum_travel_distance)}',
                            tooltip=f'Tour {tour.id_}',
                            color=color,
                            weight=4
