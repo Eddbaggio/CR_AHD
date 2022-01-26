@@ -59,20 +59,13 @@ def configs():
     ]
 
     s_request_selection: Sequence[rs.RequestSelectionBehavior.__class__] = [
-        # rs.Random,
-        # rs.SpatialBundleDSum,  # the original 'cluster' strategy by Gansterer & Hartl (2016)
-        # rs.SpatialBundleDMax,
-        # rs.MinDistanceToForeignDepotDMin,
+        rs.SpatioTemporal1,
+        rs.SpatioTemporal2,
+        rs.SpatioTemporal3,
+        rs.SpatioTemporal4,
+        rs.Random,
         rs.MinDurationToForeignDepotDMin,
-        # rs.MarginalProfitProxy,
-        # rs.MarginalProfitProxyNeighbor,
-        # rs.ComboRaw,
         rs.ComboDistStandardized,
-        rs.LosSchulteBundle,
-        # rs.TemporalRangeCluster,
-        # TODO SpatioTemporalCluster is not yet good enough & sometimes even infeasible
-        # rs.SpatioTemporalCluster,
-        # rs.InfeasibleFirstRandomSecond,
     ]
 
     s_num_auction_bundles: Sequence[int] = [

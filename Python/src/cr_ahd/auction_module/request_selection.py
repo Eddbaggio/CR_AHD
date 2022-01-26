@@ -64,7 +64,7 @@ class RequestSelectionBehaviorIndividual(RequestSelectionBehavior, ABC):
                 valuation = self._evaluate_request(instance, solution, carrier, request)
                 valuations.append(valuation)
 
-            # pick the WORST k evaluated requests (from ascending order)
+            # pick the k requests with the lowest valuation (from ascending order)
             selected = [r for _, r in sorted(zip(valuations, carrier.accepted_requests))][:k]
             selected.sort()
 
@@ -197,7 +197,8 @@ class MinDurationToForeignDepotDMin(RequestSelectionBehaviorIndividual):
         dist_min = float('inf')
         delivery = instance.vertex_from_request(request)
         for depot in foreign_depots:
-            dist = min(instance.travel_duration([depot], [delivery]), instance.travel_duration([delivery], [depot])).total_seconds()
+            dist = min(instance.travel_duration([depot], [delivery]),
+                       instance.travel_duration([delivery], [depot])).total_seconds()
             if dist < dist_min:
                 dist_min = dist
 
@@ -365,6 +366,62 @@ class ComboDistStandardized(RequestSelectionBehaviorIndividual):
         dist_to_own_depot = instance.travel_distance([own_depot, delivery], [delivery, own_depot]) / 2
 
         return min_dist_to_foreign_depot, marginal_profit, dist_to_own_depot
+
+
+class SpatioTemporal1(RequestSelectionBehaviorIndividual):
+    def _evaluate_request(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution,
+                          request: int):
+        vertex = instance.vertex_from_request(request)
+        max_dur = max(instance._travel_duration_matrix[carrier.id_])
+        dur = instance.travel_duration([carrier.id_], [vertex])
+        tour = solution.tour_of_request(request)
+        pos = tour.vertex_pos[vertex]
+        max_shift = tour.max_shift_sequence[pos]
+        max_max_shift = instance.tw_close[vertex] - instance.tw_open[vertex]
+        value = dur / max_dur + max_shift / max_max_shift  # short duration is good & short max shift is good
+        return value
+
+
+class SpatioTemporal2(RequestSelectionBehaviorIndividual):
+    def _evaluate_request(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution,
+                          request: int):
+        vertex = instance.vertex_from_request(request)
+        max_dur = max(instance._travel_duration_matrix[carrier.id_])
+        dur = instance.travel_duration([carrier.id_], [vertex])
+        tour = solution.tour_of_request(request)
+        pos = tour.vertex_pos[vertex]
+        max_shift = tour.max_shift_sequence[pos]
+        max_max_shift = instance.tw_close[vertex] - instance.tw_open[vertex]
+        value = 1 / (dur / max_dur + max_shift / max_max_shift)  # short duration is good & short max shift is good
+        return value
+
+
+class SpatioTemporal3(RequestSelectionBehaviorIndividual):
+    def _evaluate_request(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution,
+                          request: int):
+        vertex = instance.vertex_from_request(request)
+        max_dur = max(instance._travel_duration_matrix[carrier.id_])
+        dur = instance.travel_duration([carrier.id_], [vertex])
+        tour = solution.tour_of_request(request)
+        pos = tour.vertex_pos[vertex]
+        max_shift = tour.max_shift_sequence[pos]
+        max_max_shift = instance.tw_close[vertex] - instance.tw_open[vertex]
+        value = (dur / max_dur - max_shift / max_max_shift)  # short duration is good & short max shift is good
+        return value
+
+
+class SpatioTemporal4(RequestSelectionBehaviorIndividual):
+    def _evaluate_request(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution,
+                          request: int):
+        vertex = instance.vertex_from_request(request)
+        max_dur = max(instance._travel_duration_matrix[carrier.id_])
+        dur = instance.travel_duration([carrier.id_], [vertex])
+        tour = solution.tour_of_request(request)
+        pos = tour.vertex_pos[vertex]
+        max_shift = tour.max_shift_sequence[pos]
+        max_max_shift = instance.tw_close[vertex] - instance.tw_open[vertex]
+        value = 1 / (dur / max_dur - max_shift / max_max_shift)  # short duration is good & short max shift is good
+        return value
 
 
 # =====================================================================================================================

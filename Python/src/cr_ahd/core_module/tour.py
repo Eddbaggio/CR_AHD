@@ -34,6 +34,7 @@ class Tour(ABC):
         # sums
         self.sum_travel_distance: float = 0.0
         self.sum_travel_duration: dt.timedelta = dt.timedelta(0)
+        self.sum_idle_duration: dt.timedelta = dt.timedelta(0)  # TODO implement the update of idle times
         self.sum_load: float = 0.0
         self.sum_revenue: float = 0.0
         # self.sum_profit: float = 0.0
