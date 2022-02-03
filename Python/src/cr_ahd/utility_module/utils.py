@@ -338,8 +338,8 @@ def debugger_is_active() -> bool:
 
 ACCEPTANCE_START_TIME: dt.datetime = dt.datetime.min
 
-EXECUTION_START_TIME: dt.datetime = ACCEPTANCE_START_TIME + dt.timedelta(days=1)
-END_TIME: dt.datetime = EXECUTION_START_TIME + dt.timedelta(days=1)
+EXECUTION_START_TIME: dt.datetime = ACCEPTANCE_START_TIME + dt.timedelta(days=1, hours=10)
+END_TIME: dt.datetime = EXECUTION_START_TIME + dt.timedelta(hours=8)
 EXECUTION_TIME_HORIZON = TimeWindow(EXECUTION_START_TIME, END_TIME)
 
 
