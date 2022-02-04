@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 def execute_jobs(paths, configs, num_threads: int = 1, fail_on_error: bool = False):
     if num_threads > 1:
+        print(f'Solving on 1 core')
         console_log_level = logging.ERROR
     else:
         print(f'Solving on {num_threads} cores')
