@@ -453,6 +453,7 @@ class MinDistanceBundlingValuation(BundlingValuation):
 
     def evaluate_bundling(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
                           bundling: List[List[int]]) -> float:
+        raise NotImplementedError  # TODO does not work since bundles of size 1 have travel duration = 0
         bundle_valuations = []
         for bundle in bundling:
             valuation = bundle_total_travel_distance(instance, bundle)
@@ -475,6 +476,23 @@ class MinDurationBundlingValuation(BundlingValuation):
             valuation = bundle_total_travel_duration(instance, bundle).total_seconds()
             bundle_valuations.append(valuation)
         return 1 / min(bundle_valuations)
+
+
+class SumDurationBundlingValuation(BundlingValuation):
+    """
+    The value of a BUNDLING is determined by the minimum over the travel distances per BUNDLE.
+    The travel distance of a bundle is determined by building a route that traverses all the bundle's requests using
+    the dynamic insertion procedure.
+    """
+
+    def evaluate_bundling(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
+                          bundling: List[List[int]]) -> float:
+        raise NotImplementedError  # TODO does not work since bundles of size 1 have travel duration = 0
+        bundle_valuations = []
+        for bundle in bundling:
+            valuation = bundle_total_travel_duration(instance, bundle).total_seconds()
+            bundle_valuations.append(valuation)
+        return sum(bundle_valuations)
 
 
 class LosSchulteBundlingValuation(BundlingValuation):
@@ -516,7 +534,7 @@ class LosSchulteBundlingValuation(BundlingValuation):
 
                     # compute request_similarity between requests 0 and 1 acc. to the paper's formula (1)
                     assert self.vertex_relatedness_matrix[d0][d1] == self.vertex_relatedness_matrix[d1][
-                        d0]  # REMOVEME they acutally should not always be equal due to asymmetric travel times, remove once this has been confirmed
+                        d0]  # REMOVEME they acutally should not always be equal due to asymmetric travel times. (remove once this has been confirmed)
                     request_similarity = self.vertex_relatedness_matrix[d0][
                         d1]  # + self.vertex_relatedness_matrix[d1][d0] ) *0.5
 

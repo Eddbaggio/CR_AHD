@@ -89,6 +89,7 @@ def configs():
         # bv.GHProxyBundlingValuation,
         # bv.MinDistanceBundlingValuation,
         # bv.MinDurationBundlingValuation,
+        bv.SumDurationBundlingValuation,
         bv.LosSchulteBundlingValuation,
         bv.RandomBundlingValuation,
     ]
