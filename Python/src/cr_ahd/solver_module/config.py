@@ -88,7 +88,7 @@ def configs():
     s_bundling_valuation: Sequence[bv.BundlingValuation.__class__] = [
         # bv.GHProxyBundlingValuation,
         # bv.MinDistanceBundlingValuation,
-        bv.MinDurationBundlingValuation,
+        # bv.MinDurationBundlingValuation,
         bv.LosSchulteBundlingValuation,
         bv.RandomBundlingValuation,
     ]

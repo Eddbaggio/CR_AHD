@@ -228,7 +228,7 @@ def bundle_total_travel_duration(instance: it.MDVRPTWInstance, bundle: Sequence[
     # insert all remaining requests of the bundle
     tour_construction = cns.VRPTWMinTravelDurationInsertion()  # TODO this should be a parameter!
     tour_improvement = mh.VRPTWVariableNeighborhoodDescent(
-        [nh.VRPTWMoveDur(), nh.VRPTWTwoOptDur()])  # TODO this should be a parameter!
+        [nh.VRPTWMoveDur(), nh.VRPTWTwoOptDur()], 2.0)  # TODO this should be a parameter!
     for request in bundle:
         if request == depot_request:
             continue
@@ -469,9 +469,10 @@ class MinDurationBundlingValuation(BundlingValuation):
 
     def evaluate_bundling(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
                           bundling: List[List[int]]) -> float:
+        raise NotImplementedError  # TODO does not work since bundles of size 1 have travel duration = 0
         bundle_valuations = []
         for bundle in bundling:
-            valuation = bundle_total_travel_duration(instance, bundle)
+            valuation = bundle_total_travel_duration(instance, bundle).total_seconds()
             bundle_valuations.append(valuation)
         return 1 / min(bundle_valuations)
 

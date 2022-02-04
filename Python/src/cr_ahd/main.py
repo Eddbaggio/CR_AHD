@@ -19,8 +19,8 @@ def cr_ahd():
                 'num_requests': [10],
                 'carrier_max_num_tours': [3],
                 'service_area_overlap': [0.5],
-                'run': range(5),
-                'threads': 6,
+                'run': 3,
+                'threads': 1,
                 'fail': 1,
                 }
     # else read from terminal parameters
