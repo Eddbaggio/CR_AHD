@@ -10,20 +10,8 @@ import argparse
 
 
 parser = argparse.ArgumentParser(description='Optimizing CR_AHD instances')
-""" these were for GH instances
 # optional arguments
-parser.add_argument('-x', '--run', help='runs of GH instances that should be executed',
-                    type=int, nargs='*', default=None)
-parser.add_argument('-r', '--rad', help='radii of GH instances that should be executed',
-                    type=int, nargs='*', default=None)
-parser.add_argument('-n', '--n', help='n of GH instances that should be executed',
-                    type=int, nargs='*', default=None)
-parser.add_argument('-t', '--threads', help='number of threads to use',
-                    type=int, default=1)
-parser.add_argument('-f', '--fail', help='', action="store_true")
-"""
-# optional arguments
-# t=vienna+d=7+c=3+n=10+o=100+r=08
+# t=vienna+d=7+c=3+n=10+v=3+o=100+r=08
 parser.add_argument('-d', '--distance',
                     help='values for "distances of depots from city center" of vienna instances that should be executed',
                     type=int, nargs='*', default=None)
