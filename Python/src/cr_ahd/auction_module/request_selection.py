@@ -370,7 +370,7 @@ class ComboDistStandardized(RequestSelectionBehaviorIndividual):
 
 class ComboDistStandardizedNEW(RequestSelectionBehaviorIndividual):
     """
-
+    considers min_dur_to_foreign_depot, wait_duration and dur_to_own_depot
     """
 
     def execute(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution):

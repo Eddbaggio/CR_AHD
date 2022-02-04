@@ -117,7 +117,8 @@ def ask_for_overwrite_permission(path: Path):
         return True
 
 
-def vrptw_instance_selector(distance=None, num_carriers=None, num_requests=None, service_area_overlap=None, run=None):
+def vrptw_instance_selector(distance=None, num_carriers=None, num_requests=None, carrier_max_num_tours=None,
+                            service_area_overlap=None, run=None):
     """
 
     :param distance: distance of the depots from the city center
@@ -159,6 +160,17 @@ def vrptw_instance_selector(distance=None, num_carriers=None, num_requests=None,
         raise ValueError(
             f'num_requests must be int or list of int. num_requests={num_requests} is type {type(num_requests)}')
 
+    # CARRIER_MAX_NUM_TOURS
+    if isinstance(carrier_max_num_tours, int):
+        p_carrier_max_num_tours = carrier_max_num_tours
+    elif carrier_max_num_tours is None:
+        p_carrier_max_num_tours = '\d+'
+    elif isinstance(carrier_max_num_tours, (list, tuple, range)):
+        p_carrier_max_num_tours = f"({'|'.join((str(x) for x in carrier_max_num_tours))})"
+    else:
+        raise ValueError(
+            f'carrier_max_num_tours must be int or list of int. carrier_max_num_tours={carrier_max_num_tours} is type {type(carrier_max_num_tours)}')
+
     # SERVICE_AREA_OVERLAP
     if isinstance(service_area_overlap, float):
         p_service_area_overlap = f'{int(service_area_overlap * 100):03d}'
@@ -180,8 +192,13 @@ def vrptw_instance_selector(distance=None, num_carriers=None, num_requests=None,
     else:
         raise ValueError(f'run must be int or list of int. run={run} is type {type(run)}')
 
-    pattern = re.compile(f't=vienna\+d={p_distance}\+c={p_num_carriers}\+n={p_num_requests}\+'
-                         f'o={p_service_area_overlap}\+r={p_run}(\.json)')  # run={p_run}\+dist=200\+rad={p_rad}\+n={p_n}(\.dat)')
+    pattern = re.compile(f't=vienna'
+                         f'\+d={p_distance}'
+                         f'\+c={p_num_carriers}'
+                         f'\+n={p_num_requests}'
+                         f'\+v={p_carrier_max_num_tours}'
+                         f'\+o={p_service_area_overlap}'
+                         f'\+r={p_run}(\.json)')
     paths = []
     for file in (sorted(input_dir.glob('*.json'), key=ut.natural_sort_key)):
         if pattern.match(file.name):

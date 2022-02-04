@@ -16,10 +16,11 @@ def cr_ahd():
     if "PYCHARM" in os.environ:
         args = {'distance': 7,
                 'num_carriers': 3,
-                'num_requests': [25],
+                'num_requests': [10],
+                'carrier_max_num_tours': [3],
                 'service_area_overlap': [0.5],
-                'run': 7,
-                'threads': 1,
+                'run': range(5),
+                'threads': 6,
                 'fail': 1,
                 }
     # else read from terminal parameters
@@ -32,6 +33,7 @@ def cr_ahd():
     paths = io.vrptw_instance_selector(distance=args['distance'],
                                        num_carriers=args['num_carriers'],
                                        num_requests=args['num_requests'],
+                                       carrier_max_num_tours=args['carrier_max_num_tours'],
                                        service_area_overlap=args['service_area_overlap'],
                                        run=args['run'],
                                        )

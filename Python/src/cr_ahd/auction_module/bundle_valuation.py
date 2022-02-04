@@ -208,6 +208,46 @@ def bundle_total_travel_distance(instance: it.MDVRPTWInstance, bundle: Sequence[
     return tmp_tour_.sum_travel_distance
 
 
+def bundle_total_travel_duration(instance: it.MDVRPTWInstance, bundle: Sequence[int]):
+    """
+    total travel duration needed to visit all requests in a bundle. Since finding the optimal solutions for
+    all bundles is too time consuming, the tour length is approximated using the cheapest insertion heuristic
+
+    uses bundle member vertex as depot. Does not check feasibility of the tour
+
+    """
+
+    # treat the first-to-open delivery vertex as the depot
+    depot_request = argmin([instance.tw_open[instance.vertex_from_request(r)] for r in bundle])
+    depot_request = bundle[depot_request]
+
+    # initialize temporary tour with the earliest request
+    depot_vertex = instance.vertex_from_request(depot_request)
+    tmp_tour_ = tr.VRPTWTour('tmp', depot_vertex)
+
+    # insert all remaining requests of the bundle
+    tour_construction = cns.VRPTWMinTravelDurationInsertion()  # TODO this should be a parameter!
+    tour_improvement = mh.VRPTWVariableNeighborhoodDescent(
+        [nh.PDPMove(), nh.PDPTwoOpt()])  # TODO this should be a parameter!
+    for request in bundle:
+        if request == depot_request:
+            continue
+        delivery = instance.vertex_from_request(request)
+
+        # set check_feasibility to False since only the tour length is of interest here
+        delta, delivery_pos = tour_construction.best_insertion_for_request_in_tour(instance, tmp_tour_,
+                                                                                   request, check_feasibility=False)
+
+        # if no feasible insertion exists, return inf for the travel duration
+        if delivery_pos is None:
+            return float('inf')
+
+        # insert, ignores feasibility!
+        tmp_tour_.insert_and_update(instance, [delivery_pos], [delivery])
+    tour_improvement.execute_on_tour(instance, tmp_tour_)
+    return tmp_tour_.sum_travel_duration
+
+
 def waiting_time_seconds(instance: it.MDVRPTWInstance, vertex1: int, vertex2: int):
     travel_time = instance.travel_duration([vertex1], [vertex2])
     if instance.tw_open[vertex1] + travel_time > instance.tw_close[vertex2]:
@@ -228,8 +268,9 @@ def los_schulte_vertex_similarity(instance: it.MDVRPTWInstance, vertex1: int, ve
 
     # w_ij represents the minimal waiting time (due to time window restrictions) at one of the locations, if a vehicle
     # serves both locations immediately after each other
-    w_ij = max(0, min(waiting_time_seconds(instance, vertex1, vertex2), waiting_time_seconds(instance, vertex2, vertex1)))
-    avg_travel_dur = instance.travel_duration([vertex1, vertex2], [vertex2, vertex1])/2
+    w_ij = max(0,
+               min(waiting_time_seconds(instance, vertex1, vertex2), waiting_time_seconds(instance, vertex2, vertex1)))
+    avg_travel_dur = instance.travel_duration([vertex1, vertex2], [vertex2, vertex1]) / 2
     gamma = 2
     return gamma * avg_travel_dur.total_seconds() + w_ij
 
@@ -419,6 +460,22 @@ class MinDistanceBundlingValuation(BundlingValuation):
         return 1 / min(bundle_valuations)
 
 
+class MinDurationBundlingValuation(BundlingValuation):
+    """
+    The value of a BUNDLING is determined by the minimum over the travel distances per BUNDLE.
+    The travel distance of a bundle is determined by building a route that traverses all the bundle's requests using
+    the dynamic insertion procedure.
+    """
+
+    def evaluate_bundling(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
+                          bundling: List[List[int]]) -> float:
+        bundle_valuations = []
+        for bundle in bundling:
+            valuation = bundle_total_travel_duration(instance, bundle)
+            bundle_valuations.append(valuation)
+        return 1 / min(bundle_valuations)
+
+
 class LosSchulteBundlingValuation(BundlingValuation):
     """
     uses the request similarity measure by Los et al. (2020) to compute a clustering evaluation measure (cohesion)
@@ -438,7 +495,7 @@ class LosSchulteBundlingValuation(BundlingValuation):
         bundling_valuation = sum(bundle_valuations) / len(bundle_valuations)
 
         # return negative, since low values are better and the caller maximizes
-        return 1000/bundling_valuation
+        return 1000 / bundling_valuation
 
     def evaluate_bundle(self, instance: it.MDVRPTWInstance, bundle: Sequence[int]):
         # multi-request bundles
@@ -457,7 +514,8 @@ class LosSchulteBundlingValuation(BundlingValuation):
                     d1 -= instance.num_carriers
 
                     # compute request_similarity between requests 0 and 1 acc. to the paper's formula (1)
-                    assert self.vertex_relatedness_matrix[d0][d1] == self.vertex_relatedness_matrix[d1][d0]  # REMOVEME they acutally should not always be equal due to asymmetric travel times, remove once this has been confirmed
+                    assert self.vertex_relatedness_matrix[d0][d1] == self.vertex_relatedness_matrix[d1][
+                        d0]  # REMOVEME they acutally should not always be equal due to asymmetric travel times, remove once this has been confirmed
                     request_similarity = self.vertex_relatedness_matrix[d0][
                         d1]  # + self.vertex_relatedness_matrix[d1][d0] ) *0.5
 
@@ -492,5 +550,3 @@ class RandomBundlingValuation(BundlingValuation):
     def evaluate_bundling(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
                           bundling: List[List[int]]) -> float:
         return random.random()
-
-

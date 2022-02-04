@@ -33,6 +33,9 @@ parser.add_argument('-c', '--num_carriers',
 parser.add_argument('-n', '--num_requests',
                     help='values for "num_customer_per_carrier" of vienna instances that should be executed',
                     type=int, nargs='*', default=None)
+parser.add_argument('-v', '--carrier_max_num_tours',
+                    help='values for "carrier_max_num_tours" of vienna instances that should be executed',
+                    type=int, nargs='*', default=None)
 parser.add_argument('-o', '--service_area_overlap',
                     help='values for "service_area_overlap" [0.0-1.0] of vienna instances that should be executed',
                     type=float, nargs='*', default=None)

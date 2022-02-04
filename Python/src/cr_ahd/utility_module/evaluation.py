@@ -6,6 +6,7 @@ instance_config = [
     'd',
     'c',
     'n',
+    'v',
     'o',
     'r', ]
 planning_config = 'solution_algorithm'

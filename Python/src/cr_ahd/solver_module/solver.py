@@ -2,6 +2,7 @@ import datetime as dt
 import logging.config
 import random
 from copy import deepcopy
+from pprint import pformat
 from typing import Tuple
 
 from auction_module import auction as au
@@ -11,7 +12,6 @@ from routing_module import tour_construction as cns
 from tw_management_module import request_acceptance as ra
 from utility_module import utils as ut, profiling as pr
 from utility_module.cr_ahd_logging import SUCCESS
-from utility_module.plotting import plot_vienna_vrp_solution
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +131,7 @@ class Solver:
 
         solution.solver_config.update(self.config)
         random.seed(0)
-        logger.info(f'{instance.id_}: Solving {solution.solver_config}')
+        logger.info(f'{instance.id_}: Solving\n{pformat(solution.solver_config)}')
 
         # ===== Dynamic Request Arrival Phase =====
         for request in sorted(instance.requests, key=lambda x: instance.request_disclosure_time[x]):
@@ -170,9 +170,9 @@ class Solver:
             timer.write_duration_to_solution(solution, 'runtime_final_auction')
 
         ut.validate_solution(instance, solution)  # safety check to make sure everything's functional
-        logger.log(SUCCESS, f'{instance.id_}: Success {solution.solver_config}')
+        logger.log(SUCCESS, f'{instance.id_}: Success\n{pformat(solution.solver_config)}')
 
-        plot_vienna_vrp_solution(instance, solution)  # REMOVEME for debugging only
+        # plot_vienna_vrp_solution(instance, solution)  # REMOVEME for debugging only
         return instance, solution
 
     def request_acceptance_and_time_window(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier,

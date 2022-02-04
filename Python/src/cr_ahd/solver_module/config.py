@@ -63,14 +63,14 @@ def configs():
         # rs.SpatioTemporal,
         # rs.Random,
         # rs.MinDurationToForeignDepotDMin,
-        rs.ComboDistStandardizedNEW,
+        # rs.ComboDistStandardizedNEW,
         rs.ComboDistStandardized,
     ]
 
     s_num_auction_bundles: Sequence[int] = [
-        # 50,
+        50,
         100,
-        # 200,
+        200,
         # 300,
         # 500
     ]
@@ -88,8 +88,9 @@ def configs():
     s_bundling_valuation: Sequence[bv.BundlingValuation.__class__] = [
         # bv.GHProxyBundlingValuation,
         # bv.MinDistanceBundlingValuation,
+        bv.MinDurationBundlingValuation,
         bv.LosSchulteBundlingValuation,
-        # bv.RandomBundlingValuation,
+        bv.RandomBundlingValuation,
     ]
 
     s_auction_policy: List[Dict] = [

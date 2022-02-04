@@ -116,8 +116,13 @@ def generate_vienna_cr_ahd_instance(vienna_addresses: gp.GeoDataFrame,
                                                                                      num=len(group),
                                                                                      endpoint=False))
 
-    return it.MDVRPTWInstance(id_=f't=vienna+d={dist_center_to_carrier_km}+c={num_carriers}'
-                                  f'+n={num_requests_per_carrier:02d}+o={int(carrier_competition * 100):03d}+r={run:02d}',
+    return it.MDVRPTWInstance(id_=f't=vienna'
+                                  f'+d={dist_center_to_carrier_km}'
+                                  f'+c={num_carriers}'
+                                  f'+n={num_requests_per_carrier:02d}'
+                                  f'+v={carriers_max_num_tours}'
+                                  f'+o={int(carrier_competition * 100):03d}'
+                                  f'+r={run:02d}',
                               carriers_max_num_tours=carriers_max_num_tours,
                               max_vehicle_load=max_vehicle_load,
                               max_tour_length=max_tour_length,
@@ -212,7 +217,7 @@ if __name__ == '__main__':
     m = 1000
     rng = np.random.default_rng(42)
     matrices = []
-    for n in [1]:
+    for n in [1, 2, 3]:
         # travel duration in seconds *as floats*
         durations = pd.read_csv(io.input_dir.joinpath(f'vienna_{m}_durations_#{n:03d}.csv'), index_col=0)
         # distance in meters
@@ -221,26 +226,27 @@ if __name__ == '__main__':
         addresses = read_vienna_addresses(io.input_dir.joinpath(f'vienna_{m}_addresses_#{n:03d}.csv'))
         matrices.append([durations, distances, addresses])
 
-    with tqdm.tqdm(total=3 * 5 * 20) as pbar:
+    with tqdm.tqdm(total=3 * 2 * 5 * 20) as pbar:
         for num_carriers in [3]:
             for num_requests_per_carrier in [10, 25, 50]:
-                plot = True
-                for carrier_competition in [0.0, 0.25, 0.5, 0.75, 1.0]:
-                    for run in range(20):
-                        durations, distances, addresses = matrices[0]
-                        instance = generate_vienna_cr_ahd_instance(
-                            vienna_addresses=addresses,
-                            vienna_distances=distances,
-                            vienna_durations=durations,
-                            run=run,
-                            num_carriers=num_carriers,
-                            carrier_competition=carrier_competition,
-                            num_requests_per_carrier=num_requests_per_carrier,
-                            max_tour_length=1_000_000,
-                            plot=plot,
-                            rng=int(num_carriers + num_requests_per_carrier + carrier_competition * 100 + run)
-                        )
-                        # instance.write_delim(io.input_dir.joinpath(instance.id_ + '.dat'))
-                        instance.write_json(io.input_dir.joinpath(instance.id_ + '.json'))
-                        pbar.update()
-                        plot = False
+                for carrier_max_num_tours in [1, 3]:
+                    for carrier_competition in [0.0, 0.25, 0.5, 0.75, 1.0]:
+                        for run in range(20):
+                            durations, distances, addresses = matrices[rng.choice([0, 1, 2])]
+                            instance = generate_vienna_cr_ahd_instance(
+                                vienna_addresses=addresses,
+                                vienna_distances=distances,
+                                vienna_durations=durations,
+                                run=run,
+                                num_carriers=num_carriers,
+                                dist_center_to_carrier_km=7,
+                                carrier_competition=carrier_competition,
+                                num_requests_per_carrier=num_requests_per_carrier,
+                                carriers_max_num_tours=carrier_max_num_tours,
+                                max_tour_length=1_000_000,
+                                plot=False,
+                                rng=int(num_carriers + num_requests_per_carrier + carrier_competition * 100 + run)
+                            )
+                            # instance.write_delim(io.input_dir.joinpath(instance.id_ + '.dat'))
+                            instance.write_json(io.input_dir.joinpath(instance.id_ + '.json'))
+                            pbar.update()

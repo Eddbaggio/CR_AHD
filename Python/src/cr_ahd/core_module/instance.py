@@ -213,7 +213,7 @@ class MDVRPTWInstance:
         self.tw_open[vertex] = time_window.open
         self.tw_close[vertex] = time_window.close
 
-    def write_json(self, path:Path):
+    def write_json(self, path: Path):
         with open(path, 'w') as file:
             json.dump(self.__dict__, file, cls=MyJSONEncoder, indent=4)
 
