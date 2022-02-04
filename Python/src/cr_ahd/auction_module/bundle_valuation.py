@@ -487,7 +487,6 @@ class SumDurationBundlingValuation(BundlingValuation):
 
     def evaluate_bundling(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
                           bundling: List[List[int]]) -> float:
-        raise NotImplementedError  # TODO does not work since bundles of size 1 have travel duration = 0
         bundle_valuations = []
         for bundle in bundling:
             valuation = bundle_total_travel_duration(instance, bundle).total_seconds()
