@@ -252,7 +252,7 @@ class VRPTWVariableNeighborhoodDescent(VRPTWMetaHeuristic):
                     self.parameters['k'] += 1
         return best_solution
 
-    def execute_on_tour(self, instance: it.MDVRPTWInstance, tour: tr.VRPTWTour):
+    def execute_on_tour(self, instance: it.MDVRPTWInstance, tour: tr.Tour):
         """
         execute the metaheuristic for a given route (in place) using all available intra-tour neighborhoods. useful if
         a tour shall be improved that does not belong to a carrier. E.g. when estimating the tour length of a bundle

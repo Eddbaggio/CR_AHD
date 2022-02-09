@@ -177,7 +177,7 @@ class RequestAcceptanceBehavior:
         returns all time windows for which a pendulum tour is feasible
         """
         pendulum_feasible_set = []
-        tour = tr.VRPTWTour('temp', carrier.id_)
+        tour = tr.Tour('temp', carrier.id_)
         delivery = instance.vertex_from_request(request)
         for tw in ut.ALL_TW:
             instance.assign_time_window(delivery, tw)

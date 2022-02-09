@@ -7,10 +7,10 @@ from core_module import instance as it, solution as slt, tour as tr
 
 logger = logging.getLogger(__name__)
 
-vrptw_move_move = typing.Tuple[float, tr.VRPTWTour, int, int, int]  # delta, tour, old_pos, vertex, new_pos
-vrptw_2opt_move = typing.Tuple[float, tr.VRPTWTour, int, int]  # (delta, tour, i, j)
+vrptw_move_move = typing.Tuple[float, tr.Tour, int, int, int]  # delta, tour, old_pos, vertex, new_pos
+vrptw_2opt_move = typing.Tuple[float, tr.Tour, int, int]  # (delta, tour, i, j)
 vrptw_relocate_move = typing.Tuple[
-    float, slt.AHDSolution, tr.VRPTWTour, int, tr.VRPTWTour, int]  # (delta, carrier, old_tour, old_pos, new_tour, new_pos)
+    float, slt.AHDSolution, tr.Tour, int, tr.Tour, int]  # (delta, carrier, old_tour, old_pos, new_tour, new_pos)
 
 
 class Neighborhood(ABC):
@@ -80,7 +80,7 @@ class IntraTourNeighborhood(Neighborhood, ABC):
             yield from self.feasible_move_generator_for_tour(instance, tour)  # delegated generator
 
     @abstractmethod
-    def feasible_move_generator_for_tour(self, instance: it.MDVRPTWInstance, tour: tr.VRPTWTour):
+    def feasible_move_generator_for_tour(self, instance: it.MDVRPTWInstance, tour: tr.Tour):
         """
 
         :param instance:
@@ -100,7 +100,7 @@ class VRPTWMoveDist(IntraTourNeighborhood):
     move = (delta, tour, old_pos, vertex, new_pos)
     """
 
-    def feasible_move_generator_for_tour(self, instance: it.MDVRPTWInstance, tour: tr.VRPTWTour):
+    def feasible_move_generator_for_tour(self, instance: it.MDVRPTWInstance, tour: tr.Tour):
         tour_copy = deepcopy(tour)
         for old_pos, vertex in enumerate(tour_copy.routing_sequence[1:-1], start=1):
             delta = tour_copy.pop_distance_delta(instance, [old_pos])
@@ -137,7 +137,7 @@ class VRPTWMoveDist(IntraTourNeighborhood):
 
 
 class VRPTWMoveDur(VRPTWMoveDist):
-    def feasible_move_generator_for_tour(self, instance: it.MDVRPTWInstance, tour: tr.VRPTWTour):
+    def feasible_move_generator_for_tour(self, instance: it.MDVRPTWInstance, tour: tr.Tour):
         tour_copy = deepcopy(tour)
         for old_pos, vertex in enumerate(tour_copy.routing_sequence[1:-1], start=1):
             delta = tour_copy.pop_duration_delta(instance, [old_pos]).total_seconds()
@@ -166,7 +166,7 @@ class VRPTWTwoOptDist(IntraTourNeighborhood):
     The classic 2-opt neighborhood by Croes (1958)
     """
 
-    def feasible_move_generator_for_tour(self, instance: it.MDVRPTWInstance, tour: tr.VRPTWTour):
+    def feasible_move_generator_for_tour(self, instance: it.MDVRPTWInstance, tour: tr.Tour):
         for i in range(0, len(tour) - 3):
             for j in range(i + 2, len(tour) - 1):
                 delta = 0.0
@@ -202,7 +202,7 @@ class VRPTWTwoOptDur(IntraTourNeighborhood):
     The classic 2-opt neighborhood by Croes (1958)
     """
 
-    def feasible_move_generator_for_tour(self, instance: it.MDVRPTWInstance, tour: tr.VRPTWTour):
+    def feasible_move_generator_for_tour(self, instance: it.MDVRPTWInstance, tour: tr.Tour):
         for i in range(0, len(tour) - 3):
             for j in range(i + 2, len(tour) - 1):
                 delta = 0.0

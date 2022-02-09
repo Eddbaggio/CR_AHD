@@ -48,7 +48,7 @@ class FeasibleTW(TWOfferingBehavior):
         # can the carrier open a new pendulum tour and insert the request there?
         if len(carrier.tours) < instance.carriers_max_num_tours:
 
-            tmp_tour = tr.VRPTWTour('tmp', carrier.id_)
+            tmp_tour = tr.Tour('tmp', carrier.id_)
             if tmp_tour.insertion_feasibility_check(instance, [1], [delivery_vertex]):
                 # undo the setting of the time window and return
                 instance.tw_open[delivery_vertex] = ut.EXECUTION_START_TIME

@@ -151,7 +151,7 @@ class VRPTWInsertionConstruction(ABC):
                                                     ):
         carrier = solution.carriers[carrier_id]
         pendulum_tour_id = solution.get_free_pendulum_tour_id()
-        pendulum_tour = tr.VRPTWTour(pendulum_tour_id, depot_index=carrier.id_)
+        pendulum_tour = tr.Tour(pendulum_tour_id, depot_index=carrier.id_)
 
         if pendulum_tour.insertion_feasibility_check(instance, [1], [instance.vertex_from_request(request)]):
             pendulum_tour.insert_and_update(instance, [1], [instance.vertex_from_request(request)])
@@ -183,7 +183,7 @@ class VRPTWInsertionConstruction(ABC):
         tour_id = solution.get_free_tour_id()
         assert tour_id < instance.num_carriers * instance.carriers_max_num_tours, f'{instance.id_}: tour_id={tour_id}'
         logger.debug(f'Carrier {carrier_id}, *Tour {tour_id}')
-        tour = tr.VRPTWTour(tour_id, depot_index=carrier.id_)
+        tour = tr.Tour(tour_id, depot_index=carrier.id_)
 
         if tour.insertion_feasibility_check(instance, [1], [instance.vertex_from_request(request)]):
             tour.insert_and_update(instance, [1, 2], [instance.vertex_from_request(request)])
@@ -205,7 +205,7 @@ class VRPTWInsertionConstruction(ABC):
 
 class VRPTWMinTravelDistanceInsertion(VRPTWInsertionConstruction):
 
-    def best_insertion_for_request_in_tour(self, instance: it.MDVRPTWInstance, tour: tr.VRPTWTour,
+    def best_insertion_for_request_in_tour(self, instance: it.MDVRPTWInstance, tour: tr.Tour,
                                            request: int, check_feasibility=True) -> Tuple[float, int]:
         logger.warning('Distance of vienna instances violates triangle inequality!')
         delivery_vertex = instance.vertex_from_request(request)
@@ -229,7 +229,7 @@ class VRPTWMinTravelDistanceInsertion(VRPTWInsertionConstruction):
 
 class VRPTWMinTravelDurationInsertion(VRPTWInsertionConstruction):
 
-    def best_insertion_for_request_in_tour(self, instance: it.MDVRPTWInstance, tour: tr.VRPTWTour,
+    def best_insertion_for_request_in_tour(self, instance: it.MDVRPTWInstance, tour: tr.Tour,
                                            request: int, check_feasibility=True) -> Tuple[float, int]:
         delivery_vertex = instance.vertex_from_request(request)
         best_delta = float('inf')

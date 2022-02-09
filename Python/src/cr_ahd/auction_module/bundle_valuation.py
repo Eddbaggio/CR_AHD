@@ -183,7 +183,7 @@ def bundle_total_travel_distance(instance: it.MDVRPTWInstance, bundle: Sequence[
 
     # initialize temporary tour with the earliest request
     depot_vertex = instance.vertex_from_request(depot_request)
-    tmp_tour_ = tr.VRPTWTour('tmp', depot_vertex)
+    tmp_tour_ = tr.Tour('tmp', depot_vertex)
 
     # insert all remaining requests of the bundle
     tour_construction = cns.VRPTWMinTravelDistanceInsertion()  # TODO this should be a parameter!
@@ -223,7 +223,7 @@ def bundle_total_travel_duration(instance: it.MDVRPTWInstance, bundle: Sequence[
 
     # initialize temporary tour with the earliest request
     depot_vertex = instance.vertex_from_request(depot_request)
-    tmp_tour_ = tr.VRPTWTour('tmp', depot_vertex)
+    tmp_tour_ = tr.Tour('tmp', depot_vertex)
 
     # insert all remaining requests of the bundle
     tour_construction = cns.VRPTWMinTravelDurationInsertion()  # TODO this should be a parameter!
@@ -461,7 +461,7 @@ class MinDistanceBundlingValuation(BundlingValuation):
         return 1 / min(bundle_valuations)
 
 
-class MinDurationBundlingValuation(BundlingValuation):
+class MinTravelDurationBundlingValuation(BundlingValuation):
     """
     The value of a BUNDLING is determined by the minimum over the travel distances per BUNDLE.
     The travel distance of a bundle is determined by building a route that traverses all the bundle's requests using
@@ -478,9 +478,9 @@ class MinDurationBundlingValuation(BundlingValuation):
         return 1 / min(bundle_valuations)
 
 
-class SumDurationBundlingValuation(BundlingValuation):
+class SumTravelDurationBundlingValuation(BundlingValuation):
     """
-    The value of a BUNDLING is determined by the sum over the travel durations per BUNDLE.
+    The value of a BUNDLING is determined by the sum over the *travel* durations per BUNDLE.
     The travel distance of a bundle is determined by building a route that traverses all the bundle's requests using
     the dynamic insertion procedure.
     """

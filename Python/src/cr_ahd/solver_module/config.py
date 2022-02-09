@@ -40,9 +40,8 @@ def configs():
     s_request_acceptance_attractiveness: Sequence[ra.RequestAcceptanceAttractiveness] = [ra.Dummy()]
 
     s_time_window_length: Sequence[dt.timedelta] = [
-        # dt.timedelta(hours=24),
         # dt.timedelta(hours=8),
-        # dt.timedelta(hours=4),
+        dt.timedelta(hours=4),
         dt.timedelta(hours=2),
     ]
 
@@ -93,7 +92,7 @@ def configs():
         # bv.GHProxyBundlingValuation,
         # bv.MinDistanceBundlingValuation,
         # bv.MinDurationBundlingValuation,
-        bv.SumDurationBundlingValuation,
+        bv.SumTravelDurationBundlingValuation,
         # bv.LosSchulteBundlingValuation,
         # bv.RandomBundlingValuation,
     ]

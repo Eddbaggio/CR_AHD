@@ -9,7 +9,7 @@ import utility_module.utils as ut
 logger = logging.getLogger(__name__)
 
 
-class VRPTWTour(ABC):
+class Tour(ABC):
     def __init__(self, id_: int, depot_index: int):
         """
 

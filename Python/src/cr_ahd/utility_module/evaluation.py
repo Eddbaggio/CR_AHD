@@ -1,3 +1,5 @@
+from pprint import pprint
+
 import pandas as pd
 from matplotlib import pyplot as plt
 
@@ -65,6 +67,7 @@ def collaboration_gain(df: pd.DataFrame, plot: bool = False):
     gains = []
     variable_parameters = {k: list(df[k].unique()) for k in instance_config + general_config + collaborative_config}
     variable_parameters = {k: v for k, v in variable_parameters.items() if len(v) > 1}
+    pprint(variable_parameters)
 
     # group/filter by instance type (num_requests, overlap, ...)
     for inst_name, inst_group in df.groupby(instance_config):
