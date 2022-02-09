@@ -66,7 +66,7 @@ solution_runtimes = [
 def collaboration_gain(df: pd.DataFrame, plot: bool = False):
     gains = []
     variable_parameters = {k: list(df[k].unique()) for k in instance_config + general_config + collaborative_config}
-    variable_parameters = {k: v for k, v in variable_parameters.items() if len(v) > 1}
+    variable_parameters = {k: v for k, v in variable_parameters.items() if len(set(v).difference({None})) > 1}
     pprint(variable_parameters)
 
     # group/filter by instance type (num_requests, overlap, ...)

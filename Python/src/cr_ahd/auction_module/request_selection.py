@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from math import comb, sqrt
 from typing import Sequence, Tuple
 
-from auction_module import bundle_valuation as bv
+from auction_module import partition_valuation as pv
 from core_module import instance as it, solution as slt, tour as tr
 from routing_module import tour_construction as cns, metaheuristics as mh, neighborhoods as ls
 from utility_module import utils as ut

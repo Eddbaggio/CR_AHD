@@ -8,7 +8,7 @@ from auction_module import auction as au, \
     bundle_generation as bg, \
     bidding as bd, \
     winner_determination as wd, \
-    bundle_valuation as bv
+    partition_valuation as bv
 from routing_module import neighborhoods as nh, tour_construction as cns, metaheuristics as mh
 from tw_management_module import tw_offering as two, tw_selection as tws, request_acceptance as ra
 
