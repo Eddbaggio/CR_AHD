@@ -1,6 +1,6 @@
 import datetime as dt
 import logging.config
-from abc import ABC, abstractmethod
+from abc import ABC
 from copy import deepcopy
 from typing import List, Sequence, Set, Dict
 
@@ -9,7 +9,7 @@ import utility_module.utils as ut
 logger = logging.getLogger(__name__)
 
 
-class Tour(ABC):
+class VRPTWTour(ABC):
     def __init__(self, id_: int, depot_index: int):
         """
 
@@ -58,7 +58,7 @@ class Tour(ABC):
                f'Distance:\t{round(self.sum_travel_distance, 2)}\n' \
                f'Duration:\t{self.sum_travel_duration}\n' \
                f'Revenue:\t{self.sum_revenue}\n' \
-               # f'Profit:\t\t{self.sum_profit}\n'
+            # f'Profit:\t\t{self.sum_profit}\n'
 
     def __repr__(self):
         return f'Tour {self.id_} {self.requests}'
@@ -132,8 +132,8 @@ class Tour(ABC):
             'sum_revenue': self.sum_revenue,
         }
 
-    @abstractmethod
-    def _single_insertion_feasibility_check(self, instance, insertion_index: int, insertion_vertex: int):
+    def _single_insertion_feasibility_check(self, instance, insertion_index: int,
+                                            insertion_vertex: int):
         """
         Checks whether the insertion of the insertion_vertex at insertion_pos is feasible.
 
@@ -148,7 +148,42 @@ class Tour(ABC):
 
         :return: True if the insertion of the insertion_vertex at insertion_position is feasible, False otherwise
         """
-        pass
+
+        i = self.routing_sequence[insertion_index - 1]
+        j = insertion_vertex
+        k = self.routing_sequence[insertion_index]
+
+        # [1] check max tour distance
+        distance_shift_j = instance.travel_distance([i, j], [j, k]) - instance.travel_distance([i], [k])
+        if self.sum_travel_distance + distance_shift_j > instance.max_tour_distance:
+            return False
+
+        # [2] check time windows
+        # tw condition 1: start of service of j must fit the time window of j
+        arrival_time_j = self.service_time_sequence[insertion_index - 1] + \
+                         instance.vertex_service_duration[i] + \
+                         instance.travel_duration([i], [j])
+        tw_cond1 = arrival_time_j <= instance.tw_close[j]
+
+        # tw condition 2: time_shift_j must be limited to the sum of wait_k + max_shift_k
+        wait_j = max(dt.timedelta(0), instance.tw_open[j] - arrival_time_j)
+        time_shift_j = instance.travel_duration([i], [j]) + \
+                       wait_j + \
+                       instance.vertex_service_duration[j] + \
+                       instance.travel_duration([j], [k]) - \
+                       instance.travel_duration([i], [k])
+        wait_k = self.wait_duration_sequence[insertion_index]
+        max_shift_k = self.max_shift_sequence[insertion_index]
+        tw_cond2 = time_shift_j <= wait_k + max_shift_k
+
+        if not tw_cond1 or not tw_cond2:
+            return False
+
+        # [3] check max vehicle load
+        # TODO warnings.warn('check that *vertex* load and *request* load are handled properly in the Instance class!')
+        if self.sum_load + instance.vertex_load[j] > instance.max_vehicle_load:
+            return False
+        return True
 
     def insertion_feasibility_check(self,
                                     instance,
@@ -665,108 +700,3 @@ class Tour(ABC):
                 total_max_shift_delta += max_shift_delta
                 copy._single_insert_and_update(instance, insertion_index, insertion_vertex)
             return total_max_shift_delta
-
-
-class PDPTWTour(Tour):
-    def _single_insertion_feasibility_check(self, instance, insertion_index: int, insertion_vertex: int):
-        """
-        Checks whether the insertion of the insertion_vertex at insertion_pos is feasible.
-
-        Following
-        [1] Vansteenwegen,P., Souffriau,W., Vanden Berghe,G., & van Oudheusden,D. (2009). Iterated local
-        search for the team orienteering problem with time windows. Computers & Operations Research, 36(12),
-        3281–3290. https://doi.org/10.1016/j.cor.2009.03.008
-
-        [2] Lu,Q., & Dessouky,M.M. (2006). A new insertion-based construction heuristic for solving the pickup and
-        delivery problem with time windows. European Journal of Operational Research, 175(2), 672–687.
-        https://doi.org/10.1016/j.ejor.2005.05.012
-
-        :return: True if the insertion of the insertion_vertex at insertion_position is feasible, False otherwise
-        """
-
-        i = self.routing_sequence[insertion_index - 1]
-        j = insertion_vertex
-        k = self.routing_sequence[insertion_index]
-
-        # [1] check precedence (only if the counterpart vertex is already in the tour)
-        if instance.vertex_type(j) == 'delivery':
-            pickup = j - instance.num_requests
-            if pickup in self.vertex_pos and self.vertex_pos[pickup] > insertion_index:
-                return False
-        elif instance.vertex_type(j) == 'pickup':
-            delivery = j + instance.num_requests
-            if delivery in self.vertex_pos and self.vertex_pos[delivery] <= insertion_index:
-                return False
-
-        # [2] check max tour distance
-        distance_shift_j = instance.travel_distance([i, j], [j, k]) - instance.travel_distance([i], [k])
-        if self.sum_travel_distance + distance_shift_j > instance.max_tour_distance:
-            return False
-
-        # [3] check time windows (NEW: in constant time!)
-        # tw condition 1: start of service of j must fit the time window of j
-        arrival_time_j = self.service_time_sequence[insertion_index - 1] + \
-                         instance.vertex_service_duration[i] + \
-                         instance.travel_duration([i], [j])
-        tw_cond1 = arrival_time_j <= instance.tw_close[j]
-
-        # tw condition 2: time_shift_j must be limited to the sum of wait_k + max_shift_k
-        wait_j = max(dt.timedelta(0), instance.tw_open[j] - arrival_time_j)
-        time_shift_j = instance.travel_duration([i], [j]) + \
-                       wait_j + \
-                       instance.vertex_service_duration[j] + \
-                       instance.travel_duration([j], [k]) - \
-                       instance.travel_duration([i], [k])
-        wait_k = self.wait_duration_sequence[insertion_index]
-        max_shift_k = self.max_shift_sequence[insertion_index]
-        tw_cond2 = time_shift_j <= wait_k + max_shift_k
-
-        if not tw_cond1 or not tw_cond2:
-            return False
-
-        # [4] check max vehicle load (load can increase and decrease in PDP)
-        # TODO load sequence has not been implemented!
-        if self.load_sequence[insertion_index] + instance.vertex_load[j] > instance.max_vehicle_load:
-            return False
-
-        return True
-
-
-class VRPTWTour(Tour):
-    def _single_insertion_feasibility_check(self, instance, insertion_index: int,
-                                            insertion_vertex: int):
-        i = self.routing_sequence[insertion_index - 1]
-        j = insertion_vertex
-        k = self.routing_sequence[insertion_index]
-
-        # [1] check max tour distance
-        distance_shift_j = instance.travel_distance([i, j], [j, k]) - instance.travel_distance([i], [k])
-        if self.sum_travel_distance + distance_shift_j > instance.max_tour_distance:
-            return False
-
-        # [2] check time windows
-        # tw condition 1: start of service of j must fit the time window of j
-        arrival_time_j = self.service_time_sequence[insertion_index - 1] + \
-                         instance.vertex_service_duration[i] + \
-                         instance.travel_duration([i], [j])
-        tw_cond1 = arrival_time_j <= instance.tw_close[j]
-
-        # tw condition 2: time_shift_j must be limited to the sum of wait_k + max_shift_k
-        wait_j = max(dt.timedelta(0), instance.tw_open[j] - arrival_time_j)
-        time_shift_j = instance.travel_duration([i], [j]) + \
-                       wait_j + \
-                       instance.vertex_service_duration[j] + \
-                       instance.travel_duration([j], [k]) - \
-                       instance.travel_duration([i], [k])
-        wait_k = self.wait_duration_sequence[insertion_index]
-        max_shift_k = self.max_shift_sequence[insertion_index]
-        tw_cond2 = time_shift_j <= wait_k + max_shift_k
-
-        if not tw_cond1 or not tw_cond2:
-            return False
-
-        # [3] check max vehicle load
-        # TODO warnings.warn('check whether *vertex* load and *request* load are handled properly in the Instance class!')
-        if self.sum_load + instance.vertex_load[j] > instance.max_vehicle_load:
-            return False
-        return True

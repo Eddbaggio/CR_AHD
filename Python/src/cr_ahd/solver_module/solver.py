@@ -131,7 +131,7 @@ class Solver:
 
         solution.solver_config.update(self.config)
         random.seed(0)
-        logger.info(f'{instance.id_}: Solving\n{pformat(solution.solver_config)}')
+        logger.info(f'{instance.id_}: Solving\n{pformat(solution.solver_config, sort_dicts=False)}')
 
         # ===== Dynamic Request Arrival Phase =====
         for request in sorted(instance.requests, key=lambda x: instance.request_disclosure_time[x]):
@@ -170,7 +170,7 @@ class Solver:
             timer.write_duration_to_solution(solution, 'runtime_final_auction')
 
         ut.validate_solution(instance, solution)  # safety check to make sure everything's functional
-        logger.log(SUCCESS, f'{instance.id_}: Success\n{pformat(solution.solver_config)}')
+        logger.log(SUCCESS, f'{instance.id_}: Success\n{pformat(solution.solver_config, sort_dicts=False)}')
 
         # plot_vienna_vrp_solution(instance, solution)  # REMOVEME for debugging only
         return instance, solution

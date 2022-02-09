@@ -104,9 +104,9 @@ class Auction:
                     """
 
                     raise ValueError(f'{instance.id_},:\n'
-                                     f' {solution.objective()} < {pre_auction_solution.objective()}\n'
-                                     f' Post-auction objective is lower than pre-auction objective!,'
-                                     f' Recovering the pre-auction solution')
+                                     f' Post={solution.objective()}; Pre={pre_auction_solution.objective()}\n'
+                                     f' Post-auction objective is worse than pre-auction objective!\n'
+                                     f' Recovering the pre-auction solution.')
                     solution = pre_auction_solution
                     assert pre_auction_solution.objective() == solution.objective()
         return solution

@@ -210,7 +210,7 @@ def bundle_total_travel_distance(instance: it.MDVRPTWInstance, bundle: Sequence[
 
 def bundle_total_travel_duration(instance: it.MDVRPTWInstance, bundle: Sequence[int]):
     """
-    total travel duration needed to visit all requests in a bundle. Since finding the optimal solutions for
+    total *travel* duration needed to visit all requests in a bundle. Since finding the optimal solutions for
     all bundles is too time consuming, the tour length is approximated using the cheapest insertion heuristic
 
     uses bundle member vertex as depot. Does not check feasibility of the tour
@@ -480,7 +480,7 @@ class MinDurationBundlingValuation(BundlingValuation):
 
 class SumDurationBundlingValuation(BundlingValuation):
     """
-    The value of a BUNDLING is determined by the minimum over the travel distances per BUNDLE.
+    The value of a BUNDLING is determined by the sum over the travel durations per BUNDLE.
     The travel distance of a bundle is determined by building a route that traverses all the bundle's requests using
     the dynamic insertion procedure.
     """

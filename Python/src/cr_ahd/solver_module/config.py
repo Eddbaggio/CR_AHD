@@ -24,13 +24,14 @@ def configs():
         # cns.MinTimeShiftInsertion()
     ]
 
-    t = float('inf') if ut.debugger_is_active() else 5
+    # t = float('inf') if ut.debugger_is_active() else 5
+    t = 2
     s_tour_improvement: Sequence[mh.VRPTWMetaHeuristic] = [
-        # mh.NoMetaheuristic([nh.NoNeighborhood()], None),
+        mh.NoMetaheuristic([nh.NoNeighborhood()], None),
         # mh.LocalSearchFirst([nh.VRPTWMoveDur()], 1),
         # mh.LocalSearchFirst([nh.VRPTWTwoOptDur()], 1),
         # mh.LocalSearchBest([nh.VRPTWMoveDur()], 1),
-        mh.VRPTWVariableNeighborhoodDescent([nh.VRPTWTwoOptDur(), nh.VRPTWMoveDur(), nh.VRPTWRelocateDur()], t),
+        # mh.VRPTWVariableNeighborhoodDescent([nh.VRPTWTwoOptDur(), nh.VRPTWMoveDur(), nh.VRPTWRelocateDur()], t),
         # mh.VRPTWSequentialLocalSearch([nh.VRPTWTwoOptDur(), nh.VRPTWMoveDur(), nh.VRPTWRelocateDur()], t)
     ]
 
@@ -79,7 +80,7 @@ def configs():
     ]
 
     s_bundle_generation: Sequence[Tuple[bg.LimitedBundlePoolGenerationBehavior.__class__, Dict[str, float]]] = [
-        (bg.GeneticAlgorithm, dict(population_size=300,
+        (bg.GeneticAlgorithm, dict(population_size=150,
                                    num_generations=100,
                                    mutation_rate=0.5,
                                    generation_gap=0.9, )
@@ -93,7 +94,7 @@ def configs():
         # bv.MinDistanceBundlingValuation,
         # bv.MinDurationBundlingValuation,
         bv.SumDurationBundlingValuation,
-        bv.LosSchulteBundlingValuation,
+        # bv.LosSchulteBundlingValuation,
         # bv.RandomBundlingValuation,
     ]
 
