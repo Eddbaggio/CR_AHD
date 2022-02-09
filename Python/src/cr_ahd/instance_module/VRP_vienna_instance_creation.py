@@ -1,6 +1,8 @@
+import cProfile
 import datetime as dt
+import pstats
 import webbrowser
-from typing import List, Union
+from typing import List, Union, Dict, Sequence
 import multiprocessing
 from itertools import product
 
@@ -24,26 +26,34 @@ from vienna_data_handling import read_vienna_addresses
 # when using coordinates, use the order LATITUDE FIRST, LONGITUDE SECOND! All inputs will be rearranged to follow this
 # this order. https://en.wikipedia.org/wiki/ISO_6709#Items
 
-def generate_vienna_cr_ahd_instance(
-        vienna_addresses: gp.GeoDataFrame,
-        vienna_distances,
-        vienna_durations: pd.DataFrame,
-        run: int,
-        num_carriers: int = 3,
-        dist_center_to_carrier_km=7,
-        carrier_competition: float = 0,
-        num_requests_per_carrier: int = 10,
-        carriers_max_num_tours: int = 3,
-        max_vehicle_load: int = 10,
-        max_tour_length: int = 1000,
-        max_tour_duration=ut.EXECUTION_TIME_HORIZON.duration,
-        requests_service_duration: Union[dt.timedelta, List[dt.timedelta]] = dt.timedelta(minutes=4),
-        requests_revenue: Union[float, int, List[float], List[int]] = 1,
-        requests_load: Union[float, int, List[float], List[int]] = 1,
-        plot=False,
-        rng=None,
-        save=True):
-    rng = np.random.default_rng(rng)
+def generate_vienna_cr_ahd_instance(dist_center_to_carrier_km: float,
+                                    num_carriers: int,
+                                    num_requests_per_carrier: int,
+                                    carriers_max_num_tours: int,
+                                    carrier_competition: float,
+                                    run: int,
+                                    max_vehicle_load: int,
+                                    max_tour_length: int,
+                                    max_tour_duration,
+                                    requests_revenue: Union[float, int, List[float], List[int]],
+                                    requests_service_duration: Union[dt.timedelta, List[dt.timedelta]],
+                                    requests_load: Union[float, int, List[float], List[int]],
+                                    plot=False,
+                                    save=True):
+    rng = np.random.default_rng(
+        int(num_carriers + num_requests_per_carrier + carrier_competition * 100 + run + carriers_max_num_tours))
+
+    # choose one of the (address + durations + distances) data sets randomly
+    # vienna_durations, vienna_distances, vienna_addresses = matrices[rng.choice(list(range(len(matrices))))]
+
+    m = 1000
+    n = rng.choice([1, 2, 3])
+    # travel duration in seconds *as floats*
+    vienna_durations = pd.read_csv(io.input_dir.joinpath(f'vienna_{m}_durations_#{n:03d}.csv'), index_col=0)
+    # distance in meters
+    vienna_distances = pd.read_csv(io.input_dir.joinpath(f'vienna_{m}_distances_#{n:03d}.csv'), index_col=0)
+    # addresses
+    vienna_addresses = read_vienna_addresses(io.input_dir.joinpath(f'vienna_{m}_addresses_#{n:03d}.csv'))
 
     if num_carriers < 2:
         raise ValueError('Must have at least 2 carriers for a CR_AHD instance')
@@ -72,13 +82,24 @@ def generate_vienna_cr_ahd_instance(
         lambda x: np.where(vienna_addresses.geometry == nearest_points(x, vienna_addresses.unary_union)[1])[0][0])
     vienna_depots = vienna_addresses.iloc[vienna_depots].geometry
 
-    districts = read_vienna_districts_shapefile()
-    districts_centroids = districts.geometry.to_crs(epsg=3035).centroid.to_crs(epsg=4326)
+    districts = read_vienna_districts_shapefile()  # is in EPSG:4326
 
-    # assign service districts based on (euclidean?) distance d(depot, district_centroid)
+    # NOTE previously, I computed the centroids on-the-fly which was computationally expensive. Particularly,
+    #  transforming between different EPSG is slow
+    # districts_centroids: gp.GeoSeries = districts.geometry.to_crs(epsg=3035).centroid
+    # districts_centroids.to_file(io.input_dir.joinpath('districts_centroids_epsg3035.shp'))
+    # districts_centroids = districts.geometry.to_crs(epsg=3035).centroid.to_crs(epsg=4326)
+
+    districts_centroids = gp.read_file(io.input_dir.joinpath('districts_centroids_epsg3035.shp'))  # is in EPSG:3035
+    districts_centroids.set_index(['BEZNR', 'NAMEG'], inplace=True)
+    districts_centroids = districts_centroids.geometry
+
+    vienna_depots_3035 = vienna_depots.to_crs(epsg=3035).geometry
+
+    # assign service districts based on (euclidean?) distance depot -> district_centroid
     centroid_depot_dist = np.zeros((len(districts_centroids), num_carriers))
-    for (idx, name), centroid in districts_centroids.to_crs(epsg=3035).items():
-        for jdx, (_, depot) in enumerate(vienna_depots.to_crs(epsg=3035).geometry.items()):
+    for (idx, name), centroid in districts_centroids.items():
+        for jdx, (_, depot) in enumerate(vienna_depots_3035.items()):
             centroid_depot_dist[idx - 1, jdx] = centroid.distance(depot)
     district_carrier_assignment = centroid_depot_dist.min(axis=1).repeat(num_carriers).reshape(
         centroid_depot_dist.shape)
@@ -154,8 +175,28 @@ def generate_vienna_cr_ahd_instance(
     return instance
 
 
-def _generate_vienna_cr_ahd_instance_star(args):
-    return generate_vienna_cr_ahd_instance(*args)
+def _generate_vienna_cr_ahd_instance_star(kwargs):
+    return generate_vienna_cr_ahd_instance(**kwargs),
+
+
+def mp_instance_gen(list_of_kwargs: Sequence[Dict], num_threads: int):
+    """
+    Generating instances using multiprocessing.
+
+    :param list_of_kwargs: A Sequence of dicts that can be used as kwargs to the function generate_vienna_cr_ahd_instance
+    :param num_threads: number of threads to be used for instance generation
+    :return:
+    """
+    if num_threads == 1:
+        instances = []
+        for kwargs in tqdm.tqdm(list_of_kwargs):
+            instances.append(_generate_vienna_cr_ahd_instance_star(kwargs))
+    else:
+        n_jobs = len(list_of_kwargs)
+        with multiprocessing.Pool(num_threads) as pool:
+            instances = list(
+                tqdm.tqdm(pool.imap(_generate_vienna_cr_ahd_instance_star, list_of_kwargs), total=n_jobs))
+    return instances
 
 
 def plot_service_areas_and_requests(depots, district_carrier_assignment, districts, vienna_addresses, vienna_lat,
@@ -227,6 +268,7 @@ def read_vienna_districts_shapefile():
 
 
 if __name__ == '__main__':
+    """
     # read the OSRM and address data, each of the random data sets contains m locations
     m = 1000
     rng = np.random.default_rng(42)
@@ -238,64 +280,103 @@ if __name__ == '__main__':
         distances = pd.read_csv(io.input_dir.joinpath(f'vienna_{m}_distances_#{n:03d}.csv'), index_col=0)
         # addresses
         addresses = read_vienna_addresses(io.input_dir.joinpath(f'vienna_{m}_addresses_#{n:03d}.csv'))
-        matrices.append([durations, distances, addresses])
+        matrices.append([durations, distances, addresses])"""
 
-    # define the parameters desired for the set of instances that shall be created
-    num_carriers = [3]
-    num_requests_per_carrier = [10, 25, 50]
-    carrier_max_num_tours = [1, 3]
-    carrier_competition = [0.0, 0.25, 0.5, 0.75, 1.0]
-    run = list(range(20))
-    num_instances = len(num_carriers) * \
-                    len(num_requests_per_carrier) * \
-                    len(carrier_max_num_tours) * \
-                    len(carrier_competition) * \
-                    len(run)
 
-    # FAILED ATTEMPT AT PARALLELIZING THE INSTANCE GEN
-    """
-    # select random duration, distance and address matrices (from those queried via OSRM) for each instance
-    duration_matrix = []
-    distance_matrix = []
-    addresses_matrix = []
-    for i in rng.choice([0, 1, 2], size=n_jobs):
-        dur, dist, add = matrices[i]
-        duration_matrix.append(dur)
-        distance_matrix.append(dist)
-        addresses_matrix.append(add)
+    def foo():
 
-    jobs = list(product(num_carriers, num_requests_per_carrier, carrier_max_num_tours, carrier_competition, run))
-    jobs = [jobs[i] + (duration_matrix[i], distance_matrix[i], addresses_matrix[i]) for i in range(n_jobs)]
+        s_dist_center_to_carrier_km = [7]
+        s_num_carriers = [3]
+        s_num_requests_per_carrier = [10, 25, 50, 100]
+        s_carriers_max_num_tours = [1, 3]
+        s_carrier_competition = [0, 0.25, 0.5, 1, 0]
+        s_run = list(range(20))
+        s_max_vehicle_load = [999_999_999]
+        s_max_tour_length = [999_999_999]
+        s_max_tour_duration = [ut.EXECUTION_TIME_HORIZON.duration]
+        s_requests_revenue = [1]
+        s_requests_service_duration = [dt.timedelta(minutes=4)]
+        s_requests_load = [1]
+        s_plot = [False]
+        s_save = [True]  # NOTE set to false for testing
 
-    with multiprocessing.Pool(6) as pool:
-        # instances = list(tqdm(pool.imap(_execute_job_star, jobs), total=n_jobs))
-        instances = list(tqdm.tqdm(pool.map(generate_vienna_cr_ahd_instance, jobs), total=len(jobs)))
-    """
+        list_of_kwargs = []
+        for dist_center_to_carrier_km, num_carriers, num_requests_per_carrier, carriers_max_num_tours, carrier_competition, \
+            run, max_vehicle_load, max_tour_length, max_tour_duration, requests_revenue, requests_service_duration, \
+            requests_load, plot, save in product(s_dist_center_to_carrier_km,
+                                                 s_num_carriers,
+                                                 s_num_requests_per_carrier,
+                                                 s_carriers_max_num_tours,
+                                                 s_carrier_competition,
+                                                 s_run,
+                                                 s_max_vehicle_load,
+                                                 s_max_tour_length,
+                                                 s_max_tour_duration,
+                                                 s_requests_revenue,
+                                                 s_requests_service_duration,
+                                                 s_requests_load,
+                                                 s_plot,
+                                                 s_save
+                                                 ):
+            list_of_kwargs.append(dict(dist_center_to_carrier_km=dist_center_to_carrier_km,
+                                       num_carriers=num_carriers,
+                                       num_requests_per_carrier=num_requests_per_carrier,
+                                       carriers_max_num_tours=carriers_max_num_tours,
+                                       carrier_competition=carrier_competition,
+                                       run=run,
+                                       max_vehicle_load=max_vehicle_load,
+                                       max_tour_length=max_tour_length,
+                                       max_tour_duration=max_tour_duration,
+                                       requests_revenue=requests_revenue,
+                                       requests_service_duration=requests_service_duration,
+                                       requests_load=requests_load,
+                                       plot=plot,
+                                       save=save,
+                                       ))
+        mp_instance_gen(list_of_kwargs, 6)
+
+
+    cProfile.run('foo()', io.output_dir.joinpath('instance_gen_stats'))
+    # STATS
+    p = pstats.Stats(io.output_dir.joinpath('instance_gen_stats').as_posix())
+    # remove the extraneous path from all the module names:
+    p.strip_dirs()
+    # sorts the profile by cumulative time in a function, and then only prints the n most significant lines:
+    p.sort_stats('cumtime').print_stats(50)
+    # see what functions were looping a lot, and taking a lot of time:
+    p.sort_stats('tottime').print_stats(50)  # time spent in a function (excluding time made in calls to sub-functions)
+    p.sort_stats('ncalls').print_stats(20)
+    # p.print_callers(20)
+
+    """# define the parameters desired for the set of instances that shall be created
+    s_num_carriers = [3]
+    s_num_requests_per_carrier = [100]
+    s_carrier_max_num_tours = [3]
+    s_carrier_competition = [0.0, 0.25, 0.5, 0.75, 1.0]
+    s_run = list(range(20))
+    num_instances = len(s_num_carriers) * \
+                    len(s_num_requests_per_carrier) * \
+                    len(s_carrier_max_num_tours) * \
+                    len(s_carrier_competition) * \
+                    len(s_run)
 
     with tqdm.tqdm(total=num_instances) as pbar:
-        for num_carriers in [3]:
-            for num_requests_per_carrier in [10, 25, 50]:
-                for carrier_max_num_tours in [1, 3]:
-                    for carrier_competition in [0.0, 0.25, 0.5, 0.75, 1.0]:
-                        for run in range(20):
+        for num_carriers in s_num_carriers:
+            for num_requests_per_carrier in s_num_requests_per_carrier:
+                for carrier_max_num_tours in s_carrier_max_num_tours:
+                    for carrier_competition in s_carrier_competition:
+                        for run in s_run:
                             durations, distances, addresses = matrices[rng.choice([0, 1, 2])]
-                            instance = generate_vienna_cr_ahd_instance(
-                                vienna_addresses=addresses,
-                                vienna_distances=distances,
-                                vienna_durations=durations,
-                                run=run,
-                                num_carriers=num_carriers,
-                                dist_center_to_carrier_km=7,
-                                carrier_competition=carrier_competition,
-                                num_requests_per_carrier=num_requests_per_carrier,
-                                carriers_max_num_tours=carrier_max_num_tours,
-                                max_vehicle_load=1000,
-                                max_tour_length=1_000_000,
-                                max_tour_duration=ut.EXECUTION_TIME_HORIZON.duration,
-                                requests_service_duration=dt.timedelta(minutes=4),
-                                requests_revenue=1,
-                                requests_load=1,
-                                plot=False,
-                                rng=int(num_carriers + num_requests_per_carrier + carrier_competition * 100 + run),
-                                save=True)
+                            instance = generate_vienna_cr_ahd_instance(dist_center_to_carrier_km=7,
+                                                                       num_carriers=num_carriers,
+                                                                       num_requests_per_carrier=num_requests_per_carrier,
+                                                                       carriers_max_num_tours=carrier_max_num_tours,
+                                                                       carrier_competition=carrier_competition, run=run,
+                                                                       max_vehicle_load=1000, max_tour_length=1_000_000,
+                                                                       max_tour_duration=ut.EXECUTION_TIME_HORIZON.duration,
+                                                                       requests_revenue=1,
+                                                                       requests_service_duration=dt.timedelta(
+                                                                           minutes=4), requests_load=1, plot=False,
+                                                                       save=True)
                             pbar.update()
+"""

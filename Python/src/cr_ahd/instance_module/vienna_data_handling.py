@@ -146,12 +146,12 @@ def read_vienna_addresses(path=io.input_dir.joinpath('vienna_addresses.csv'),
         df['geometry'] = df['geometry'].apply(lambda x: Point(float(s) for s in re.findall(r'-?\d+\.?\d*', x)))
         # turn into geodataframe
         gdf = gp.GeoDataFrame(df, crs=f'EPSG:4326')
-        print(f'reading and preparing {path.name} took {time.time() - t} seconds')
+        # print(f'reading and preparing {path.name} took {time.time() - t} seconds')
 
     elif path.suffix == '.feather':
         warnings.warn('Writing and Reading in feather has caused issues before: values are not preserved!')
         gdf = gp.read_feather(path)
-        print(f'reading {path.name} took {time.time() - t} seconds')
+        # print(f'reading {path.name} took {time.time() - t} seconds')
 
     # filter out Train Stations, Museums, public toilets, Schrebergärten, ...
     gdf = gdf[gdf['ZUGADR_TYP'] == 0]

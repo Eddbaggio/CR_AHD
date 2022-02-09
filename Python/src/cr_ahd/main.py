@@ -10,54 +10,53 @@ logging.config.dictConfig(log.LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
 logger.parent.handlers[0].setFormatter(log.CustomFormatter())
 
-
-def cr_ahd():
-    # if called from within PyCharm
-    if "PYCHARM" in os.environ:
-        args = {'distance': 7,
-                'num_carriers': 3,
-                'num_requests': [25, 50],
-                'carrier_max_num_tours': [1, 3],
-                'service_area_overlap': [0, 1.0],
-                'run': range(20),
-                'threads': 1,
-                'fail': 1,
-                }
-    # else read from terminal parameters
-    else:
-        args = parser.parse_args().__dict__
-
-    start = datetime.now()
-    logger.info(f'START {start}')
-
-    paths = io.vrptw_instance_selector(distance=args['distance'],
-                                       num_carriers=args['num_carriers'],
-                                       num_requests=args['num_requests'],
-                                       carrier_max_num_tours=args['carrier_max_num_tours'],
-                                       service_area_overlap=args['service_area_overlap'],
-                                       run=args['run'],
-                                       )
-    configs = list(pg.configs())
-
-    # solving
-    solutions = wf.execute_jobs(paths, configs, args['threads'], args['fail'])
-
-    agg_level = 'solution'
-    df = io.solutions_to_df(solutions, agg_level)
-
-    # write df
-    csv_path = io.unique_path(io.output_dir, 'evaluation_agg_' + agg_level + '_#{:03d}' + '.csv')
-    df.to_csv(path_or_buf=csv_path, index=False)
-
-    collaboration_gains = ev.collaboration_gain(df)
-    collaboration_gains.to_csv(str(csv_path).replace('agg_solution', 'coll_gain'), index=True)
-
-    end = datetime.now()
-    logger.info(f'END {end}')
-    logger.info(f'DURATION {end - start}')
-
-
 if __name__ == '__main__':
+    def cr_ahd():
+        # if called from within PyCharm
+        if "PYCHARM" in os.environ:
+            args = {'distance': 7,
+                    'num_carriers': 3,
+                    'num_requests': [100],
+                    'carrier_max_num_tours': [3],
+                    'service_area_overlap': [0, 0.5, 1.0],
+                    'run': range(1),
+                    'threads': 1,
+                    'fail': 1,
+                    }
+        # else read from terminal parameters
+        else:
+            args = parser.parse_args().__dict__
+
+        start = datetime.now()
+        logger.info(f'START {start}')
+
+        paths = io.vrptw_instance_selector(distance=args['distance'],
+                                           num_carriers=args['num_carriers'],
+                                           num_requests=args['num_requests'],
+                                           carrier_max_num_tours=args['carrier_max_num_tours'],
+                                           service_area_overlap=args['service_area_overlap'],
+                                           run=args['run'],
+                                           )
+        configs = list(pg.configs())
+
+        # solving
+        solutions = wf.execute_jobs(paths, configs, args['threads'], args['fail'])
+
+        agg_level = 'solution'
+        df = io.solutions_to_df(solutions, agg_level)
+
+        # write df
+        csv_path = io.unique_path(io.output_dir, 'evaluation_agg_' + agg_level + '_#{:03d}' + '.csv')
+        df.to_csv(path_or_buf=csv_path, index=False)
+
+        collaboration_gains = ev.collaboration_gain(df)
+        collaboration_gains.to_csv(str(csv_path).replace('agg_solution', 'coll_gain'), index=True)
+
+        end = datetime.now()
+        logger.info(f'END {end}')
+        logger.info(f'DURATION {end - start}')
+
+
     cr_ahd()
 
     """
