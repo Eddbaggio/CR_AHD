@@ -119,7 +119,9 @@ def unassigned_request_marker(instance, color, request):
     orig_carrier = instance.request_to_carrier_assignment[request]
     return folium.CircleMarker(location=instance.coords(delivery_vertex),
                                tooltip=f'{request}, unassigned',
-                               popup=f'Request {request}(xy={instance.coords(delivery_vertex)}, '
+                               popup=f'Request {request}<br>'
+                                     f'UNASSIGNED<br>'
+                                     # f'(xy={instance.vertex_x_coords(delivery_vertex)}, {instance.vertex_y_coords(delivery_vertex)} <br>'
                                      f'original carrier={orig_carrier}',
                                radius=5,
                                color=color,
@@ -132,8 +134,11 @@ def unassigned_request_marker(instance, color, request):
 def unrouted_request_marker(instance, carrier, color, request):
     delivery_vertex = instance.vertex_from_request(request)
     return folium.CircleMarker(location=instance.coords(delivery_vertex),
-                               tooltip=f'{request}',
-                               popup=f'Request {request}(xy={instance.coords(delivery_vertex)}, carrier={carrier.id_}',
+                               tooltip=f'{request}, unrouted',
+                               popup=f'Request {request}<br>'
+                                     f'UNROUTED<br>'
+                                     # f'(xy={instance.vertex_x_coords(delivery_vertex)}, {instance.vertex_y_coords(delivery_vertex)} <br>'
+                                     f' carrier={carrier.id_}',
                                radius=5,
                                color=color,
                                fill_color=color,

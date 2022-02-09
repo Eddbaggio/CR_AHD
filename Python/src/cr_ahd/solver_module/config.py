@@ -51,10 +51,13 @@ def configs():
 
     s_time_window_selection: Sequence[tws.TWSelectionBehavior] = [
         tws.UnequalPreference(),
+        tws.UniformPreference(),
     ]
+
+    # by setting this to an empty sequence, no collaborative solutions will be generated
     s_num_submitted_requests: Sequence[int] = [
         # 3,
-        4,
+        # 4,
         # 5
     ]
 

@@ -16,10 +16,10 @@ def cr_ahd():
     if "PYCHARM" in os.environ:
         args = {'distance': 7,
                 'num_carriers': 3,
-                'num_requests': [10],
-                'carrier_max_num_tours': [3],
-                'service_area_overlap': [0.5],
-                'run': 3,
+                'num_requests': [25, 50],
+                'carrier_max_num_tours': [1, 3],
+                'service_area_overlap': [0, 1.0],
+                'run': range(20),
                 'threads': 1,
                 'fail': 1,
                 }

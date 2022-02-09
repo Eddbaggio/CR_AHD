@@ -63,8 +63,12 @@ solution_runtimes = [
 
 def collaboration_gain(df: pd.DataFrame, plot: bool = False):
     gains = []
+    variable_parameters = {k: list(df[k].unique()) for k in instance_config + general_config + collaborative_config}
+    variable_parameters = {k: v for k, v in variable_parameters.items() if len(v) > 1}
 
+    # group/filter by instance type (num_requests, overlap, ...)
     for inst_name, inst_group in df.groupby(instance_config):
+        # group/filter by general solver parameters (time_window_length, tour_construction, ...)
         for gen_name, gen_group in inst_group.groupby(general_config, dropna=False):
             isolated = gen_group[gen_group[planning_config] == 'IsolatedPlanning'].squeeze()
             collaborative = gen_group[gen_group[planning_config] == 'CollaborativePlanning'].squeeze()
@@ -75,6 +79,7 @@ def collaboration_gain(df: pd.DataFrame, plot: bool = False):
                 record.update({k: v for k, v in zip(solution_values, coll_gain)})
                 gains.append(record)
             else:
+                # group/filter by collaborative parameters (num_submitted_requests, bundle_valuation, ...)
                 for collab_name, collab_group in collaborative.groupby(collaborative_config, dropna=False):
                     collab_group = collab_group.squeeze()
                     coll_gain = 1 - (collab_group[solution_values] / isolated[solution_values])
@@ -88,13 +93,15 @@ def collaboration_gain(df: pd.DataFrame, plot: bool = False):
                                    columns=instance_config + general_config + collaborative_config + solution_values)
     df.set_index(instance_config + general_config + collaborative_config, inplace=True)
     if plot:
-        df.plot(kind='bar').legend(loc='upper center', bbox_to_anchor=(0.5, 1.1), ncol=5)
+        df['objective'].plot(kind='bar').legend(loc='upper center', bbox_to_anchor=(0.5, 1.1), ncol=5)
         plt.show()
     return df
 
 
 if __name__ == '__main__':
-    path = "C:/Users/Elting/Desktop/HPC_Output/evaluation_agg_solution_#002.csv"
+    # path = "C:/Users/Elting/Desktop/HPC_Output/evaluation_agg_solution_#011.csv"
+    path = "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home Deliveries/01_Code/data/Output/evaluation_agg_solution_#021.csv"
     df = pd.read_csv(path)
 
-    collaboration_gain(df).to_csv(path.replace('agg_solution', 'coll_gain'))
+    collaboration_gain(df, True)
+    # .to_csv(path.replace('agg_solution', 'coll_gain'))
