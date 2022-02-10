@@ -1,6 +1,6 @@
 import datetime as dt
 import json
-from typing import List, Sequence, Dict
+from typing import List, Sequence, Dict, Optional
 
 import numpy as np
 
@@ -30,6 +30,9 @@ class CAHDSolution:
         self.tours_pendulum: List[
             tr.Tour] = []  # TODO urgently need to check whether this is treated correctly in all methods
         self.carriers: List[AHDSolution] = [AHDSolution(c, objective) for c in range(instance.num_carriers)]
+
+        # to which degree were requests exchanged?
+        self.degree_of_reallocation: Optional[float] = None
 
         # solver configuration and other meta data
         self.solver_config = dict()
@@ -99,6 +102,7 @@ class CAHDSolution:
             'num_pendulum_tours': self.num_pendulum_tours(),
             'num_routing_stops': self.num_routing_stops(),
             'acceptance_rate': self.avg_acceptance_rate(),
+            'degree_of_reallocation': self.degree_of_reallocation,
             **self.timings,
             'carrier_summaries': {c.id_: c.summary() for c in self.carriers}
         })

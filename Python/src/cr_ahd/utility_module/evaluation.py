@@ -11,7 +11,8 @@ instance_config = [
     'n',
     'v',
     'o',
-    'r', ]
+    'r',
+]
 planning_config = 'solution_algorithm'
 general_config = [
     'tour_improvement',
@@ -22,7 +23,8 @@ general_config = [
     'request_acceptance_attractiveness',
     'time_window_length',
     'time_window_offering',
-    'time_window_selection', ]
+    'time_window_selection',
+]
 collaborative_config = [
     'num_int_auctions',
     'int_auction_tour_construction',
@@ -46,7 +48,8 @@ collaborative_config = [
     'fin_auction_num_auction_bundles',
     'fin_auction_bidding',
     'fin_auction_winner_determination',
-    'fin_auction_num_auction_rounds', ]
+    'fin_auction_num_auction_rounds',
+]
 solution_values = [
     'objective',
     # 'sum_profit',
@@ -57,18 +60,22 @@ solution_values = [
     'num_tours',
     'num_pendulum_tours',
     'num_routing_stops',
-    'acceptance_rate', ]
+    'acceptance_rate',
+    'degree_of_reallocation',
+]
 solution_runtimes = [
     'runtime_final_improvement',
     'runtime_total',
-    'runtime_final_auction', ]
+    'runtime_final_auction',
+]
 
 
 def collaboration_gain(df: pd.DataFrame, plot: bool = False):
     gains = []
     variable_parameters = {k: list(df[k].unique()) for k in instance_config + general_config + collaborative_config}
     variable_parameters = {k: v for k, v in variable_parameters.items() if len(set(v).difference({None, np.nan})) > 1}
-    pprint(variable_parameters)
+    print('Variable Parameters'.center(50, '='))
+    pprint(variable_parameters, sort_dicts=False)
 
     # group/filter by instance type (num_requests, overlap, ...)
     for inst_name, inst_group in df.groupby(instance_config):

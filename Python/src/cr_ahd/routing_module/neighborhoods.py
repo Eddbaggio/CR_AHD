@@ -214,6 +214,7 @@ class VRPTWTwoOptDur(IntraTourNeighborhood):
                     [tour.routing_sequence[j], *tour.routing_sequence[j-1:i:-1], tour.routing_sequence[j+1]]
                 ).total_seconds()
                 move: vrptw_2opt_move = (delta, tour, i, j)
+                # logger.debug(msg=f'testing 2-opt move: {move}')
                 if self.feasibility_check(instance, move):
                     yield move
 

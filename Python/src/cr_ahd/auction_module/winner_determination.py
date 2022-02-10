@@ -32,8 +32,8 @@ class WinnerDeterminationBehavior(ABC):
          contain the carrier bids on that bundle
         """
 
-        status, winner_bundles, bundle_winners, winner_bids = self._determine_winners(instance, solution, auction_pool,
-                                                                                      bundles, bids_matrix)
+        wdp_solution = self._determine_winners(instance, solution, auction_pool, bundles, bids_matrix)
+        status, winner_bundles, bundle_winners, winner_bids, winner_partition_labels = wdp_solution
 
         # fall back to the pre-auction assignment
         if status != GRB.OPTIMAL or -GRB.INFINITY in winner_bids:
@@ -41,7 +41,7 @@ class WinnerDeterminationBehavior(ABC):
             bundle_winners = [w for i, w in enumerate(original_partition_labels) if
                               w not in original_partition_labels[:i]]
 
-        return status, winner_bundles, bundle_winners, winner_bids
+        return status, winner_bundles, bundle_winners, winner_bids, winner_partition_labels
 
     @abstractmethod
     def _determine_winners(self,
@@ -130,9 +130,10 @@ class MaxBidGurobiCAP1(WinnerDeterminationBehavior):
                 if m.Status != GRB.OPTIMAL:
                     return m.Status, None, None, None
                 assert m.Status == GRB.OPTIMAL, f'Winner Determination is not optimal; status: {m.Status}'
-                # status 3 is 'infeasible'
+                # status = 3 -> 'infeasible'
 
                 winner_bundles = []
+                winner_partition_labels = auction_pool[:]
                 bundle_winners = []
                 winner_bids = []
                 logger.debug(f'the optimal solution for the Winner Determination Problem with {len(bundles)} bundles:')
@@ -143,9 +144,12 @@ class MaxBidGurobiCAP1(WinnerDeterminationBehavior):
                             winner_bundles.append(bundle)
                             bundle_winners.append(c)
                             winner_bids.append(bids_matrix[b, c])
+                            # replace elements from the auction pool by their winning carrier's id. using the
+                            # negative value to avoid errors caused by same index for request and carrier
+                            winner_partition_labels = [-c if x in bundle else x for x in winner_partition_labels]
                             logger.debug(f'Bundle {b}: {bundle} assigned to {c} for a bid of {bids_matrix[b, c]}')
-
-                return m.Status, winner_bundles, bundle_winners, winner_bids
+                winner_partition_labels = [-x for x in winner_partition_labels]
+                return m.Status, winner_bundles, bundle_winners, winner_bids, winner_partition_labels
 
 
 '''class MaxBidGurobiCAP2(WinnerDeterminationBehavior):

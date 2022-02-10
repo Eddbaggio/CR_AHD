@@ -58,13 +58,20 @@ def split_iterable(iterable, num_chunks):
     return (iterable[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(num_chunks))
 
 
-def _euclidean_distance(a: Coordinates, b: Coordinates):
-    raise DeprecationWarning(f'Use new _euclidean_distance function!')
-    return math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
-
-
 def euclidean_distance(x1, y1, x2, y2):
     return math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
+
+
+def hamming_distance(string1: Sequence, string2: Sequence):
+    """
+    The Hamming distance between two equal-length strings of symbols is the number of positions at which the
+    corresponding symbols are different.
+    Straight up copied from wikipedia: https://en.wikipedia.org/wiki/Hamming_distance
+
+    :return: number of positions at which string1 and string2 are different
+    """
+    assert len(string1) == len(string2)
+    return sum(xi != yi for xi, yi in zip(string1, string2))
 
 
 def power_set(iterable, include_empty_set=True):
@@ -85,20 +92,9 @@ def flatten(sequence: (List, Tuple)):
     return sequence[:1] + flatten(sequence[1:])
 
 
-def random_partition(li):
-    min_chunk = 1
-    max_chunk = len(li)
-    it = iter(li)
-    while True:
-        randint = np.random.randint(min_chunk, max_chunk)
-        nxt = list(itertools.islice(it, randint))
-        if nxt:
-            yield nxt
-        else:
-            break
-
-
 def random_max_k_partition_idx(ls, max_k) -> List[int]:
+    """partition ls into at most k randomly sized disjoint subsets"""
+    # https://stackoverflow.com/a/45880095
     if max_k < 1:
         return []
     # randomly determine the actual k
@@ -110,40 +106,6 @@ def random_max_k_partition_idx(ls, max_k) -> List[int]:
     # shuffle the indices into a random order
     random.shuffle(indices)
     return indices
-
-
-def random_max_k_partition(ls, max_k) -> Sequence[Sequence[int]]:
-    """partition ls in at most k randomly sized disjoint subsets
-
-    """
-    # https://stackoverflow.com/a/45880095
-    # we need to know the length of ls, so convert it into a list
-    ls = list(ls)
-    # sanity check
-    if max_k < 1:
-        return []
-    # randomly determine the actual k
-    k = random.randint(1, min(max_k, len(ls)))
-    # Create a list of length ls, where each element is the index of
-    # the subset that the corresponding member of ls will be assigned
-    # to.
-    #
-    # We require that this list contains k different values, so we
-    # start by adding each possible different value.
-    indices = list(range(k))
-    # now we add random values from range(k) to indices to fill it up
-    # to the length of ls
-    indices.extend([random.choice(list(range(k))) for _ in range(len(ls) - k)])
-    # shuffle the indices into a random order
-    random.shuffle(indices)
-    return indices
-    # construct and return the random subset: sort the elements by
-    # which subset they will be assigned to, and group them into sets
-    partitions = []
-    sorted_ = sorted(zip(indices, ls), key=lambda x: x[0])
-    for index, subset in itertools.groupby(sorted_, key=lambda x: x[0]):
-        partitions.append([x[1] for x in subset])
-    return partitions
 
 
 def argmin(a):

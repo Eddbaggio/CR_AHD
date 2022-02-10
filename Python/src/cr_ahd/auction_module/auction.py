@@ -159,8 +159,14 @@ class Auction:
 
             # ===== [4.1] Winner Determination =====
             timer = pr.Timer()
-            status, winner_bundles, bundle_winners, winner_bids = self.winner_determination.execute(
+            wdp_solution = self.winner_determination.execute(
                 instance, solution, auction_request_pool, auction_bundle_pool, bids_matrix, original_partition_labels)
+            status, winner_bundles, bundle_winners, winner_bids, winner_partition_labels = wdp_solution
+
+            hamming_dist = ut.hamming_distance(original_partition_labels, winner_partition_labels)
+            degree_of_reallocation = hamming_dist / len(original_partition_labels)
+            solution.degree_of_reallocation = degree_of_reallocation
+
             # timer.write_duration_to_solution(solution, 'runtime_winner_determination') fixme
             if status != GRB.OPTIMAL or -GRB.INFINITY in winner_bids:  # fall back to the pre-auction solution
                 solution = pre_rs_solution

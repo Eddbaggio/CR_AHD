@@ -1,5 +1,7 @@
+import cProfile
 import logging.config
 import os
+import pstats
 from datetime import datetime
 
 from solver_module import workflow as wf, config as pg
@@ -73,4 +75,4 @@ if __name__ == '__main__':
     p.sort_stats('tottime').print_stats(20)
     p.sort_stats('ncalls').print_stats(20)
     # p.print_callers(20)
-    """
+    # """
