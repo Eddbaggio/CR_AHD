@@ -73,7 +73,9 @@ solution_runtimes = [
 def collaboration_gain(df: pd.DataFrame, plot: bool = False):
     gains = []
     variable_parameters = {k: list(df[k].unique()) for k in instance_config + general_config + collaborative_config}
-    variable_parameters = {k: v for k, v in variable_parameters.items() if len(set(v).difference({None, np.nan})) > 1}
+    variable_parameters = {k: v for k, v in variable_parameters.items()
+                           if len(set(v).difference({None, np.nan, np.NaN})) > 1}
+    print()
     print('Variable Parameters'.center(50, '='))
     pprint(variable_parameters, sort_dicts=False)
 
