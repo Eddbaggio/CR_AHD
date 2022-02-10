@@ -125,5 +125,5 @@ class ClearAndReinsertAll(BiddingBehavior):
             if isinstance(solution.objective(), float):
                 with_bundle = -GRB.INFINITY
             elif isinstance(solution.objective(), dt.timedelta):
-                with_bundle = dt.timedelta.max  # TODO create a custom infinity time delta?
+                with_bundle = dt.timedelta.max
         return with_bundle

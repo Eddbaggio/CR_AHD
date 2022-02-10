@@ -6,9 +6,7 @@ from typing import Sequence, List, final
 import numpy as np
 from scipy.spatial.distance import squareform, pdist
 
-from auction_module.bundle_and_partition_valuation.bundle_metrics import bundle_centroid, bundle_sum_squared_errors, \
-    bundle_vertex_to_centroid_travel_dist, bundle_radius, bundle_total_travel_distance_proxy, \
-    bundle_total_travel_distance, bundle_total_travel_duration
+import auction_module.bundle_and_partition_valuation.bundle_metrics as bm
 from core_module import instance as it, solution as slt
 from utility_module import utils as ut
 # ======================================================================================================================
@@ -210,7 +208,7 @@ class GHProxyPartitionValuation(PartitionValuation):
         for bundle in partition:
             # pd_direct_travel_dist = bundle_direct_travel_dist(instance, bundle)
             # request_direct_travel_distances.append(pd_direct_travel_dist)
-            centroid = bundle_centroid(instance, bundle)
+            centroid = bm.bundle_centroid(instance, bundle)
             centroids.append(centroid)
 
         extended_distance_matrix = partition_extended_distance_matrix(instance, centroids)
@@ -221,17 +219,17 @@ class GHProxyPartitionValuation(PartitionValuation):
 
         for bundle_idx, bundle in enumerate(partition):
             # compute the radius
-            travel_dist_to_centroid = bundle_vertex_to_centroid_travel_dist(instance, bundle_idx, bundle,
-                                                                            extended_distance_matrix)
-            radius = bundle_radius(bundle, travel_dist_to_centroid)
+            travel_dist_to_centroid = bm.bundle_vertex_to_centroid_travel_dist(instance, bundle_idx, bundle,
+                                                                               extended_distance_matrix)
+            radius = bm.bundle_radius(bundle, travel_dist_to_centroid)
             radii.append(radius)
 
             # compute bundle density
-            density = bundle_sum_squared_errors()  # FIXME cannot compute density the way it was done before
+            density = bm.bundle_sum_squared_errors()  # FIXME cannot compute density the way it was done before
             densities.append(density)
 
             # estimating the tour length of the bundle
-            approx_travel_dist = bundle_total_travel_distance_proxy(instance, bundle)
+            approx_travel_dist = bm.bundle_total_travel_distance_proxy(instance, bundle)
 
             # if there is no feasible tour for this bundle, return a valuation of negative infinity for the whole
             # partition
@@ -263,7 +261,7 @@ class MinDistancePartitionValuation(PartitionValuation):
         raise NotImplementedError  # TODO does not work since bundles of size 1 have travel duration = 0
         bundle_valuations = []
         for bundle in partition:
-            valuation = bundle_total_travel_distance(instance, bundle)
+            valuation = bm.bundle_total_travel_distance(instance, bundle)
             bundle_valuations.append(valuation)
         return 1 / min(bundle_valuations)
 
@@ -280,7 +278,7 @@ class MinTravelDurationPartitionValuation(PartitionValuation):
         raise NotImplementedError  # TODO does not work since bundles of size 1 have travel duration = 0
         bundle_valuations = []
         for bundle in partition:
-            valuation = bundle_total_travel_duration(instance, bundle).total_seconds()
+            valuation = bm.bundle_total_travel_duration(instance, bundle).total_seconds()
             bundle_valuations.append(valuation)
         return 1 / min(bundle_valuations)
 
@@ -288,15 +286,15 @@ class MinTravelDurationPartitionValuation(PartitionValuation):
 class SumTravelDurationPartitionValuation(PartitionValuation):
     """
     The value of a partition is determined by the sum over the *travel* durations per BUNDLE.
-    The travel distance of a bundle is determined by building a route that traverses all the bundle's requests using
-    the dynamic insertion procedure.
+    The travel duration of a bundle is determined by building a route that traverses all the bundle's requests using
+    the dynamic insertion procedure (without improvement).
     """
 
     def evaluate_partition(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
                            partition: List[List[int]]) -> float:
         bundle_valuations = []
         for bundle in partition:
-            valuation = bundle_total_travel_duration(instance, bundle).total_seconds()
+            valuation = bm.bundle_total_travel_duration(instance, bundle).total_seconds()
             bundle_valuations.append(valuation)
         return sum(bundle_valuations)
 

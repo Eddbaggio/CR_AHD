@@ -19,8 +19,8 @@ if __name__ == '__main__':
                     'num_requests': [100],
                     'carrier_max_num_tours': [3],
                     'service_area_overlap': [0.5],
-                    'run': [13],
-                    'threads': 6,
+                    'run': [5],
+                    'threads': 1,
                     'fail': 1,
                     }
         # else read from terminal parameters

@@ -2,11 +2,11 @@ from abc import abstractmethod
 from typing import Sequence
 from core_module import instance as it, solution as slt
 from utility_module import utils as ut
-import bundle_generation as bg
+import bundle_gen as bg
 from auction_module.bundle_and_partition_valuation import bundle_valuation as bv
 
 
-class LimitedNumBundles(bg.BundleGeneration):
+class LimitedNumBundles(bg.BundleGenerationBehavior):
     """
     Generate a pool of bundles that has a limited, predefined number of bundles in it.
     Bundle selection happens by evaluating different bundles created from the requests in the auction request pool
@@ -37,7 +37,7 @@ class LimitedNumBundles(bg.BundleGeneration):
         pass
 
 
-class AllBundles(bg.BundleGeneration):
+class AllBundles(bg.BundleGenerationBehavior):
     """
     creates the power set of all the submitted requests, i.e. all subsets of size k for all k = 1, ..., len(pool).
     Does not include emtpy set.
@@ -49,7 +49,7 @@ class AllBundles(bg.BundleGeneration):
         return tuple(ut.power_set(range(len(auction_request_pool)), False))
 
 
-class BestOfAllBundles(bg.BundleGeneration):
+class BestOfAllBundles(bg.BundleGenerationBehavior):
     """
     Generates the power set of all the submitted requests and selects those that have the best valuation according
     to the bundle valuation function

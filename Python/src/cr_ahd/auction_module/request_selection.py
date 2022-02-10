@@ -6,6 +6,8 @@ from abc import ABC, abstractmethod
 from math import comb, sqrt
 from typing import Sequence, Tuple
 
+import numpy as np
+
 from core_module import instance as it, solution as slt, tour as tr
 from routing_module import tour_construction as cns, metaheuristics as mh, neighborhoods as ls
 from utility_module import utils as ut
@@ -63,7 +65,7 @@ class RequestSelectionBehaviorIndividual(RequestSelectionBehavior, ABC):
                 valuation = self._evaluate_request(instance, solution, carrier, request)
                 valuations.append(valuation)
 
-            # pick the k requests with the lowest valuation (from ascending order)
+            # pick the k requests with the LOWEST valuation (from ascending order)
             selected = [r for _, r in sorted(zip(valuations, carrier.accepted_requests))][:k]
             selected.sort()
 
@@ -244,7 +246,7 @@ class MinDurationToForeignDepotDSum(RequestSelectionBehaviorIndividual):
 
         for depot in foreign_depots:
             dur = sum((instance.travel_duration([depot], [delivery]), instance.travel_duration([delivery], [depot])),
-                       start=dt.timedelta(0))
+                      start=dt.timedelta(0))
             if dur < dur_min:
                 dur_min = dur
 
@@ -311,12 +313,6 @@ class ComboDistStandardized(RequestSelectionBehaviorIndividual):
         auction_request_pool = []
         original_partition_labels = []
 
-        # weighting factors for the three components (min_dist_to_foreign_depot, marginal_profit, dist_to_own_depot)
-        # of the valuation function
-        alpha1 = 1
-        alpha2 = 1
-        alpha3 = 1
-
         for carrier in solution.carriers:
             k = _abs_num_requests(carrier, self.num_submitted_requests)
             valuations = []
@@ -331,10 +327,14 @@ class ComboDistStandardized(RequestSelectionBehaviorIndividual):
                 std = sqrt(sum([(x - mean) ** 2 for x in component_series]) / len(component_series))
                 standardized_components.append(((x - mean) / std for x in component_series))
 
+            # weighting factors for the three components (min_dist_to_foreign_depot, marginal_profit, dist_to_own_depot)
+            # of the valuation function
+            alphas = np.array([1, 1, 1])
+
             # compute the weighted sum of the standardized components
             valuations = []
-            for comp1, comp2, comp3 in zip(*standardized_components):
-                weighted_valuation = alpha1 * comp1 + alpha2 * comp2 + alpha3 * comp3
+            for comp in zip(*standardized_components):
+                weighted_valuation = alphas * comp
                 valuations.append(weighted_valuation)
 
             # pick the WORST k evaluated requests (from ascending order)
@@ -367,80 +367,26 @@ class ComboDistStandardized(RequestSelectionBehaviorIndividual):
         return min_dist_to_foreign_depot, marginal_profit, dist_to_own_depot
 
 
-class ComboDistStandardizedNEW(RequestSelectionBehaviorIndividual):
+class DepotDurations(RequestSelectionBehaviorIndividual):
     """
-    considers min_dur_to_foreign_depot, wait_duration and dur_to_own_depot
+    considers min_dur_to_foreign_depot and dur_to_own_depot. Does NOT consider marginal profit!
+    evaluates requests as min_dur_to_foreign_depot/dur_to_own_depot
     """
-
-    def execute(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution):
-        """
-        Overrides method in RequestSelectionBehaviorIndividual because different components of the valuation function
-        need to be normalized before summing them up
-
-        select a set of requests based on the concrete selection behavior. will retract the requests from the carrier
-        and return
-
-        :return: the auction_request_pool as a list of request indices and a default
-        partition, i.e. a list of the carrier indices that maps the auction_request_pool to their original carrier.
-        """
-        auction_request_pool = []
-        original_partition_labels = []
-
-        # weighting factors for the three components (min_dist_to_foreign_depot, marginal_profit, dist_to_own_depot)
-        # of the valuation function
-        alpha1 = 1
-        alpha2 = 1
-        alpha3 = 1
-
-        for carrier in solution.carriers:
-            k = _abs_num_requests(carrier, self.num_submitted_requests)
-            valuations = []
-            for request in carrier.accepted_requests:
-                valuation = self._evaluate_request(instance, solution, carrier, request)
-                valuations.append(valuation)
-
-            # normalize the valuation components
-            standardized_components = []
-            for component_series in zip(*valuations):
-                mean = sum(component_series) / len(component_series)
-                std = sqrt(sum([(x - mean) ** 2 for x in component_series]) / len(component_series))
-                standardized_components.append(((x - mean) / std for x in component_series))
-
-            # compute the weighted sum of the standardized components
-            valuations = []
-            for comp1, comp2, comp3 in zip(*standardized_components):
-                weighted_valuation = alpha1 * comp1 + alpha2 * comp2 + alpha3 * comp3
-                valuations.append(weighted_valuation)
-
-            # pick the WORST k evaluated requests (from ascending order)
-            selected = [r for _, r in sorted(zip(valuations, carrier.accepted_requests))][:k]
-            selected.sort()
-
-            for request in selected:
-                solution.free_requests_from_carriers(instance, [request])
-                auction_request_pool.append(request)
-                original_partition_labels.append(carrier.id_)
-
-        return auction_request_pool, original_partition_labels
 
     def _evaluate_request(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution,
-                          request: int) -> Tuple[float, float, float]:
+                          request: int) -> Tuple[float, float]:
 
         # [i] duration to the depot of one of the collaborating carriers
         min_dur_to_foreign_depot = MinDurationToForeignDepotDSum(None)._evaluate_request(instance, solution,
                                                                                          carrier, request)
 
-        # [ii] wait duration
-        tour = solution.tour_of_request(request)
-        vertex = instance.vertex_from_request(request)
-        wait_duration = tour.wait_duration_sequence[tour.vertex_pos[vertex]]
-
         # [iii] duration to the carrier's own depot
+        vertex = instance.vertex_from_request(request)
         own_depot = carrier.id_
         # duration as the average of the asymmetric durations between depot and delivery vertex
         dur_to_own_depot = instance.travel_duration([own_depot, vertex], [vertex, own_depot]) / 2
 
-        return min_dur_to_foreign_depot.total_seconds(), wait_duration.total_seconds(), dur_to_own_depot.total_seconds()
+        return min_dur_to_foreign_depot.total_seconds()/dur_to_own_depot.total_seconds()
 
 
 class SpatioTemporal(RequestSelectionBehaviorIndividual):

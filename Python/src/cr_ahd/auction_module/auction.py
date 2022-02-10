@@ -4,8 +4,8 @@ from typing import List
 
 from gurobipy import GRB
 
-from auction_module import request_selection as rs, bundle_generation as bg, bidding as bd, \
-    winner_determination as wd
+from auction_module import request_selection as rs, bidding as bd, winner_determination as wd
+from auction_module.bundle_generation import bundle_gen as bg, partition_based_bg as bgp
 from core_module import instance as it, solution as slt
 from routing_module import tour_construction as cns, metaheuristics as mh
 from utility_module import profiling as pr, utils as ut
@@ -18,7 +18,7 @@ class Auction:
                  tour_construction: cns.VRPTWInsertionConstruction,
                  tour_improvement: mh.VRPTWMetaHeuristic,
                  request_selection: rs.RequestSelectionBehavior,
-                 bundle_generation: bg.LimitedBundlePoolGenerationBehavior,
+                 bundle_generation: bg.BundleGenerationBehavior,
                  bidding: bd.BiddingBehavior,
                  winner_determination: wd.WinnerDeterminationBehavior,
                  num_auction_rounds: int = 1
@@ -227,5 +227,3 @@ class Auction:
                 key=lambda x: (instance.request_disclosure_time[x], instance.request_to_carrier_assignment[x]))
             carrier.unrouted_requests.sort(
                 key=lambda x: (instance.request_disclosure_time[x], instance.request_to_carrier_assignment[x]))
-
-

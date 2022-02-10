@@ -4,7 +4,7 @@ from typing import List, Tuple, Dict, Sequence
 
 from auction_module import auction as au, request_selection as rs, bidding as bd, winner_determination as wd
 from auction_module.bundle_and_partition_valuation import partition_valuation as pv
-from auction_module.bundle_generation import bundle_generation as bg, partition_based_bg as bgp
+from auction_module.bundle_generation import bundle_gen as bg, partition_based_bg as bgp
 from routing_module import neighborhoods as nh, tour_construction as cns, metaheuristics as mh
 from tw_management_module import tw_offering as two, tw_selection as tws, request_acceptance as ra
 
@@ -64,7 +64,8 @@ def configs():
         # rs.Random,
         # rs.MinDurationToForeignDepotDMin,
         # rs.ComboDistStandardizedNEW,
-        rs.ComboDistStandardized,
+        # rs.ComboDistStandardized,
+        rs.DepotDurations
     ]
 
     s_num_auction_bundles: Sequence[int] = [
@@ -75,7 +76,7 @@ def configs():
         # 500
     ]
 
-    s_bundle_generation: Sequence[Tuple[bg.BundleGeneration.__class__, Dict[str, float]]] = [
+    s_bundle_generation: Sequence[Tuple[bg.BundleGenerationBehavior.__class__, Dict[str, float]]] = [
         (bgp.GeneticAlgorithm, dict(population_size=150,
                                     num_generations=100,
                                     mutation_rate=0.5,

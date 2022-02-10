@@ -7,12 +7,10 @@ import numpy as np
 import tqdm
 from sklearn.cluster import KMeans
 
-import auction_module.bundle_and_partition_valuation.bundle_metrics
-import auction_module.bundle_and_partition_valuation.bundle_valuation
-from auction_module.bundle_and_partition_valuation import partition_valuation as pv
+from auction_module.bundle_and_partition_valuation import partition_valuation as pv, bundle_metrics as bm
+from auction_module.bundle_generation import bundle_gen as bg
 from core_module import instance as it, solution as slt
 from utility_module import utils as ut
-import bundle_generation as bg
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +38,7 @@ partition_labels: Sequence[int]
 """
 
 
-class SingleKMeansPartition(bg.BundleGeneration):
+class SingleKMeansPartition(bg.BundleGenerationBehavior):
     """
     creates a *spatial* k-means partitions of the submitted requests.
     generates exactly as many clusters as there are carriers.
@@ -69,7 +67,7 @@ class SingleKMeansPartition(bg.BundleGeneration):
 #     pass
 
 
-class LimitedNumBundles(bg.BundleGeneration):
+class LimitedNumBundles(bg.BundleGenerationBehavior):
     """
     Generate a pool of bundles that has a limited, predefined number of bundles in it.
     Bundle selection happens by evaluating different partitions of the auction request pool and keeping a partition's
@@ -122,7 +120,8 @@ class BestOfAllPartitions(LimitedNumBundles):
         for partition in tqdm.tqdm(all_partitions, desc='Bundle Generation', disable=not ut.debugger_is_active()):
             partition_valuations.append(self.partition_valuation.evaluate_partition(instance, solution, partition))
 
-        sorted_partitions = (partition for _, partition in sorted(zip(partition_valuations, all_partitions), reverse=True))
+        sorted_partitions = (partition for _, partition in
+                             sorted(zip(partition_valuations, all_partitions), reverse=True))
         limited_bundle_pool = [*ut.indices_to_nested_lists(original_partition_labels, auction_request_pool)]
         # TODO loop significantly faster if the limited bundle pool was a set rather than a list! but the return of
         #  ut.indices_to_nested_list is unhashable: List[List[int]]
@@ -218,7 +217,8 @@ class GeneticAlgorithm(LimitedNumBundles):
         return limited_bundle_pool
 
     def fitness(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, offspring, auction_request_pool):
-        fitness = self.partition_valuation.evaluate_partition_labels(instance, solution, offspring, auction_request_pool)
+        fitness = self.partition_valuation.evaluate_partition_labels(instance, solution, offspring,
+                                                                     auction_request_pool)
         return fitness
 
     def generate_new_population(self, instance, solution, previous_population, previous_fitness, auction_request_pool):
@@ -336,7 +336,8 @@ class GeneticAlgorithm(LimitedNumBundles):
         fitness = []
 
         # initialize at least one k-means bundle that is also likely to be feasible (only location-based)
-        k_means_individual = list(SingleKMeansPartition().generate_partition(instance, auction_request_pool))
+        k_means_individual = list(
+            SingleKMeansPartition()._generate_auction_bundles(instance, solution, auction_request_pool, None))
 
         self._normalize_individual(k_means_individual)
         if k_means_individual not in population:
@@ -529,7 +530,7 @@ class GeneticAlgorithm(LimitedNumBundles):
         bundles = ut.indices_to_nested_lists(offspring, auction_request_pool)
         centroids = []
         for bundle in bundles:
-            centroid = auction_module.bundle_and_partition_valuation.bundle_metrics.bundle_centroid(instance, bundle)
+            centroid = bm.bundle_centroid(instance, bundle)
             centroids.append(centroid)
 
         for i, request in enumerate(auction_request_pool):

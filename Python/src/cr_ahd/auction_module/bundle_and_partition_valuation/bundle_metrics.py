@@ -138,9 +138,8 @@ def bundle_total_travel_distance(instance: it.MDVRPTWInstance, bundle: Sequence[
 
     # insert all remaining requests of the bundle
     tour_construction = cns.VRPTWMinTravelDistanceInsertion()  # TODO this should be a parameter!
-    tour_improvement = mh.VRPTWVariableNeighborhoodDescent(
-        [nh.PDPMove(), nh.PDPTwoOpt()])  # TODO this should be a parameter!
-    for request in bundle:
+
+    for request in sorted(bundle, key=lambda x: instance.request_disclosure_time[x]):
         if request == depot_request:
             continue
         delivery = instance.vertex_from_request(request)
@@ -155,7 +154,11 @@ def bundle_total_travel_distance(instance: it.MDVRPTWInstance, bundle: Sequence[
 
         # insert, ignores feasibility!
         tmp_tour_.insert_and_update(instance, [delivery_pos], [delivery])
-    tour_improvement.execute_on_tour(instance, tmp_tour_)
+
+    # TODO improvement should be a parameter!
+    # tour_improvement = mh.VRPTWVariableNeighborhoodDescent([nh.PDPMove(), nh.PDPTwoOpt()])
+    # tour_improvement.execute_on_tour(instance, tmp_tour_)
+
     return tmp_tour_.sum_travel_distance
 
 
@@ -178,9 +181,8 @@ def bundle_total_travel_duration(instance: it.MDVRPTWInstance, bundle: Sequence[
 
     # insert all remaining requests of the bundle
     tour_construction = cns.VRPTWMinTravelDurationInsertion()  # TODO this should be a parameter!
-    tour_improvement = mh.VRPTWVariableNeighborhoodDescent(
-        [nh.VRPTWMoveDur(), nh.VRPTWTwoOptDur()], 2.0)  # TODO this should be a parameter!
-    for request in bundle:
+
+    for request in sorted(bundle, key=lambda x: instance.request_disclosure_time[x]):
         if request == depot_request:
             continue
         delivery = instance.vertex_from_request(request)
@@ -195,5 +197,9 @@ def bundle_total_travel_duration(instance: it.MDVRPTWInstance, bundle: Sequence[
 
         # insert, ignores feasibility!
         tmp_tour_.insert_and_update(instance, [delivery_pos], [delivery])
-    tour_improvement.execute_on_tour(instance, tmp_tour_)
+
+    # TODO improvement should be a parameter!
+    # tour_improvement = mh.VRPTWVariableNeighborhoodDescent([nh.VRPTWMoveDur(), nh.VRPTWTwoOptDur()], 2.0)
+    # tour_improvement.execute_on_tour(instance, tmp_tour_)
+
     return tmp_tour_.sum_travel_duration

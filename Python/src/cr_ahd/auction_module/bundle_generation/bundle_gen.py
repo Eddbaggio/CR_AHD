@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Sequence
 
 
-class BundleGeneration(ABC):
+class BundleGenerationBehavior(ABC):
     """
     Generates auction bundles based on partitioning the auction request pool. This guarantees a feasible solution
     for the Winner Determination Problem which cannot (easily) be guaranteed if bundles are generated without
