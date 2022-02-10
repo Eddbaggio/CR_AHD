@@ -23,7 +23,7 @@ class WinnerDeterminationBehavior(ABC):
                 auction_pool,
                 bundles: Sequence,
                 bids_matrix: Sequence,
-                original_bundling_labels: Sequence):
+                original_partition_labels: Sequence):
         """
         apply the concrete winner determination behavior. Each carrier can only win a single bundle for now and the
         number of bundles must be equal to the number of carriers
@@ -37,9 +37,9 @@ class WinnerDeterminationBehavior(ABC):
 
         # fall back to the pre-auction assignment
         if status != GRB.OPTIMAL or -GRB.INFINITY in winner_bids:
-            winner_bundles = ut.indices_to_nested_lists(original_bundling_labels, auction_pool)
-            bundle_winners = [w for i, w in enumerate(original_bundling_labels) if
-                              w not in original_bundling_labels[:i]]
+            winner_bundles = ut.indices_to_nested_lists(original_partition_labels, auction_pool)
+            bundle_winners = [w for i, w in enumerate(original_partition_labels) if
+                              w not in original_partition_labels[:i]]
 
         return status, winner_bundles, bundle_winners, winner_bids
 

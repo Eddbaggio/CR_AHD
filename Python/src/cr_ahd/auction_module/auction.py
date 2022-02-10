@@ -120,7 +120,7 @@ class Auction:
 
         # ===== [1] Request Selection =====
         timer = pr.Timer()
-        auction_request_pool, original_bundling_labels = self.request_selection.execute(instance, solution)
+        auction_request_pool, original_partition_labels = self.request_selection.execute(instance, solution)
 
         # /// Part of the sequential-auctions problem :
         # post_rs_solution must be re-optimized to avoid inconsistencies when intermediate auctions are used
@@ -128,7 +128,7 @@ class Auction:
         # solution = self.re_optimize(instance, solution)
         # ///
 
-        original_bundles = ut.indices_to_nested_lists(original_bundling_labels, auction_request_pool)
+        original_bundles = ut.indices_to_nested_lists(original_partition_labels, auction_request_pool)
         # timer.write_duration_to_solution(solution, 'runtime_request_selection') fixme need to distinguish between intermediate and final: auction_counter in Solver class?
 
         if auction_request_pool:
@@ -138,7 +138,7 @@ class Auction:
             # ===== [2] Bundle Generation =====
             timer = pr.Timer()
             auction_bundle_pool = self.bundle_generation.execute(instance, solution, auction_request_pool,
-                                                                 original_bundling_labels)
+                                                                 original_partition_labels)
             # timer.write_duration_to_solution(solution, 'runtime_auction_bundle_pool_generation') fixme
             logger.debug(f'bundles {auction_bundle_pool} have been created')
 
@@ -160,7 +160,7 @@ class Auction:
             # ===== [4.1] Winner Determination =====
             timer = pr.Timer()
             status, winner_bundles, bundle_winners, winner_bids = self.winner_determination.execute(
-                instance, solution, auction_request_pool, auction_bundle_pool, bids_matrix, original_bundling_labels)
+                instance, solution, auction_request_pool, auction_bundle_pool, bids_matrix, original_partition_labels)
             # timer.write_duration_to_solution(solution, 'runtime_winner_determination') fixme
             if status != GRB.OPTIMAL or -GRB.INFINITY in winner_bids:  # fall back to the pre-auction solution
                 solution = pre_rs_solution
@@ -229,39 +229,3 @@ class Auction:
                 key=lambda x: (instance.request_disclosure_time[x], instance.request_to_carrier_assignment[x]))
 
 
-# ======================================================================================================================
-# THESE CLASSES ARE NOT YET IN USE
-# ======================================================================================================================
-
-class Bundle(list):
-    """bundle: Sequence[int]
-    a sequence of request indices that make up one bundle -> cannot have duplicates etc., maybe a set rather than a list
-    would be better?"""
-    pass
-
-
-class Bundling(list):
-    """bundling: Sequence[Sequence[int]]
-    a sequence of {bundles} (see above) that fully partition the {auction_request_pool}"""
-    pass
-
-
-class BundlingLabels(list):
-    """bundling_labels: Sequence[int]
-    a sequence of bundle indices that partitions the {auction_request_pool}
-     NOTE: Contrary to the {bundling}, the {bundling_labels} is not nested and does not contain request indices but
-     bundle indices"""
-    pass
-
-
-class AuctionRequestPool(list):
-    """auction_request_pool: Sequence[int][int]
-    a sequence of request indices of the requests that were submitted to be auctioned"""
-    pass
-
-
-class AuctionBundlePool(list):
-    """auction_bundle_pool: Sequence[Sequence[int]]
-    a nested sequence of request index sequences. Each inner sequence is a {bundle} inside the auction_bundle_pool that
-    carriers will have to bid on"""
-    pass

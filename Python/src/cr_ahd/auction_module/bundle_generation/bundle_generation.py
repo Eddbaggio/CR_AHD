@@ -18,15 +18,15 @@ class BundleGeneration(ABC):
                 instance: it.MDVRPTWInstance,
                 solution: slt.CAHDSolution,
                 auction_request_pool: Sequence[int],
-                original_bundling_labels: Sequence[int]):
+                original_partition_labels: Sequence[int]):
         self.preprocessing(instance, auction_request_pool)
         auction_bundle_pool = self._generate_auction_bundles(instance, solution, auction_request_pool,
-                                                             original_bundling_labels)
+                                                             original_partition_labels)
         return auction_bundle_pool
 
     def preprocessing(self, instance, auction_request_pool):
         pass
 
     @abstractmethod
-    def _generate_auction_bundles(self, instance, solution, auction_request_pool, original_bundling_labels):
+    def _generate_auction_bundles(self, instance, solution, auction_request_pool, original_partition_labels):
         pass

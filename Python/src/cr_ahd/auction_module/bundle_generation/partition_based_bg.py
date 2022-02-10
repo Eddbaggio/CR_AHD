@@ -1,14 +1,15 @@
 import logging
 import random
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing import Sequence, List, Callable
 
 import numpy as np
 import tqdm
 from sklearn.cluster import KMeans
 
-import auction_module.bundle_valuation
-from auction_module import partition_valuation as pv
+import auction_module.bundle_and_partition_valuation.bundle_metrics
+import auction_module.bundle_and_partition_valuation.bundle_valuation
+from auction_module.bundle_and_partition_valuation import partition_valuation as pv
 from core_module import instance as it, solution as slt
 from utility_module import utils as ut
 import bundle_generation as bg
@@ -29,12 +30,12 @@ bundle: Sequence[int]
     a sequence of request indices that make up one bundle -> cannot have duplicates etc., maybe a set rather than a list
     would be better?
     
-bundling: Sequence[Sequence[int]]
+partition: Sequence[Sequence[int]]
     a sequence of {bundles} (see above) that fully partition the {auction_request_pool}
     
-bundling_labels: Sequence[int]
+partition_labels: Sequence[int]
     a sequence of bundle indices that partitions the {auction_request_pool}
-     NOTE: Contrary to the {bundling}, the {bundling_labels} is not nested and does not contain request indices but 
+     NOTE: Contrary to the {partition}, the {partition_labels} is not nested and does not contain request indices but 
      bundle indices
 """
 
@@ -44,11 +45,11 @@ class SingleKMeansPartition(bg.BundleGeneration):
     creates a *spatial* k-means partitions of the submitted requests.
     generates exactly as many clusters as there are carriers.
 
-    :return bundling_labels (not normalized) of the k-means partitioning
+    :return partition_labels (not normalized) of the k-means partitioning
     """
 
     def _generate_auction_bundles(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
-                                  auction_request_pool: Sequence[int], original_bundling_labels):
+                                  auction_request_pool: Sequence[int], original_partition_labels):
         request_midpoints = [instance.coords(r) for r in auction_request_pool]
         # k_means = KMeans(n_clusters=instance.num_carriers, random_state=0).fit(request_midpoints)
         k_means = KMeans(n_clusters=instance.num_carriers).fit(request_midpoints)
@@ -79,10 +80,10 @@ class LimitedNumBundles(bg.BundleGeneration):
     even if this means that the given bundle pool size is slightly exceeded.
     """
 
-    def __init__(self, num_auction_bundles: int, bundling_valuation: bv.BundlingValuation, **kwargs):
+    def __init__(self, num_auction_bundles: int, partition_valuation: pv.PartitionValuation, **kwargs):
         super().__init__()
         self.num_auction_bundles = num_auction_bundles
-        self.bundling_valuation = bundling_valuation
+        self.partition_valuation = partition_valuation
         self.parameters = kwargs
 
     @abstractmethod
@@ -90,11 +91,11 @@ class LimitedNumBundles(bg.BundleGeneration):
                                   instance: it.MDVRPTWInstance,
                                   solution: slt.CAHDSolution,
                                   auction_request_pool: Sequence[int],
-                                  original_bundling_labels: Sequence[int]):
+                                  original_partition_labels: Sequence[int]):
         pass
 
     def preprocessing(self, instance: it.MDVRPTWInstance, auction_request_pool: Sequence[int]):
-        self.bundling_valuation.preprocessing(instance, auction_request_pool)
+        self.partition_valuation.preprocessing(instance, auction_request_pool)
         pass
 
 
@@ -111,22 +112,22 @@ class BestOfAllPartitions(LimitedNumBundles):
                                   instance: it.MDVRPTWInstance,
                                   solution: slt.CAHDSolution,
                                   auction_request_pool: Sequence[int],
-                                  original_bundling_labels: Sequence[int]):
+                                  original_partition_labels: Sequence[int]):
 
-        all_bundlings = [[auction_request_pool]]
+        all_partitions = [[auction_request_pool]]
         for k in range(2, instance.num_carriers + 1):
-            all_bundlings.extend(list(algorithm_u(auction_request_pool, k)))
+            all_partitions.extend(list(algorithm_u(auction_request_pool, k)))
 
-        bundling_valuations = []
-        for bundling in tqdm.tqdm(all_bundlings, desc='Bundle Generation', disable=not ut.debugger_is_active()):
-            bundling_valuations.append(self.bundling_valuation.evaluate_bundling(instance, solution, bundling))
+        partition_valuations = []
+        for partition in tqdm.tqdm(all_partitions, desc='Bundle Generation', disable=not ut.debugger_is_active()):
+            partition_valuations.append(self.partition_valuation.evaluate_partition(instance, solution, partition))
 
-        sorted_bundlings = (bundling for _, bundling in sorted(zip(bundling_valuations, all_bundlings), reverse=True))
-        limited_bundle_pool = [*ut.indices_to_nested_lists(original_bundling_labels, auction_request_pool)]
+        sorted_partitions = (partition for _, partition in sorted(zip(partition_valuations, all_partitions), reverse=True))
+        limited_bundle_pool = [*ut.indices_to_nested_lists(original_partition_labels, auction_request_pool)]
         # TODO loop significantly faster if the limited bundle pool was a set rather than a list! but the return of
         #  ut.indices_to_nested_list is unhashable: List[List[int]]
         while len(limited_bundle_pool) < self.num_auction_bundles:
-            for bundle in next(sorted_bundlings):
+            for bundle in next(sorted_partitions):
                 if bundle not in limited_bundle_pool:
                     limited_bundle_pool.append(bundle)
 
@@ -143,19 +144,19 @@ class RandomMaxKPartitions(LimitedNumBundles):
                                   instance: it.MDVRPTWInstance,
                                   solution: slt.CAHDSolution,
                                   auction_request_pool: Sequence[int],
-                                  original_bundling_labels: Sequence[int]):
+                                  original_partition_labels: Sequence[int]):
 
-        bundling_labels_pool = [original_bundling_labels]
-        num_bundles = max(original_bundling_labels) + 1
+        partition_labels_pool = [original_partition_labels]
+        num_bundles = max(original_partition_labels) + 1
 
         while num_bundles < self.num_auction_bundles:
-            bundling_labels = self._random_max_k_partition_idx(auction_request_pool, max_k=instance.num_carriers)
-            if bundling_labels not in bundling_labels_pool:
-                bundling_labels_pool.append(bundling_labels)
-                num_bundles += max(bundling_labels) + 1
+            partition_labels = self._random_max_k_partition_idx(auction_request_pool, max_k=instance.num_carriers)
+            if partition_labels not in partition_labels_pool:
+                partition_labels_pool.append(partition_labels)
+                num_bundles += max(partition_labels) + 1
 
         limited_bundle_pool = []
-        for bl in bundling_labels_pool:
+        for bl in partition_labels_pool:
             bundles = ut.indices_to_nested_lists(bl, auction_request_pool)
             limited_bundle_pool.extend(bundles)
 
@@ -182,11 +183,12 @@ class GeneticAlgorithm(LimitedNumBundles):
     Generates partitions using a Genetic Algorithm to find promising candidates.
     The best partitions of the final population will be put into the bundle pool.
     """
+
     def _generate_auction_bundles(self,
                                   instance: it.MDVRPTWInstance,
                                   solution: slt.CAHDSolution,
                                   auction_request_pool: Sequence[int],
-                                  original_bundling_labels: Sequence[int]):
+                                  original_partition_labels: Sequence[int]):
         # parameters
         # only a fraction of generation_gap is replaced in a new gen. the remaining individuals (generation overlap)
         # are the top (1-generation_gap)*100 % from the previous gen, measured by their fitness
@@ -207,8 +209,8 @@ class GeneticAlgorithm(LimitedNumBundles):
 
         # add each of the original bundles if it is not contained yet - this cannot be infeasible
         # this might exceed the auction_pool_size even more than self.generate_bundle_pool
-        self._normalize_individual(original_bundling_labels)
-        original_bundles = ut.indices_to_nested_lists(original_bundling_labels, auction_request_pool)
+        self._normalize_individual(original_partition_labels)
+        original_bundles = ut.indices_to_nested_lists(original_partition_labels, auction_request_pool)
         for ob in original_bundles:
             if ob not in limited_bundle_pool:
                 limited_bundle_pool.append(ob)
@@ -216,7 +218,7 @@ class GeneticAlgorithm(LimitedNumBundles):
         return limited_bundle_pool
 
     def fitness(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, offspring, auction_request_pool):
-        fitness = self.bundling_valuation.evaluate_bundling_labels(instance, solution, offspring, auction_request_pool)
+        fitness = self.partition_valuation.evaluate_partition_labels(instance, solution, offspring, auction_request_pool)
         return fitness
 
     def generate_new_population(self, instance, solution, previous_population, previous_fitness, auction_request_pool):
@@ -267,14 +269,14 @@ class GeneticAlgorithm(LimitedNumBundles):
         bundle_pool = []
 
         # select the top candidates
-        population_sorted = list(bundling_labels
-                                 for fit, bundling_labels in sorted(zip(fitness, population), reverse=True))
+        population_sorted = list(partition_labels
+                                 for fit, partition_labels in sorted(zip(fitness, population), reverse=True))
         adjusted_pool_size = min(pool_size, 2 ** (len(auction_request_pool)) - 1)
         while len(bundle_pool) < adjusted_pool_size and population_sorted:
-            bundling_labels = population_sorted.pop(0)
-            bundling_labels = np.array(bundling_labels)
-            for bundle_idx in range(max(bundling_labels) + 1):
-                bundle = auction_pool_array[bundling_labels == bundle_idx].tolist()
+            partition_labels = population_sorted.pop(0)
+            partition_labels = np.array(partition_labels)
+            for bundle_idx in range(max(partition_labels) + 1):
+                bundle = auction_pool_array[partition_labels == bundle_idx].tolist()
                 if bundle not in bundle_pool:
                     bundle_pool.append(bundle)
 
@@ -291,8 +293,11 @@ class GeneticAlgorithm(LimitedNumBundles):
         :return: the NORMALIZED offspring
         """
         # crossover
-        crossover_func: Callable = random.choice(
-            [self._crossover_uniform, self._crossover_geo, self._crossover_temporal])
+        crossover_func: Callable = random.choice([
+            self._crossover_uniform,
+            self._crossover_geo,
+            # self._crossover_temporal # TODO uncomment! this is to test
+        ])
         offspring: List[int] = crossover_func(instance, solution, auction_request_pool, parent1, parent2)
         # normalization IN PLACE
         self._normalize_individual(offspring)
@@ -319,7 +324,7 @@ class GeneticAlgorithm(LimitedNumBundles):
                               ):
         """
         initializes the a population of size population_size. this first generation includes the original bundles as
-        well as a k-means bundling. the rest is filled with random partitions of the auction_request_pool
+        well as a k-means partition. the rest is filled with random partitions of the auction_request_pool
 
         :param instance:
         :param solution:
@@ -524,7 +529,7 @@ class GeneticAlgorithm(LimitedNumBundles):
         bundles = ut.indices_to_nested_lists(offspring, auction_request_pool)
         centroids = []
         for bundle in bundles:
-            centroid = auction_module.bundle_valuation.bundle_centroid(instance, bundle)
+            centroid = auction_module.bundle_and_partition_valuation.bundle_metrics.bundle_centroid(instance, bundle)
             centroids.append(centroid)
 
         for i, request in enumerate(auction_request_pool):

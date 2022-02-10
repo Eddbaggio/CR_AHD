@@ -2,13 +2,9 @@ import datetime as dt
 import itertools
 from typing import List, Tuple, Dict, Sequence
 
-import utility_module.utils as ut
-from auction_module import auction as au, \
-    request_selection as rs, \
-    bundle_generation as bg, \
-    bidding as bd, \
-    winner_determination as wd, \
-    partition_valuation as bv
+from auction_module import auction as au, request_selection as rs, bidding as bd, winner_determination as wd
+from auction_module.bundle_and_partition_valuation import partition_valuation as pv
+from auction_module.bundle_generation import bundle_generation as bg, partition_based_bg as bgp
 from routing_module import neighborhoods as nh, tour_construction as cns, metaheuristics as mh
 from tw_management_module import tw_offering as two, tw_selection as tws, request_acceptance as ra
 
@@ -40,9 +36,10 @@ def configs():
     s_request_acceptance_attractiveness: Sequence[ra.RequestAcceptanceAttractiveness] = [ra.Dummy()]
 
     s_time_window_length: Sequence[dt.timedelta] = [
-        # dt.timedelta(hours=8),
+        dt.timedelta(hours=8),
         dt.timedelta(hours=4),
         dt.timedelta(hours=2),
+        dt.timedelta(hours=1)
     ]
 
     s_time_window_offering: two.TWOfferingBehavior.__class__ = [
@@ -78,23 +75,23 @@ def configs():
         # 500
     ]
 
-    s_bundle_generation: Sequence[Tuple[bg.LimitedBundlePoolGenerationBehavior.__class__, Dict[str, float]]] = [
-        (bg.GeneticAlgorithm, dict(population_size=150,
-                                   num_generations=100,
-                                   mutation_rate=0.5,
-                                   generation_gap=0.9, )
+    s_bundle_generation: Sequence[Tuple[bg.BundleGeneration.__class__, Dict[str, float]]] = [
+        (bgp.GeneticAlgorithm, dict(population_size=150,
+                                    num_generations=100,
+                                    mutation_rate=0.5,
+                                    generation_gap=0.9, )
          ),
-        # (bg.BestOfAllBundlings, dict()),
+        # (bg.BestOfAllPartitions, dict()),
         # (bg.RandomMaxKPartition, dict())
     ]
 
-    s_bundling_valuation: Sequence[bv.BundlingValuation.__class__] = [
-        # bv.GHProxyBundlingValuation,
-        # bv.MinDistanceBundlingValuation,
-        # bv.MinDurationBundlingValuation,
-        bv.SumTravelDurationBundlingValuation,
-        # bv.LosSchulteBundlingValuation,
-        # bv.RandomBundlingValuation,
+    s_partition_valuation: Sequence[pv.PartitionValuation.__class__] = [
+        # bv.GHProxyPartitionValuation,
+        # bv.MinDistancePartitionValuation,
+        # bv.MinDurationPartitionValuation,
+        pv.SumTravelDurationPartitionValuation,
+        # bv.LosSchultePartitionValuation,
+        # bv.RandomPartitionValuation,
     ]
 
     s_auction_policy: List[Dict] = [
@@ -138,7 +135,7 @@ def configs():
             for request_selection in s_request_selection:
                 for num_auction_bundles in s_num_auction_bundles:
                     for bundle_generation, bundle_generation_kwargs in s_bundle_generation:
-                        for bundling_valuation in s_bundling_valuation:
+                        for partition_valuation in s_partition_valuation:
                             for auction_policy in s_auction_policy:
 
                                 # ===== INTERMEDIATE AUCTIONS =====
@@ -165,7 +162,7 @@ def configs():
                                             # TODO is it fair to divide by num_int_auctions?
                                             num_auction_bundles=num_auction_bundles,
                                             # / auction_policy['num_intermediate_auctions'],
-                                            bundling_valuation=bundling_valuation(),
+                                            partition_valuation=partition_valuation(),
                                             **bundle_generation_kwargs
                                         ),
                                         bidding=bd.ClearAndReinsertAll(tour_construction,
@@ -194,7 +191,7 @@ def configs():
                                         # TODO is it fair to divide by num_int_auctions?
                                         num_auction_bundles=num_auction_bundles,
                                         # / auction_policy['num_intermediate_auctions'],
-                                        bundling_valuation=bundling_valuation(),
+                                        partition_valuation=partition_valuation(),
                                         **bundle_generation_kwargs
                                     ),
                                     bidding=bd.ClearAndReinsertAll(tour_construction,

@@ -6,7 +6,7 @@ from typing import Sequence, List, final
 import numpy as np
 from scipy.spatial.distance import squareform, pdist
 
-from auction_module.bundle_valuation import bundle_centroid, bundle_sum_squared_errors, \
+from auction_module.bundle_and_partition_valuation.bundle_metrics import bundle_centroid, bundle_sum_squared_errors, \
     bundle_vertex_to_centroid_travel_dist, bundle_radius, bundle_total_travel_distance_proxy, \
     bundle_total_travel_distance, bundle_total_travel_duration
 from core_module import instance as it, solution as slt
@@ -16,7 +16,7 @@ from utility_module import utils as ut
 # ======================================================================================================================
 
 
-def bundling_extended_distance_matrix(instance: it.MDVRPTWInstance, additional_vertex_coords: Sequence[ut.Coordinates]):
+def partition_extended_distance_matrix(instance: it.MDVRPTWInstance, additional_vertex_coords: Sequence[ut.Coordinates]):
     """
     uses euclidean distance for distances to/from additional_vertex_coords
 
@@ -158,46 +158,46 @@ def ropke_pisinger_request_similarity(instance: it.MDVRPTWInstance,
 
 
 # ======================================================================================================================
-# BUNDLING EVALUATION CLASSES
-# combine the above functions in a certain way
+# PARTITION EVALUATION CLASSES
+# combine the bundle_metrics and the functions above in a certain way
 # ======================================================================================================================
 
-class BundlingValuation(ABC):
+class PartitionValuation(ABC):
     """
-    Class to compute the valuation of a bundling based on some valuation measure(s)
+    Class to compute the valuation of a partition based on some valuation measure(s)
     """
 
     def __init__(self):
         self.name = self.__class__.__name__
 
     @final
-    def evaluate_bundling_labels(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
-                                 bundling_labels: Sequence[int], auction_request_pool: Sequence[int]) -> float:
-        """turns bundling labels into bundling and evaluates that bundling"""
-        bundling = ut.indices_to_nested_lists(bundling_labels, auction_request_pool)
-        return self.evaluate_bundling(instance, solution, bundling)
+    def evaluate_partition_labels(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
+                                  partition_labels: Sequence[int], auction_request_pool: Sequence[int]) -> float:
+        """turns partition labels into a partition and evaluates that partition"""
+        partition = ut.indices_to_nested_lists(partition_labels, auction_request_pool)
+        return self.evaluate_partition(instance, solution, partition)
 
     @abstractmethod
-    def evaluate_bundling(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
-                          bundling: List[List[int]]) -> float:
-        """evaluate a bundling"""
+    def evaluate_partition(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
+                           partition: List[List[int]]) -> float:
+        """evaluate a partition"""
         pass
 
     def preprocessing(self, instance: it.MDVRPTWInstance, auction_request_pool: Sequence[int]):
         pass
 
 
-class GHProxyBundlingValuation(BundlingValuation):
+class GHProxyPartitionValuation(PartitionValuation):
     """
-    The quality of a bundling is defined as: \n
+    The quality of a partition is defined as: \n
     (min(isolations) * min(densities)) / (max(total_travel_distances) * num_bundles) \n
-    Each of isolations, densities and total_travel_distances is a list of values per bundle in the bundling. The
+    Each of isolations, densities and total_travel_distances is a list of values per bundle in the partition. The
     total_travel_distance for a bundle is estimated by a very rough proxy function (bundle_total_travel_distance_proxy)
 
     """
 
-    def evaluate_bundling(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
-                          bundling: List[List[int]]) -> float:
+    def evaluate_partition(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
+                           partition: List[List[int]]) -> float:
         """
 
         :return: the bundle's valuation/fitness
@@ -205,21 +205,21 @@ class GHProxyBundlingValuation(BundlingValuation):
         raise NotImplementedError()
         centroids = []
         request_direct_travel_distances = []  # fixme does not exist for VRP
-        num_bundles = len(bundling)
+        num_bundles = len(partition)
 
-        for bundle in bundling:
+        for bundle in partition:
             # pd_direct_travel_dist = bundle_direct_travel_dist(instance, bundle)
             # request_direct_travel_distances.append(pd_direct_travel_dist)
             centroid = bundle_centroid(instance, bundle)
             centroids.append(centroid)
 
-        extended_distance_matrix = bundling_extended_distance_matrix(instance, centroids)
+        extended_distance_matrix = partition_extended_distance_matrix(instance, centroids)
 
         radii = []
         densities = []
         total_travel_distances = []
 
-        for bundle_idx, bundle in enumerate(bundling):
+        for bundle_idx, bundle in enumerate(partition):
             # compute the radius
             travel_dist_to_centroid = bundle_vertex_to_centroid_travel_dist(instance, bundle_idx, bundle,
                                                                             extended_distance_matrix)
@@ -234,7 +234,7 @@ class GHProxyBundlingValuation(BundlingValuation):
             approx_travel_dist = bundle_total_travel_distance_proxy(instance, bundle)
 
             # if there is no feasible tour for this bundle, return a valuation of negative infinity for the whole
-            # bundling
+            # partition
             if approx_travel_dist == float('inf'):
                 return 0
 
@@ -251,76 +251,76 @@ class GHProxyBundlingValuation(BundlingValuation):
         return evaluation
 
 
-class MinDistanceBundlingValuation(BundlingValuation):
+class MinDistancePartitionValuation(PartitionValuation):
     """
-    The value of a BUNDLING is determined by the minimum over the travel distances per BUNDLE.
+    The value of a partition is determined by the minimum over the travel distances per BUNDLE.
     The travel distance of a bundle is determined by building a route that traverses all the bundle's requests using
     the dynamic insertion procedure.
     """
 
-    def evaluate_bundling(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
-                          bundling: List[List[int]]) -> float:
+    def evaluate_partition(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
+                           partition: List[List[int]]) -> float:
         raise NotImplementedError  # TODO does not work since bundles of size 1 have travel duration = 0
         bundle_valuations = []
-        for bundle in bundling:
+        for bundle in partition:
             valuation = bundle_total_travel_distance(instance, bundle)
             bundle_valuations.append(valuation)
         return 1 / min(bundle_valuations)
 
 
-class MinTravelDurationBundlingValuation(BundlingValuation):
+class MinTravelDurationPartitionValuation(PartitionValuation):
     """
-    The value of a BUNDLING is determined by the minimum over the travel distances per BUNDLE.
+    The value of a partition is determined by the minimum over the travel distances per BUNDLE.
     The travel distance of a bundle is determined by building a route that traverses all the bundle's requests using
     the dynamic insertion procedure.
     """
 
-    def evaluate_bundling(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
-                          bundling: List[List[int]]) -> float:
+    def evaluate_partition(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
+                           partition: List[List[int]]) -> float:
         raise NotImplementedError  # TODO does not work since bundles of size 1 have travel duration = 0
         bundle_valuations = []
-        for bundle in bundling:
+        for bundle in partition:
             valuation = bundle_total_travel_duration(instance, bundle).total_seconds()
             bundle_valuations.append(valuation)
         return 1 / min(bundle_valuations)
 
 
-class SumTravelDurationBundlingValuation(BundlingValuation):
+class SumTravelDurationPartitionValuation(PartitionValuation):
     """
-    The value of a BUNDLING is determined by the sum over the *travel* durations per BUNDLE.
+    The value of a partition is determined by the sum over the *travel* durations per BUNDLE.
     The travel distance of a bundle is determined by building a route that traverses all the bundle's requests using
     the dynamic insertion procedure.
     """
 
-    def evaluate_bundling(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
-                          bundling: List[List[int]]) -> float:
+    def evaluate_partition(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
+                           partition: List[List[int]]) -> float:
         bundle_valuations = []
-        for bundle in bundling:
+        for bundle in partition:
             valuation = bundle_total_travel_duration(instance, bundle).total_seconds()
             bundle_valuations.append(valuation)
         return sum(bundle_valuations)
 
 
-class LosSchulteBundlingValuation(BundlingValuation):
+class LosSchultePartitionValuation(PartitionValuation):
     """
     uses the request similarity measure by Los et al. (2020) to compute a clustering evaluation measure (cohesion)
     VRP: adjusted the formulas and algorithms to be somewhat applicable to a delivery-only setting
     """
 
-    def evaluate_bundling(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
-                          bundling: List[List[int]]) -> float:
+    def evaluate_partition(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
+                           partition: List[List[int]]) -> float:
 
         bundle_valuations = []
-        for bundle in bundling:
+        for bundle in partition:
             bundle_valuation = self.evaluate_bundle(instance, bundle)
             bundle_valuations.append(bundle_valuation)
 
-        # compute mean valuation of the bundles in the bundling; lower values are better
+        # compute mean valuation of the bundles in the partition; lower values are better
         # TODO try max, min or other measures instead of mean?
-        bundling_valuation = sum(bundle_valuations) / len(bundle_valuations)
+        partition_valuation = sum(bundle_valuations) / len(bundle_valuations)
 
         # return negative, since low values are better and the caller maximizes
-        return 1000 / bundling_valuation
+        return 1000 / partition_valuation
 
     def evaluate_bundle(self, instance: it.MDVRPTWInstance, bundle: Sequence[int]):
         # multi-request bundles
@@ -371,7 +371,7 @@ class LosSchulteBundlingValuation(BundlingValuation):
                 self.vertex_relatedness_matrix[i][j] = los_schulte_vertex_similarity(instance, delivery1, delivery2)
 
 
-class RandomBundlingValuation(BundlingValuation):
-    def evaluate_bundling(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
-                          bundling: List[List[int]]) -> float:
+class RandomPartitionValuation(PartitionValuation):
+    def evaluate_partition(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
+                           partition: List[List[int]]) -> float:
         return random.random()

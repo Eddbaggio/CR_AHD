@@ -1,12 +1,17 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing import Sequence
 from core_module import instance as it, solution as slt
 from utility_module import utils as ut
 import bundle_generation as bg
-import auction_module.partition_valuation as pv
+from auction_module.bundle_and_partition_valuation import bundle_valuation as bv
 
 
 class LimitedNumBundles(bg.BundleGeneration):
+    """
+    Generate a pool of bundles that has a limited, predefined number of bundles in it.
+    Bundle selection happens by evaluating different bundles created from the requests in the auction request pool
+    and keeping those bundles with the highest valuation according to some metric (e.g. spatial density)
+    """
     def __init__(self, num_auction_bundles: int, bundle_valuation: bv.BundleValuation, **kwargs):
         """
         
@@ -24,11 +29,11 @@ class LimitedNumBundles(bg.BundleGeneration):
                                   instance: it.MDVRPTWInstance,
                                   solution: slt.CAHDSolution,
                                   auction_request_pool: Sequence[int],
-                                  original_bundling_labels: Sequence[int]):
+                                  original_partition_labels: Sequence[int]):
         pass
 
     def preprocessing(self, instance: it.MDVRPTWInstance, auction_request_pool: Sequence[int]):
-        self.bundling_valuation.preprocessing(instance, auction_request_pool)
+        self.bundle_valuation.preprocessing(instance, auction_request_pool)
         pass
 
 
@@ -40,7 +45,7 @@ class AllBundles(bg.BundleGeneration):
 
     def _generate_auction_bundles(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
                                   auction_request_pool: Sequence[int],
-                                  original_bundling_labels: Sequence[int]):
+                                  original_partition_labels: Sequence[int]):
         return tuple(ut.power_set(range(len(auction_request_pool)), False))
 
 
@@ -52,6 +57,6 @@ class BestOfAllBundles(bg.BundleGeneration):
 
     def _generate_auction_bundles(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
                                   auction_request_pool: Sequence[int],
-                                  original_bundling_labels: Sequence[int]):
+                                  original_partition_labels: Sequence[int]):
         all_bundles = tuple(ut.power_set(range(len(auction_request_pool)), False))
         best_bundles = sorted(all_bundles, key=self.bundle_valuation)[:self.num_bundles]

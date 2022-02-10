@@ -53,7 +53,7 @@ class Solver:
             'int_auction_num_submitted_requests': None,
             'int_auction_request_selection': None,
             'int_auction_bundle_generation': None,
-            'int_auction_bundling_valuation': None,
+            'int_auction_partition_valuation': None,
             'int_auction_num_auction_bundles': None,
             'int_auction_bidding': None,
             'int_auction_winner_determination': None,
@@ -64,7 +64,7 @@ class Solver:
             'fin_auction_num_submitted_requests': None,
             'fin_auction_request_selection': None,
             'fin_auction_bundle_generation': None,
-            'fin_auction_bundling_valuation': None,
+            'fin_auction_partition_valuation': None,
             'fin_auction_num_auction_bundles': None,
             'fin_auction_bidding': None,
             'fin_auction_winner_determination': None,
@@ -80,8 +80,8 @@ class Solver:
                 'int_auction_num_submitted_requests': intermediate_auction.request_selection.num_submitted_requests,
                 'int_auction_request_selection': intermediate_auction.request_selection.name,
                 'int_auction_bundle_generation': intermediate_auction.bundle_generation.name,
-                # FIXME not all bundle_generation approaches have a bundling_valuation!
-                'int_auction_bundling_valuation': intermediate_auction.bundle_generation.bundling_valuation.name,
+                # FIXME not all bundle_generation approaches have a partition_valuation!
+                'int_auction_partition_valuation': intermediate_auction.bundle_generation.partition_valuation.name,
                 'int_auction_num_auction_bundles': intermediate_auction.bundle_generation.num_auction_bundles,
                 'int_auction_bidding': intermediate_auction.bidding.name,
                 'int_auction_winner_determination': intermediate_auction.winner_determination.name,
@@ -97,8 +97,8 @@ class Solver:
                 'fin_auction_num_submitted_requests': final_auction.request_selection.num_submitted_requests,
                 'fin_auction_request_selection': final_auction.request_selection.name,
                 'fin_auction_bundle_generation': final_auction.bundle_generation.name,
-                # FIXME not all bundle_generation approaches have a bundling_valuation!
-                'fin_auction_bundling_valuation': final_auction.bundle_generation.bundling_valuation.name,
+                # FIXME not all bundle_generation approaches have a partition_valuation!
+                'fin_auction_partition_valuation': final_auction.bundle_generation.partition_valuation.name,
                 'fin_auction_num_auction_bundles': final_auction.bundle_generation.num_auction_bundles,
                 'fin_auction_bidding': final_auction.bidding.name,
                 'fin_auction_winner_determination': final_auction.winner_determination.name,

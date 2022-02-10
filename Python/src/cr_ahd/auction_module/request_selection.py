@@ -6,7 +6,6 @@ from abc import ABC, abstractmethod
 from math import comb, sqrt
 from typing import Sequence, Tuple
 
-from auction_module import partition_valuation as pv
 from core_module import instance as it, solution as slt, tour as tr
 from routing_module import tour_construction as cns, metaheuristics as mh, neighborhoods as ls
 from utility_module import utils as ut
@@ -53,10 +52,10 @@ class RequestSelectionBehaviorIndividual(RequestSelectionBehavior, ABC):
         and return
 
         :return: the auction_request_pool as a list of request indices and a default
-        bundling, i.e. a list of the carrier indices that maps the auction_request_pool to their original carrier.
+        partition, i.e. a list of the carrier indices that maps the auction_request_pool to their original carrier.
         """
         auction_request_pool = []
-        original_bundling_labels = []
+        original_partition_labels = []
         for carrier in solution.carriers:
             k = _abs_num_requests(carrier, self.num_submitted_requests)
             valuations = []
@@ -71,9 +70,9 @@ class RequestSelectionBehaviorIndividual(RequestSelectionBehavior, ABC):
             for request in selected:
                 solution.free_requests_from_carriers(instance, [request])
                 auction_request_pool.append(request)
-                original_bundling_labels.append(carrier.id_)
+                original_partition_labels.append(carrier.id_)
 
-        return auction_request_pool, original_bundling_labels
+        return auction_request_pool, original_partition_labels
 
     @abstractmethod
     def _evaluate_request(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution,
@@ -307,10 +306,10 @@ class ComboDistStandardized(RequestSelectionBehaviorIndividual):
         and return
 
         :return: the auction_request_pool as a list of request indices and a default
-        bundling, i.e. a list of the carrier indices that maps the auction_request_pool to their original carrier.
+        partition, i.e. a list of the carrier indices that maps the auction_request_pool to their original carrier.
         """
         auction_request_pool = []
-        original_bundling_labels = []
+        original_partition_labels = []
 
         # weighting factors for the three components (min_dist_to_foreign_depot, marginal_profit, dist_to_own_depot)
         # of the valuation function
@@ -345,9 +344,9 @@ class ComboDistStandardized(RequestSelectionBehaviorIndividual):
             for request in selected:
                 solution.free_requests_from_carriers(instance, [request])
                 auction_request_pool.append(request)
-                original_bundling_labels.append(carrier.id_)
+                original_partition_labels.append(carrier.id_)
 
-        return auction_request_pool, original_bundling_labels
+        return auction_request_pool, original_partition_labels
 
     def _evaluate_request(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution,
                           request: int) -> Tuple[float, float, float]:
@@ -382,10 +381,10 @@ class ComboDistStandardizedNEW(RequestSelectionBehaviorIndividual):
         and return
 
         :return: the auction_request_pool as a list of request indices and a default
-        bundling, i.e. a list of the carrier indices that maps the auction_request_pool to their original carrier.
+        partition, i.e. a list of the carrier indices that maps the auction_request_pool to their original carrier.
         """
         auction_request_pool = []
-        original_bundling_labels = []
+        original_partition_labels = []
 
         # weighting factors for the three components (min_dist_to_foreign_depot, marginal_profit, dist_to_own_depot)
         # of the valuation function
@@ -420,9 +419,9 @@ class ComboDistStandardizedNEW(RequestSelectionBehaviorIndividual):
             for request in selected:
                 solution.free_requests_from_carriers(instance, [request])
                 auction_request_pool.append(request)
-                original_bundling_labels.append(carrier.id_)
+                original_partition_labels.append(carrier.id_)
 
-        return auction_request_pool, original_bundling_labels
+        return auction_request_pool, original_partition_labels
 
     def _evaluate_request(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution,
                           request: int) -> Tuple[float, float, float]:
@@ -480,7 +479,7 @@ class RequestSelectionBehaviorNeighbor(RequestSelectionBehavior, ABC):
 
     def execute(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution):
         auction_request_pool = []
-        original_bundling_labels = []
+        original_partition_labels = []
 
         for carrier in solution.carriers:
             k = _abs_num_requests(carrier, self.num_submitted_requests)
@@ -494,15 +493,15 @@ class RequestSelectionBehaviorNeighbor(RequestSelectionBehavior, ABC):
             best_bundle = [initial_request] + neighbors
             best_bundle.sort()
 
-            # carrier's best bundles: retract requests from their tours and add them to auction pool & original bundling
+            # carrier's best bundles: retract requests from their tours and add them to auction pool & original partition
             for request in best_bundle:
                 solution.free_requests_from_carriers(instance, [request])
 
-                # update auction pool and original bundling candidate
+                # update auction pool and original partition candidate
                 auction_request_pool.append(request)
-                original_bundling_labels.append(carrier.id_)
+                original_partition_labels.append(carrier.id_)
 
-        return auction_request_pool, original_bundling_labels
+        return auction_request_pool, original_partition_labels
 
     @abstractmethod
     def _find_initial_request(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution):
@@ -613,7 +612,7 @@ class RequestSelectionBehaviorBundle(RequestSelectionBehavior, ABC):
 
     def execute(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution):
         auction_request_pool = []
-        original_bundling_labels = []
+        original_partition_labels = []
 
         for carrier in solution.carriers:
             k = _abs_num_requests(carrier, self.num_submitted_requests)
@@ -630,15 +629,15 @@ class RequestSelectionBehaviorBundle(RequestSelectionBehavior, ABC):
                     best_bundle = bundle
                     best_bundle_valuation = bundle_valuation
 
-            # carrier's best bundles: retract requests from their tours and add them to auction pool & original bundling
+            # carrier's best bundles: retract requests from their tours and add them to auction pool & original partition
             for request in best_bundle:
                 solution.free_requests_from_carriers(instance, [request])
 
-                # update auction pool and original bundling candidate
+                # update auction pool and original partition candidate
                 auction_request_pool.append(request)
-                original_bundling_labels.append(carrier.id_)
+                original_partition_labels.append(carrier.id_)
 
-        return auction_request_pool, original_bundling_labels
+        return auction_request_pool, original_partition_labels
 
     @abstractmethod
     def _create_bundles(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution, k: int):
@@ -646,7 +645,7 @@ class RequestSelectionBehaviorBundle(RequestSelectionBehavior, ABC):
 
     @abstractmethod
     def _evaluate_bundle(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution, bundle: Sequence[int]):
-        # TODO It could literally be a bundle_valuation strategy that is executed here. Not a bundlING_valuation though
+        # TODO It could literally be a bundle_valuation strategy that is executed here. Not a partition_valuation though
         pass
 
 
@@ -788,7 +787,7 @@ class LosSchulteBundle(RequestSelectionBehaviorBundle):
 
     def _evaluate_bundle(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution, bundle: Sequence[int]):
         # selection for the minimum
-        bundle_valuation = bv.LosSchulteBundlingValuation()
+        bundle_valuation = bv.LosSchultePartitionValuation()
         bundle_valuation.preprocessing(instance, None)
         # must invert since RequestSelectionBehaviorBundle searches for the maximum valuation and request
         return 1 / bundle_valuation.evaluate_bundle(instance, bundle)
@@ -806,7 +805,7 @@ class InfeasibleFirstRandomSecond(RequestSelectionBehavior):
 
     def execute(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution):
         auction_request_pool = []
-        original_bundling_labels = []
+        original_partition_labels = []
         for carrier in solution.carriers:
             k = _abs_num_requests(carrier, self.num_submitted_requests)
             selected = random.sample(carrier.accepted_infeasible_requests,
@@ -825,9 +824,9 @@ class InfeasibleFirstRandomSecond(RequestSelectionBehavior):
             for request in selected:
                 solution.free_requests_from_carriers(instance, [request])
                 auction_request_pool.append(request)
-                original_bundling_labels.append(carrier.id_)
+                original_partition_labels.append(carrier.id_)
 
-        return auction_request_pool, original_bundling_labels
+        return auction_request_pool, original_partition_labels
 
     def _evaluate_request(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution,
                           request: int):
