@@ -57,7 +57,7 @@ def _execute_job(path, config, fail_on_error, console_log_level):
         logger.error(
             f'{e}\nFailed on instance {instance}\n'
             f'with solver\n'
-            f'{pformat(solver.config)}\n'
+            f'{pformat(solver.config, sort_dicts=False)}\n'
             f'at {datetime.now()}\n{e}')
         if fail_on_error:
             raise e

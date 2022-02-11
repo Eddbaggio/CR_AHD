@@ -27,7 +27,7 @@ def configs():
         # mh.LocalSearchFirst([nh.VRPTWMoveDur()], 1),
         # mh.LocalSearchFirst([nh.VRPTWTwoOptDur()], 1),
         # mh.LocalSearchBest([nh.VRPTWMoveDur()], 1),
-        mh.VRPTWVariableNeighborhoodDescent([nh.VRPTWTwoOptDur(), nh.VRPTWMoveDur(), nh.VRPTWRelocateDur()], t),
+        # mh.VRPTWVariableNeighborhoodDescent([nh.VRPTWTwoOptDur(), nh.VRPTWMoveDur(), nh.VRPTWRelocateDur()], t),
         # mh.VRPTWSequentialLocalSearch([nh.VRPTWTwoOptDur(), nh.VRPTWMoveDur(), nh.VRPTWRelocateDur()], t)
     ]
 

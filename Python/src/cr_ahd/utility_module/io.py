@@ -21,6 +21,38 @@ logging_dir.mkdir(parents=True, exist_ok=True)
 solution_dir = output_dir.joinpath('solutions')
 solution_dir.mkdir(parents=True, exist_ok=True)
 
+numeric_columns = [
+    'd',
+    'c',
+    'n',
+    'v',
+    'o',
+    'r',
+    'tour_improvement_time_limit_per_carrier',
+    'max_num_accepted_infeasible',
+    # 'time_window_length',
+    'num_int_auctions',
+    'int_auction_num_submitted_requests',
+    'int_auction_num_auction_bundles',
+    'int_auction_num_auction_rounds',
+    'fin_auction_num_submitted_requests',
+    'fin_auction_num_auction_bundles',
+    'fin_auction_num_auction_rounds',
+    'objective',
+    'sum_travel_distance',
+    'sum_travel_duration',
+    'sum_load',
+    'sum_revenue',
+    'num_tours',
+    'num_pendulum_tours',
+    'num_routing_stops',
+    'acceptance_rate',
+    'degree_of_reallocation',
+    'runtime_final_improvement',
+    'runtime_total',
+    'runtime_final_auction',
+]
+
 
 class MyJSONEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -46,15 +78,18 @@ class MyJSONEncoder(json.JSONEncoder):
 def solutions_to_df(solutions, agg_level: str):
     """
     :param solutions: A List of solutions.
-    :param agg_level: defines up to which level the solution will be summarized. E.g. if agg_level='carrier' the
-    returned pd.DataFrame contains infos per carrier but not per tour since tours are summarized for each carrier.
+    :param agg_level: defines up to which level the solution will be
+    summarized/aggregated. E.g. if agg_level='carrier', the returned pd.DataFrame contains infos per carrier but not
+    per tour since tours are aggregated for each carrier.
     """
     assert solutions, f'No solutions available'
     df = []
     for solution in solutions:
         if agg_level == 'solution':
-            record = solution.summary()
+            record: dict = solution.summary()
             record.pop('carrier_summaries')
+            # replace None with np.nan if the feature is numeric
+            record = {k: (np.nan if (k in numeric_columns and v is None) else v) for k, v in record.items()}
             df.append(record)
 
         elif agg_level == 'carrier':

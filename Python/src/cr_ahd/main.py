@@ -18,10 +18,10 @@ if __name__ == '__main__':
         if "PYCHARM" in os.environ:
             args = {'distance': 7,
                     'num_carriers': 3,
-                    'num_requests': [100],
+                    'num_requests': [10],
                     'carrier_max_num_tours': [3],
                     'service_area_overlap': [0.5],
-                    'run': [5],
+                    'run': [8],
                     'threads': 1,
                     'fail': 1,
                     }
