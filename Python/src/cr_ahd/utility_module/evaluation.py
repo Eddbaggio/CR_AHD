@@ -77,7 +77,7 @@ def collaboration_gain(df: pd.DataFrame, plot: bool = False):
     variable_parameters = {k: v for k, v in variable_parameters.items() if len(v) > 1}
     print()
     print('Variable Parameters'.center(50, '='))
-    pprint(variable_parameters, sort_dicts=False)
+    pprint(variable_parameters, sort_dicts=True)
 
     # group/filter by instance type (num_requests, overlap, ...)
     for inst_name, inst_group in df.groupby(instance_config):

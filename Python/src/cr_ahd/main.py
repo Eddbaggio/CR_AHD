@@ -18,10 +18,10 @@ if __name__ == '__main__':
         if "PYCHARM" in os.environ:
             args = {'distance': 7,
                     'num_carriers': 3,
-                    'num_requests': [10],
+                    'num_requests': [25],
                     'carrier_max_num_tours': [3],
-                    'service_area_overlap': [0.5],
-                    'run': [8],
+                    'service_area_overlap': [0.25],
+                    'run': [10],
                     'threads': 1,
                     'fail': 1,
                     }
@@ -59,9 +59,9 @@ if __name__ == '__main__':
         logger.info(f'DURATION {end - start}')
 
 
-    cr_ahd()
+    # cr_ahd()
 
-    """
+    # """
     # PROFILING
     cProfile.run('cr_ahd()', io.output_dir.joinpath('cr_ahd_stats'))
 

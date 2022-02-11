@@ -23,11 +23,13 @@ def configs():
     # t = float('inf') if ut.debugger_is_active() else 5
     t = 2
     s_tour_improvement: Sequence[mh.VRPTWMetaHeuristic] = [
-        mh.NoMetaheuristic([nh.NoNeighborhood()], None),
+        # mh.NoMetaheuristic([nh.NoNeighborhood()], None),
         # mh.LocalSearchFirst([nh.VRPTWMoveDur()], 1),
         # mh.LocalSearchFirst([nh.VRPTWTwoOptDur()], 1),
         # mh.LocalSearchBest([nh.VRPTWMoveDur()], 1),
-        # mh.VRPTWVariableNeighborhoodDescent([nh.VRPTWTwoOptDur(), nh.VRPTWMoveDur(), nh.VRPTWRelocateDur()], t),
+        mh.VRPTWVariableNeighborhoodDescent([nh.VRPTWTwoOptDur(), nh.VRPTWMoveDur(), nh.VRPTWRelocateDur()], t),
+        mh.VRPTWVariableNeighborhoodDescent([nh.VRPTWMoveDur(), nh.VRPTWRelocateDur(), nh.VRPTWTwoOptDur()], t),
+        mh.VRPTWVariableNeighborhoodDescent([nh.VRPTWRelocateDur(), nh.VRPTWMoveDur(), nh.VRPTWTwoOptDur()], t),
         # mh.VRPTWSequentialLocalSearch([nh.VRPTWTwoOptDur(), nh.VRPTWMoveDur(), nh.VRPTWRelocateDur()], t)
     ]
 
@@ -36,10 +38,10 @@ def configs():
     s_request_acceptance_attractiveness: Sequence[ra.RequestAcceptanceAttractiveness] = [ra.Dummy()]
 
     s_time_window_length: Sequence[dt.timedelta] = [
-        dt.timedelta(hours=8),
-        dt.timedelta(hours=4),
+        # dt.timedelta(hours=8),
+        # dt.timedelta(hours=4),
         dt.timedelta(hours=2),
-        dt.timedelta(hours=1)
+        # dt.timedelta(hours=1)
     ]
 
     s_time_window_offering: two.TWOfferingBehavior.__class__ = [
