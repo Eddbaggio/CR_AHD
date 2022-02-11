@@ -27,10 +27,7 @@ def configs():
         # mh.LocalSearchFirst([nh.VRPTWMoveDur()], 1),
         # mh.LocalSearchFirst([nh.VRPTWTwoOptDur()], 1),
         # mh.LocalSearchBest([nh.VRPTWMoveDur()], 1),
-        mh.VRPTWVariableNeighborhoodDescent([nh.VRPTWTwoOptDur(), nh.VRPTWMoveDur(), nh.VRPTWRelocateDur()], t),
-        mh.VRPTWVariableNeighborhoodDescent([nh.VRPTWTwoOptDurMax4(), nh.VRPTWMoveDur(), nh.VRPTWRelocateDur()], t),
-        mh.VRPTWVariableNeighborhoodDescent([nh.VRPTWMoveDur(), nh.VRPTWRelocateDur(), nh.VRPTWTwoOptDur()], t),
-        mh.VRPTWVariableNeighborhoodDescent([nh.VRPTWRelocateDur(), nh.VRPTWMoveDur(), nh.VRPTWTwoOptDur()], t),
+        mh.VRPTWVariableNeighborhoodDescent([nh.VRPTWRelocateDur(), nh.VRPTWMoveDur(), nh.VRPTWTwoOptDurMax4()], t),
         # mh.VRPTWSequentialLocalSearch([nh.VRPTWTwoOptDur(), nh.VRPTWMoveDur(), nh.VRPTWRelocateDur()], t)
     ]
 
@@ -39,10 +36,10 @@ def configs():
     s_request_acceptance_attractiveness: Sequence[ra.RequestAcceptanceAttractiveness] = [ra.Dummy()]
 
     s_time_window_length: Sequence[dt.timedelta] = [
-        # dt.timedelta(hours=8),
-        # dt.timedelta(hours=4),
+        dt.timedelta(hours=8),
+        dt.timedelta(hours=4),
         dt.timedelta(hours=2),
-        # dt.timedelta(hours=1)
+        dt.timedelta(hours=1)
     ]
 
     s_time_window_offering: two.TWOfferingBehavior.__class__ = [
@@ -80,7 +77,7 @@ def configs():
     ]
 
     s_bundle_generation: Sequence[Tuple[bg.BundleGenerationBehavior.__class__, Dict[str, float]]] = [
-        (bgp.GeneticAlgorithm, dict(population_size=150,
+        (bgp.GeneticAlgorithm, dict(population_size=300,
                                     num_generations=100,
                                     mutation_rate=0.5,
                                     generation_gap=0.9, )
