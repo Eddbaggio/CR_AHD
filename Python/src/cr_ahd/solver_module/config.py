@@ -23,11 +23,12 @@ def configs():
     # t = float('inf') if ut.debugger_is_active() else 5
     t = 2
     s_tour_improvement: Sequence[mh.VRPTWMetaHeuristic] = [
-        # mh.NoMetaheuristic([nh.NoNeighborhood()], None),
+        mh.NoMetaheuristic([nh.NoNeighborhood()], None),
         # mh.LocalSearchFirst([nh.VRPTWMoveDur()], 1),
         # mh.LocalSearchFirst([nh.VRPTWTwoOptDur()], 1),
         # mh.LocalSearchBest([nh.VRPTWMoveDur()], 1),
         mh.VRPTWVariableNeighborhoodDescent([nh.VRPTWTwoOptDur(), nh.VRPTWMoveDur(), nh.VRPTWRelocateDur()], t),
+        mh.VRPTWVariableNeighborhoodDescent([nh.VRPTWTwoOptDurMax4(), nh.VRPTWMoveDur(), nh.VRPTWRelocateDur()], t),
         mh.VRPTWVariableNeighborhoodDescent([nh.VRPTWMoveDur(), nh.VRPTWRelocateDur(), nh.VRPTWTwoOptDur()], t),
         mh.VRPTWVariableNeighborhoodDescent([nh.VRPTWRelocateDur(), nh.VRPTWMoveDur(), nh.VRPTWTwoOptDur()], t),
         # mh.VRPTWSequentialLocalSearch([nh.VRPTWTwoOptDur(), nh.VRPTWMoveDur(), nh.VRPTWRelocateDur()], t)

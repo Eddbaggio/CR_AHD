@@ -207,11 +207,11 @@ class VRPTWTwoOptDur(IntraTourNeighborhood):
             for j in range(i + 2, len(tour) - 1):
                 delta = 0.0
                 delta -= instance.travel_duration(
-                    tour.routing_sequence[i:j+1], tour.routing_sequence[i+1:j+2]
+                    tour.routing_sequence[i:j + 1], tour.routing_sequence[i + 1:j + 2]
                 ).total_seconds()
                 delta += instance.travel_duration(
                     [tour.routing_sequence[i], *tour.routing_sequence[j:i:-1]],
-                    [tour.routing_sequence[j], *tour.routing_sequence[j-1:i:-1], tour.routing_sequence[j+1]]
+                    [tour.routing_sequence[j], *tour.routing_sequence[j - 1:i:-1], tour.routing_sequence[j + 1]]
                 ).total_seconds()
                 move: vrptw_2opt_move = (delta, tour, i, j)
                 # logger.debug(msg=f'testing 2-opt move: {move}')
@@ -232,6 +232,24 @@ class VRPTWTwoOptDur(IntraTourNeighborhood):
         popped = tour.pop_and_update(instance, list(range(i + 1, j + 1)))
         tour.insert_and_update(instance, range(i + 1, j + 1), list(reversed(popped)))
         pass
+
+
+class VRPTWTwoOptDurMax4(VRPTWTwoOptDur):
+    def feasible_move_generator_for_tour(self, instance: it.MDVRPTWInstance, tour: tr.Tour):
+        for i in range(0, len(tour) - 3):
+            for j in range(i + 2, min(i + 6, len(tour) - 1)):
+                delta = 0.0
+                delta -= instance.travel_duration(
+                    tour.routing_sequence[i:j + 1], tour.routing_sequence[i + 1:j + 2]
+                ).total_seconds()
+                delta += instance.travel_duration(
+                    [tour.routing_sequence[i], *tour.routing_sequence[j:i:-1]],
+                    [tour.routing_sequence[j], *tour.routing_sequence[j - 1:i:-1], tour.routing_sequence[j + 1]]
+                ).total_seconds()
+                move: vrptw_2opt_move = (delta, tour, i, j)
+                # logger.debug(msg=f'testing 2-opt move: {move}')
+                if self.feasibility_check(instance, move):
+                    yield move
 
 
 # =====================================================================================================================

@@ -61,7 +61,7 @@ if __name__ == '__main__':
 
     # cr_ahd()
 
-    # """
+    """
     # PROFILING
     cProfile.run('cr_ahd()', io.output_dir.joinpath('cr_ahd_stats'))
 
