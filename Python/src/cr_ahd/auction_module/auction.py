@@ -129,7 +129,8 @@ class Auction:
         # ///
 
         original_bundles = ut.indices_to_nested_lists(original_partition_labels, auction_request_pool)
-        # timer.write_duration_to_solution(solution, 'runtime_request_selection') fixme need to distinguish between intermediate and final: auction_counter in Solver class?
+        # fixme need to distinguish between intermediate and final: auction_counter in Solver class?
+        timer.write_duration_to_solution(solution, 'runtime_request_selection')
 
         if auction_request_pool:
             # profit_after_rs = [carrier.sum_profit() for carrier in solution.carriers]
@@ -139,7 +140,7 @@ class Auction:
             timer = pr.Timer()
             auction_bundle_pool = self.bundle_generation.execute(instance, solution, auction_request_pool,
                                                                  original_partition_labels)
-            # timer.write_duration_to_solution(solution, 'runtime_auction_bundle_pool_generation') fixme
+            timer.write_duration_to_solution(solution, 'runtime_auction_bundle_pool_generation')  # fixme
             logger.debug(f'bundles {auction_bundle_pool} have been created')
 
             # ===== [3] Bidding =====
@@ -154,7 +155,7 @@ class Auction:
                 bids_on_original_bundles.append(bids_dict[tuple(bundle)][carrier.id_])
             # ///
 
-            # timer.write_duration_to_solution(solution, 'runtime_bidding') fixme
+            timer.write_duration_to_solution(solution, 'runtime_bidding')  # fixme
             logger.debug(f'Bids {bids_matrix} have been created for bundles {auction_bundle_pool}')
 
             # ===== [4.1] Winner Determination =====
@@ -167,7 +168,7 @@ class Auction:
             degree_of_reallocation = hamming_dist / len(original_partition_labels)
             solution.degree_of_reallocation = degree_of_reallocation
 
-            # timer.write_duration_to_solution(solution, 'runtime_winner_determination') fixme
+            timer.write_duration_to_solution(solution, 'runtime_winner_determination')  # fixme
             if status != GRB.OPTIMAL or -GRB.INFINITY in winner_bids:  # fall back to the pre-auction solution
                 solution = pre_rs_solution
 
@@ -211,10 +212,10 @@ class Auction:
             while len(carrier.unrouted_requests) > 0:
                 request = carrier.unrouted_requests[0]
                 self.tour_construction.insert_single_request(instance, solution, carrier.id_, request)
-        # timer.write_duration_to_solution(solution, 'runtime_final_dynamic_insertion') FixMe
+        timer.write_duration_to_solution(solution, 'runtime_reopt_dynamic_insertion')  # FixMe
         timer = pr.Timer()
         solution = self.tour_improvement.execute(instance, solution)
-        # timer.write_duration_to_solution(solution, 'runtime_final_improvement') fixme
+        timer.write_duration_to_solution(solution, 'runtime_reopt_improvement')  # fixme
         return solution
 
     @staticmethod

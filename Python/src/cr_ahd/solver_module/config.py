@@ -1,6 +1,6 @@
 import datetime as dt
 import itertools
-from typing import List, Tuple, Dict, Sequence
+from typing import List, Tuple, Dict, Sequence, Union
 
 from auction_module import auction as au, request_selection as rs, bidding as bd, winner_determination as wd
 from auction_module.bundle_and_partition_valuation import partition_valuation as pv
@@ -27,7 +27,7 @@ def configs():
         # mh.LocalSearchFirst([nh.VRPTWMoveDur()], 1),
         # mh.LocalSearchFirst([nh.VRPTWTwoOptDur()], 1),
         # mh.LocalSearchBest([nh.VRPTWMoveDur()], 1),
-        mh.VRPTWVariableNeighborhoodDescent([nh.VRPTWRelocateDur(), nh.VRPTWMoveDur(), nh.VRPTWTwoOptDurMax4()], t),
+        # mh.VRPTWVariableNeighborhoodDescent([nh.VRPTWRelocateDur(), nh.VRPTWMoveDur(), nh.VRPTWTwoOptDurMax4()], t),
         # mh.VRPTWSequentialLocalSearch([nh.VRPTWTwoOptDur(), nh.VRPTWMoveDur(), nh.VRPTWRelocateDur()], t)
     ]
 
@@ -52,9 +52,10 @@ def configs():
     ]
 
     # by setting this to an empty sequence, no collaborative solutions will be generated
-    s_num_submitted_requests: Sequence[int] = [
+    s_num_submitted_requests: Sequence[Union[int, float]] = [
+        0.2,
         # 3,
-        4,
+        # 4,
         # 5
     ]
 
@@ -179,10 +180,13 @@ def configs():
                                     intermediate_auction = False
 
                                 # ===== FINAL AUCTION =====
-                                assert total_nsr_fin % auction_policy[
-                                    'num_final_auction_rounds'] == 0
-                                nsr_fin_round = total_nsr_fin // auction_policy[
-                                    'num_final_auction_rounds']
+                                if auction_policy['num_final_auction_rounds'] > 1:
+                                    assert total_nsr_fin % auction_policy[
+                                        'num_final_auction_rounds'] == 0
+                                    nsr_fin_round = total_nsr_fin // auction_policy[
+                                        'num_final_auction_rounds']
+                                else:
+                                    nsr_fin_round = num_submitted_requests
 
                                 final_auction = au.Auction(
                                     tour_construction=tour_construction,
