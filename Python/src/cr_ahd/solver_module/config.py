@@ -36,10 +36,10 @@ def configs():
     s_request_acceptance_attractiveness: Sequence[ra.RequestAcceptanceAttractiveness] = [ra.Dummy()]
 
     s_time_window_length: Sequence[dt.timedelta] = [
-        dt.timedelta(hours=8),
-        dt.timedelta(hours=4),
+        # dt.timedelta(hours=8),
+        # dt.timedelta(hours=4),
         dt.timedelta(hours=2),
-        dt.timedelta(hours=1)
+        # dt.timedelta(hours=1)
     ]
 
     s_time_window_offering: two.TWOfferingBehavior.__class__ = [

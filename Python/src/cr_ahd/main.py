@@ -1,11 +1,10 @@
-import cProfile
 import logging.config
 import os
-import pstats
 from datetime import datetime
 
 from solver_module import workflow as wf, config as pg
-from utility_module import cr_ahd_logging as log, io, evaluation as ev
+from utility_module import cr_ahd_logging as log, io
+from evaluation_module import collaboration_gain as cg
 from utility_module.argparse_utils import parser
 
 logging.config.dictConfig(log.LOGGING_CONFIG)
@@ -20,7 +19,7 @@ if __name__ == '__main__':
                     'num_carriers': 3,
                     'num_requests': [100],
                     'carrier_max_num_tours': [3],
-                    'service_area_overlap': [0.25],
+                    'service_area_overlap': [0.75],
                     'run': [17],
                     'threads': 1,
                     'fail': 1,
@@ -51,7 +50,7 @@ if __name__ == '__main__':
         csv_path = io.unique_path(io.output_dir, 'evaluation_agg_' + agg_level + '_#{:03d}' + '.csv')
         df.to_csv(path_or_buf=csv_path, index=False)
 
-        collaboration_gains = ev.collaboration_gain(df)
+        collaboration_gains = cg.collaboration_gain(df)
         collaboration_gains.to_csv(str(csv_path).replace('agg_solution', 'coll_gain'), index=True)
 
         end = datetime.now()

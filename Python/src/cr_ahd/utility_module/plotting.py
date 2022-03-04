@@ -153,7 +153,8 @@ def routed_request_marker(instance, carrier, color, index, tour, vertex):
         popup=f'Request {request}<br>'
               f'arrival={tour.arrival_time_sequence[index]}<br>'
               f'wait={tour.wait_duration_sequence[index]}<br>'
-              f'service={tour.service_time_sequence[index]}<br>'
+              f'service time={tour.service_time_sequence[index]}<br>'
+              f'service_duration={tour.service_duration_sequence[index]}<br>'
               f'carrier={carrier.id_}<br>'
               f'tw={instance.time_window(vertex)}',
         tooltip=f'Stop {index}',

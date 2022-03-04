@@ -28,7 +28,8 @@ class Tour(ABC):
         self.vertex_pos: Dict[int, int] = dict()  # mapping each vertex to its routing index
         self.arrival_time_sequence: List[dt.datetime] = []  # arrival time of each vertex
         self.service_time_sequence: List[dt.datetime] = []  # start of service time of each vertex
-        self.wait_duration_sequence: List[dt.timedelta] = []  # required for efficient feasibility checks
+        self.service_duration_sequence: List[dt.timedelta] = []  # duration of service at each vertex
+        self.wait_duration_sequence: List[dt.timedelta] = []  # wait duration at each vertex
         self.max_shift_sequence: List[dt.timedelta] = []  # required for efficient feasibility checks
 
         # sums
@@ -44,6 +45,7 @@ class Tour(ABC):
             self.routing_sequence.insert(1, depot_index)
             self.arrival_time_sequence.insert(1, ut.EXECUTION_START_TIME)
             self.service_time_sequence.insert(1, ut.EXECUTION_START_TIME)
+            self.service_duration_sequence.insert(1, dt.timedelta(0))
             self.wait_duration_sequence.insert(1, dt.timedelta(0))
             self.max_shift_sequence.insert(1, ut.END_TIME - ut.EXECUTION_START_TIME)
 
@@ -53,7 +55,8 @@ class Tour(ABC):
                f'Sequence:\t{self.routing_sequence}\n' \
                f'Arrival:\t{[x.strftime("%d-%H:%M:%S") for x in self.arrival_time_sequence]}\n' \
                f'Wait:\t\t{[str(x) for x in self.wait_duration_sequence]}\n' \
-               f'Service:\t{[x.strftime("%d-%H:%M:%S") for x in self.service_time_sequence]}\n' \
+               f'Service Time:\t{[x.strftime("%d-%H:%M:%S") for x in self.service_time_sequence]}\n' \
+               f'Service Duration:\t{[str(x) for x in self.service_duration_sequence]}\n' \
                f'Max Shift:\t{[str(x) for x in self.max_shift_sequence]}\n' \
                f'Distance:\t{round(self.sum_travel_distance, 2)}\n' \
                f'Duration:\t{self.sum_travel_duration}\n' \
@@ -76,6 +79,7 @@ class Tour(ABC):
         setattr(result, 'vertex_pos', self.vertex_pos.copy())
         setattr(result, 'arrival_time_sequence', self.arrival_time_sequence[:])
         setattr(result, 'service_time_sequence', self.service_time_sequence[:])
+        setattr(result, 'service_duration_sequence', self.service_duration_sequence[:])
         setattr(result, 'wait_duration_sequence', self.wait_duration_sequence[:])
         setattr(result, 'max_shift_sequence', self.max_shift_sequence[:])
         setattr(result, 'sum_travel_distance', self.sum_travel_distance)
@@ -96,18 +100,26 @@ class Tour(ABC):
             'arrival_schedule': self.arrival_time_sequence,
             'wait_sequence': self.wait_duration_sequence,
             'max_shift_sequence': self.max_shift_sequence,
-            'service_schedule': self.service_time_sequence,
+            'service_time_schedule': self.service_time_sequence,
+            'service_duration_sequence': self.service_duration_sequence,
         }
 
     def print_as_table(self):
-        print(f'Vertex\tArrival\t\tWait\t\tService\t\tMax_Shift')
-        for v, a, w, s, m in zip(self.routing_sequence, self.arrival_time_sequence, self.wait_duration_sequence,
-                                 self.service_time_sequence, self.max_shift_sequence):
+        print(f'Vertex\tArrival\t\tWait\t\tService Time\tService Duration\tMax_Shift')
+        for v, a, w, st, sd, m in zip(self.routing_sequence, self.arrival_time_sequence, self.wait_duration_sequence,
+                                      self.service_time_sequence, self.service_duration_sequence,
+                                      self.max_shift_sequence):
             w_seconds = w.seconds
             w_hours = w_seconds // 3600
             w_seconds = w_seconds - (w_hours * 3600)
             w_minutes = w_seconds // 60
             w_seconds = w_seconds - (w_minutes * 60)
+
+            sd_seconds = sd.seconds
+            sd_hours = sd_seconds // 3600
+            sd_seconds = sd_seconds - (sd_hours * 3600)
+            sd_minutes = sd_seconds // 60
+            sd_seconds = sd_seconds - (sd_minutes * 60)
 
             m_seconds = m.seconds
             m_hours = m_seconds // 3600
@@ -118,7 +130,8 @@ class Tour(ABC):
             print(f'{v:02d}\t\t'
                   f'{a.strftime("%d-%H:%M:%S")}\t'
                   f'{w.days:02d}-{w_hours :02d}:{w_minutes :02d}:{w_seconds:02d}\t'
-                  f'{s.strftime("%d-%H:%M:%S")}\t'
+                  f'{st.strftime("%d-%H:%M:%S")}\t\t'
+                  f'{sd.days:02d}-{sd_hours :02d}:{sd_minutes :02d}:{sd_seconds:02d}\t\t\t'
                   f'{m.days:02d}-{m_hours :02d}:{m_minutes :02d}:{m_seconds:02d}')
 
     def summary(self):
@@ -245,13 +258,16 @@ class Tour(ABC):
                     instance.travel_duration([i_vertex], [j_vertex])
         self.arrival_time_sequence.insert(insertion_index, arrival_j)
 
+        # calculate wait duration at j_vertex
+        wait_j = max(dt.timedelta(0), instance.tw_open[j_vertex] - arrival_j)
+        self.wait_duration_sequence.insert(insertion_index, wait_j)
+
         # calculate start of service at j_vertex
         service_j = max(instance.tw_open[j_vertex], arrival_j)
         self.service_time_sequence.insert(insertion_index, service_j)
 
-        # calculate wait duration at j_vertex
-        wait_j = max(dt.timedelta(0), instance.tw_open[j_vertex] - arrival_j)
-        self.wait_duration_sequence.insert(insertion_index, wait_j)
+        # store the service duration at j_vertex
+        self.service_duration_sequence.insert(insertion_index, instance.vertex_service_duration[j_vertex])
 
         # set max_shift of j_vertex temporarily to 0, will be updated further down
         max_shift_j = dt.timedelta(0)
@@ -371,9 +387,11 @@ class Tour(ABC):
 
         self.arrival_time_sequence.pop(pop_index)
 
+        wait_j = self.wait_duration_sequence.pop(pop_index)
+
         self.service_time_sequence.pop(pop_index)
 
-        wait_j = self.wait_duration_sequence.pop(pop_index)
+        self.service_duration_sequence.pop(pop_index)
 
         self.max_shift_sequence.pop(pop_index)
 
