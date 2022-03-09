@@ -105,10 +105,11 @@ class Tour(ABC):
         }
 
     def print_as_table(self):
-        print(f'Vertex\tArrival\t\tWait\t\tService Time\tService Duration\tMax_Shift')
-        for v, a, w, st, sd, m in zip(self.routing_sequence, self.arrival_time_sequence, self.wait_duration_sequence,
-                                      self.service_time_sequence, self.service_duration_sequence,
-                                      self.max_shift_sequence):
+        print(f'pos\tVertex\tArrival\t\tWait\t\tService Time\tService Duration\tMax_Shift')
+        for i, (v, a, w, st, sd, m) in enumerate(
+                zip(self.routing_sequence, self.arrival_time_sequence, self.wait_duration_sequence,
+                    self.service_time_sequence, self.service_duration_sequence,
+                    self.max_shift_sequence)):
             w_seconds = w.seconds
             w_hours = w_seconds // 3600
             w_seconds = w_seconds - (w_hours * 3600)
@@ -127,7 +128,8 @@ class Tour(ABC):
             m_minutes = m_seconds // 60
             m_seconds = m_seconds - (m_minutes * 60)
 
-            print(f'{v:02d}\t\t'
+            print(f'{i}\t'
+                  f'{v:02d}\t\t'
                   f'{a.strftime("%d-%H:%M:%S")}\t'
                   f'{w.days:02d}-{w_hours :02d}:{w_minutes :02d}:{w_seconds:02d}\t'
                   f'{st.strftime("%d-%H:%M:%S")}\t\t'
