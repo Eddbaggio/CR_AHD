@@ -1,10 +1,20 @@
 from typing import Sequence
 import datetime as dt
-from core_module import tour as tr
+from core_module import tour as tr, solution as slt
 from tw_management_module.tw import TimeWindow
+import matplotlib.pyplot as plt
+from utility_module import utils as ut
 
 
-def tour_density(tour: tr.Tour, time_windows: Sequence[TimeWindow]):
+def plot_avg_tour_tw_occupancy(solutions: Sequence[slt.CAHDSolution]):
+    x = {solution.solver_config['time_window-length']: [] for solution in solutions}
+    for solution in solutions:
+        tw_length = solution.solver_config['time_window_length']
+        time_windows = ut.generate_time_windows(tw_length)
+        densities = [tour_tw_occupancy(tour, time_windows) for tour in solution.tours]
+
+
+def tour_tw_occupancy(tour: tr.Tour, time_windows: Sequence[TimeWindow]):
     tw_occupancy = {tw: {'travel': dt.timedelta(0), 'service': dt.timedelta(0), 'wait': dt.timedelta(0)}
                     for tw in time_windows}
 

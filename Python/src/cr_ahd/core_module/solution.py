@@ -55,11 +55,22 @@ class CAHDSolution:
     def sum_travel_duration(self):
         return sum((c.sum_travel_duration() for c in self.carriers), dt.timedelta(0))
 
+    def sum_wait_duration(self):
+        return sum((c.sum_wait_duration() for c in self.carriers), dt.timedelta(0))
+
+    def sum_service_duration(self):
+        return sum((c.sum_service_duration() for c in self.carriers), dt.timedelta(0))
+
     def sum_load(self):
         return sum(c.sum_load() for c in self.carriers)
 
     def sum_revenue(self):
         return sum(c.sum_revenue() for c in self.carriers)
+
+    def density(self):
+        """average ratio of active time (travel & service) to total tour time (travel & service & wait) of all Tours"""
+        densities = [c.density() for c in self.carriers]
+        return sum(densities)/len(densities)
 
     # def objective(self):
     #     return sum(c.objective() for c in self.carriers)
@@ -96,8 +107,11 @@ class CAHDSolution:
             # 'sum_profit': self.sum_profit(),
             'sum_travel_distance': self.sum_travel_distance(),
             'sum_travel_duration': self.sum_travel_duration(),
+            'sum_wait_duration': self.sum_wait_duration(),
+            'sum_service_duration': self.sum_service_duration(),
             'sum_load': self.sum_load(),
             'sum_revenue': self.sum_revenue(),
+            'density': self.density(),
             'num_tours': self.num_tours(),
             'num_pendulum_tours': self.num_pendulum_tours(),
             'num_routing_stops': self.num_routing_stops(),
@@ -252,6 +266,22 @@ class AHDSolution:
         pendulum = sum((t.sum_travel_duration for t in self.tours_pendulum), dt.timedelta(0))
         return regular + pendulum
 
+    def sum_wait_duration(self):
+        regular = sum((t.sum_wait_duration for t in self.tours), dt.timedelta(0))
+        pendulum = sum((t.sum_wait_duration for t in self.tours_pendulum), dt.timedelta(0))
+        return regular + pendulum
+
+    def sum_service_duration(self):
+        regular = sum((t.sum_service_duration for t in self.tours), dt.timedelta(0))
+        pendulum = sum((t.sum_service_duration for t in self.tours_pendulum), dt.timedelta(0))
+        return regular + pendulum
+
+    def density(self):
+        """average ratio of active time (travel & service) to total tour time (travel & service & wait) of all Tours"""
+        regular = [t.density for t in self.tours]
+        pendulum = [t.density for t in self.tours_pendulum]
+        return sum(regular + pendulum) / len(pendulum + regular)
+
     def sum_load(self):
         regular = sum(t.sum_load for t in self.tours)
         pendulum = sum(t.sum_load for t in self.tours_pendulum)
@@ -290,8 +320,11 @@ class AHDSolution:
             # 'sum_profit': self.sum_profit(),
             'sum_travel_distance': self.sum_travel_distance(),
             'sum_travel_duration': self.sum_travel_duration(),
+            'sum_wait_duration': self.sum_wait_duration(),
+            'sum_service_duration': self.sum_service_duration(),
             'sum_load': self.sum_load(),
             'sum_revenue': self.sum_revenue(),
+            'density': self.density(),
             'acceptance_rate': self.acceptance_rate,
             'num_pendulum_tours': len(self.tours_pendulum),
             'tour_summaries': {t.id_: t.summary() for t in self.tours},

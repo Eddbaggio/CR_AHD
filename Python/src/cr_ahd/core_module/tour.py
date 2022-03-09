@@ -35,7 +35,7 @@ class Tour(ABC):
         # sums
         self.sum_travel_distance: float = 0.0
         self.sum_travel_duration: dt.timedelta = dt.timedelta(0)
-        self.sum_idle_duration: dt.timedelta = dt.timedelta(0)  # TODO implement the update of idle times
+        self.sum_service_duration: dt.timedelta = dt.timedelta(0)
         self.sum_load: float = 0.0
         self.sum_revenue: float = 0.0
         # self.sum_profit: float = 0.0
@@ -94,6 +94,16 @@ class Tour(ABC):
     def num_routing_stops(self):
         return len(self)
 
+    @property
+    def sum_wait_duration(self):
+        return sum(self.wait_duration_sequence, dt.timedelta(0))
+
+    @property
+    def density(self):
+        density = (self.sum_travel_duration + self.sum_service_duration) / (
+                    self.sum_travel_duration + self.sum_service_duration + self.sum_wait_duration)
+        return density
+
     def as_dict(self):
         return {
             'routing_sequence': self.routing_sequence,
@@ -143,8 +153,11 @@ class Tour(ABC):
             'num_routing_stops': self.num_routing_stops,
             'sum_travel_distance': self.sum_travel_distance,
             'sum_travel_duration': self.sum_travel_duration,
+            'sum_wait_duration': self.sum_wait_duration,
+            'sum_service_duration': self.sum_service_duration,
             'sum_load': self.sum_load,
             'sum_revenue': self.sum_revenue,
+            'density': self.density
         }
 
     def _single_insertion_feasibility_check(self, instance, insertion_index: int,
@@ -294,6 +307,7 @@ class Tour(ABC):
         self.sum_travel_duration += travel_time_shift_j
         self.sum_load += instance.vertex_load[j_vertex]
         self.sum_revenue += instance.vertex_revenue[j_vertex]
+        self.sum_service_duration += instance.vertex_service_duration[j_vertex]
         # self.sum_profit = self.sum_profit + instance.vertex_revenue[j_vertex] - time_shift_j
 
         # update arrival at k_vertex

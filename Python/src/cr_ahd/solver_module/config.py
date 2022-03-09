@@ -36,10 +36,10 @@ def configs():
     s_request_acceptance_attractiveness: Sequence[ra.RequestAcceptanceAttractiveness] = [ra.Dummy()]
 
     s_time_window_length: Sequence[dt.timedelta] = [
-        # dt.timedelta(hours=8),
-        # dt.timedelta(hours=4),
+        dt.timedelta(hours=1),
         dt.timedelta(hours=2),
-        # dt.timedelta(hours=1)
+        dt.timedelta(hours=4),
+        dt.timedelta(hours=8),
     ]
 
     s_time_window_offering: two.TWOfferingBehavior.__class__ = [
@@ -54,9 +54,6 @@ def configs():
     # by setting this to an empty sequence, no collaborative solutions will be generated
     s_num_submitted_requests: Sequence[Union[int, float]] = [
         0.2,
-        # 3,
-        # 4,
-        # 5
     ]
 
     s_request_selection: Sequence[rs.RequestSelectionBehavior.__class__] = [
