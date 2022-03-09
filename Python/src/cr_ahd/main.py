@@ -43,6 +43,7 @@ if __name__ == '__main__':
         # solving
         solutions = wf.execute_jobs(paths, configs, args['threads'], args['fail'])
 
+        # evaluation
         agg_level = 'solution'
         df = io.solutions_to_df(solutions, agg_level)
 

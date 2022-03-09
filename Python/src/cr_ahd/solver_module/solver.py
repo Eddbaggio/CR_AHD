@@ -12,7 +12,7 @@ from routing_module import tour_construction as cns
 from tw_management_module import request_acceptance as ra
 from utility_module import utils as ut, profiling as pr
 from utility_module.cr_ahd_logging import SUCCESS
-from evaluation_module.tour_density import tour_density
+from evaluation_module.tour_density import tour_tw_occupancy
 
 logger = logging.getLogger(__name__)
 
