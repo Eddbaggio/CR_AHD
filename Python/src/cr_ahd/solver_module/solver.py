@@ -12,7 +12,6 @@ from routing_module import tour_construction as cns
 from tw_management_module import request_acceptance as ra
 from utility_module import utils as ut, profiling as pr
 from utility_module.cr_ahd_logging import SUCCESS
-from evaluation_module.tour_density import tour_tw_occupancy
 
 logger = logging.getLogger(__name__)
 
@@ -107,9 +106,9 @@ class Solver:
             })
 
     def execute(self,
-                instance: it.MDVRPTWInstance,
+                instance: it.CAHDInstance,
                 starting_solution: slt.CAHDSolution = None,
-                ) -> Tuple[it.MDVRPTWInstance, slt.CAHDSolution]:
+                ) -> Tuple[it.CAHDInstance, slt.CAHDSolution]:
         """
         apply the concrete steps of the solution algorithms specified in the config
 
@@ -176,7 +175,7 @@ class Solver:
         # plot_vienna_vrp_solution(instance, solution)  # REMOVEME: for debugging only
         return instance, solution
 
-    def request_acceptance_and_time_window(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier,
+    def request_acceptance_and_time_window(self, instance: it.CAHDInstance, solution: slt.CAHDSolution, carrier,
                                            request: int):
         delivery_vertex = instance.vertex_from_request(request)
         acceptance_type, selected_tw = self.request_acceptance.execute(instance, carrier, request)

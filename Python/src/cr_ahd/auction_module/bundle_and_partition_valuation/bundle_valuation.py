@@ -13,11 +13,11 @@ class BundleValuation(ABC):
         self.name = self.__class__.__name__
 
     @abstractmethod
-    def evaluate_bundle(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, bundle: List[int]):
+    def evaluate_bundle(self, instance: it.CAHDInstance, solution: slt.CAHDSolution, bundle: List[int]):
         """returns the value of a bundle"""
         pass
 
-    def preprocessing(self, instance: it.MDVRPTWInstance, auction_request_pool: Sequence[int]):
+    def preprocessing(self, instance: it.CAHDInstance, auction_request_pool: Sequence[int]):
         pass
 
 

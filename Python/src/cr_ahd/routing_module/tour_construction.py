@@ -42,7 +42,7 @@ class VRPTWInsertionConstruction(ABC):
     def __init__(self):
         self.name = self.__class__.__name__
 
-    def insert_single_request(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
+    def insert_single_request(self, instance: it.CAHDInstance, solution: slt.CAHDSolution,
                               carrier_id: int, request: int):
         carrier = solution.carriers[carrier_id]
         insertion_criteria, tour, delivery_pos = self.best_insertion_for_request(instance, carrier, request)
@@ -53,7 +53,7 @@ class VRPTWInsertionConstruction(ABC):
             self.execute_insertion(instance, solution, carrier_id, request, tour.id_, delivery_pos)
 
     def best_insertion_for_carrier(self,
-                                   instance: it.MDVRPTWInstance,
+                                   instance: it.CAHDInstance,
                                    carrier: slt.AHDSolution) -> Tuple[Optional[int],
                                                                       Optional[tr.Tour],
                                                                       Optional[int]]:
@@ -90,7 +90,7 @@ class VRPTWInsertionConstruction(ABC):
         return best_request, best_tour, best_delivery_pos
 
     def best_insertion_for_request(self,
-                                   instance: it.MDVRPTWInstance,
+                                   instance: it.CAHDInstance,
                                    carrier: slt.AHDSolution,
                                    request: int) -> Tuple[float, tr.Tour, int]:
         """
@@ -115,12 +115,12 @@ class VRPTWInsertionConstruction(ABC):
         return best_delta, best_tour, best_delivery_pos
 
     @abstractmethod
-    def best_insertion_for_request_in_tour(self, instance: it.MDVRPTWInstance, tour: tr.Tour,
+    def best_insertion_for_request_in_tour(self, instance: it.CAHDInstance, tour: tr.Tour,
                                            request: int, check_feasibility=True) -> Tuple[float, int]:
         pass
 
     @staticmethod
-    def execute_insertion(instance: it.MDVRPTWInstance,
+    def execute_insertion(instance: it.CAHDInstance,
                           solution: slt.CAHDSolution,
                           carrier_id: int,
                           request: int,
@@ -135,7 +135,7 @@ class VRPTWInsertionConstruction(ABC):
         carrier.routed_requests.append(request)
 
     @staticmethod
-    def execute_insertion_in_tour(instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, tour_id: int,
+    def execute_insertion_in_tour(instance: it.CAHDInstance, solution: slt.CAHDSolution, tour_id: int,
                                   request: int, delivery_pos: int):
 
         delivery = instance.vertex_from_request(request)
@@ -144,7 +144,7 @@ class VRPTWInsertionConstruction(ABC):
         tour.requests.add(request)
 
     def create_pendulum_tour_for_infeasible_request(self,
-                                                    instance: it.MDVRPTWInstance,
+                                                    instance: it.CAHDInstance,
                                                     solution: slt.CAHDSolution,
                                                     carrier_id: int,
                                                     request: int,
@@ -170,7 +170,7 @@ class VRPTWInsertionConstruction(ABC):
         pass
 
     def create_new_tour_with_request(self,
-                                     instance: it.MDVRPTWInstance,
+                                     instance: it.CAHDInstance,
                                      solution: slt.CAHDSolution,
                                      carrier_id: int,
                                      request: int):
@@ -205,7 +205,7 @@ class VRPTWInsertionConstruction(ABC):
 
 class VRPTWMinTravelDistanceInsertion(VRPTWInsertionConstruction):
 
-    def best_insertion_for_request_in_tour(self, instance: it.MDVRPTWInstance, tour: tr.Tour,
+    def best_insertion_for_request_in_tour(self, instance: it.CAHDInstance, tour: tr.Tour,
                                            request: int, check_feasibility=True) -> Tuple[float, int]:
         logger.warning('Distance of vienna instances violates triangle inequality!')
         delivery_vertex = instance.vertex_from_request(request)
@@ -229,7 +229,7 @@ class VRPTWMinTravelDistanceInsertion(VRPTWInsertionConstruction):
 
 class VRPTWMinTravelDurationInsertion(VRPTWInsertionConstruction):
 
-    def best_insertion_for_request_in_tour(self, instance: it.MDVRPTWInstance, tour: tr.Tour,
+    def best_insertion_for_request_in_tour(self, instance: it.CAHDInstance, tour: tr.Tour,
                                            request: int, check_feasibility=True) -> Tuple[float, int]:
         delivery_vertex = instance.vertex_from_request(request)
         best_delta = float('inf')

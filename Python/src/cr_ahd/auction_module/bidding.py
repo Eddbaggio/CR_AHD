@@ -23,7 +23,7 @@ class BiddingBehavior(ABC):
         self.tour_improvement = tour_improvement
         self.name = self.__class__.__name__
 
-    def execute_bidding(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
+    def execute_bidding(self, instance: it.CAHDInstance, solution: slt.CAHDSolution,
                         bundles: Sequence[Sequence[int]]) -> List[List[float]]:
         """
         :return a nested list of bids. the first axis is the bundles, the second axis (inner lists) contain the carrier
@@ -49,7 +49,7 @@ class BiddingBehavior(ABC):
         return bundle_bids
 
     @staticmethod
-    def _add_bundle_to_carrier(instance: it.MDVRPTWInstance, carrier: slt.AHDSolution, bundle: Sequence[int]):
+    def _add_bundle_to_carrier(instance: it.CAHDInstance, carrier: slt.AHDSolution, bundle: Sequence[int]):
         """
         add the bundle to the carriers assigned, accepted and unrouted requests.
         correct sorting is required to ensure that dynamic insertion order is the same as in the acceptance phase. in
@@ -86,7 +86,7 @@ class BiddingBehavior(ABC):
         pass
 
     @abstractmethod
-    def _value_with_bundle(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, bundle: Sequence[int],
+    def _value_with_bundle(self, instance: it.CAHDInstance, solution: slt.CAHDSolution, bundle: Sequence[int],
                            carrier_id: int):
         pass
 
@@ -100,7 +100,7 @@ class ClearAndReinsertAll(BiddingBehavior):
     Note that this is only compatible if the same dynamic re-optimization is also applied after the reallocation, too.
     """
 
-    def _value_with_bundle(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, bundle: Sequence[int],
+    def _value_with_bundle(self, instance: it.CAHDInstance, solution: slt.CAHDSolution, bundle: Sequence[int],
                            carrier_id: int):
 
         solution_copy = deepcopy(solution)

@@ -10,7 +10,7 @@ from core_module import instance as it, tour as tr
 
 class CAHDSolution:
     # default, empty solution
-    def __init__(self, instance: it.MDVRPTWInstance, objective: str = 'duration'):
+    def __init__(self, instance: it.CAHDInstance, objective: str = 'duration'):
         self.id_: str = instance.id_
         self.meta: Dict[str, int] = instance.meta
         if objective == 'duration':
@@ -137,7 +137,7 @@ class CAHDSolution:
             self.carriers[c].assigned_requests.append(r)
             self.carriers[c].unrouted_requests.append(r)
 
-    def free_requests_from_carriers(self, instance: it.MDVRPTWInstance, requests: Sequence[int]):
+    def free_requests_from_carriers(self, instance: it.CAHDInstance, requests: Sequence[int]):
         """
         removes the given requests from their route and sets them to be unassigned and not accepted (not_accepted !=
         rejected)

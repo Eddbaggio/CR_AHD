@@ -20,7 +20,7 @@ if __name__ == '__main__':
                     'num_requests': [100],
                     'carrier_max_num_tours': [3],
                     'service_area_overlap': [0.75],
-                    'run': [0],
+                    'run': range(2),
                     'threads': 1,
                     'fail': 1,
                     }

@@ -17,12 +17,12 @@ class TourInitializationBehavior(ABC):
     or a single specific carrier.
     """
 
-    def execute(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution):
+    def execute(self, instance: it.CAHDInstance, solution: slt.CAHDSolution):
         for carrier in range(len(solution.carriers)):
             self._initialize_carrier(instance, solution, carrier)
         pass
 
-    def _initialize_carrier(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier_id: int):
+    def _initialize_carrier(self, instance: it.CAHDInstance, solution: slt.CAHDSolution, carrier_id: int):
         carrier = solution.carriers[carrier_id]
         assert carrier.unrouted_requests
 
@@ -71,7 +71,7 @@ class TourInitializationBehavior(ABC):
 
 
     @abstractmethod
-    def _request_evaluation(self, instance: it.MDVRPTWInstance, solution:slt.CAHDSolution, request: int):
+    def _request_evaluation(self, instance: it.CAHDInstance, solution:slt.CAHDSolution, request: int):
         """
         See below
 
@@ -114,12 +114,12 @@ class MaxCliqueTourInitialization(ABC):
     https://doi.org/10.1016/j.ejor.2005.05.012
     """
 
-    def execute(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution):
+    def execute(self, instance: it.CAHDInstance, solution: slt.CAHDSolution):
         for carrier in range(len(solution.carriers)):
             self._initialize_carrier(instance, solution, carrier)
         pass
 
-    def _initialize_carrier(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier: int):
+    def _initialize_carrier(self, instance: it.CAHDInstance, solution: slt.CAHDSolution, carrier: int):
         carrier_ = solution.carriers[carrier]
         assert len(solution.carrier_depots[carrier]) == 1, f'graph based initialization only available for single-depot'
         assert carrier_.unrouted_requests

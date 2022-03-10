@@ -26,13 +26,13 @@ class LimitedNumBundles(bg.BundleGenerationBehavior):
 
     @abstractmethod
     def _generate_auction_bundles(self,
-                                  instance: it.MDVRPTWInstance,
+                                  instance: it.CAHDInstance,
                                   solution: slt.CAHDSolution,
                                   auction_request_pool: Sequence[int],
                                   original_partition_labels: Sequence[int]):
         pass
 
-    def preprocessing(self, instance: it.MDVRPTWInstance, auction_request_pool: Sequence[int]):
+    def preprocessing(self, instance: it.CAHDInstance, auction_request_pool: Sequence[int]):
         self.bundle_valuation.preprocessing(instance, auction_request_pool)
         pass
 
@@ -43,7 +43,7 @@ class AllBundles(bg.BundleGenerationBehavior):
     Does not include emtpy set.
     """
 
-    def _generate_auction_bundles(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
+    def _generate_auction_bundles(self, instance: it.CAHDInstance, solution: slt.CAHDSolution,
                                   auction_request_pool: Sequence[int],
                                   original_partition_labels: Sequence[int]):
         return tuple(ut.power_set(range(len(auction_request_pool)), False))
@@ -55,7 +55,7 @@ class BestOfAllBundles(bg.BundleGenerationBehavior):
     to the bundle valuation function
     """
 
-    def _generate_auction_bundles(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
+    def _generate_auction_bundles(self, instance: it.CAHDInstance, solution: slt.CAHDSolution,
                                   auction_request_pool: Sequence[int],
                                   original_partition_labels: Sequence[int]):
         all_bundles = tuple(ut.power_set(range(len(auction_request_pool)), False))

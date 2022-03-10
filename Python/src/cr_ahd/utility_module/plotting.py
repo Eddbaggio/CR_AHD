@@ -26,7 +26,7 @@ def read_vienna_districts_shapefile():
     return districts
 
 
-def plot_vienna_vrp_solution(instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, service_areas=True):
+def plot_vienna_vrp_solution(instance: it.CAHDInstance, solution: slt.CAHDSolution, service_areas=True):
     num_carriers = instance.num_carriers
     # prepare districts
     carrier_competition = instance.meta['o'] / 100

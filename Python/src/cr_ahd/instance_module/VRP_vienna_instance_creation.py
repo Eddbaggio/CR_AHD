@@ -141,33 +141,33 @@ def generate_vienna_cr_ahd_instance(dist_center_to_carrier_km: float,
                                                                                      num=len(group),
                                                                                      endpoint=False))
 
-    instance = it.MDVRPTWInstance(id_=f't=vienna'
+    instance = it.CAHDInstance(id_=f't=vienna'
                                       f'+d={dist_center_to_carrier_km}'
                                       f'+c={num_carriers}'
                                       f'+n={num_requests_per_carrier:02d}'
                                       f'+v={carriers_max_num_tours}'
                                       f'+o={int(carrier_competition * 100):03d}'
                                       f'+r={run:02d}',
-                                  carriers_max_num_tours=carriers_max_num_tours,
-                                  max_vehicle_load=max_vehicle_load,
-                                  max_tour_length=max_tour_length,
-                                  max_tour_duration=max_tour_duration,
-                                  requests=list(range(len(vienna_requests))),
-                                  requests_initial_carrier_assignment=list(vienna_requests['carrier']),
-                                  requests_disclosure_time=list(vienna_requests['disclosure_time']),
-                                  requests_x=vienna_requests.geometry.x,
-                                  requests_y=vienna_requests.geometry.y,
-                                  requests_revenue=requests_revenue,
-                                  requests_service_duration=requests_service_duration,
-                                  requests_load=requests_load,
-                                  request_time_window_open=[ut.EXECUTION_START_TIME] * len(vienna_requests),
-                                  request_time_window_close=[ut.END_TIME] * len(vienna_requests),
-                                  carrier_depots_x=vienna_depots.geometry.x,
-                                  carrier_depots_y=vienna_depots.geometry.y,
-                                  carrier_depots_tw_open=[ut.EXECUTION_START_TIME] * len(vienna_depots),
-                                  carrier_depots_tw_close=[ut.END_TIME] * len(vienna_depots),
-                                  duration_matrix=np.array(vienna_durations),
-                                  distance_matrix=np.array(vienna_distances))
+                               carriers_max_num_tours=carriers_max_num_tours,
+                               max_vehicle_load=max_vehicle_load,
+                               max_tour_length=max_tour_length,
+                               max_tour_duration=max_tour_duration,
+                               requests=list(range(len(vienna_requests))),
+                               requests_initial_carrier_assignment=list(vienna_requests['carrier']),
+                               requests_disclosure_time=list(vienna_requests['disclosure_time']),
+                               requests_x=vienna_requests.geometry.x,
+                               requests_y=vienna_requests.geometry.y,
+                               requests_revenue=requests_revenue,
+                               requests_service_duration=requests_service_duration,
+                               requests_load=requests_load,
+                               request_time_window_open=[ut.EXECUTION_START_TIME] * len(vienna_requests),
+                               request_time_window_close=[ut.END_TIME] * len(vienna_requests),
+                               carrier_depots_x=vienna_depots.geometry.x,
+                               carrier_depots_y=vienna_depots.geometry.y,
+                               carrier_depots_tw_open=[ut.EXECUTION_START_TIME] * len(vienna_depots),
+                               carrier_depots_tw_close=[ut.END_TIME] * len(vienna_depots),
+                               duration_matrix=np.array(vienna_durations),
+                               distance_matrix=np.array(vienna_distances))
 
     if save:
         instance.write_json(io.input_dir.joinpath(instance.id_ + '.json'))

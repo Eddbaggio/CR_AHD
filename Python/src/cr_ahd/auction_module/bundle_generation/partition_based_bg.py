@@ -46,7 +46,7 @@ class SingleKMeansPartition(bg.BundleGenerationBehavior):
     :return partition_labels (not normalized) of the k-means partitioning
     """
 
-    def _generate_auction_bundles(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
+    def _generate_auction_bundles(self, instance: it.CAHDInstance, solution: slt.CAHDSolution,
                                   auction_request_pool: Sequence[int], original_partition_labels):
         request_midpoints = [instance.coords(r) for r in auction_request_pool]
         # k_means = KMeans(n_clusters=instance.num_carriers, random_state=0).fit(request_midpoints)
@@ -86,13 +86,13 @@ class LimitedNumBundles(bg.BundleGenerationBehavior):
 
     @abstractmethod
     def _generate_auction_bundles(self,
-                                  instance: it.MDVRPTWInstance,
+                                  instance: it.CAHDInstance,
                                   solution: slt.CAHDSolution,
                                   auction_request_pool: Sequence[int],
                                   original_partition_labels: Sequence[int]):
         pass
 
-    def preprocessing(self, instance: it.MDVRPTWInstance, auction_request_pool: Sequence[int]):
+    def preprocessing(self, instance: it.CAHDInstance, auction_request_pool: Sequence[int]):
         self.partition_valuation.preprocessing(instance, auction_request_pool)
         pass
 
@@ -107,7 +107,7 @@ class BestOfAllPartitions(LimitedNumBundles):
     """
 
     def _generate_auction_bundles(self,
-                                  instance: it.MDVRPTWInstance,
+                                  instance: it.CAHDInstance,
                                   solution: slt.CAHDSolution,
                                   auction_request_pool: Sequence[int],
                                   original_partition_labels: Sequence[int]):
@@ -140,7 +140,7 @@ class RandomMaxKPartitions(LimitedNumBundles):
     """
 
     def _generate_auction_bundles(self,
-                                  instance: it.MDVRPTWInstance,
+                                  instance: it.CAHDInstance,
                                   solution: slt.CAHDSolution,
                                   auction_request_pool: Sequence[int],
                                   original_partition_labels: Sequence[int]):
@@ -184,7 +184,7 @@ class GeneticAlgorithm(LimitedNumBundles):
     """
 
     def _generate_auction_bundles(self,
-                                  instance: it.MDVRPTWInstance,
+                                  instance: it.CAHDInstance,
                                   solution: slt.CAHDSolution,
                                   auction_request_pool: Sequence[int],
                                   original_partition_labels: Sequence[int]):
@@ -216,7 +216,7 @@ class GeneticAlgorithm(LimitedNumBundles):
 
         return limited_bundle_pool
 
-    def fitness(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, offspring, auction_request_pool):
+    def fitness(self, instance: it.CAHDInstance, solution: slt.CAHDSolution, offspring, auction_request_pool):
         fitness = self.partition_valuation.evaluate_partition_labels(instance, solution, offspring,
                                                                      auction_request_pool)
         return fitness
@@ -317,7 +317,7 @@ class GeneticAlgorithm(LimitedNumBundles):
 
         return offspring
 
-    def initialize_population(self, instance: it.MDVRPTWInstance,
+    def initialize_population(self, instance: it.CAHDInstance,
                               solution: slt.CAHDSolution,
                               auction_request_pool: Sequence,
                               n: int,
@@ -383,7 +383,7 @@ class GeneticAlgorithm(LimitedNumBundles):
         return parents
 
     @staticmethod
-    def _crossover_uniform(instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, auction_request_pool, parent1,
+    def _crossover_uniform(instance: it.CAHDInstance, solution: slt.CAHDSolution, auction_request_pool, parent1,
                            parent2):
         """
         For each request, the corresponding bundle is randomly chosen from parent A or B. This corresponds to the
@@ -395,7 +395,7 @@ class GeneticAlgorithm(LimitedNumBundles):
         return offspring
 
     @staticmethod
-    def _crossover_temporal(instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, auction_request_pool, parent1,
+    def _crossover_temporal(instance: it.CAHDInstance, solution: slt.CAHDSolution, auction_request_pool, parent1,
                             parent2):
         """
         combine parents using their time window information
@@ -427,7 +427,7 @@ class GeneticAlgorithm(LimitedNumBundles):
         return offspring
 
     @staticmethod
-    def _crossover_geo(instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, auction_request_pool, parent1,
+    def _crossover_geo(instance: it.CAHDInstance, solution: slt.CAHDSolution, auction_request_pool, parent1,
                        parent2):
         """
         "In this operator, we try to keep potentially good parts of existing bundles by combining the parents using
@@ -473,7 +473,7 @@ class GeneticAlgorithm(LimitedNumBundles):
         return offspring
 
     @staticmethod
-    def _mutation_move(instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, offspring: List[int],
+    def _mutation_move(instance: it.CAHDInstance, solution: slt.CAHDSolution, offspring: List[int],
                        auction_request_pool: Sequence[int]):
         """
         A random number of randomly chosen positions is changed. However, the number of available bundles is not
@@ -487,7 +487,7 @@ class GeneticAlgorithm(LimitedNumBundles):
         pass
 
     @staticmethod
-    def _mutation_create(instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, offspring: List[int],
+    def _mutation_create(instance: it.CAHDInstance, solution: slt.CAHDSolution, offspring: List[int],
                          auction_request_pool: Sequence[int]):
         """
         A new bundle is created. We randomly chose one request and assign it to the new bundle. If by this the
@@ -507,7 +507,7 @@ class GeneticAlgorithm(LimitedNumBundles):
         pass
 
     @staticmethod
-    def _mutation_join(instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, offspring: List[int],
+    def _mutation_join(instance: it.CAHDInstance, solution: slt.CAHDSolution, offspring: List[int],
                        auction_request_pool: Sequence[int]):
         """
         Two randomly chosen bundles are merged. If the offspring has only a single bundle, nothing happens
@@ -521,7 +521,7 @@ class GeneticAlgorithm(LimitedNumBundles):
         pass
 
     @staticmethod
-    def _mutation_shift(instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, offspring: List[int],
+    def _mutation_shift(instance: it.CAHDInstance, solution: slt.CAHDSolution, offspring: List[int],
                         auction_request_pool: Sequence[int]):
         """
         for each of the given bundles in the candidate solution, the centroid is calculated. Then, requests are

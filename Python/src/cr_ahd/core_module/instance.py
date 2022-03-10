@@ -9,6 +9,7 @@ import numpy as np
 
 import utility_module.utils as ut
 from tw_management_module import tw
+from tw_management_module.tw import TimeWindow
 from utility_module.datetime_rounding import ceil_timedelta
 from utility_module.io import MyJSONEncoder
 
@@ -79,7 +80,7 @@ class Instance(ABC):
 """
 
 
-class MDVRPTWInstance:
+class CAHDInstance:
     def __init__(self,
                  id_: str,
                  carriers_max_num_tours: int,
@@ -260,7 +261,7 @@ class MDVRPTWInstance:
         pass
 
 
-def read_vienna_instance(path: Path) -> MDVRPTWInstance:
+def read_vienna_instance(path: Path) -> CAHDInstance:
     if path.suffix == ".json":
         with open(path, 'r') as file:
             inst = dict(json.load(file))
@@ -272,27 +273,27 @@ def read_vienna_instance(path: Path) -> MDVRPTWInstance:
                                            for x in inst['_travel_duration_matrix']]
         inst['max_tour_duration'] = dt.timedelta(seconds=inst['max_tour_duration'])
 
-        return MDVRPTWInstance(id_=inst['_id_'],
-                               carriers_max_num_tours=inst['carriers_max_num_tours'],
-                               max_vehicle_load=inst['max_vehicle_load'],
-                               max_tour_length=inst['max_tour_distance'],
-                               max_tour_duration=inst['max_tour_duration'],
-                               requests=inst['requests'],
-                               requests_initial_carrier_assignment=inst['request_to_carrier_assignment'],
-                               requests_disclosure_time=inst['request_disclosure_time'],
-                               requests_x=inst['vertex_x_coords'][inst['num_carriers']:],
-                               requests_y=inst['vertex_y_coords'][inst['num_carriers']:],
-                               requests_revenue=inst['vertex_revenue'][inst['num_carriers']:],
-                               requests_service_duration=inst['vertex_service_duration'][inst['num_carriers']:],
-                               requests_load=inst['vertex_load'][inst['num_carriers']:],
-                               request_time_window_open=inst['tw_open'][inst['num_carriers']:],
-                               request_time_window_close=inst['tw_close'][inst['num_carriers']:],
-                               carrier_depots_x=inst['vertex_x_coords'][:inst['num_carriers']],
-                               carrier_depots_y=inst['vertex_y_coords'][:inst['num_carriers']],
-                               carrier_depots_tw_open=inst['tw_open'][:inst['num_carriers']],
-                               carrier_depots_tw_close=inst['tw_close'][:inst['num_carriers']],
-                               duration_matrix=inst['_travel_duration_matrix'],
-                               distance_matrix=inst['_travel_distance_matrix'])
+        return CAHDInstance(id_=inst['_id_'],
+                            carriers_max_num_tours=inst['carriers_max_num_tours'],
+                            max_vehicle_load=inst['max_vehicle_load'],
+                            max_tour_length=inst['max_tour_distance'],
+                            max_tour_duration=inst['max_tour_duration'],
+                            requests=inst['requests'],
+                            requests_initial_carrier_assignment=inst['request_to_carrier_assignment'],
+                            requests_disclosure_time=inst['request_disclosure_time'],
+                            requests_x=inst['vertex_x_coords'][inst['num_carriers']:],
+                            requests_y=inst['vertex_y_coords'][inst['num_carriers']:],
+                            requests_revenue=inst['vertex_revenue'][inst['num_carriers']:],
+                            requests_service_duration=inst['vertex_service_duration'][inst['num_carriers']:],
+                            requests_load=inst['vertex_load'][inst['num_carriers']:],
+                            request_time_window_open=inst['tw_open'][inst['num_carriers']:],
+                            request_time_window_close=inst['tw_close'][inst['num_carriers']:],
+                            carrier_depots_x=inst['vertex_x_coords'][:inst['num_carriers']],
+                            carrier_depots_y=inst['vertex_y_coords'][:inst['num_carriers']],
+                            carrier_depots_tw_open=inst['tw_open'][:inst['num_carriers']],
+                            carrier_depots_tw_close=inst['tw_close'][:inst['num_carriers']],
+                            duration_matrix=inst['_travel_duration_matrix'],
+                            distance_matrix=inst['_travel_distance_matrix'])
     else:
         raise NotImplementedError(f'Reading files from {path.suffix} files is not supported yet')
 

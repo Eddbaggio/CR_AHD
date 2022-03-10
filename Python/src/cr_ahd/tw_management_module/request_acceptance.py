@@ -10,22 +10,22 @@ class RequestAcceptanceAttractiveness(ABC):
         self.name = self.__class__.__name__
 
     @abstractmethod
-    def evaluate(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution, request: int):
+    def evaluate(self, instance: it.CAHDInstance, carrier: slt.AHDSolution, request: int):
         pass
 
 
 class FirstComeFirstServed(RequestAcceptanceAttractiveness):
-    def evaluate(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution, request: int):
+    def evaluate(self, instance: it.CAHDInstance, carrier: slt.AHDSolution, request: int):
         return True
 
 
 class Dummy(RequestAcceptanceAttractiveness):
-    def evaluate(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution, request: int):
+    def evaluate(self, instance: it.CAHDInstance, carrier: slt.AHDSolution, request: int):
         return False
 
 
 class _CloseDurationToCompetitors(RequestAcceptanceAttractiveness):
-    def evaluate(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution, request: int):
+    def evaluate(self, instance: it.CAHDInstance, carrier: slt.AHDSolution, request: int):
         delivery_vertex = instance.vertex_from_request(request)
         carrier_dur_sum = instance.travel_duration([carrier.id_, delivery_vertex],
                                                    [delivery_vertex, carrier.id_])
@@ -64,7 +64,7 @@ class _CloseDistToCompetitors(RequestAcceptanceAttractiveness):
     rated attractive.
     """
 
-    def evaluate(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution, request: int):
+    def evaluate(self, instance: it.CAHDInstance, carrier: slt.AHDSolution, request: int):
         delivery_vertex = instance.vertex_from_request(request)
         carrier_dist_sum = instance.travel_distance([carrier.id_, delivery_vertex],
                                                     [delivery_vertex, carrier.id_])
@@ -110,7 +110,7 @@ class RequestAcceptanceBehavior:
         self.time_window_selection = time_window_selection
         self.name = self.__class__.__name__
 
-    def execute(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution, request: int):
+    def execute(self, instance: it.CAHDInstance, carrier: slt.AHDSolution, request: int):
 
         offer_set = self.time_window_offering.execute(instance, carrier, request)
         acceptance_type = 'accept_feasible'
@@ -172,7 +172,7 @@ class RequestAcceptanceBehavior:
         return acceptance_type, selected_tw
     """
 
-    def pendulum_feasible_set(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution, request: int):
+    def pendulum_feasible_set(self, instance: it.CAHDInstance, carrier: slt.AHDSolution, request: int):
         """
         returns all time windows for which a pendulum tour is feasible
         """

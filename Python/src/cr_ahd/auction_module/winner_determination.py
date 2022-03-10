@@ -18,7 +18,7 @@ class WinnerDeterminationBehavior(ABC):
         self.name = self.__class__.__name__
 
     def execute(self,
-                instance: it.MDVRPTWInstance,
+                instance: it.CAHDInstance,
                 solution: slt.CAHDSolution,
                 auction_pool,
                 bundles: Sequence,
@@ -45,7 +45,7 @@ class WinnerDeterminationBehavior(ABC):
 
     @abstractmethod
     def _determine_winners(self,
-                           instance: it.MDVRPTWInstance,
+                           instance: it.CAHDInstance,
                            solution: slt.CAHDSolution,
                            auction_pool: Sequence[int],
                            bundles: Sequence[Sequence[int]],
@@ -73,7 +73,7 @@ class MaxBidGurobiCAP1(WinnerDeterminationBehavior):
     """
 
     def _determine_winners(self,
-                           instance: it.MDVRPTWInstance,
+                           instance: it.CAHDInstance,
                            solution: slt.CAHDSolution,
                            auction_pool: Sequence[int],
                            bundles: Sequence[Sequence[int]],

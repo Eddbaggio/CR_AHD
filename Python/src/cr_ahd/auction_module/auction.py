@@ -46,7 +46,7 @@ class Auction:
         assert isinstance(self.bidding.tour_construction, type(self.tour_construction))
         assert isinstance(self.bidding.tour_improvement, type(self.tour_improvement))
 
-    def execute(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution):
+    def execute(self, instance: it.CAHDInstance, solution: slt.CAHDSolution):
         for auction_round in range(self.num_auction_rounds):
 
             # auction
@@ -112,7 +112,7 @@ class Auction:
         return solution
 
     def reallocate_requests(self,
-                            instance: it.MDVRPTWInstance,
+                            instance: it.CAHDInstance,
                             solution: slt.CAHDSolution) -> (slt.CAHDSolution, List[int]):
         logger.debug(f'running auction {self.__class__.__name__}')
 
@@ -189,7 +189,7 @@ class Auction:
 
         return status, solution, bundle_winners
 
-    def re_optimize(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution, carrier_ids: List[int] = None):
+    def re_optimize(self, instance: it.CAHDInstance, solution: slt.CAHDSolution, carrier_ids: List[int] = None):
         """
         After requests have been reallocated, this function builds the new tours based on the new requests. It is
         important that this routing follows the same steps as the routing approach in the bidding phase to reliably
@@ -219,7 +219,7 @@ class Auction:
         return solution
 
     @staticmethod
-    def assign_bundles_to_winners(instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
+    def assign_bundles_to_winners(instance: it.CAHDInstance, solution: slt.CAHDSolution,
                                   winner_bundles: List[List[int]],
                                   bundle_winners: List[int]):
         # assign the bundles to the corresponding winner

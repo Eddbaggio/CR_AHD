@@ -13,7 +13,7 @@ def plot_avg_tour_tw_occupancy(solutions: Sequence[slt.CAHDSolution]):
         time_windows = ut.generate_time_windows(tw_length)
         densities = [tour_tw_occupancy(tour, time_windows) for tour in solution.tours]
 
-
+"""
 def tour_tw_occupancy(tour: tr.Tour, time_windows: Sequence[TimeWindow]):
     tw_occupancy = {tw: {'travel': dt.timedelta(0), 'service': dt.timedelta(0), 'wait': dt.timedelta(0)}
                     for tw in time_windows}
@@ -64,9 +64,10 @@ def tour_tw_occupancy(tour: tr.Tour, time_windows: Sequence[TimeWindow]):
 
     # print
     for tw, occupancy in tw_occupancy.items():
-        print(tw)
-        print(str(occupancy))
+        # print(tw)
+        # print(str(occupancy))
         sum_durations = sum(occupancy.values(), dt.timedelta(0))
         assert sum_durations <= tw.duration
-        print(sum_durations)
+        # print(sum_durations)
     pass
+"""

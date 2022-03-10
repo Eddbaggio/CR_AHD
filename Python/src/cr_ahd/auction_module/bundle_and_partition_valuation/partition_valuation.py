@@ -14,7 +14,7 @@ from utility_module import utils as ut
 # ======================================================================================================================
 
 
-def partition_extended_distance_matrix(instance: it.MDVRPTWInstance, additional_vertex_coords: Sequence[ut.Coordinates]):
+def partition_extended_distance_matrix(instance: it.CAHDInstance, additional_vertex_coords: Sequence[ut.Coordinates]):
     """
     uses euclidean distance for distances to/from additional_vertex_coords
 
@@ -53,7 +53,7 @@ def bundle_isolation(bundle_centroid: ut.Coordinates,
     return min_separation
 
 
-def waiting_time_seconds(instance: it.MDVRPTWInstance, vertex1: int, vertex2: int):
+def waiting_time_seconds(instance: it.CAHDInstance, vertex1: int, vertex2: int):
     travel_time = instance.travel_duration([vertex1], [vertex2])
     if instance.tw_open[vertex1] + travel_time > instance.tw_close[vertex2]:
         return float('inf')
@@ -63,7 +63,7 @@ def waiting_time_seconds(instance: it.MDVRPTWInstance, vertex1: int, vertex2: in
         return (t0 - t1).total_seconds()
 
 
-def los_schulte_vertex_similarity(instance: it.MDVRPTWInstance, vertex1: int, vertex2: int):
+def los_schulte_vertex_similarity(instance: it.CAHDInstance, vertex1: int, vertex2: int):
     """
     Following [1] Los, J., Schulte, F., Gansterer, M., Hartl, R. F., Spaan, M. T. J., & Negenborn, R. R. (2020).
     Decentralized combinatorial auctions for dynamic and large-scale collaborative vehicle routing.
@@ -98,7 +98,7 @@ def los_schulte_request_similarity(delivery0, delivery1, vertex_similarity_matri
     )
 
 
-def ropke_pisinger_request_similarity(instance: it.MDVRPTWInstance,
+def ropke_pisinger_request_similarity(instance: it.CAHDInstance,
                                       solution: slt.CAHDSolution,
                                       request_0: int,
                                       request_1: int,
@@ -169,19 +169,19 @@ class PartitionValuation(ABC):
         self.name = self.__class__.__name__
 
     @final
-    def evaluate_partition_labels(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
+    def evaluate_partition_labels(self, instance: it.CAHDInstance, solution: slt.CAHDSolution,
                                   partition_labels: Sequence[int], auction_request_pool: Sequence[int]) -> float:
         """turns partition labels into a partition and evaluates that partition"""
         partition = ut.indices_to_nested_lists(partition_labels, auction_request_pool)
         return self.evaluate_partition(instance, solution, partition)
 
     @abstractmethod
-    def evaluate_partition(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
+    def evaluate_partition(self, instance: it.CAHDInstance, solution: slt.CAHDSolution,
                            partition: List[List[int]]) -> float:
         """evaluate a partition"""
         pass
 
-    def preprocessing(self, instance: it.MDVRPTWInstance, auction_request_pool: Sequence[int]):
+    def preprocessing(self, instance: it.CAHDInstance, auction_request_pool: Sequence[int]):
         pass
 
 
@@ -194,7 +194,7 @@ class GHProxyPartitionValuation(PartitionValuation):
 
     """
 
-    def evaluate_partition(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
+    def evaluate_partition(self, instance: it.CAHDInstance, solution: slt.CAHDSolution,
                            partition: List[List[int]]) -> float:
         """
 
@@ -256,7 +256,7 @@ class MinDistancePartitionValuation(PartitionValuation):
     the dynamic insertion procedure.
     """
 
-    def evaluate_partition(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
+    def evaluate_partition(self, instance: it.CAHDInstance, solution: slt.CAHDSolution,
                            partition: List[List[int]]) -> float:
         raise NotImplementedError  # TODO does not work since bundles of size 1 have travel duration = 0
         bundle_valuations = []
@@ -273,7 +273,7 @@ class MinTravelDurationPartitionValuation(PartitionValuation):
     the dynamic insertion procedure.
     """
 
-    def evaluate_partition(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
+    def evaluate_partition(self, instance: it.CAHDInstance, solution: slt.CAHDSolution,
                            partition: List[List[int]]) -> float:
         raise NotImplementedError  # TODO does not work since bundles of size 1 have travel duration = 0
         bundle_valuations = []
@@ -290,7 +290,7 @@ class SumTravelDurationPartitionValuation(PartitionValuation):
     the dynamic insertion procedure (without improvement).
     """
 
-    def evaluate_partition(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
+    def evaluate_partition(self, instance: it.CAHDInstance, solution: slt.CAHDSolution,
                            partition: List[List[int]]) -> float:
         bundle_valuations = []
         for bundle in partition:
@@ -305,7 +305,7 @@ class LosSchultePartitionValuation(PartitionValuation):
     VRP: adjusted the formulas and algorithms to be somewhat applicable to a delivery-only setting
     """
 
-    def evaluate_partition(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
+    def evaluate_partition(self, instance: it.CAHDInstance, solution: slt.CAHDSolution,
                            partition: List[List[int]]) -> float:
 
         bundle_valuations = []
@@ -320,7 +320,7 @@ class LosSchultePartitionValuation(PartitionValuation):
         # return negative, since low values are better and the caller maximizes
         return 1000 / partition_valuation
 
-    def evaluate_bundle(self, instance: it.MDVRPTWInstance, bundle: Sequence[int]):
+    def evaluate_bundle(self, instance: it.CAHDInstance, bundle: Sequence[int]):
         # multi-request bundles
         if len(bundle) > 1:
             # lower request_similarity values are better
@@ -355,7 +355,7 @@ class LosSchultePartitionValuation(PartitionValuation):
 
         return bundle_valuation
 
-    def preprocessing(self, instance: it.MDVRPTWInstance, auction_request_pool: Sequence[int]):
+    def preprocessing(self, instance: it.CAHDInstance, auction_request_pool: Sequence[int]):
         """
         pre-compute the pairwise relatedness matrix for all vertices
         """
@@ -370,6 +370,6 @@ class LosSchultePartitionValuation(PartitionValuation):
 
 
 class RandomPartitionValuation(PartitionValuation):
-    def evaluate_partition(self, instance: it.MDVRPTWInstance, solution: slt.CAHDSolution,
+    def evaluate_partition(self, instance: it.CAHDInstance, solution: slt.CAHDSolution,
                            partition: List[List[int]]) -> float:
         return random.random()

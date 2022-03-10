@@ -18,7 +18,7 @@ class Neighborhood(ABC):
         self.name = self.__class__.__name__
 
     @abstractmethod
-    def feasible_move_generator_for_carrier(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution):
+    def feasible_move_generator_for_carrier(self, instance: it.CAHDInstance, carrier: slt.AHDSolution):
         """
         :return: generator that returns the next found move upon calling the next() method on it. Each move is a
         tuple containing all necessary information to see whether to accept that move and the information to execute
@@ -27,7 +27,7 @@ class Neighborhood(ABC):
         pass
 
     @abstractmethod
-    def execute_move(self, instance: it.MDVRPTWInstance, move: tuple):
+    def execute_move(self, instance: it.CAHDInstance, move: tuple):
         """
         Executes the neighbourhood move in place.
 
@@ -37,7 +37,7 @@ class Neighborhood(ABC):
         pass
 
     @abstractmethod
-    def feasibility_check(self, instance: it.MDVRPTWInstance, move: tuple):
+    def feasibility_check(self, instance: it.CAHDInstance, move: tuple):
         """
         A (hopefully efficient) feasibility check of the neighborhood move. Optimally, this is a constant time
         algorithm. However, the Precedence and Time Window constraints of the PDPTW make efficient move evaluation
@@ -51,13 +51,13 @@ class Neighborhood(ABC):
 
 
 class NoNeighborhood(Neighborhood):
-    def feasible_move_generator_for_carrier(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution):
+    def feasible_move_generator_for_carrier(self, instance: it.CAHDInstance, carrier: slt.AHDSolution):
         pass
 
-    def execute_move(self, instance: it.MDVRPTWInstance, move: tuple):
+    def execute_move(self, instance: it.CAHDInstance, move: tuple):
         pass
 
-    def feasibility_check(self, instance: it.MDVRPTWInstance, move: tuple):
+    def feasibility_check(self, instance: it.CAHDInstance, move: tuple):
         pass
 
 
@@ -66,7 +66,7 @@ class NoNeighborhood(Neighborhood):
 # =====================================================================================================================
 class IntraTourNeighborhood(Neighborhood, ABC):
     @typing.final
-    def feasible_move_generator_for_carrier(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution):
+    def feasible_move_generator_for_carrier(self, instance: it.CAHDInstance, carrier: slt.AHDSolution):
         """
         using a generator (i.e. "yield" instead of "return") avoids unnecessary move evaluations. E.g., in a first
         improvement scenario, it is not necessary to evaluate (or even define) the complete neighborhood, finding a
@@ -80,7 +80,7 @@ class IntraTourNeighborhood(Neighborhood, ABC):
             yield from self.feasible_move_generator_for_tour(instance, tour)  # delegated generator
 
     @abstractmethod
-    def feasible_move_generator_for_tour(self, instance: it.MDVRPTWInstance, tour: tr.Tour):
+    def feasible_move_generator_for_tour(self, instance: it.CAHDInstance, tour: tr.Tour):
         """
 
         :param instance:
@@ -90,7 +90,7 @@ class IntraTourNeighborhood(Neighborhood, ABC):
         pass
 
     @abstractmethod
-    def feasibility_check(self, instance: it.MDVRPTWInstance, move):
+    def feasibility_check(self, instance: it.CAHDInstance, move):
         pass
 
 
@@ -100,7 +100,7 @@ class VRPTWMoveDist(IntraTourNeighborhood):
     move = (delta, tour, old_pos, vertex, new_pos)
     """
 
-    def feasible_move_generator_for_tour(self, instance: it.MDVRPTWInstance, tour: tr.Tour):
+    def feasible_move_generator_for_tour(self, instance: it.CAHDInstance, tour: tr.Tour):
         tour_copy = deepcopy(tour)
         for old_pos, vertex in enumerate(tour_copy.routing_sequence[1:-1], start=1):
             delta = tour_copy.pop_distance_delta(instance, [old_pos])
@@ -122,11 +122,11 @@ class VRPTWMoveDist(IntraTourNeighborhood):
             tour_copy.insert_and_update(instance, [old_pos], [vertex])
         pass
 
-    def feasibility_check(self, instance: it.MDVRPTWInstance, move: vrptw_move_move):
+    def feasibility_check(self, instance: it.CAHDInstance, move: vrptw_move_move):
         delta, tour, old_pos, vertex, new_pos = move
         return tour.insertion_feasibility_check(instance, [new_pos], [vertex])
 
-    def execute_move(self, instance: it.MDVRPTWInstance, move: vrptw_move_move):
+    def execute_move(self, instance: it.CAHDInstance, move: vrptw_move_move):
         delta, tour, old_pos, vertex, new_pos = move
         # remove
         tour.pop_and_update(instance, [old_pos])
@@ -137,7 +137,7 @@ class VRPTWMoveDist(IntraTourNeighborhood):
 
 
 class VRPTWMoveDur(VRPTWMoveDist):
-    def feasible_move_generator_for_tour(self, instance: it.MDVRPTWInstance, tour: tr.Tour):
+    def feasible_move_generator_for_tour(self, instance: it.CAHDInstance, tour: tr.Tour):
         tour_copy = deepcopy(tour)
         for old_pos, vertex in enumerate(tour_copy.routing_sequence[1:-1], start=1):
             delta = tour_copy.pop_duration_delta(instance, [old_pos]).total_seconds()
@@ -166,7 +166,7 @@ class VRPTWTwoOptDist(IntraTourNeighborhood):
     The classic 2-opt neighborhood by Croes (1958)
     """
 
-    def feasible_move_generator_for_tour(self, instance: it.MDVRPTWInstance, tour: tr.Tour):
+    def feasible_move_generator_for_tour(self, instance: it.CAHDInstance, tour: tr.Tour):
         for i in range(0, len(tour) - 3):
             for j in range(i + 2, len(tour) - 1):
                 delta = 0.0
@@ -181,7 +181,7 @@ class VRPTWTwoOptDist(IntraTourNeighborhood):
                 if self.feasibility_check(instance, move):
                     yield move
 
-    def feasibility_check(self, instance: it.MDVRPTWInstance, move: vrptw_2opt_move):
+    def feasibility_check(self, instance: it.CAHDInstance, move: vrptw_2opt_move):
         delta, tour, i, j = move
 
         pop_indices = list(range(i + 1, j + 1))
@@ -190,7 +190,7 @@ class VRPTWTwoOptDist(IntraTourNeighborhood):
         tour.insert_and_update(instance, pop_indices, popped)
         return feasibility
 
-    def execute_move(self, instance: it.MDVRPTWInstance, move: vrptw_2opt_move):
+    def execute_move(self, instance: it.CAHDInstance, move: vrptw_2opt_move):
         delta, tour, i, j = move
         popped = tour.pop_and_update(instance, list(range(i + 1, j + 1)))
         tour.insert_and_update(instance, range(i + 1, j + 1), list(reversed(popped)))
@@ -202,7 +202,7 @@ class VRPTWTwoOptDur(IntraTourNeighborhood):
     The classic 2-opt neighborhood by Croes (1958)
     """
 
-    def feasible_move_generator_for_tour(self, instance: it.MDVRPTWInstance, tour: tr.Tour):
+    def feasible_move_generator_for_tour(self, instance: it.CAHDInstance, tour: tr.Tour):
         for i in range(0, len(tour) - 3):
             for j in range(i + 2, len(tour) - 1):
                 delta = 0.0
@@ -218,7 +218,7 @@ class VRPTWTwoOptDur(IntraTourNeighborhood):
                 if self.feasibility_check(instance, move):
                     yield move
 
-    def feasibility_check(self, instance: it.MDVRPTWInstance, move: vrptw_2opt_move):
+    def feasibility_check(self, instance: it.CAHDInstance, move: vrptw_2opt_move):
         delta, tour, i, j = move
 
         pop_indices = list(range(i + 1, j + 1))
@@ -227,7 +227,7 @@ class VRPTWTwoOptDur(IntraTourNeighborhood):
         tour.insert_and_update(instance, pop_indices, popped)
         return feasibility
 
-    def execute_move(self, instance: it.MDVRPTWInstance, move: vrptw_2opt_move):
+    def execute_move(self, instance: it.CAHDInstance, move: vrptw_2opt_move):
         delta, tour, i, j = move
         popped = tour.pop_and_update(instance, list(range(i + 1, j + 1)))
         tour.insert_and_update(instance, range(i + 1, j + 1), list(reversed(popped)))
@@ -235,7 +235,7 @@ class VRPTWTwoOptDur(IntraTourNeighborhood):
 
 
 class VRPTWTwoOptDurMax4(VRPTWTwoOptDur):
-    def feasible_move_generator_for_tour(self, instance: it.MDVRPTWInstance, tour: tr.Tour):
+    def feasible_move_generator_for_tour(self, instance: it.CAHDInstance, tour: tr.Tour):
         for i in range(0, len(tour) - 3):
             for j in range(i + 2, min(i + 6, len(tour) - 1)):
                 delta = 0.0
@@ -257,7 +257,7 @@ class VRPTWTwoOptDurMax4(VRPTWTwoOptDur):
 # =====================================================================================================================
 class InterTourNeighborhood(Neighborhood, ABC):
     @abstractmethod
-    def feasible_move_generator_for_carrier(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution):
+    def feasible_move_generator_for_carrier(self, instance: it.CAHDInstance, carrier: slt.AHDSolution):
         """
         :return: tuple containing all necessary information to see whether to accept a move and the information to
         execute a move. The first element must be the delta in travel distance.
@@ -265,7 +265,7 @@ class InterTourNeighborhood(Neighborhood, ABC):
         pass
 
     @abstractmethod
-    def feasibility_check(self, instance: it.MDVRPTWInstance, move):
+    def feasibility_check(self, instance: it.CAHDInstance, move):
         pass
 
 
@@ -274,7 +274,7 @@ class VRPTWRelocateDist(InterTourNeighborhood):
     take a delivery request and see whether inserting it intro another tour is cheaper
     """
 
-    def feasible_move_generator_for_carrier(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution):
+    def feasible_move_generator_for_carrier(self, instance: it.CAHDInstance, carrier: slt.AHDSolution):
         for old_tour in carrier.tours:
             for old_pos, vertex in enumerate(old_tour.routing_sequence[1:-1], start=1):
                 for new_tour in carrier.tours:
@@ -289,12 +289,12 @@ class VRPTWRelocateDist(InterTourNeighborhood):
                             yield move
         pass
 
-    def feasibility_check(self, instance: it.MDVRPTWInstance, move: vrptw_relocate_move):
+    def feasibility_check(self, instance: it.CAHDInstance, move: vrptw_relocate_move):
         delta, carrier, old_tour, old_pos, new_tour, new_pos = move
         vertex = old_tour.routing_sequence[old_pos]
         return new_tour.insertion_feasibility_check(instance, [new_pos], [vertex])
 
-    def execute_move(self, instance: it.MDVRPTWInstance, move: vrptw_relocate_move):
+    def execute_move(self, instance: it.CAHDInstance, move: vrptw_relocate_move):
         delta, carrier, old_tour, old_pos, new_tour, new_pos = move
         vertex = old_tour.pop_and_update(instance, [old_pos])[0]
         request = instance.request_from_vertex(vertex)
@@ -311,7 +311,7 @@ class VRPTWRelocateDur(InterTourNeighborhood):
     take a delivery request and see whether inserting it intro another tour is cheaper
     """
 
-    def feasible_move_generator_for_carrier(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution):
+    def feasible_move_generator_for_carrier(self, instance: it.CAHDInstance, carrier: slt.AHDSolution):
         for old_tour in carrier.tours:
             for old_pos, vertex in enumerate(old_tour.routing_sequence[1:-1], start=1):
                 for new_tour in carrier.tours:
@@ -326,12 +326,12 @@ class VRPTWRelocateDur(InterTourNeighborhood):
                             yield move
         pass
 
-    def feasibility_check(self, instance: it.MDVRPTWInstance, move: vrptw_relocate_move):
+    def feasibility_check(self, instance: it.CAHDInstance, move: vrptw_relocate_move):
         delta, carrier, old_tour, old_pos, new_tour, new_pos = move
         vertex = old_tour.routing_sequence[old_pos]
         return new_tour.insertion_feasibility_check(instance, [new_pos], [vertex])
 
-    def execute_move(self, instance: it.MDVRPTWInstance, move: vrptw_relocate_move):
+    def execute_move(self, instance: it.CAHDInstance, move: vrptw_relocate_move):
         delta, carrier, old_tour, old_pos, new_tour, new_pos = move
         vertex = old_tour.pop_and_update(instance, [old_pos])[0]
         request = instance.request_from_vertex(vertex)

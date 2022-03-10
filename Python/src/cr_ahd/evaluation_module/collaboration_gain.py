@@ -113,8 +113,6 @@ def collaboration_gain(df: pd.DataFrame, plot: bool = False):
     return df
 
 
-
-
 if __name__ == '__main__':
     # path = "C:/Users/Elting/Desktop/HPC_Output/evaluation_agg_solution_#011.csv"
     path = "C:/Users/Elting/ucloud/PhD/02_Research/02_Collaborative Routing for Attended Home Deliveries/01_Code/data/Output/evaluation_agg_solution_#021.csv"

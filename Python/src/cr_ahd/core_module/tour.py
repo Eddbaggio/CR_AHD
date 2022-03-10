@@ -40,7 +40,7 @@ class Tour(ABC):
         self.sum_revenue: float = 0.0
         # self.sum_profit: float = 0.0
 
-        # initialize depot to depot tour
+        # initialize depot-to-depot tour
         for _ in range(2):
             self.routing_sequence.insert(1, depot_index)
             self.arrival_time_sequence.insert(1, ut.EXECUTION_START_TIME)
@@ -101,7 +101,7 @@ class Tour(ABC):
     @property
     def density(self):
         density = (self.sum_travel_duration + self.sum_service_duration) / (
-                    self.sum_travel_duration + self.sum_service_duration + self.sum_wait_duration)
+                self.sum_travel_duration + self.sum_service_duration + self.sum_wait_duration)
         return density
 
     def as_dict(self):

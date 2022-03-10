@@ -15,7 +15,7 @@ class BundleGenerationBehavior(ABC):
         self.name = self.__class__.__name__
 
     def execute(self,
-                instance: it.MDVRPTWInstance,
+                instance: it.CAHDInstance,
                 solution: slt.CAHDSolution,
                 auction_request_pool: Sequence[int],
                 original_partition_labels: Sequence[int]):

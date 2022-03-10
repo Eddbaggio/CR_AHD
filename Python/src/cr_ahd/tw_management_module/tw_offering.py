@@ -12,7 +12,7 @@ class TWOfferingBehavior(abc.ABC):
         self.time_window_length = time_window_length
         self.time_windows = ut.generate_time_windows(time_window_length)
 
-    def execute(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution, request: int):
+    def execute(self, instance: it.CAHDInstance, carrier: slt.AHDSolution, request: int):
         delivery_vertex = instance.vertex_from_request(request)
         # make sure that the request has not been given a tw yet
         assert instance.tw_open[delivery_vertex] in (ut.EXECUTION_START_TIME, None), \
@@ -28,13 +28,13 @@ class TWOfferingBehavior(abc.ABC):
         return offered_time_windows
 
     @abc.abstractmethod
-    def _evaluate_time_window(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution, request: int,
+    def _evaluate_time_window(self, instance: it.CAHDInstance, carrier: slt.AHDSolution, request: int,
                               tw: tw.TimeWindow):
         pass
 
 
 class FeasibleTW(TWOfferingBehavior):
-    def _evaluate_time_window(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution, request: int,
+    def _evaluate_time_window(self, instance: it.CAHDInstance, carrier: slt.AHDSolution, request: int,
                               tw: tw.TimeWindow):
         """
         :return: 1 if TW is feasible, -1 else
@@ -71,9 +71,9 @@ class FeasibleTW(TWOfferingBehavior):
 
 
 class NoTw(TWOfferingBehavior):
-    def execute(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution, request: int):
+    def execute(self, instance: it.CAHDInstance, carrier: slt.AHDSolution, request: int):
         return [ut.EXECUTION_TIME_HORIZON]
 
-    def _evaluate_time_window(self, instance: it.MDVRPTWInstance, carrier: slt.AHDSolution, request: int,
+    def _evaluate_time_window(self, instance: it.CAHDInstance, carrier: slt.AHDSolution, request: int,
                               tw: tw.TimeWindow):
         pass

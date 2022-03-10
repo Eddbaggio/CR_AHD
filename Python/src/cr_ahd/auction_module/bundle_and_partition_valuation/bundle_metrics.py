@@ -6,7 +6,7 @@ from utility_module import utils as ut
 from utility_module.utils import argmin
 
 
-def bundle_centroid(instance: it.MDVRPTWInstance, bundle: Sequence):
+def bundle_centroid(instance: it.CAHDInstance, bundle: Sequence):
     """
     centroid of the requests
     """
@@ -15,7 +15,7 @@ def bundle_centroid(instance: it.MDVRPTWInstance, bundle: Sequence):
     return ut.Coordinates(sum(x) / len(x), sum(y) / len(y))
 
 
-def bundle_sum_squared_errors(instance: it.MDVRPTWInstance, bundle: Sequence[int], centroid: ut.Coordinates):
+def bundle_sum_squared_errors(instance: it.CAHDInstance, bundle: Sequence[int], centroid: ut.Coordinates):
     """based on cluster analysis evaluation"""
     raise NotImplementedError('Bundle evaluation inspired by external cluster evaluation measures not yet complete')
     vertex_sse_list = []
@@ -29,7 +29,7 @@ def bundle_sum_squared_errors(instance: it.MDVRPTWInstance, bundle: Sequence[int
     return bundle_sse
 
 
-def bundle_cohesion_centroid_based(instance: it.MDVRPTWInstance, bundle: Sequence[int], centroid: ut.Coordinates):
+def bundle_cohesion_centroid_based(instance: it.CAHDInstance, bundle: Sequence[int], centroid: ut.Coordinates):
     """values closer to 1 are better"""
     raise NotImplementedError('Bundle evaluation inspired by external cluster evaluation measures not yet complete')
     vertex_cohesion_list = []
@@ -57,7 +57,7 @@ def bundle_separation_centroid_based(centroid: ut.Coordinates, other_centroids: 
     return bundle_separation
 
 
-def bundle_cohesion_graph_based(instance: it.MDVRPTWInstance, bundle: Sequence[int]):
+def bundle_cohesion_graph_based(instance: it.CAHDInstance, bundle: Sequence[int]):
     """values closer to 1 are better"""
     raise NotImplementedError('Bundle evaluation inspired by external cluster evaluation measures not yet complete')
     # since the bundle contains *request* IDs, they need to be unpacked to vertex IDs
@@ -74,7 +74,7 @@ def bundle_cohesion_graph_based(instance: it.MDVRPTWInstance, bundle: Sequence[i
     return cohesion
 
 
-def bundle_vertex_to_centroid_travel_dist(instance: it.MDVRPTWInstance,
+def bundle_vertex_to_centroid_travel_dist(instance: it.CAHDInstance,
                                           bundle_idx: int,
                                           bundle: Sequence,
                                           extended_distance_matrix):
@@ -108,7 +108,7 @@ def bundle_density(direct_travel_dist, vertex_to_centroid_travel_dist: Sequence[
     return avg_direct_travel_dist / max_dist_to_centroid  # todo causes issues due to python rounding small numbers to zero
 
 
-def bundle_total_travel_distance_proxy(instance: it.MDVRPTWInstance, bundle: Sequence[int]):
+def bundle_total_travel_distance_proxy(instance: it.CAHDInstance, bundle: Sequence[int]):
     """
     VERY rough estimate for the total travel distance required to visit all requests in the bundle. Ignores all
     constraints (time windows, vehicle capacity, max tour length, ...)
@@ -119,7 +119,7 @@ def bundle_total_travel_distance_proxy(instance: it.MDVRPTWInstance, bundle: Seq
     return instance.travel_distance(routing_sequence[:-1], routing_sequence[1:])
 
 
-def bundle_total_travel_distance(instance: it.MDVRPTWInstance, bundle: Sequence[int]):
+def bundle_total_travel_distance(instance: it.CAHDInstance, bundle: Sequence[int]):
     """
     total travel distance needed to visit all requests in a bundle. Since finding the optimal solutions for
     all bundles is too time consuming, the tour length is approximated using the cheapest insertion heuristic
@@ -162,7 +162,7 @@ def bundle_total_travel_distance(instance: it.MDVRPTWInstance, bundle: Sequence[
     return tmp_tour_.sum_travel_distance
 
 
-def bundle_total_travel_duration(instance: it.MDVRPTWInstance, bundle: Sequence[int]):
+def bundle_total_travel_duration(instance: it.CAHDInstance, bundle: Sequence[int]):
     """
     total *travel* duration needed to visit all requests in a bundle. Since finding the optimal solutions for
     all bundles is too time consuming, the tour length is approximated using the cheapest insertion heuristic
