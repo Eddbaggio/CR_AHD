@@ -1,7 +1,7 @@
 import logging
 from copy import deepcopy
 from typing import List
-
+import pandas as pd
 from gurobipy import GRB
 
 from auction_module import request_selection as rs, bidding as bd, winner_determination as wd
@@ -9,6 +9,7 @@ from auction_module.bundle_generation import bundle_gen as bg, partition_based_b
 from core_module import instance as it, solution as slt
 from routing_module import tour_construction as cns, metaheuristics as mh
 from utility_module import profiling as pr, utils as ut
+from utility_module.io import output_dir, unique_path
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +60,6 @@ class Auction:
 
                 # consistency check
                 if solution.objective() > pre_auction_solution.objective():
-
                     raise ValueError(f'{instance.id_},:\n'
                                      f' Post={solution.objective()}; Pre={pre_auction_solution.objective()}\n'
                                      f' Post-auction objective is worse than pre-auction objective!\n'
@@ -96,6 +96,15 @@ class Auction:
             logger.debug(f'Generating bids_matrix')
             timer = pr.Timer()
             bids_matrix = self.bidding.execute_bidding(instance, solution, auction_bundle_pool)
+
+            # /// write bids matrix to data/output/bids
+            path = output_dir.joinpath('bids/')
+            path.mkdir(exist_ok=True, parents=True)
+            path = unique_path(path, f'bids_{instance.id_}' + '_#{:03d}' + '.csv')
+            bids_df = pd.DataFrame(data=((x.total_seconds() for x in y) for y in bids_matrix),
+                                   index=['/'.join(str(x) for x in y) for y in auction_bundle_pool])
+            bids_df.to_csv(path)
+            # ///
 
             timer.write_duration_to_solution(solution, 'runtime_bidding')
             logger.debug(f'Bids {bids_matrix} have been created for bundles {auction_bundle_pool}')
