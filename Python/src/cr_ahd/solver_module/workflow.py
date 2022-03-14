@@ -48,7 +48,7 @@ def _execute_job(path, config, fail_on_error, console_log_level):
     solver = slv.Solver(**config)
     try:
         timer = pr.Timer()
-        tw_instance, solution = solver.execute(instance, None)
+        tw_instance, solution = solver.execute(instance)
         timer.write_duration_to_solution(solution, 'runtime_total')
         # logger.info(f'{instance.id_}: Solved in {solution.timings["runtime_total"]}')
         solution.write_to_json()

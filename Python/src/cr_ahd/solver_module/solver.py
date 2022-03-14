@@ -105,10 +105,7 @@ class Solver:
                 'fin_auction_num_auction_rounds': final_auction.num_auction_rounds,
             })
 
-    def execute(self,
-                instance: it.CAHDInstance,
-                starting_solution: slt.CAHDSolution = None,
-                ) -> Tuple[it.CAHDInstance, slt.CAHDSolution]:
+    def execute(self, instance: it.CAHDInstance) -> Tuple[it.CAHDInstance, slt.CAHDSolution]:
         """
         apply the concrete steps of the solution algorithms specified in the config
 
@@ -116,18 +113,8 @@ class Solver:
         """
 
         # ===== [0] Setup =====
-        if self.intermediate_auction:
-            intermediate_auction_times = ut.datetime_range(ut.ACCEPTANCE_START_TIME, ut.EXECUTION_START_TIME,
-                                                           num=self.num_intermediate_auctions, startpoint=False,
-                                                           endpoint=False)
-            intermediate_auction_threshold = next(intermediate_auction_times)
-
         instance = deepcopy(instance)
-        if starting_solution is None:
-            solution = slt.CAHDSolution(instance)
-        else:
-            solution = starting_solution
-            solution.timings.clear()
+        solution = slt.CAHDSolution(instance)
 
         solution.solver_config.update(self.config)
         random.seed(0)
@@ -135,15 +122,6 @@ class Solver:
 
         # ===== Dynamic Request Arrival Phase =====
         for request in sorted(instance.requests, key=lambda x: instance.request_disclosure_time[x]):
-
-            # ===== Intermediate Auctions =====
-            if self.intermediate_auction:
-                if instance.request_disclosure_time[request] >= intermediate_auction_threshold:
-                    solution = self.run_intermediate_auction(instance, solution)
-                    try:
-                        intermediate_auction_threshold = next(intermediate_auction_times)
-                    except StopIteration:
-                        intermediate_auction_threshold = dt.datetime.max  # or better, = ut.END_TIME?
 
             assert request in solution.unassigned_requests
             carrier_id = instance.request_to_carrier_assignment[request]
@@ -154,7 +132,6 @@ class Solver:
             self.request_acceptance_and_time_window(instance, solution, carrier, request)
 
         # ===== Final Improvement =====
-        # plot_vienna_vrp_solution(instance, solution)  # REMOVEME for debugging only
         objective = solution.objective()
         timer = pr.Timer()
         solution = self.tour_improvement.execute(instance, solution)
@@ -172,7 +149,6 @@ class Solver:
         ut.validate_solution(instance, solution)  # safety check to make sure everything's functional
         logger.log(SUCCESS, f'{instance.id_}: Success\n{pformat(solution.solver_config, sort_dicts=True)}')
 
-        # plot_vienna_vrp_solution(instance, solution)  # REMOVEME: for debugging only
         return instance, solution
 
     def request_acceptance_and_time_window(self, instance: it.CAHDInstance, solution: slt.CAHDSolution, carrier,
@@ -203,43 +179,3 @@ class Solver:
         carrier.acceptance_rate = len(
             carrier.accepted_requests + carrier.accepted_infeasible_requests) / len(
             carrier.assigned_requests)
-
-    '''
-    def request_acceptance_and_time_window(self, instance, solution, carrier, request):
-        pickup_vertex, delivery_vertex = instance.pickup_delivery_pair(request)
-        instance.assign_time_window(pickup_vertex, ut.EXECUTION_TIME_HORIZON)  # pickup at any time
-        acceptance_type, selected_tw = self.request_acceptance.execute(instance, carrier, request)
-
-        if acceptance_type == 'accept_feasible':
-            carrier.accepted_requests.append(request)
-            instance.assign_time_window(delivery_vertex, selected_tw)
-            self.tour_construction.insert_single_request(instance, solution, carrier.id_, request)
-
-        elif acceptance_type == 'accept_infeasible':
-            logger.debug(f'[{instance.id_}] No feasible TW can be offered from Carrier {carrier.id_} '
-                         f'to request {request}: {acceptance_type}')
-            carrier.accepted_infeasible_requests.append(request)
-            instance.assign_time_window(delivery_vertex, selected_tw)
-            self.tour_construction.create_pendulum_tour_for_infeasible_request(instance, solution, carrier.id_, request)
-
-        else:
-            logger.debug(f'[{instance.id_}] No feasible TW can be offered from Carrier {carrier.id_} '
-                         f'to request {request}: {acceptance_type}')
-            instance.assign_time_window(delivery_vertex, ut.EXECUTION_TIME_HORIZON)
-            carrier.rejected_requests.append(request)
-            carrier.unrouted_requests.remove(request)
-
-        # update acceptance rate
-        carrier.acceptance_rate = len(
-            carrier.accepted_requests + carrier.accepted_infeasible_requests) / len(
-            carrier.assigned_requests)
-    '''
-
-    def run_intermediate_auction(self, instance, solution):
-        timer = pr.Timer()
-        # solution = self.tour_improvement.execute(instance, solution)
-        timer.write_duration_to_solution(solution, 'runtime_intermediate_improvements', True)
-        timer = pr.Timer()
-        solution = self.intermediate_auction.execute(instance, solution)
-        timer.write_duration_to_solution(solution, 'runtime_intermediate_auctions', True)
-        return solution
