@@ -21,4 +21,7 @@ class BundleValuation(ABC):
         pass
 
 
+class NoBundleValuation(BundleValuation):
 
+    def evaluate_bundle(self, instance: it.CAHDInstance, solution: slt.CAHDSolution, bundle: List[int]):
+        pass

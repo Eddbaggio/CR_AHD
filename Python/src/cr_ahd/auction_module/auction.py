@@ -100,9 +100,10 @@ class Auction:
             # /// write bids matrix to data/output/bids
             path = output_dir.joinpath('bids/')
             path.mkdir(exist_ok=True, parents=True)
-            path = unique_path(path, f'bids_{instance.id_}' + '_#{:03d}' + '.csv')
+            bg_method = self.bundle_generation.name
+            path = unique_path(path, f'{bg_method}_bids_{instance.id_}' + '_#{:03d}' + '.csv')
             bids_df = pd.DataFrame(data=((x.total_seconds() for x in y) for y in bids_matrix),
-                                   index=['/'.join(str(x) for x in y) for y in auction_bundle_pool])
+                                   index=['|'.join(str(x) for x in y) for y in auction_bundle_pool])
             bids_df.to_csv(path)
             # ///
 

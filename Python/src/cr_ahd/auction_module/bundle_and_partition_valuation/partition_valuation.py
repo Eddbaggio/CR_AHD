@@ -9,6 +9,8 @@ from scipy.spatial.distance import squareform, pdist
 import auction_module.bundle_and_partition_valuation.bundle_metrics as bm
 from core_module import instance as it, solution as slt
 from utility_module import utils as ut
+
+
 # ======================================================================================================================
 # STAND-ALONE BUNDLE EVALUATION MEASURES
 # ======================================================================================================================
@@ -373,3 +375,10 @@ class RandomPartitionValuation(PartitionValuation):
     def evaluate_partition(self, instance: it.CAHDInstance, solution: slt.CAHDSolution,
                            partition: List[List[int]]) -> float:
         return random.random()
+
+
+class NoPartitionValuation(PartitionValuation):
+
+    def evaluate_partition(self, instance: it.CAHDInstance, solution: slt.CAHDSolution,
+                           partition: List[List[int]]) -> float:
+        pass

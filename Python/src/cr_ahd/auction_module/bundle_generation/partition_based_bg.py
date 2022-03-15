@@ -67,11 +67,15 @@ class SingleKMeansPartition(bg.BundleGenerationBehavior):
 #     pass
 
 
-class LimitedNumBundles(bg.BundleGenerationBehavior):
+class LimitedNumPartitions(bg.BundleGenerationBehavior):
     """
-    Generate a pool of bundles that has a limited, predefined number of bundles in it.
+    Generate a pool of bundles that has a limited, predefined number of bundles/partitions in it.
     Bundle selection happens by evaluating different partitions of the auction request pool and keeping a partition's
     bundles if the partition's evaluation was sufficiently good.
+
+    based on partitioning the auction request pool. This guarantees a feasible solution for the Winner Determination
+    Problem which cannot (easily) be guaranteed if a limited bundle pool is generated without considering that the
+    WDP requires a partitioning of the auction request pool (see bundle_based_bg.py)
 
     Note: the size of the resulting auction pool may differ slightly from the exact given number, since partitions
     are always preserved. Therefore, whenever a partition's evaluation is sufficient, all its bundles will be kept,
@@ -97,7 +101,7 @@ class LimitedNumBundles(bg.BundleGenerationBehavior):
         pass
 
 
-class BestOfAllPartitions(LimitedNumBundles):
+class BestOfAllPartitions(LimitedNumPartitions):
     """
     Creates all possible partitions of the auction request pool of sizes [2, ..., num_carriers] and evaluates them to 
     find the best ones. 
@@ -133,7 +137,7 @@ class BestOfAllPartitions(LimitedNumBundles):
         return limited_bundle_pool
 
 
-class RandomMaxKPartitions(LimitedNumBundles):
+class RandomMaxKPartitions(LimitedNumPartitions):
     """
     creates random partitions of the submitted bundles, each with AT MOST as many subsets as there are carriers and 
     chooses random ones
@@ -177,7 +181,7 @@ class RandomMaxKPartitions(LimitedNumBundles):
         return indices
 
 
-class GeneticAlgorithm(LimitedNumBundles):
+class GeneticAlgorithm(LimitedNumPartitions):
     """
     Generates partitions using a Genetic Algorithm to find promising candidates.
     The best partitions of the final population will be put into the bundle pool.

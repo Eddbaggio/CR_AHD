@@ -6,9 +6,7 @@ from typing import Sequence
 
 class BundleGenerationBehavior(ABC):
     """
-    Generates auction bundles based on partitioning the auction request pool. This guarantees a feasible solution
-    for the Winner Determination Problem which cannot (easily) be guaranteed if bundles are generated without
-    considering that the WDP requires a partitioning of the auction request pool (see bundle_based_bg.py)
+    Generates auction bundles
     """
 
     def __init__(self):

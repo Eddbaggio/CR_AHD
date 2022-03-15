@@ -2,7 +2,7 @@ from abc import abstractmethod
 from typing import Sequence
 from core_module import instance as it, solution as slt
 from utility_module import utils as ut
-import bundle_gen as bg
+from auction_module.bundle_generation import bundle_gen as bg
 from auction_module.bundle_and_partition_valuation import bundle_valuation as bv
 
 
@@ -42,11 +42,16 @@ class AllBundles(bg.BundleGenerationBehavior):
     creates the power set of all the submitted requests, i.e. all subsets of size k for all k = 1, ..., len(pool).
     Does not include emtpy set.
     """
+    def __init__(self, **kwargs):
+        super().__init__()
+        self.num_auction_bundles = 'all'
+        self.partition_valuation = bv.NoBundleValuation()
+        self.parameters = kwargs
 
     def _generate_auction_bundles(self, instance: it.CAHDInstance, solution: slt.CAHDSolution,
                                   auction_request_pool: Sequence[int],
                                   original_partition_labels: Sequence[int]):
-        return tuple(ut.power_set(range(len(auction_request_pool)), False))
+        return tuple(ut.power_set(auction_request_pool, False))
 
 
 class BestOfAllBundles(bg.BundleGenerationBehavior):
