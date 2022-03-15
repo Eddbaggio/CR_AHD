@@ -99,9 +99,16 @@ class Tour(ABC):
         return sum(self.wait_duration_sequence, dt.timedelta(0))
 
     @property
+    def sum_idle_duration(self):
+        """assumes that vehicles leave the depot immediately! Therefore, there is no idle time at the start depot"""
+        idle = ut.END_TIME - (self.service_time_sequence[-1] + self.service_duration_sequence[-1])
+        return idle
+
+    @property
     def density(self):
-        density = (self.sum_travel_duration + self.sum_service_duration) / (
-                self.sum_travel_duration + self.sum_service_duration + self.sum_wait_duration)
+        # density = (self.sum_travel_duration + self.sum_service_duration) / (
+        #         self.sum_travel_duration + self.sum_service_duration + self.sum_wait_duration)
+        density = (self.sum_travel_duration + self.sum_service_duration) / ut.EXECUTION_TIME_HORIZON.duration
         return density
 
     def as_dict(self):
@@ -155,6 +162,7 @@ class Tour(ABC):
             'sum_travel_duration': self.sum_travel_duration,
             'sum_wait_duration': self.sum_wait_duration,
             'sum_service_duration': self.sum_service_duration,
+            'sum_idle_duration': self.sum_idle_duration,
             'sum_load': self.sum_load,
             'sum_revenue': self.sum_revenue,
             'density': self.density

@@ -57,6 +57,7 @@ solution_values = [
     'sum_travel_duration',
     'sum_wait_duration',
     'sum_service_duration',
+    'sum_idle_duration',
     'sum_revenue',
     'density',
     'num_tours',
