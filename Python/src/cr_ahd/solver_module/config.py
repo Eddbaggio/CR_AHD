@@ -2,7 +2,8 @@ import datetime as dt
 import itertools
 from typing import List, Tuple, Dict, Sequence, Union
 
-from auction_module import auction as au, request_selection as rs, bidding as bd, winner_determination as wd
+from auction_module import auction as au, bidding as bd, winner_determination as wd
+from auction_module.request_selection import request_selection as rs, individual as rsi, bundle as rsb, neighbor as rsn
 from auction_module.bundle_and_partition_valuation import partition_valuation as pv
 from auction_module.bundle_generation import bundle_gen as bg, partition_based_bg as bgp
 from routing_module import neighborhoods as nh, tour_construction as cns, metaheuristics as mh
@@ -36,10 +37,10 @@ def configs():
     s_request_acceptance_attractiveness: Sequence[ra.RequestAcceptanceAttractiveness] = [ra.Dummy()]
 
     s_time_window_length: Sequence[dt.timedelta] = [
-        dt.timedelta(hours=1),
+        # dt.timedelta(hours=1),
         dt.timedelta(hours=2),
-        dt.timedelta(hours=4),
-        dt.timedelta(hours=8),
+        # dt.timedelta(hours=4),
+        # dt.timedelta(hours=8),
     ]
 
     s_time_window_offering: two.TWOfferingBehavior.__class__ = [
@@ -57,13 +58,13 @@ def configs():
     ]
 
     s_request_selection: Sequence[rs.RequestSelectionBehavior.__class__] = [
-        # rs.SuccessorsNeighbor,
-        # rs.SpatioTemporal,
-        # rs.Random,
-        # rs.MinDurationToForeignDepotDMin,
-        # rs.ComboDistStandardizedNEW,
-        # rs.ComboDistStandardized,
-        rs.DepotDurations
+        # rsn.SuccessorsNeighbor,
+        # rsi.SpatioTemporal,
+        # rsi.Random,
+        # rsi.MinDurationToForeignDepotDMin,
+        # rsi.ComboDistStandardizedNEW,
+        # rsi.ComboDistStandardized,
+        rsi.DepotDurations
     ]
 
     s_num_auction_bundles: Sequence[int] = [

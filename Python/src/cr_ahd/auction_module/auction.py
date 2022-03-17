@@ -4,7 +4,8 @@ from typing import List
 
 from gurobipy import GRB
 
-from auction_module import request_selection as rs, bidding as bd, winner_determination as wd
+from auction_module import bidding as bd, winner_determination as wd
+from auction_module.request_selection import request_selection as rs
 from auction_module.bundle_generation import bundle_gen as bg, partition_based_bg as bgp
 from core_module import instance as it, solution as slt
 from routing_module import tour_construction as cns, metaheuristics as mh
