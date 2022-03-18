@@ -64,7 +64,8 @@ def configs():
         # rsi.MinDurationToForeignDepotDMin,
         # rsi.ComboDistStandardizedNEW,
         # rsi.ComboDistStandardized,
-        rsi.DepotDurations
+        rsi.EarlyTimeWindow,
+        rsi.DepotDurations,
     ]
 
     s_num_auction_bundles: Sequence[int] = [
@@ -81,8 +82,8 @@ def configs():
                                     mutation_rate=0.5,
                                     generation_gap=0.9, )
          ),
-        # (bg.BestOfAllPartitions, dict()),
-        # (bg.RandomMaxKPartition, dict())
+        # (bgp.BestOfAllPartitions, dict()),
+        # (bgp.RandomMaxKPartitions, dict())
     ]
 
     s_partition_valuation: Sequence[pv.PartitionValuation.__class__] = [

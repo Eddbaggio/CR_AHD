@@ -34,7 +34,8 @@ class RequestSelectionBehaviorIndividual(RequestSelectionBehavior, ABC):
                 valuations.append(valuation)
 
             # pick the k requests with the LOWEST valuation (from ascending order)
-            selected = [r for _, r in sorted(zip(valuations, carrier.accepted_requests))][:k]
+            selected = [r for _, r in sorted(zip(valuations, carrier.accepted_requests))]
+            selected = selected[:k]
             selected.sort()
 
             for request in selected:
@@ -343,7 +344,6 @@ class DepotDurations(RequestSelectionBehaviorIndividual):
 
     def _evaluate_request(self, instance: it.CAHDInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution,
                           request: int) -> Tuple[float, float]:
-
         # [i] duration to the depot of one of the collaborating carriers
         min_dur_to_foreign_depot = MinDurationToForeignDepotDSum(None)._evaluate_request(instance, solution,
                                                                                          carrier, request)
@@ -354,7 +354,7 @@ class DepotDurations(RequestSelectionBehaviorIndividual):
         # duration as the average of the asymmetric durations between depot and delivery vertex
         dur_to_own_depot = instance.travel_duration([own_depot, vertex], [vertex, own_depot]) / 2
 
-        return min_dur_to_foreign_depot.total_seconds()/dur_to_own_depot.total_seconds()
+        return min_dur_to_foreign_depot.total_seconds() / dur_to_own_depot.total_seconds()
 
 
 class SpatioTemporal(RequestSelectionBehaviorIndividual):
@@ -377,3 +377,14 @@ class SpatioTemporal(RequestSelectionBehaviorIndividual):
             return float('inf')
         else:
             return 1 / value
+
+
+class EarlyTimeWindow(RequestSelectionBehaviorIndividual):
+    """
+    a request's chance to be selected is equivalent to the earliness of its time window (the earlier, the better)
+    """
+
+    def _evaluate_request(self, instance: it.CAHDInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution,
+                          request: int):
+        value = instance.tw_open[instance.vertex_from_request(request)]
+        return value
