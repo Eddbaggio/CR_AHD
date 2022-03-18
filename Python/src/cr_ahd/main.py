@@ -49,6 +49,7 @@ if __name__ == '__main__':
 
         # write df
         csv_path = io.unique_path(io.output_dir, 'evaluation_agg_' + agg_level + '_#{:03d}' + '.csv')
+        print(csv_path.name)
         df.to_csv(path_or_buf=csv_path, index=False)
 
         collaboration_gains = cg.collaboration_gain(df)

@@ -148,11 +148,14 @@ class RandomMaxKPartitions(LimitedNumBundles):
         partition_labels_pool = [original_partition_labels]
         num_bundles = max(original_partition_labels) + 1
 
-        while num_bundles < self.num_auction_bundles:
-            partition_labels = self._random_max_k_partition_idx(auction_request_pool, max_k=instance.num_carriers)
-            if partition_labels not in partition_labels_pool:
-                partition_labels_pool.append(partition_labels)
-                num_bundles += max(partition_labels) + 1
+        with tqdm.tqdm(total=num_bundles, disable=not ut.debugger_is_active()) as p_bar:
+
+            while num_bundles < self.num_auction_bundles:
+                partition_labels = self._random_max_k_partition_idx(auction_request_pool, max_k=instance.num_carriers)
+                if partition_labels not in partition_labels_pool:
+                    partition_labels_pool.append(partition_labels)
+                    num_bundles += max(partition_labels) + 1
+                    p_bar.update()
 
         limited_bundle_pool = []
         for bl in partition_labels_pool:

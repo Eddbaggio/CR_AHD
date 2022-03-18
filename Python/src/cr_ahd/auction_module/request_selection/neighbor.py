@@ -173,9 +173,9 @@ class TemporalSpatialNeighbors(RequestSelectionBehaviorNeighbor):
             vertex = instance.vertex_from_request(r)
             if r != initial_request:
                 # append the candidate's (1) tw distance, (2) travel duration distance and (3) the candidate request id
-                tw_distance = abs(instance.time_window(vertex).center - initial_tw.center)
-                travel_duration_distance = instance.travel_duration([initial_vertex], [vertex])
-                candidates.append((tw_distance, travel_duration_distance, r))
+                temporal_distance = abs(instance.time_window(vertex).center - initial_tw.center)
+                spatial_distance = instance.travel_duration([initial_vertex], [vertex])
+                candidates.append((temporal_distance, spatial_distance, r))
         candidates.sort()
         assert num_neighbors <= len(candidates)
         neighbors = [r[2] for r in candidates[:num_neighbors]]
