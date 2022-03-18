@@ -19,6 +19,10 @@ class TimeWindow:
     def __eq__(self, other):
         return self.open == other.open and self.close == other.close
 
+    @property
+    def center(self):
+        return self.open + (self.close - self.open) / 2
+
     def overlap(self, other):
         other: TimeWindow
         open = max(self.open, other.open)

@@ -44,9 +44,10 @@ class RequestSelectionBehaviorNeighbor(RequestSelectionBehavior, ABC):
     def _find_initial_request(self, instance: it.CAHDInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution):
         pass
 
-    def _find_neighbors(self,
-                        instance: it.CAHDInstance, solution: slt.CAHDSolution,
-                        carrier_id: int, initial_request: int,
+    def _find_neighbors(self, instance: it.CAHDInstance,
+                        solution: slt.CAHDSolution,
+                        carrier: slt.AHDSolution,
+                        initial_request: int,
                         num_neighbors: int):
         """
         "Any further request s ∈ Ra is selected based on its closeness to r. Closeness is determined by the sum of
@@ -56,12 +57,11 @@ class RequestSelectionBehaviorNeighbor(RequestSelectionBehavior, ABC):
 
         :param solution:
         :param instance:
-        :param carrier_id:
+        :param carrier:
         :param initial_request: r
         :param num_neighbors:
         :return:
         """
-        carrier = solution.carriers[carrier_id]
         init_delivery = instance.vertex_from_request(initial_request)
 
         neighbor_valuations = []
@@ -114,9 +114,10 @@ class SuccessorsNeighbor(RequestSelectionBehaviorNeighbor):
                 max_wait_vertex = vertex
         return instance.request_from_vertex(max_wait_vertex)
 
-    def _find_neighbors(self,
-                        instance: it.CAHDInstance, solution: slt.CAHDSolution,
-                        carrier_id: int, initial_request: int,
+    def _find_neighbors(self, instance: it.CAHDInstance,
+                        solution: slt.CAHDSolution,
+                        carrier: slt.AHDSolution,
+                        initial_request: int,
                         num_neighbors: int):
         tour = solution.tour_of_request(initial_request)
         pos = tour.vertex_pos[instance.vertex_from_request(initial_request)]
@@ -125,7 +126,6 @@ class SuccessorsNeighbor(RequestSelectionBehaviorNeighbor):
             return [instance.request_from_vertex(v) for v in tour.routing_sequence[pos + 1:pos + 1 + num_neighbors]]
         else:
             neighbors = [instance.request_from_vertex(v) for v in tour.routing_sequence[pos + 1:-1]]
-            carrier = solution.carriers[carrier_id]
             initial_vertex = instance.vertex_from_request(initial_request)
             nearest_neighbors = sorted(carrier.accepted_requests,
                                        key=lambda x: instance.travel_duration(
@@ -135,3 +135,48 @@ class SuccessorsNeighbor(RequestSelectionBehaviorNeighbor):
                 if candidate not in [initial_vertex] + neighbors:
                     neighbors.append(candidate)
             return neighbors
+
+
+class TemporalSpatialNeighbors(RequestSelectionBehaviorNeighbor):
+    """
+    initial request: the one closest to a foreign depot
+    neighbors: the ones that are closest, sorted by (1) distance between the orders' time windows and (2) travel
+    duration distance between the neighbor request and the initial request
+    """
+
+    def _find_initial_request(self, instance: it.CAHDInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution):
+        foreign_depots = list(range(instance.num_carriers))
+        foreign_depots.pop(carrier.id_)
+
+        duration_min = float('inf')
+        initial_request = None
+        for request in carrier.accepted_requests:
+            delivery = instance.vertex_from_request(request)
+            for depot in foreign_depots:
+                duration = min(instance.travel_duration([depot], [delivery]),
+                               instance.travel_duration([delivery], [depot])).total_seconds()
+                if duration < duration_min:
+                    duration_min = duration
+                    initial_request = request
+        return initial_request
+
+    def _find_neighbors(self, instance: it.CAHDInstance,
+                        solution: slt.CAHDSolution,
+                        carrier: slt.AHDSolution,
+                        initial_request: int,
+                        num_neighbors: int):
+        # find those that have the same TW as the initial request
+        initial_vertex = instance.vertex_from_request(initial_request)
+        initial_tw = instance.time_window(initial_vertex)
+        candidates = []
+        for r in carrier.accepted_requests:
+            vertex = instance.vertex_from_request(r)
+            if r != initial_request:
+                # append the candidate's (1) tw distance, (2) travel duration distance and (3) the candidate request id
+                tw_distance = abs(instance.time_window(vertex).center - initial_tw.center)
+                travel_duration_distance = instance.travel_duration([initial_vertex], [vertex])
+                candidates.append((tw_distance, travel_duration_distance, r))
+        candidates.sort()
+        assert num_neighbors <= len(candidates)
+        neighbors = [r[2] for r in candidates[:num_neighbors]]
+        return neighbors

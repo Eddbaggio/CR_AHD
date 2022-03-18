@@ -8,8 +8,7 @@ from typing import Sequence, List, NoReturn
 import numpy as np
 
 import utility_module.utils as ut
-from tw_management_module import tw
-from tw_management_module.tw import TimeWindow
+from tw_management_module.time_window import TimeWindow
 from utility_module.datetime_rounding import ceil_timedelta
 from utility_module.io import MyJSONEncoder
 
@@ -206,7 +205,7 @@ class CAHDInstance:
         else:
             raise IndexError(f'Vertex index {vertex} out of range')
 
-    def assign_time_window(self, vertex: int, time_window: tw.TimeWindow):
+    def assign_time_window(self, vertex: int, time_window: TimeWindow):
         """
         changes the time window of a vertex
         """

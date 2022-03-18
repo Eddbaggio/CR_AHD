@@ -73,7 +73,7 @@ class MarginalProfit(RequestSelectionBehaviorIndividual):
     effort. Requests with the lowest marginal profits are submitted to the pool. This strategy is proposed by Berger
     and Bierwirth (2010)."
 
-    NOTE: due to the lack of some functionality (e.g., efficiently identifying all requests that belong to a tour),
+    Note: due to the lack of some functionality (e.g., efficiently identifying all requests that belong to a tour),
     this is not yet functional.
     """
 
@@ -130,6 +130,21 @@ class MarginalProfitProxy(RequestSelectionBehaviorIndividual):
         return marginal_profit
 
 
+class MarginalCostProxy(RequestSelectionBehaviorIndividual):
+    """
+    order are selected based on their marginal fulfilment costs. Similar to Marginal Profit but ignores revenue
+    of an order
+    """
+
+    def _evaluate_request(self, instance: it.CAHDInstance, solution: slt.CAHDSolution, carrier: slt.AHDSolution,
+                          request: int):
+        tour = solution.tour_of_request(request)
+        delivery = instance.vertex_from_request(request)
+        delivery_pos = tour.vertex_pos[delivery]
+        marginal_fulfillment_cost = - tour.pop_distance_delta(instance, [delivery_pos])
+        return marginal_fulfillment_cost
+
+
 class MinDistanceToForeignDepotDMin(RequestSelectionBehaviorIndividual):
     """
     Select the requests that are closest to another carrier's depot. the distance of a request to a depot is the
@@ -164,15 +179,15 @@ class MinDurationToForeignDepotDMin(RequestSelectionBehaviorIndividual):
         foreign_depots = list(range(instance.num_carriers))
         foreign_depots.pop(carrier.id_)
 
-        dist_min = float('inf')
+        duration_min = float('inf')
         delivery = instance.vertex_from_request(request)
         for depot in foreign_depots:
-            dist = min(instance.travel_duration([depot], [delivery]),
+            duration = min(instance.travel_duration([depot], [delivery]),
                        instance.travel_duration([delivery], [depot])).total_seconds()
-            if dist < dist_min:
-                dist_min = dist
+            if duration < duration_min:
+                duration_min = duration
 
-        return dist_min
+        return duration_min
 
 
 class MinDistanceToForeignDepotDSum(RequestSelectionBehaviorIndividual):

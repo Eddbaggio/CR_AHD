@@ -7,11 +7,10 @@ import sys
 from collections import namedtuple
 from typing import List, Sequence, Tuple
 
-import numpy as np
 from matplotlib.colors import LinearSegmentedColormap
 from tqdm import trange
 
-from tw_management_module.tw import TimeWindow
+from tw_management_module.time_window import TimeWindow
 
 Coordinates = namedtuple('Coords', ['x', 'y'])
 

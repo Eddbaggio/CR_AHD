@@ -1,8 +1,6 @@
 from typing import Sequence
-import datetime as dt
-from core_module import tour as tr, solution as slt
-from tw_management_module.tw import TimeWindow
-import matplotlib.pyplot as plt
+
+from core_module import solution as slt
 from utility_module import utils as ut
 
 

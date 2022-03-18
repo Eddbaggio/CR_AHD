@@ -3,7 +3,7 @@ import logging
 import random
 from typing import List
 
-from tw_management_module.tw import TimeWindow
+from tw_management_module.time_window import TimeWindow
 from utility_module.utils import EXECUTION_START_TIME, END_TIME, EXECUTION_TIME_HORIZON
 
 logger = logging.getLogger(__name__)
