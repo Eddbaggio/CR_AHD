@@ -31,25 +31,6 @@ class RequestSelectionBehavior(ABC):
         pass
 
 
-# =====================================================================================================================
-# REQUEST SELECTION BASED ON INDIVIDUAL REQUEST EVALUATION
-# =====================================================================================================================
-
-
-# =====================================================================================================================
-# NEIGHBOR-BASED REQUEST SELECTION
-# =====================================================================================================================
-
-
-# =====================================================================================================================
-# BUNDLE-BASED REQUEST SELECTION
-# =====================================================================================================================
-
-
-# class TimeShiftCluster(RequestSelectionBehaviorCluster):
-#     """Selects the cluster that yields the highest temporal flexibility when removed"""
-#     pass
-
 class InfeasibleFirstRandomSecond(RequestSelectionBehavior):
     """
     Those requests that got accepted although they were infeasible will be selected.

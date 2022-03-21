@@ -60,10 +60,10 @@ def configs():
 
     s_request_selection: Sequence[rs.RequestSelectionBehavior.__class__] = [
         rsi.Random,
-        # rsi.EarlyTimeWindow,
-        # rsi.DepotDurations,
-        # rsi.MarginalCostProxy,
-        # rsn.TemporalSpatialNeighbors,
+        rsi.DepotDurations,
+        rsi.MarginalCostProxy,
+        rsi.EarlyTimeWindow,
+        rsn.TemporalSpatialNeighbors,
     ]
 
     s_num_auction_bundles: Sequence[int] = [
@@ -75,11 +75,11 @@ def configs():
     ]
 
     s_bundle_generation: Sequence[Tuple[bg.BundleGenerationBehavior.__class__, Dict[str, float]]] = [
-        # (bgp.GeneticAlgorithm, dict(population_size=300,
-        #                             num_generations=100,
-        #                             mutation_rate=0.5,
-        #                             generation_gap=0.9, )
-        #  ),
+        (bgp.GeneticAlgorithm, dict(population_size=300,
+                                    num_generations=100,
+                                    mutation_rate=0.5,
+                                    generation_gap=0.9, )
+         ),
         # (bgp.BestOfAllPartitions, dict()),
         (bgp.RandomMaxKPartitions, dict())  # currently better than the GA
     ]

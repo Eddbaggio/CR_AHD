@@ -1,7 +1,6 @@
 import datetime as dt
 import itertools
 import math
-import random
 import re
 import sys
 from collections import namedtuple
@@ -73,38 +72,12 @@ def hamming_distance(string1: Sequence, string2: Sequence):
     return sum(xi != yi for xi, yi in zip(string1, string2))
 
 
-def power_set(iterable, include_empty_set=True):
-    """power_set([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"""
-    s = list(iterable)
-    if include_empty_set:
-        rng = range(len(s) + 1)
-    else:
-        rng = range(1, len(s) + 1)
-    return itertools.chain.from_iterable(itertools.combinations(s, r) for r in rng)
-
-
 def flatten(sequence: (List, Tuple)):
     if not sequence:
         return sequence
     if isinstance(sequence[0], (List, Tuple)):
         return flatten(sequence[0]) + flatten(sequence[1:])
     return sequence[:1] + flatten(sequence[1:])
-
-
-def random_max_k_partition_idx(ls, max_k) -> List[int]:
-    """partition ls into at most k randomly sized disjoint subsets"""
-    # https://stackoverflow.com/a/45880095
-    if max_k < 1:
-        return []
-    # randomly determine the actual k
-    k = random.randint(1, min(max_k, len(ls)))
-    # We require that this list contains k different values, so we start by adding each possible different value.
-    indices = list(range(k))
-    # now we add random values from range(k) to indices to fill it up to the length of ls
-    indices.extend([random.choice(list(range(k))) for _ in range(len(ls) - k)])
-    # shuffle the indices into a random order
-    random.shuffle(indices)
-    return indices
 
 
 def argmin(a):

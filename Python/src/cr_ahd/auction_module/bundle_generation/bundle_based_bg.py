@@ -1,11 +1,12 @@
 from abc import abstractmethod
 from typing import Sequence
+
+import utility_module.combinatorics as cmb
 from core_module import instance as it, solution as slt
-from utility_module import utils as ut
 import bundle_gen as bg
 from auction_module.bundle_and_partition_valuation import bundle_valuation as bv
 
-
+'''
 class LimitedNumBundles(bg.BundleGenerationBehavior):
     """
     Generate a pool of bundles that has a limited, predefined number of bundles in it.
@@ -36,6 +37,8 @@ class LimitedNumBundles(bg.BundleGenerationBehavior):
         self.bundle_valuation.preprocessing(instance, auction_request_pool)
         pass
 
+'''
+
 
 class AllBundles(bg.BundleGenerationBehavior):
     """
@@ -46,7 +49,7 @@ class AllBundles(bg.BundleGenerationBehavior):
     def _generate_auction_bundles(self, instance: it.CAHDInstance, solution: slt.CAHDSolution,
                                   auction_request_pool: Sequence[int],
                                   original_partition_labels: Sequence[int]):
-        return tuple(ut.power_set(range(len(auction_request_pool)), False))
+        return tuple(cmb.power_set(range(len(auction_request_pool)), False))
 
 
 class BestOfAllBundles(bg.BundleGenerationBehavior):
@@ -58,5 +61,5 @@ class BestOfAllBundles(bg.BundleGenerationBehavior):
     def _generate_auction_bundles(self, instance: it.CAHDInstance, solution: slt.CAHDSolution,
                                   auction_request_pool: Sequence[int],
                                   original_partition_labels: Sequence[int]):
-        all_bundles = tuple(ut.power_set(range(len(auction_request_pool)), False))
+        all_bundles = tuple(cmb.power_set(range(len(auction_request_pool)), False))
         best_bundles = sorted(all_bundles, key=self.bundle_valuation)[:self.num_bundles]

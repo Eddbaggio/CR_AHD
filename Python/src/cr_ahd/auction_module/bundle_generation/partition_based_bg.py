@@ -10,7 +10,7 @@ from sklearn.cluster import KMeans
 from auction_module.bundle_and_partition_valuation import partition_valuation as pv, bundle_metrics as bm
 from auction_module.bundle_generation import bundle_gen as bg
 from core_module import instance as it, solution as slt
-from utility_module import utils as ut
+from utility_module import utils as ut, combinatorics as cmb
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ class SingleKMeansPartition(bg.BundleGenerationBehavior):
 # class LimitedBlockSizePartitions(PartitionBasedBundleGeneration):
 #     """
 #     Generate a pool of bundles which have a limited bundle size by evaluating different partitions of the auction
-#     request pool that respect the bundle sizes.
+#     request pool that respect the maximum bundle size.
 #     This might be useful since it can be expected that successfully sold bundles have a medium size and do not
 #     contain a very large or small number of requests.
 #     """
@@ -114,7 +114,7 @@ class BestOfAllPartitions(LimitedNumBundles):
 
         all_partitions = [[auction_request_pool]]
         for k in range(2, instance.num_carriers + 1):
-            all_partitions.extend(list(algorithm_u(auction_request_pool, k)))
+            all_partitions.extend(list(cmb.algorithm_u(auction_request_pool, k)))
 
         partition_valuations = []
         for partition in tqdm.tqdm(all_partitions, desc='Bundle Generation', disable=not ut.debugger_is_active()):
@@ -145,39 +145,28 @@ class RandomMaxKPartitions(LimitedNumBundles):
                                   auction_request_pool: Sequence[int],
                                   original_partition_labels: Sequence[int]):
 
-        partition_labels_pool = [original_partition_labels]
-        num_bundles = max(original_partition_labels) + 1
+        # if the number of all possible bundles is lower than then number of required bundles then generate all bundles
+        if 2**len(auction_request_pool) - 1 < self.num_auction_bundles:
+            bundle_pool = set(cmb.power_set(auction_request_pool, False))
 
-        with tqdm.tqdm(total=num_bundles, disable=not ut.debugger_is_active()) as p_bar:
+        # otherwise, randomly generate partitions of the data set
+        else:
+            bundle_pool = set()
+            for original_bundle in ut.indices_to_nested_lists(original_partition_labels, auction_request_pool):
+                bundle_pool.add(tuple(original_bundle))
+            with tqdm.tqdm(total=self.num_auction_bundles, disable=not ut.debugger_is_active()) as p_bar:
 
-            while num_bundles < self.num_auction_bundles:
-                partition_labels = self._random_max_k_partition_idx(auction_request_pool, max_k=instance.num_carriers)
-                if partition_labels not in partition_labels_pool:
-                    partition_labels_pool.append(partition_labels)
-                    num_bundles += max(partition_labels) + 1
-                    p_bar.update()
+                while len(bundle_pool) < self.num_auction_bundles:
+                    partition_labels = cmb.random_max_k_partition_idx(auction_request_pool, instance.num_carriers)
+                    partition_labels = normalize_partition_labels(partition_labels)
+                    partition = ut.indices_to_nested_lists(partition_labels, auction_request_pool)
+                    for bundle in partition:
+                        bundle = tuple(bundle)
+                        if bundle not in bundle_pool:
+                            p_bar.update()
+                            bundle_pool.add(bundle)
 
-        limited_bundle_pool = []
-        for bl in partition_labels_pool:
-            bundles = ut.indices_to_nested_lists(bl, auction_request_pool)
-            limited_bundle_pool.extend(bundles)
-
-        return limited_bundle_pool
-
-    @staticmethod
-    def _random_max_k_partition_idx(ls: Sequence, max_k: int) -> List[int]:
-        """create a random paritioning of ls of at most max_k bins. returns a list of bin indices that map to ls"""
-        if max_k < 1:
-            return []
-        # randomly determine the actual k
-        k = random.randint(1, min(max_k, len(ls)))
-        # We require that this list contains k different values, so we start by adding each possible different value.
-        indices = list(range(k))
-        # now we add random values from range(k) to indices to fill it up to the length of ls
-        indices.extend([random.choice(list(range(k))) for _ in range(len(ls) - k)])
-        # shuffle the indices into a random order
-        random.shuffle(indices)
-        return indices
+        return list(bundle_pool)
 
 
 class GeneticAlgorithm(LimitedNumBundles):
@@ -191,6 +180,11 @@ class GeneticAlgorithm(LimitedNumBundles):
                                   solution: slt.CAHDSolution,
                                   auction_request_pool: Sequence[int],
                                   original_partition_labels: Sequence[int]):
+        # if the number of all possible bundles is lower than then number of required bundles then generate all bundles
+        if 2**len(auction_request_pool) - 1 < self.num_auction_bundles:
+            limited_bundle_pool = set(cmb.power_set(auction_request_pool, False))
+            return list(limited_bundle_pool)
+
         # parameters
         # only a fraction of generation_gap is replaced in a new gen. the remaining individuals (generation overlap)
         # are the top (1-generation_gap)*100 % from the previous gen, measured by their fitness
@@ -211,7 +205,7 @@ class GeneticAlgorithm(LimitedNumBundles):
 
         # add each of the original bundles if it is not contained yet - this cannot be infeasible
         # this might exceed the auction_pool_size even more than self.generate_bundle_pool
-        self._normalize_individual(original_partition_labels)
+        original_partition_labels = normalize_partition_labels(original_partition_labels)
         original_bundles = ut.indices_to_nested_lists(original_partition_labels, auction_request_pool)
         for ob in original_bundles:
             if ob not in limited_bundle_pool:
@@ -299,11 +293,11 @@ class GeneticAlgorithm(LimitedNumBundles):
         crossover_func: Callable = random.choice([
             self._crossover_uniform,
             self._crossover_geo,
-            # self._crossover_temporal # TODO uncomment! this is to test
+            # self._crossover_temporal # TODO uncomment! this must still be tested
         ])
         offspring: List[int] = crossover_func(instance, solution, auction_request_pool, parent1, parent2)
-        # normalization IN PLACE
-        self._normalize_individual(offspring)
+        # normalize
+        offspring = normalize_partition_labels(offspring)
 
         # mutation
         if random.random() <= self.parameters['mutation_rate']:
@@ -315,8 +309,7 @@ class GeneticAlgorithm(LimitedNumBundles):
                     self._mutation_shift
                 ])
             mutation_func(instance, solution, offspring, auction_request_pool)
-        # normalization IN PLACE
-        self._normalize_individual(offspring)
+        offspring = normalize_partition_labels(offspring)
 
         return offspring
 
@@ -342,7 +335,7 @@ class GeneticAlgorithm(LimitedNumBundles):
         k_means_individual = list(
             SingleKMeansPartition()._generate_auction_bundles(instance, solution, auction_request_pool, None))
 
-        self._normalize_individual(k_means_individual)
+        k_means_individual = normalize_partition_labels(k_means_individual)
         if k_means_individual not in population:
             population.append(k_means_individual)
             fitness.append(self.fitness(instance, solution, k_means_individual, auction_request_pool))
@@ -350,8 +343,8 @@ class GeneticAlgorithm(LimitedNumBundles):
         # fill the rest of the population with random individuals
         i = 1
         while i < min(self.parameters['population_size'], 2 ** len(auction_request_pool) - 1):
-            individual = ut.random_max_k_partition_idx(auction_request_pool, n)
-            self._normalize_individual(individual)
+            individual = cmb.random_max_k_partition_idx(auction_request_pool, n)
+            individual = normalize_partition_labels(individual)
             if individual in population:
                 continue
             else:
@@ -361,24 +354,6 @@ class GeneticAlgorithm(LimitedNumBundles):
                 i += 1
 
         return fitness, population
-
-    @staticmethod
-    def _normalize_individual(individual: List[int]):
-        """creates a normalized representation of the individual IN PLACE"""
-        mapping_idx = 0
-        mapping: List[int] = [-1] * (
-                len(individual) + 1)  # +1 because the CREATE mutation may exceed the valid num_bundles temporarily
-        mapping[individual[0]] = mapping_idx
-        individual[0] = mapping_idx
-
-        for i in range(1, len(individual)):
-            if mapping[individual[i]] == -1:
-                mapping_idx += 1
-                mapping[individual[i]] = mapping_idx
-                individual[i] = mapping_idx
-            else:
-                individual[i] = mapping[individual[i]]
-        pass
 
     @staticmethod
     def _roulette_wheel(fitness: Sequence[float], n: int = 2):
@@ -552,133 +527,28 @@ class GeneticAlgorithm(LimitedNumBundles):
         pass
 
 
-# =====================================================================================================================
-# AUXILIARY FUNCTIONS
-# =====================================================================================================================
+def normalize_partition_labels(partition_labels: Sequence[int]) -> List[int]:
+    """returns a normalized representation of the partitions_labels sequence such that the sequence starts with 0"""
+    normalized = list(partition_labels[:])
+    mapping_idx = 0
 
-def stirling_second(n, k):
-    """
-    Stirling numbers of the second kind: number of ways to partition a set of n objects into m non-empty subsets
-    https://extr3metech.wordpress.com/2013/01/21/stirling-number-generation-using-python-code-examples/
-    Stirling Algorithm
-    Cod3d by EXTR3ME
-    https://extr3metech.wordpress.com
-    """
-    n1 = n
-    k1 = k
-    if n <= 0:
-        return 1
+    # +1 because the CREATE mutation may exceed the valid num_bundles temporarily
+    mapping: List[int] = [-1] * (len(normalized) + 1)
+    mapping[normalized[0]] = mapping_idx
+    normalized[0] = mapping_idx
 
-    elif k <= 0:
-        return 0
-
-    elif n == 0 and k == 0:
-        return -1
-
-    elif n != 0 and n == k:
-        return 1
-
-    elif n < k:
-        return 0
-
-    else:
-        temp1 = stirling_second(n1 - 1, k1)
-        temp1 = k1 * temp1
-        return (k1 * (stirling_second(n1 - 1, k1))) + stirling_second(n1 - 1, k1 - 1)
-
-
-def algorithm_u(ns, m):
-    """
-    https://codereview.stackexchange.com/a/1944
-
-    Generates all set partitions with a given number of blocks. The total amount of k-partitions is given by the
-    Stirling number of the second kind
-
-    :param ns: sequence of integers to build the subsets from
-    :param m: integer, smaller than ns, number of subsets
-    :return:
-    """
-    assert m > 1
-
-    def visit(n, a):
-        ps = [[] for i in range(m)]
-        for j in range(n):
-            ps[a[j + 1]].append(ns[j])
-        return ps
-
-    def f(mu, nu, sigma, n, a):
-        if mu == 2:
-            yield visit(n, a)
+    for i in range(1, len(normalized)):
+        if mapping[normalized[i]] == -1:
+            mapping_idx += 1
+            mapping[normalized[i]] = mapping_idx
+            normalized[i] = mapping_idx
         else:
-            for v in f(mu - 1, nu - 1, (mu + sigma) % 2, n, a):
-                yield v
-        if nu == mu + 1:
-            a[mu] = mu - 1
-            yield visit(n, a)
-            while a[nu] > 0:
-                a[nu] = a[nu] - 1
-                yield visit(n, a)
-        elif nu > mu + 1:
-            if (mu + sigma) % 2 == 1:
-                a[nu - 1] = mu - 1
-            else:
-                a[mu] = mu - 1
-            if (a[nu] + sigma) % 2 == 1:
-                for v in b(mu, nu - 1, 0, n, a):
-                    yield v
-            else:
-                for v in f(mu, nu - 1, 0, n, a):
-                    yield v
-            while a[nu] > 0:
-                a[nu] = a[nu] - 1
-                if (a[nu] + sigma) % 2 == 1:
-                    for v in b(mu, nu - 1, 0, n, a):
-                        yield v
-                else:
-                    for v in f(mu, nu - 1, 0, n, a):
-                        yield v
-
-    def b(mu, nu, sigma, n, a):
-        if nu == mu + 1:
-            while a[nu] < mu - 1:
-                yield visit(n, a)
-                a[nu] = a[nu] + 1
-            yield visit(n, a)
-            a[mu] = 0
-        elif nu > mu + 1:
-            if (a[nu] + sigma) % 2 == 1:
-                for v in f(mu, nu - 1, 0, n, a):
-                    yield v
-            else:
-                for v in b(mu, nu - 1, 0, n, a):
-                    yield v
-            while a[nu] < mu - 1:
-                a[nu] = a[nu] + 1
-                if (a[nu] + sigma) % 2 == 1:
-                    for v in f(mu, nu - 1, 0, n, a):
-                        yield v
-                else:
-                    for v in b(mu, nu - 1, 0, n, a):
-                        yield v
-            if (mu + sigma) % 2 == 1:
-                a[nu - 1] = 0
-            else:
-                a[mu] = 0
-        if mu == 2:
-            yield visit(n, a)
-        else:
-            for v in b(mu - 1, nu - 1, (mu + sigma) % 2, n, a):
-                yield v
-
-    n = len(ns)
-    a = [0] * (n + 1)
-    for j in range(1, m + 1):
-        a[n - m + j] = j - 1
-    return f(m, n, 0, n, a)
+            normalized[i] = mapping[normalized[i]]
+    return normalized
 
 
 if __name__ == '__main__':
-    for p in list(algorithm_u(range(4), 3)) + list(algorithm_u(range(4), 2)) + list(algorithm_u(range(4), 1)):
+    for p in list(cmb.algorithm_u(range(4), 3)) + list(cmb.algorithm_u(range(4), 2)) + list(cmb.algorithm_u(range(4), 1)):
         print(p)
 
     # for p in ut.power_set([0, 1, 2, 3, 4, 5], False):
