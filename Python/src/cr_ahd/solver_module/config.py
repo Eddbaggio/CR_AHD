@@ -54,15 +54,16 @@ def configs():
 
     # by setting this to an empty sequence, no collaborative solutions will be generated
     s_num_submitted_requests: Sequence[Union[int, float]] = [
+        0.1,
         0.2,
     ]
 
     s_request_selection: Sequence[rs.RequestSelectionBehavior.__class__] = [
         rsi.Random,
-        rsi.EarlyTimeWindow,
-        rsi.DepotDurations,
-        rsi.MarginalCostProxy,
-        rsn.TemporalSpatialNeighbors,
+        # rsi.EarlyTimeWindow,
+        # rsi.DepotDurations,
+        # rsi.MarginalCostProxy,
+        # rsn.TemporalSpatialNeighbors,
     ]
 
     s_num_auction_bundles: Sequence[int] = [
